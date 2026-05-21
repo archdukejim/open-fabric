@@ -4,7 +4,6 @@
 domain: example.com
 hostname: core-server
 friendly_name: "Example Org"
-vendor: "" # Deprecated, use care_of
 service_mark: ""
 care_of: ""
 trademark: ""
@@ -25,7 +24,8 @@ core_subnet: 10.255.0.0/24
 dns:
   dynamic_zone_var:
     zone_authority: true
-
+tsig_keys:
+- { name: test-key, algorithm: hmac-sha256, domain: '{{ domain }}', record_types: [TXT] }
 
 # ============================================================
 # CERTIFICATES / PKI
