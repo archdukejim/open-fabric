@@ -61,14 +61,14 @@
         
         <strong>1. All-in-One Installer (Recommended):</strong>
         <p style="color:var(--muted);font-size:.85rem;margin-top:.5rem;">Installs OS certificates, configures Python, Firefox, and Chrome/Chromium automatically.</p>
-        <pre><code><span class="cmd">wget</span> -nv -O- https://{{ hostname_landing }}/certificates/install-all-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate -O- https://{{ hostname_landing }}/certificates/install-all-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
         
         <strong style="display:block;margin-top:1.5rem;">2. System Certificates Only (OS Level):</strong>
-        <pre><code><span class="cmd">wget</span> -nv -O- https://{{ hostname_landing }}/certificates/install-certs-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate -O- https://{{ hostname_landing }}/certificates/install-certs-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
         
         <strong style="display:block;margin-top:1.5rem;">3. Python Applications Only:</strong>
         <p style="color:var(--muted);font-size:.85rem;margin-top:.5rem;">Updates the global Requests library and environment variables.</p>
-        <pre><code><span class="cmd">wget</span> -nv -O- https://{{ hostname_landing }}/certificates/install-python-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate -O- https://{{ hostname_landing }}/certificates/install-python-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
       </div>
     </div>
 
@@ -80,10 +80,10 @@
         </p>
         
         <strong>Firefox (Standard / Debian ESR / Snap):</strong>
-        <pre><code><span class="cmd">wget</span> -nv -O- https://{{ hostname_landing }}/certificates/install-firefox-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate -O- https://{{ hostname_landing }}/certificates/install-firefox-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
 
         <strong style="display:block;margin-top:1.5rem;">Chrome, Chromium, Brave, Edge (Standard / Snap):</strong>
-        <pre><code><span class="cmd">wget</span> -nv -O- https://{{ hostname_landing }}/certificates/install-chrome-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate -O- https://{{ hostname_landing }}/certificates/install-chrome-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
       </div>
     </div>
 
