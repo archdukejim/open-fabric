@@ -368,19 +368,25 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
     os.chown(os.path.join(DEPLOY_BASE_DIR, 'nginx/www'), nginx_uid, nginx_gid)
     
     def copy_tree_with_perms(src, dst, uid=0, gid=0, fmode=0o640, dmode=0o750):
+        changed = False
         if not os.path.exists(dst):
             os.makedirs(dst)
+            changed = True
         os.chown(dst, uid, gid)
         os.chmod(dst, dmode)
         for item in os.listdir(src):
             s = os.path.join(src, item)
             d = os.path.join(dst, item)
             if os.path.isdir(s):
-                copy_tree_with_perms(s, d, uid, gid, fmode, dmode)
+                if copy_tree_with_perms(s, d, uid, gid, fmode, dmode):
+                    changed = True
             else:
-                shutil.copy2(s, d)
-                os.chown(d, uid, gid)
-                os.chmod(d, fmode)
+                if not os.path.exists(d) or not filecmp.cmp(s, d, shallow=False):
+                    shutil.copy2(s, d)
+                    os.chown(d, uid, gid)
+                    os.chmod(d, fmode)
+                    changed = True
+        return changed
 
     # Sync repo core directory (safely)
     # Exclude jinja, playbooks if we want, but copying full is fine.
@@ -460,16 +466,21 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
             services_to_restart.add(svc_name)
     # Nginx Conf
     ensure_dir(os.path.join(DEPLOY_BASE_DIR, "nginx/config"), 0o755, nginx_uid, nginx_gid)
-    shutil.copy2(os.path.join(render_tmp, "nginx/nginx.conf"), os.path.join(DEPLOY_BASE_DIR, "nginx/config/nginx.conf"))
-    os.chown(os.path.join(DEPLOY_BASE_DIR, "nginx/config/nginx.conf"), nginx_uid, nginx_gid)
+    src_nginx = os.path.join(render_tmp, "nginx/nginx.conf")
+    dst_nginx = os.path.join(DEPLOY_BASE_DIR, "nginx/config/nginx.conf")
+    nginx_config_changed = False
+    if not os.path.exists(dst_nginx) or not filecmp.cmp(src_nginx, dst_nginx, shallow=False):
+        shutil.copy2(src_nginx, dst_nginx)
+        os.chown(dst_nginx, nginx_uid, nginx_gid)
+        nginx_config_changed = True
 
     # Bind9 Files
     bind_uid, bind_gid = get_service_user(final_vars, 'bind')
     for d in ['config', 'data', 'log', 'cache']:
         ensure_dir(os.path.join(DEPLOY_BASE_DIR, f"bind9/{d}"), 0o750, bind_uid, bind_gid)
     
-    copy_tree_with_perms(os.path.join(render_tmp, "bind9/config"), os.path.join(DEPLOY_BASE_DIR, "bind9/config"), bind_uid, bind_gid, 0o640, 0o750)
-    copy_tree_with_perms(os.path.join(render_tmp, "bind9/data"), os.path.join(DEPLOY_BASE_DIR, "bind9/data"), bind_uid, bind_gid, 0o640, 0o750)
+    bind9_config_changed = copy_tree_with_perms(os.path.join(render_tmp, "bind9/config"), os.path.join(DEPLOY_BASE_DIR, "bind9/config"), bind_uid, bind_gid, 0o640, 0o750)
+    bind9_data_changed = copy_tree_with_perms(os.path.join(render_tmp, "bind9/data"), os.path.join(DEPLOY_BASE_DIR, "bind9/data"), bind_uid, bind_gid, 0o640, 0o750)
     
     os.chmod(os.path.join(DEPLOY_BASE_DIR, "bind9/config/named.conf.keys"), 0o600)
     os.chmod(os.path.join(DEPLOY_BASE_DIR, "bind9/config/rndc.key"), 0o600)
@@ -479,13 +490,15 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         ldap_uid, ldap_gid = get_service_user(final_vars, 'ldap')
         ensure_dir(os.path.join(DEPLOY_BASE_DIR, "openldap/data"), 0o750, ldap_uid, ldap_gid)
         if os.path.exists(os.path.join(render_tmp, "openldap")):
-            copy_tree_with_perms(os.path.join(render_tmp, "openldap"), os.path.join(DEPLOY_BASE_DIR, "openldap"), ldap_uid, ldap_gid, 0o640, 0o750)
+            if copy_tree_with_perms(os.path.join(render_tmp, "openldap"), os.path.join(DEPLOY_BASE_DIR, "openldap"), ldap_uid, ldap_gid, 0o640, 0o750):
+                services_to_restart.add('ldap')
 
     # Step-CA Files
     step_uid, step_gid = get_service_user(final_vars, 'step')
     ensure_dir(os.path.join(DEPLOY_BASE_DIR, "stepca/data"), 0o750, step_uid, step_gid)
     if os.path.exists(os.path.join(render_tmp, "stepca/templates/certs")):
-        copy_tree_with_perms(os.path.join(render_tmp, "stepca/templates"), os.path.join(DEPLOY_BASE_DIR, "stepca/templates"), step_uid, step_gid, 0o640, 0o750)
+        if copy_tree_with_perms(os.path.join(render_tmp, "stepca/templates"), os.path.join(DEPLOY_BASE_DIR, "stepca/templates"), step_uid, step_gid, 0o640, 0o750):
+            services_to_restart.add('stepca')
 
     # Reloading services
     def get_svc_timeout(s):
@@ -516,18 +529,20 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         running = []
     
     if "bind9" in running and "bind9" not in services_to_restart:
-        print("Reloading BIND9...")
-        try:
-            subprocess.run("docker exec -u bind bind9 rndc reload", shell=True, timeout=15)
-        except subprocess.TimeoutExpired:
-            print("Reloading BIND9 timed out")
+        if bind9_config_changed or bind9_data_changed:
+            print("Reloading BIND9...")
+            try:
+                subprocess.run("docker exec -u bind bind9 rndc reload", shell=True, timeout=15)
+            except subprocess.TimeoutExpired:
+                print("Reloading BIND9 timed out")
         
     if "nginx" in running and "nginx" not in services_to_restart:
-        print("Reloading NGINX...")
-        try:
-            subprocess.run("docker exec nginx nginx -s reload", shell=True, timeout=15)
-        except subprocess.TimeoutExpired:
-            print("Reloading NGINX timed out")
+        if nginx_config_changed:
+            print("Reloading NGINX...")
+            try:
+                subprocess.run("docker exec nginx nginx -s reload", shell=True, timeout=15)
+            except subprocess.TimeoutExpired:
+                print("Reloading NGINX timed out")
 
     print("Deployment complete.")
     return services_to_restart

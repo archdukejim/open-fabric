@@ -168,11 +168,17 @@ Runs an uninstallation followed by a fresh installation without needing to authe
 **`-r, --reinstall`**
 Runs a safe uninstallation but preserves your CA infrastructure and service certificates to prevent client trust issues upon redeployment. Note: To ensure idempotency and handle any deployed file structure changes from v1.3.0 and newer, this relies on a native script that recursively identifies and backs up `*.crt`, `*.pem`, and `*.key` files, as well as CA history. 
 
-**Deployment Tree (v1.3.0+) Breakdown:**
-*   `/opt/core/config/`: Deployment `vars.yaml`, TSIG keys, and CA root/intermediate injection.
-*   `/opt/stepca/data/`: Complete Certificate Authority history, internal DB, CA keys (`secrets/`), signed CA certs (`certs/`), and issued service bundles (`artifacts/`).
-*   `/opt/nginx/certs/`: Publicly facing reverse proxy endpoint certificates (e.g., DNS, LDAP, SSO endpoints).
-*   `/opt/keycloak/certs/` & `/opt/openldap/certs/`: Service-specific decoupled keys.
+**Final Deployed Structure:**
+When deployed, the infrastructure resides securely in `/opt` (or your chosen `DEPLOY_BASE_DIR`):
+*   `/opt/core/`: The central brain. Contains `config/` (holding `vars.yaml`, `link-vars.yaml`, and `core-secrets.yml`), the deployed python deployment engine (`lib/deploy.py`), and the `core-mgr` script.
+*   `/opt/bind9/`: Core DNS service. Contains `config/` (holding `named.conf.*`), `data/` (holding all `db.<zone>` zone data and journals), `log/`, and `cache/`.
+*   `/opt/nginx/`: Core reverse proxy. Contains `config/` (`nginx.conf`), `www/` (holding the generated HTML documentation, scripts, and portal assets), and `certs/` (public-facing service certificates).
+*   `/opt/stepca/`: Core PKI. Contains `data/` (Internal DB, CA keys in `secrets/`, signed CA certs in `certs/`, and issued leaf certificates in `artifacts/`) and custom `templates/`.
+*   `/opt/openldap/`: Core directory service. Contains `data/` (LDAP database) and `certs/` (LDAPS keys).
+*   `/opt/keycloak/`: Core SSO identity provider. Contains `certs/`.
+*   `/opt/postgres/`: Backend DB for Keycloak. Contains persistent `data/`.
+
+*Note: During day-2 operations, `core-mgr --apply` uses an intelligent file-tracking system against this structure. It renders templates to `/tmp/core-template-render/` and compares them against the live `/opt/` files. A container is ONLY restarted if its critical templates or configuration files structurally changed.*
 
 #### Combined Short Flags
 You can combine short flags into a single string for rapid execution. If `-s` is included in a combined string without a direct argument, the script will securely prompt you for the remote target.

@@ -139,6 +139,13 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
         os.system('clear')
         print(f"{BOLD}--- DNS Zone: {disp_zone} ---{NC}\n")
         
+        jnl_path = f"/opt/core/bind9/data/db.{disp_zone}.jnl"
+        if os.path.exists(jnl_path):
+            print(f"  {YELLOW}🟡 OUT OF SYNC (Journal exists - updates pending){NC}")
+        else:
+            print(f"  {GREEN}🟢 IN SYNC (No active journal){NC}")
+        print()
+        
         record_types = [k for k in zone_data.keys() if k != 'zone_authority' and isinstance(zone_data[k], list)]
         
         idx = 1
@@ -154,6 +161,8 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
         print(f"\n  a) Add new record")
         if record_map:
             print(f"  d) Delete record")
+        print(f"  l) Live update (rndc sync & reload)")
+        print(f"  f) Force update (rm journal, recreate zone, reboot bind9)")
         print(f"  b) Back to zones")
         
         choice = input(f"Select an option: ").strip().lower()
@@ -200,6 +209,37 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
                 zone_data[rtype].append(new_rec)
                 save_yaml(CUSTOM_VARS_FILE, full_data)
                 audit_log("dns", "None", f"Added {rtype} {name}", "MODIFIED")
+        elif choice == 'l':
+            print(f"\n{BLUE}Freezing zone {disp_zone}...{NC}")
+            subprocess.run(f"docker exec -u bind bind9 rndc freeze {disp_zone}", shell=True)
+            print(f"{BLUE}Applying deployment to render zone...{NC}")
+            import deploy
+            try:
+                deploy.apply_deployment()
+            except Exception as e:
+                print(f"{RED}Render failed: {e}{NC}")
+            print(f"{BLUE}Thawing zone {disp_zone}...{NC}")
+            subprocess.run(f"docker exec -u bind bind9 rndc thaw {disp_zone}", shell=True)
+            print(f"{GREEN}Live update complete.{NC}")
+            input("Press Enter to continue...")
+        elif choice == 'f':
+            print(f"\n{YELLOW}WARNING: This will delete the journal file, overwrite the zone data, and restart the BIND9 container.{NC}")
+            confirm = input("Type 'force' to confirm: ").strip().lower()
+            if confirm == 'force':
+                jnl = f"/opt/core/bind9/data/db.{disp_zone}.jnl"
+                if os.path.exists(jnl):
+                    os.remove(jnl)
+                    print(f"Removed {jnl}")
+                print(f"{BLUE}Applying deployment to recreate zone...{NC}")
+                import deploy
+                try:
+                    deploy.apply_deployment()
+                except Exception as e:
+                    print(f"{RED}Render failed: {e}{NC}")
+                print(f"{BLUE}Restarting BIND9 container...{NC}")
+                subprocess.run("systemctl restart bind9", shell=True)
+                print(f"{GREEN}Force update complete.{NC}")
+            input("Press Enter to continue...")
 
 def edit_dns(data):
     if 'dns' not in data or not isinstance(data['dns'], dict):
@@ -705,26 +745,14 @@ def apply_mode():
         return
         
     print(f"Changed variables: {YELLOW}{', '.join(changed_keys)}{NC}")
-    
-    impacted_services = set()
-    for k in changed_keys:
-        for s in map_service(k):
-            impacted_services.add(s)
-            
-    if "postgres" in impacted_services and new_vars.get("install_keycloak"):
-        impacted_services.add("keycloak")
-            
-    print(f"Impacted services to restart: {YELLOW}{', '.join(impacted_services)}{NC}")
     print(f"  {BLUE}[2/3]{NC} Done deploying configuration files.")
     def get_svc_timeout(s):
         if s == "keycloak": return 90
         if s == "postgres": return 60
         return 30
 
-    print(f"  {BLUE}[3/3]{NC} Restarting services...")
-    for svc in impacted_services:
-        if svc in ["bind9", "nginx"] or svc in restarted_services:
-            continue
+    print(f"  {BLUE}[3/3]{NC} Restarting system services...")
+    for svc in restarted_services:
         try:
             res_check = subprocess.run(["systemctl", "is-active", svc], capture_output=True, timeout=10)
             if res_check.returncode == 0:

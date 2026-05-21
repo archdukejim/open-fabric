@@ -39,7 +39,12 @@ sudo core-mgr --print
 ```
 
 #### `--apply`
-Apply any manual changes made directly to `vars.yaml`. `core-mgr` leverages the native Python `deploy.py` engine to compare the file against the running configuration, directly render Jinja2 templates, and selectively reload or restart only the affected systemd-managed services. Ansible is bypassed entirely for these day-2 operations.
+Apply any manual changes made directly to `vars.yaml`. `core-mgr` leverages the native Python `deploy.py` engine to compare the file against the running configuration, directly render Jinja2 templates, and selectively reload or restart only the affected systemd-managed services. 
+
+**Intelligent Restarts:** `deploy.py` tracks exact file modifications.
+- If only `nginx/www/...` templates change, Nginx natively live-reads the files. No restart or reload is performed.
+- If `bind9` or `nginx` configurations change, they are issued a seamless `rndc reload` or `nginx -s reload`.
+- A full container restart (`docker compose down/up` via systemctl) is ONLY triggered if immutable service definitions (like `docker-compose.yml` or the systemd `.service` wrapper) or service-specific config files (like OpenLDAP `.ldif` seeds or StepCA templates) actually change their rendered contents.
 
 ```bash
 sudo core-mgr --apply
@@ -60,9 +65,18 @@ All granular modifications are now managed within the unified `--interactive` me
 
 #### DNS Configuration
 
-Add or remove records in BIND9 zones without a full redeploy via the interactive menu. Supported record types include `A`, `AAAA`, `CNAME`, `MX`, `TXT`, and `SRV`.
+Add, modify, or remove records in BIND9 zones without a full redeploy via the interactive menu. Supported record types include `A`, `AAAA`, `CNAME`, `MX`, `TXT`, and `SRV`.
 
-Changes edit `vars.yaml` and re-render forward and reverse zone files natively using Jinja2. Rendered files are written to `/opt/bind9/data/` with bind ownership, and BIND9 is reloaded via `rndc reload`. **Reverse zones are auto-generated** based on `/24` subnets found in `A` records.
+**DNS Sync Status & Actions:**
+When entering a specific zone, the menu will display its current journal status:
+- `🟢 IN SYNC (No active journal)`: Zone data file matches live state.
+- `🟡 OUT OF SYNC (Journal exists - updates pending)`: Dynamic updates have occurred and are stored in `db.<zone>.jnl`. Modifying the `db.<zone>` file directly in this state can cause conflicts.
+
+You have two powerful options to apply your pending `vars.yaml` modifications directly from the menu:
+- **`l` (Live update):** Freezes the zone (flushes the journal and stops dynamic updates), re-renders the zone file from `vars.yaml`, thaws the zone (re-enabling dynamic updates), and issues an `rndc reload`. *This is completely non-disruptive to DNS resolution.*
+- **`f` (Force update):** Deletes the `.jnl` journal file completely, forcefully rewrites the zone data, and issues a full systemd restart of the BIND9 container. *Warning: Disruptive. Can drop inflight queries.*
+
+Changes edit `vars.yaml` and re-render forward and reverse zone files natively using Jinja2. Rendered files are written to `/opt/bind9/data/` with bind ownership. **Reverse zones are auto-generated** based on `/24` subnets found in `A` records.
 
 `dns:` zone key uses the actual domain string (the `dynamic_zone_var` placeholder is already resolved to `domain` at install time):
 
