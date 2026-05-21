@@ -1,5 +1,0 @@
-links:
-  - name: Adguard Home
-    link: "adguard.{{ domain }}"
-  - name: Keycloak (Admin)
-    link: "sso.{{ domain }}/admin"
