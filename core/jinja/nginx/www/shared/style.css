@@ -358,3 +358,119 @@ footer {
 .label-leaf { background: rgba(74,222,128,.15); color: var(--green); }
 .chain-cn { font-size: 1.1rem; font-weight: 600; }
 .chain-meta { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+
+/* ----------------------------------------------------------------
+   Landing Page Styles
+   ---------------------------------------------------------------- */
+.link-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.link-list li {
+  margin-bottom: 0.75rem;
+}
+.link-list .btn {
+  display: flex;
+  width: 100%;
+}
+.link-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.link-grid li {
+  display: flex;
+}
+.link-grid .btn {
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  padding: 0.75rem 1rem;
+}
+.section-title {
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.5rem;
+  color: var(--text);
+}
+
+/* ----------------------------------------------------------------
+   Markdown Content Styles (Manual)
+   ---------------------------------------------------------------- */
+#markdown-content {
+  line-height: 1.6;
+}
+#markdown-content p {
+  margin-bottom: 1rem;
+}
+#markdown-content ul,
+#markdown-content ol {
+  padding-left: 2rem;
+  margin-bottom: 1rem;
+}
+#markdown-content li {
+  margin-bottom: 0.25rem;
+}
+#markdown-content ul ul,
+#markdown-content ol ul {
+  list-style-type: circle;
+  margin-bottom: 0;
+}
+#markdown-content ul ul ul,
+#markdown-content ol ul ul {
+  list-style-type: square;
+}
+#markdown-content h1,
+#markdown-content h2,
+#markdown-content h3 {
+  color: var(--text);
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+#markdown-content pre {
+  background: var(--surface);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+}
+#markdown-content code {
+  font-family: monospace;
+  background: var(--surface);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+#markdown-content pre code {
+  background: none;
+  padding: 0;
+  border: none;
+}
+#markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+#markdown-content th,
+#markdown-content td {
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  text-align: left;
+}
+#markdown-content th {
+  background: var(--surface);
+}
+#markdown-content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+#markdown-content a:hover {
+  text-decoration: underline;
+}

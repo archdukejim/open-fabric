@@ -1,44 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ friendly_name | default(ca_name) }} &mdash; LDAP Authentication</title>
-  <script>
-    try {
-        const savedTheme = localStorage.getItem('selected-theme');
-        if (savedTheme && savedTheme !== 'auto') {
-            document.documentElement.setAttribute('data-theme', savedTheme);
-        }
-    } catch (e) {}
-  </script>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <div class="container">
-    <header>
-      <div class="header-content">
-        <h1>{{ friendly_name | default(ca_name) }}</h1>
-        <p class="subtitle">Infrastructure Authentication &mdash; OpenLDAP</p>
-      </div>
-      <div class="theme-selector">
-        <select id="theme-select" class="theme-select" aria-label="Select Theme">
-          <option value="auto">System Auto</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
-          <option value="army">Army</option>
-          <option value="navy">Navy</option>
-          <option value="air-force">Air Force</option>
-          <option value="marines">Marines</option>
-          <option value="coast-guard">Coast Guard</option>
-          <option value="space-force">Space Force</option>
-          <option value="cyberpunk">Cyberpunk</option>
-        </select>
-      </div>
-    </header>
+{% extends "../shared/base.html.j2" %}
 
-    <a href="/" class="back-link">&larr; Back to Landing Portal</a>
+{% block title %}{{ friendly_name | default(ca_name) }} &mdash; LDAP Authentication{% endblock %}
 
+{% block header_subtitle %}Infrastructure Authentication &mdash; OpenLDAP{% endblock %}
+
+{% block content %}
     <!-- Top Tabs -->
     <div class="tabs-wrapper">
       <div class="tabs">
@@ -167,22 +133,9 @@ enumerate = true</code></pre>
         </p>
       </div>
     </div>
+{% endblock %}
 
-    <footer>
-      &#10227; Last Updated: {{ ansible_date_time.date | default('2026-04-29', true) }}.<br>
-      {% if copyright | default('', true) %}&#169; {{ copyright }} {% endif %}{{ friendly_name | default(ca_name, true) }}{% if service_mark | default('', true) %} &#8480; {{ service_mark }}{% endif %}{% if trademark | default('', true) %} &#8482; {{ trademark }}{% endif %}
-      {% if address_line1 | default('', true) or address_line2 | default('', true) %}
-      <br>{{ address_line1 | default('', true) }}{% if address_line1 | default('', true) and address_line2 | default('', true) %}, {% endif %}{{ address_line2 | default('', true) }}
-      {% endif %}
-      {% if contact_phone | default('', true) or contact_email | default('', true) %}
-      <br>{% if contact_phone | default('', true) %}{{ contact_phone }}{% endif %}{% if contact_phone | default('', true) and contact_email | default('', true) %} | {% endif %}{% if contact_email | default('', true) %}{{ contact_email }}{% endif %}
-      {% endif %}
-      {% if care_of | default('', true) %}
-      <br>&#8453; {{ care_of }}
-      {% endif %}
-    </footer>
-  </div>
-
+{% block extra_scripts %}
   <script>
     function showTab(e, id) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -190,26 +143,5 @@ enumerate = true</code></pre>
       e.target.classList.add('active');
       document.getElementById(id).classList.add('active');
     }
-
-    const themeSelect = document.getElementById('theme-select');
-    let currentTheme = 'auto';
-    try {
-        currentTheme = localStorage.getItem('selected-theme') || 'auto';
-    } catch (e) {}
-    
-    themeSelect.value = currentTheme;
-
-    themeSelect.addEventListener('change', (e) => {
-        const theme = e.target.value;
-        if (theme === 'auto') {
-            document.documentElement.removeAttribute('data-theme');
-        } else {
-            document.documentElement.setAttribute('data-theme', theme);
-        }
-        try {
-            localStorage.setItem('selected-theme', theme);
-        } catch (e) {}
-    });
   </script>
-</body>
-</html>
+{% endblock %}

@@ -159,6 +159,7 @@
       loop:
         - index.html
         - marked.min.js
+        - mermaid.min.js
 
     - name: Section 4a - Deploy rendered nginx ldap client files
       tags: [file-structure, update, nginx]
