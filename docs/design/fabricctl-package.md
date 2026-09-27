@@ -25,6 +25,68 @@ free in Debian trixie and Ubuntu 24.04.
 Scope beyond the installer: add **Kea DHCP** and **802.1X (FreeRADIUS)**, and
 grow the web UI to manage every service.
 
+## 1a. Two products: fabricctl and Fabric
+
+| | **fabricctl** — the control | **Fabric** — the control-plane UI |
+|---|---|---|
+| What | Native apt package on the host | Web app in its own unprivileged container |
+| Role | The integration point: installs, configures, updates and secures the whole stack — containers, host firewall, Docker daemon, image updates, OpenBao seals and hardware tokens | Configuration and control plane in the browser: status, DNS/DHCP/users/secrets, triggering operations. Holds no power of its own |
+| Stands alone? | **Yes** — everything is possible from the CLI | No — every action is a request to fabricctl's daemon |
+| Artifact | `fabricctl` .deb: `fabricctl` CLI + `fabricd` daemon + systemd timers | `fabric` container image, installed, pinned (via the channel) and updated by fabricctl |
+
+One repo (`archdukejim/fabric`) builds and tests both; each fabricctl
+version declares the Fabric image it expects.
+
+**Privilege model (decided):**
+
+- **`fabricd`** — root, sandboxed systemd service; the *only* component that
+  touches Docker, nftables, systemd, udev and OpenBao seal configuration.
+  It exposes a fixed, validated operation API (today's `fabric-agent`,
+  generalised) — never "run this command".
+- **`fabricctl` CLI** runs as the invoking user and talks to `fabricd` over
+  a socket restricted to the **`fabric-admins`** group. Membership grants
+  fabric's operations, not a root shell. **Nobody is added to the `docker`
+  group** (that group is root-equivalent).
+- **Fabric UI** reaches `fabricd` over its own socket, identified by its
+  container uid (SO_PEERCRED); operations are further filtered by the
+  user's Keycloak role.
+- Every operation is audited with the real actor: Unix user for the CLI,
+  Keycloak user for the UI.
+
+## 1b. Setup: secure by default, fully scriptable
+
+`sudo fabricctl setup` (first run, or `--reconfigure` later):
+
+1. Preflight (architecture, RAM, cgroup memory controller, Docker, ports).
+2. Shows **the full list of changes it will make by default** — every one a
+   hardened choice — then offers **Proceed** or **Advanced**.
+3. **Advanced** walks the same list item by item, allowing each to be kept
+   or relaxed, with the consequence of relaxing it stated inline.
+
+Default plan (each item is a setting under `security:` / `updates:` /
+`vault:` in `fabric.yaml`):
+
+| Item | Default | Can relax to |
+|---|---|---|
+| Host firewall (nftables) | On: only fabric's service ports inbound; management (443/`mgr`, SSH) from `lan_cidr` only | Off, or custom allow-lists |
+| Container hardening | On: non-root, `cap_drop: ALL`, `no-new-privileges`, read-only root where possible | Per-service exceptions |
+| Docker daemon | Hardened `daemon.json` (`no-new-privileges`, `icc: false`, `userland-proxy: false`, `live-restore`) | Stock daemon config |
+| userns-remap | **On** (container root → unprivileged host uid; fabricctl shifts bind-mount ownership) | Off |
+| Rootless Docker | Off | On, with stated limits: Kea DHCP unavailable, DNS/RADIUS source-IP ACLs need the slower slirp4netns/pasta port driver |
+| OpenBao unseal | Local key file | USB kill switch, Thales k160 (KMIP), PKCS#11 token, or manual Shamir |
+| Image updates | On: signed stable channel, weekly, health-checked with rollback | Off, candidate channel, or offline-only |
+| Web UI access | mTLS + Keycloak OIDC + TOTP | TOTP optional |
+
+Non-interactive: `sudo fabricctl setup --file ./vars.yaml` takes every
+answer (including all of the above) from the file; the walkthrough only
+prompts for missing or invalid values. `--non-interactive` never prompts
+and fails on anything missing — for automation and re-provisioning.
+
+Every setting can be changed later (`fabricctl security …`,
+`fabricctl vault seal-…`, `fabricctl updates …`, or editing `fabric.yaml` +
+`fabricctl apply`). `fabricctl status` and the Fabric dashboard show a
+**security posture** summary that lists every relaxed default as a warning.
+
 ## 2. What exists to build on
 
 | Today | Reuse |
@@ -196,10 +258,11 @@ Role split (Keycloak realm roles): `fabric-admin` (everything),
   an upstream push can never change what gets built.
 - **Docker daemon:** `no-new-privileges` by default, `icc: false`,
   `userland-proxy: false`, `live-restore: true`. The installer **asks**
-  whether to enable `userns-remap` (container root → unprivileged host uid);
-  default off. Rootless Docker is not offered: it hides client source IPs
-  (breaks BIND/RADIUS ACLs), has no real host networking (breaks Kea DHCP)
-  and needs a system-wide low-port sysctl.
+  `userns-remap` is **on by default** (container root → unprivileged host
+  uid); setup can turn it off (§1b). Rootless Docker is an opt-in relaxation
+  with stated limits: it hides client source IPs unless the slower
+  slirp4netns/pasta port driver is used (BIND/RADIUS ACLs), has no real host
+  networking (no Kea DHCP) and needs a system-wide low-port sysctl.
 - **Line endings:** `.gitattributes` forces LF so a Windows checkout can't
   ship CRLF scripts or Dockerfiles to the Pi.
 
@@ -384,7 +447,9 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D8 | Keep `setup.sh`/Ansible for remote install after phase 2? | One release as a wrapper, then remove |
 | D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b) |
 | D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b) |
-| D11 ✅ | Docker privilege | Harden all containers + daemon; installer asks about userns-remap; no rootless (§7a) |
+| D11 ✅ | Docker privilege | Harden all containers + daemon; userns-remap on by default; rootless opt-in with stated limits (§1b, §7a) |
+| D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabricd`, `fabric-admins` group, no docker group) and the Fabric UI container; one repo, two artifacts (§1a) |
+| D15 ✅ | Setup UX | Default change list → Proceed / Advanced; everything settable in `vars.yaml`; `--non-interactive` (§1b) |
 | D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 
