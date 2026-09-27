@@ -291,6 +291,49 @@ source. Multi-arch images; ~150 MB at 4 GB (fits the §7a budget).
   whoever holds the SD card (or USB stick) holds the vault. Recovery shares
   and the initial root token are shown once at `init`; the root token is
   revoked after bootstrap.
+- **Seal modes and commands** (all native to OpenBao ≥ 2.3; switching modes
+  is an OpenBao *seal migration*: the old seal is kept with
+  `disabled = "true"`, OpenBao restarts, and `bao operator unseal -migrate`
+  runs with the **recovery keys** shown at `init` — `fabricctl` walks
+  through it and refuses to start without them):
+
+  | Mode | Command | Unseal source | At boot |
+  |---|---|---|---|
+  | Local file (default) | — | `static` seal, key in `/etc/fabric/openbao/unseal.key` | Automatic |
+  | **USB kill switch** | `fabricctl vault key-to-usb /dev/sdX [--backup /dev/sdY]` | `static` seal, key only on a USB stick (label `FABRIC-KEY`) | Automatic if the stick is present, sealed if not |
+  | **Thales CipherTrust k160** (or any KMIP server) | `fabricctl vault seal-kmip --endpoint k160.lan:5696 --ca … --client-cert … --client-key … --key-id …` | `kmip` seal — the root key is wrapped by a key that never leaves the k160 (FIPS 140-2 token) | Automatic while the k160 is reachable and authorises this client |
+  | PKCS#11 token (SafeNet eToken, YubiHSM 2, Nitrokey HSM) | `fabricctl vault seal-pkcs11 --lib … --token-label … --key-label …` | `pkcs11` seal via the vendor library (built into a thin local image layer) | Automatic while the token is plugged in |
+
+  Every mode can move to every other (`fabricctl vault seal-usb`,
+  `seal-local`, `seal-kmip`, `seal-pkcs11`).
+
+- **USB kill switch details:**
+  - `key-to-usb` writes a fresh 32-byte key (with key id + checksum) to the
+    stick, verifies it, rotates OpenBao onto it (static seal supports
+    `previous_key` → `current_key` rotation), then **shreds** the on-disk
+    copy. `--backup` writes the same key to a second stick for the safe.
+  - A udev rule + systemd units: **insert** → mount read-only at
+    `/run/fabric/key` (tmpfs mount point, never under `/opt`) and start/
+    unseal OpenBao; **remove** → `bao operator seal` immediately (the root
+    key is wiped from memory) and unmount. Pulling the stick is the kill
+    switch; the data on the SD card stays encrypted and useless without it.
+  - The container mounts the key directory with `rslave` propagation, so a
+    stick inserted after start is visible without recreating the container.
+  - Limits, stated in the command's output: someone holding both the Pi and
+    the stick can unseal; a stick left in the Pi is the same as the local
+    file mode.
+
+- **Thales CipherTrust k160 details:**
+  - The k160 is a network appliance (KMIP on TCP 5696, mutual TLS).
+    `seal-kmip` needs: endpoint, the k160's CA, a KMIP client certificate
+    registered on the k160 (the command can issue one from fabric's Step-CA
+    for upload, or use one issued by the k160), and the id of an AES-256
+    key with encrypt/decrypt usage (or `--create-key`).
+  - It test-wraps and unwraps a value through the k160 before migrating, so
+    a misconfiguration never leaves OpenBao unsealable.
+  - Revoking the client on the k160 is the "official" kill switch: at the
+    next restart OpenBao stays sealed. Core services keep running (below).
+
 - **Boot independence:** no core service (DNS, DHCP, LDAP, SSO, nginx) reads
   OpenBao to *start*. fabricctl renders secrets into each service's config at
   deploy time; if OpenBao is down or sealed, the last rendered config keeps
@@ -347,6 +390,8 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 
 ## References
 
+- OpenBao, [seal types](https://openbao.org/docs/configuration/seal/), [static seal](https://openbao.org/docs/configuration/seal/static/), [KMIP seal](https://openbao.org/docs/configuration/seal/kmip/), [PKCS#11 seal](https://openbao.org/docs/configuration/seal/pkcs11/), [2.3.x release notes](https://openbao.org/community/release-notes/2-3-0/)
+- Thales, [CipherTrust k160](https://www.thalestct.com/ciphertrust-data-security-platform/ciphertrust-manager/ciphertrust-k160/)
 - ISC, [Kea 3.0, our first LTS version](https://www.isc.org/blogs/kea-3-0/)
 - ISC, [Most Kea hooks open-sourced](https://www.isc.org/blogs/kea-hooks-opensourced/)
 - ISC KB, [Upgrading to Kea 3.0.0](https://kb.isc.org/docs/things-to-be-aware-of-when-upgrading-to-kea-300)
