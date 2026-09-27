@@ -232,6 +232,8 @@ env.tests['match'] = match_test
 env.filters['bool'] = lambda x: str(x).lower() in ['true', 'yes', '1', 'on', 't', 'y']
 env.filters['dirname'] = os.path.dirname
 env.filters['basename'] = os.path.basename
+env.filters['to_json'] = __import__('json').dumps
+env.filters['combine'] = lambda base, *others: {k: v for d in (base, *others) for k, v in (d or {}).items()}
 
 try:
     template = env.get_template(os.path.basename(template_path))

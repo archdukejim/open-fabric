@@ -248,6 +248,7 @@ def apply_deployment():
     jinja_env.tests['match'] = match_test
     jinja_env.filters['basename'] = basename_filter
     jinja_env.filters['to_json'] = json.dumps
+    jinja_env.filters['combine'] = lambda base, *others: {k: v for d in (base, *others) for k, v in (d or {}).items()}
     
     merged_context = {**secrets, **custom_vars}
     merged_context['playbook_dir'] = os.path.join(FABRIC_DIR, 'playbooks')
@@ -356,7 +357,8 @@ def apply_deployment():
         {'service': 'stepca', 'compose': 'step-ca', 'folder': 'stepca', 'requires': []},
         {'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []},
         {'service': 'postgres', 'compose': 'postgres', 'folder': 'postgres', 'requires': []},
-        {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']}
+        {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']},
+        {'service': 'webui', 'compose': 'webui', 'folder': 'webui', 'requires': ['fabric-agent']},
     ]
 
     for svc_info in sys_svcs:
@@ -366,6 +368,8 @@ def apply_deployment():
         if svc_folder in ['keycloak', 'postgres'] and not final_vars.get('install_keycloak'):
             continue
         if svc_folder == 'dirsrv' and not final_vars.get('install_ldap'):
+            continue
+        if svc_folder == 'webui' and not final_vars.get('install_webui'):
             continue
             
         render_file(f'{svc_folder}/docker-compose.yml.j2', f'{svc_folder}/docker-compose.yml')
@@ -411,7 +415,7 @@ def apply_deployment():
     # webui management UI
     if final_vars.get('install_webui'):
         render_file('webui/webui.json.j2', 'webui/webui.json')
-        render_file('systemd/webui.service.j2', 'systemd/webui.service')
+        render_file('systemd/fabric-agent.service.j2', 'systemd/fabric-agent.service')
 
     # Step-CA
     render_file('stepca/leaf.tpl.j2', 'stepca/templates/certs/leaf.tpl')
@@ -571,21 +575,35 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
                                                  os.path.join(DEPLOY_BASE_DIR, "dirsrv/seed"),
                                                  0, ldap_gid, 0o640, 0o750)
 
-    # webui config + unit
-    webui_changed = False
+    # webui container (config, build context) + fabric-agent host unit
+    webui_changed = webui_image_changed = agent_unit_changed = False
     if final_vars.get('install_webui'):
-        ensure_dir(os.path.join(DEPLOY_BASE_DIR, "webui"), 0o755)
-        ensure_dir(os.path.join(DEPLOY_BASE_DIR, "webui/run"), 0o750, 0, get_service_user(final_vars, 'nginx')[1])
-        for src_rel, dst, mode in [("webui/webui.json", os.path.join(DEPLOY_BASE_DIR, "webui/webui.json"), 0o600),
-                                   ("systemd/webui.service", "/etc/systemd/system/webui.service", 0o644)]:
-            src = os.path.join(render_tmp, src_rel)
-            if not os.path.exists(dst) or not filecmp.cmp(src, dst, shallow=False):
-                shutil.copy2(src, dst)
-                os.chown(dst, 0, 0)
-                os.chmod(dst, mode)
-                webui_changed = True
-                if dst.endswith(".service"):
-                    daemon_reload_needed = True
+        webui_uid, webui_gid = get_service_user(final_vars, 'webui')
+        nginx_gid = get_service_user(final_vars, 'nginx')[1]
+        base = os.path.join(DEPLOY_BASE_DIR, "webui")
+        ensure_dir(base, 0o755)
+        ensure_dir(os.path.join(base, "config"), 0o750, 0, webui_gid)
+        ensure_dir(os.path.join(base, "run"), 0o750, webui_uid, nginx_gid)    # container -> nginx socket
+        ensure_dir(os.path.join(base, "agent"), 0o750, 0, webui_gid)          # fabric-agent socket
+        cfg_dst = os.path.join(base, "config/webui.json")
+        cfg_src = os.path.join(render_tmp, "webui/webui.json")
+        if not os.path.exists(cfg_dst) or not filecmp.cmp(cfg_src, cfg_dst, shallow=False):
+            shutil.copy2(cfg_src, cfg_dst)
+            webui_changed = True
+        os.chown(cfg_dst, webui_uid, webui_gid)
+        os.chmod(cfg_dst, 0o400)
+        # Build context: Dockerfile + the app code (fabric/lib/webui)
+        webui_image_changed = copy_tree_with_perms(os.path.join(jinja_dir, "webui/build"),
+                                                   os.path.join(base, "build"), 0, 0, 0o644, 0o755)
+        webui_image_changed |= copy_tree_with_perms(os.path.join(FABRIC_DIR, "lib", "webui"),
+                                                    os.path.join(base, "build", "app"), 0, 0, 0o644, 0o755)
+        unit_src = os.path.join(render_tmp, "systemd/fabric-agent.service")
+        unit_dst = "/etc/systemd/system/fabric-agent.service"
+        if not os.path.exists(unit_dst) or not filecmp.cmp(unit_src, unit_dst, shallow=False):
+            shutil.copy2(unit_src, unit_dst)
+            os.chown(unit_dst, 0, 0)
+            os.chmod(unit_dst, 0o644)
+            agent_unit_changed = daemon_reload_needed = True
 
     # Step-CA Files
     step_uid, step_gid = get_service_user(final_vars, 'step')
@@ -621,6 +639,11 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         for zone, src, dst in changed_zones:
             install_zone_file(src, dst, bind_uid, bind_gid)
 
+    # webui is restarted last and without blocking: this apply may have been
+    # started from the web UI, and restarting it drops that request.
+    restart_webui = "webui" in services_to_restart or webui_changed or webui_image_changed
+    services_to_restart.discard("webui")
+
     for svc in services_to_restart:
         print(f"Restarting {svc} due to configuration changes...")
         try:
@@ -648,10 +671,21 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         print("Applying 389-DS seed data...")
         subprocess.run(["bash", os.path.join(TARGET_FABRIC, "lib", "dirsrv.sh"), "seed"], timeout=600)
 
-    if webui_changed and subprocess.run(["systemctl", "is-enabled", "--quiet", "webui"]).returncode == 0:
-        # --no-block: this apply may itself be running inside webui.
+    if agent_unit_changed and subprocess.run(["systemctl", "is-enabled", "--quiet", "fabric-agent"]).returncode == 0:
+        # --no-block: this apply may itself be running inside fabric-agent.
+        print("Restarting fabric-agent (queued)...")
+        subprocess.run(["systemctl", "restart", "--no-block", "fabric-agent"], timeout=15)
+
+    if restart_webui and subprocess.run(["systemctl", "is-enabled", "--quiet", "webui"]).returncode == 0:
+        if webui_image_changed:
+            # No --pull on purpose: apply never takes a new base image; only an
+            # explicit update (`fabricctl --update-containers`) does.
+            print("Rebuilding webui image...")
+            subprocess.run(["docker", "compose", "-f", os.path.join(DEPLOY_BASE_DIR, "webui/docker-compose.yml"),
+                            "build"], timeout=900)
         print("Restarting webui (queued)...")
         subprocess.run(["systemctl", "restart", "--no-block", "webui"], timeout=15)
+        services_to_restart.add("webui")
 
     print("Deployment complete.")
     return services_to_restart

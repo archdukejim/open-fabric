@@ -30,7 +30,7 @@ grow the web UI to manage every service.
 | Today | Reuse |
 |---|---|
 | `fabric/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | Becomes the core of the installer; already replaces playbooks 01 and 04 for day-2 changes |
-| `fabric/lib/webui/`, `keycloak_bootstrap.py`, `dirsrv.sh`, `ldap_migrate.*` | Ship as-is inside the package |
+| `fabric/lib/webui/` (container app), `fabric/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh`, `ldap_migrate.*` | Ship as-is inside the package |
 | `fabric/jinja/**` templates | Ship as-is (package data) |
 | Playbooks 02, 03, 05–10 | **Port** to Python modules (see §4) |
 | `package.sh` offline bundles | Becomes an image bundle next to the `.deb` |
@@ -43,10 +43,11 @@ day-2 half is already native.
 ```
 fabricctl_<ver>_<arch>.deb
   /usr/bin/fabricctl                      entry point (Python)
-  /usr/lib/fabricctl/                     fabric/lib (deploy, webui, seeders, bootstrap)
+  /usr/lib/fabricctl/                     fabric/lib (deploy, agent, webui build context, seeders, bootstrap)
   /usr/share/fabricctl/templates/         fabric/jinja
   /usr/share/fabricctl/images/            (optional, "fabricctl-images" package) docker save tarballs
-  /lib/systemd/system/webui.service       shipped static, config in /etc
+  /lib/systemd/system/fabric-agent.service shipped static, config in /etc
+  /lib/systemd/system/webui.service       compose wrapper for the webui container
   /etc/fabric/                            conffiles: fabric.yaml (vars), link-vars.yaml
   /var/lib/fabric/                        secrets, rendered vars, archive/audit
 ```
@@ -154,8 +155,12 @@ then is removed along with `fabric/playbooks/`.
 
 ## 7. Web UI as the single pane
 
-Same security model (mTLS + Keycloak OIDC + TOTP + CSRF). New sections,
-each a thin layer over `fabricctl` actions so CLI and UI never diverge:
+Same security model (mTLS + Keycloak OIDC + TOTP + CSRF) and the same
+privilege split: the UI runs in its own unprivileged container (`webui`, no
+caps, read-only, no Docker socket) and reaches the host only through
+`fabric-agent` — a root host service with a fixed, validated, audited JSON
+API on a unix socket (SO_PEERCRED-checked). Each new section is a new agent
+endpoint over `fabricctl` actions, so CLI and UI never diverge:
 
 - **DHCP:** subnets, live leases (lease API), reservations (creates DNS).
 - **802.1X:** RADIUS clients, recent auth log, device certs (issue/revoke),

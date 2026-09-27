@@ -46,6 +46,7 @@ ip_stepca: {{ ip_stepca | default('10.255.0.40') }}
 ip_ldap: {{ ip_ldap | default('10.255.0.50') }}
 ip_keycloak: {{ ip_keycloak | default('10.255.0.60') }}
 ip_postgres: {{ ip_postgres | default('10.255.0.70') }}
+ip_webui: {{ ip_webui | default('10.255.0.80') }}
 
 # ============================================================
 # SERVICE HOSTNAMES
@@ -75,6 +76,8 @@ image_stepca: {{ image_stepca | default('smallstep/step-ca:latest') }}
 image_dirsrv: {{ image_dirsrv | default('fabric/dirsrv:local') }}
 image_keycloak: {{ image_keycloak | default('keycloak/keycloak:latest') }}
 image_postgres: {{ image_postgres | default('postgres:latest') }}
+{# Built locally from fabric/jinja/webui/build (Debian + python3-jinja2). #}
+image_webui: {{ image_webui | default('fabric/webui:local') }}
 
 install_ldap: {{ install_ldap | default(true) | bool }}
 install_keycloak: {{ install_keycloak | default(false) | bool }}
@@ -94,10 +97,11 @@ keycloak_data_dir: {{ keycloak_data_dir | default((deploy_base_dir | default('/o
 postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/opt')) ~ '/postgres/data') }}
 {# Optional containers are derived from the install_* flags on every render, so
    strip them from any value read back from a previously rendered vars.yaml. #}
-{% set _optional_containers = ['openldap', 'dirsrv', 'keycloak', 'postgres'] %}
+{% set _optional_containers = ['openldap', 'dirsrv', 'keycloak', 'postgres', 'webui'] %}
 {% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9'])) | reject('in', _optional_containers) | list %}
 {% if install_ldap | default(true) | bool %}{% set _ = _containers.append('dirsrv') %}{% endif %}
 {% if install_keycloak | default(false) | bool %}{% set _ = _containers.extend(['keycloak', 'postgres']) %}{% endif %}
+{% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) %}{% set _ = _containers.append('webui') %}{% endif %}
 project_containers:
 {{ _containers | unique | list | to_nice_yaml(indent=2) | indent(2, first=True) }}
 {% set default_service_dirs = [
@@ -119,10 +123,12 @@ service_dirs:
   'nginx': {'uid': 443, 'gid': 443},
   'step': {'uid': 135, 'gid': 135},
   'keycloak': {'uid': 900, 'gid': 0},
-  'postgres': {'uid': 901, 'gid': 901}
+  'postgres': {'uid': 901, 'gid': 901},
+  'webui': {'uid': 912, 'gid': 912}
 } %}
+{# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:
-{{ service_users | default(default_service_users) | to_nice_yaml(indent=2) | indent(2, first=True) }}
+{{ default_service_users | combine(service_users | default({})) | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
 # ============================================================
 # CERTIFICATES / PKI

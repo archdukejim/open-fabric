@@ -44,9 +44,11 @@ DOCKER_IMAGES=(
 
 BUILT_IMAGES=()
 
-# Images built from a directory context in this repo: "tag|context-dir"
+# Images built from a directory context in this repo:
+#   "tag|context-dir[|app-dir]"  — app-dir is copied to <context>/app first
 CONTEXT_IMAGES=(
   "fabric/dirsrv:local|fabric/jinja/dirsrv/build"
+  "fabric/webui:local|fabric/jinja/webui/build|fabric/lib/webui"
 )
 
 # -----------------------------------------------------------------------
@@ -193,11 +195,14 @@ except Exception as e:
       done
 
       for entry in "${CONTEXT_IMAGES[@]}"; do
-        image="${entry%%|*}"
-        context="${SCRIPT_DIR}/${entry#*|}"
+        IFS='|' read -r image context_rel app_rel <<<"$entry"
+        context=$(mktemp -d)
+        cp -a "${SCRIPT_DIR}/${context_rel}/." "$context/"
+        [ -n "${app_rel:-}" ] && cp -a "${SCRIPT_DIR}/${app_rel}" "$context/app"
         safe_name="${image//\//_}"; safe_name="${safe_name//:/_}.tar"
         info "  Building ${image} (fresh base, --pull)..."
         docker build --pull --platform linux/amd64 -t "$image" "$context" >/dev/null
+        rm -rf "$context"
         info "  Saving -> images/${safe_name}"
         docker save -o "${WORK_TARGET}/images/${safe_name}" "$image"
       done

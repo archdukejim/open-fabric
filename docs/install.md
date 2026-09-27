@@ -177,7 +177,7 @@ When deployed, the infrastructure resides securely in `/opt` (or your chosen `DE
 *   `/opt/nginx/`: Core reverse proxy. Contains `config/` (`nginx.conf`), `www/` (holding the generated HTML documentation, scripts, and portal assets), and `certs/` (public-facing service certificates).
 *   `/opt/stepca/`: Core PKI. Contains `data/` (Internal DB, CA keys in `secrets/`, signed CA certs in `certs/`, and issued leaf certificates in `artifacts/`) and custom `templates/`.
 *   `/opt/dirsrv/`: Core directory service (389 Directory Server). Contains `data/` (389-DS `/data`: config, database, logs, and `tls/` with `server.crt`, `server.key`, `ca/*.crt`) and `seed/` (seed LDIFs + `seed.py`).
-*   `/opt/webui/`: webui management UI (only when `install_webui`). Contains `webui.json` and `run/web.sock`; the service itself runs on the host as systemd `webui`.
+*   `/opt/webui/`: webui management UI (only when `install_webui`). Contains `docker-compose.yml` (unprivileged `webui` container), `build/` (image build context: Dockerfile + `app/`), `config/webui.json` (`0400`, webui uid), `run/web.sock` (created by the container for nginx) and `agent/agent.sock` (created by the host service `fabric-agent`, `/etc/systemd/system/fabric-agent.service`).
 *   `/opt/keycloak/`: Core SSO identity provider. Contains `certs/`.
 *   `/opt/postgres/`: Backend DB for Keycloak. Contains persistent `data/`.
 
@@ -224,7 +224,7 @@ Installs before 1.5.0 ran `osixia/openldap` in `/opt/openldap`. Re-running `setu
 
 ## Teardown / Uninstall
 
-To stop and remove all containers (and the `webui` service), remove service accounts, and delete `/opt/{fabric,nginx,bind9,stepca,dirsrv,keycloak,postgres,webui}/`:
+To stop and remove all containers (and the `webui` and `fabric-agent` services), remove service accounts (incl. `webui`), and delete `/opt/{fabric,nginx,bind9,stepca,dirsrv,keycloak,postgres,webui}/`:
 
 ```bash
 sudo ./setup.sh --uninstall

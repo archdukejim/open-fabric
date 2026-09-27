@@ -55,7 +55,7 @@ EXTRA_ANSIBLE_ARGS=()
 # Directories that contain the live installation state
 # openldap: legacy dir from pre-389-DS installs, kept so snapshots/uninstall still cover it
 SERVICE_DIRS=(nginx bind9 stepca dirsrv keycloak postgres webui openldap)
-SERVICE_USERS_LIST=(nginx bind step ldap keycloak postgres)
+SERVICE_USERS_LIST=(nginx bind step ldap keycloak postgres webui)
 
 # --- Parse arguments ---
 ARGS=()
@@ -400,7 +400,7 @@ set -euo pipefail
 TARGET_BASE="${TARGET_BASE}"
 
 echo "[*] Stopping and removing systemd services..."
-for svc in webui nginx bind9 ldap stepca keycloak postgres; do
+for svc in webui fabric-agent nginx bind9 ldap stepca keycloak postgres; do
     systemctl stop \$svc 2>/dev/null || true
     systemctl disable \$svc 2>/dev/null || true
     rm -f /etc/systemd/system/\$svc.service
@@ -472,7 +472,7 @@ REMOTE
         fi
     else
         info "Stopping and removing systemd services..."
-        for svc in webui nginx bind9 ldap stepca keycloak postgres; do
+        for svc in webui fabric-agent nginx bind9 ldap stepca keycloak postgres; do
             systemctl stop $svc 2>/dev/null || true
             systemctl disable $svc 2>/dev/null || true
             rm -f /etc/systemd/system/$svc.service

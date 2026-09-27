@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """webui: browser front end for fabricctl.
 
+Runs unprivileged in its own container (read-only, no capabilities, no
+Docker socket). It holds no power of its own: every read and change goes
+through fabric-agent on the host (agentclient.py), which exposes a fixed,
+validated set of operations and audits each one.
+
 Security model (every request must pass all of these):
   1. nginx requires a client certificate issued by the core Step-CA
      intermediate (ssl_verify_client on, depth 2) and forwards the verified
@@ -32,7 +37,7 @@ from http import cookies
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from webui import actions  # noqa: E402
+from webui import agentclient as actions  # noqa: E402  (fabric-agent API)
 from webui.oidc import KeycloakOIDC, OIDCError  # noqa: E402
 from webui.tlsclient import TLSClient  # noqa: E402
 from webui import views  # noqa: E402
@@ -230,6 +235,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.get(sess, path, query)
         except actions.ValidationError as exc:
             self.deny(400, str(exc))
+        except actions.AgentError:
+            traceback.print_exc()
+            self.deny(503, "The fabric-agent service is unavailable. See `journalctl -u fabric-agent`.")
         except Exception:
             traceback.print_exc()
             self.deny(500, "Internal error. See `journalctl -u webui`.")
@@ -258,7 +266,7 @@ class Handler(BaseHTTPRequestHandler):
 
         user = claims.get("preferred_username", "")
         if user != cert["cn"]:
-            actions.audit(user or "?", "LOGIN_DENIED", f"cert CN {cert['cn']!r} does not match user")
+            actions.audit(user or "unknown", "LOGIN_DENIED", f"cert CN {cert['cn']!r} does not match user")
             return self.deny(403, "Your client certificate does not belong to this user.")
         if self.app.admin_role not in (claims.get("roles") or []):
             actions.audit(user, "LOGIN_DENIED", f"missing role {self.app.admin_role}")
@@ -335,6 +343,7 @@ def main():
     with open(args.config) as f:
         cfg = json.load(f)
 
+    actions.configure(cfg["agent_socket"])
     Handler.app = App(cfg)
     sock = cfg["socket"]
     if os.path.exists(sock):
@@ -344,8 +353,9 @@ def main():
         server = UnixServer(sock, Handler)
     finally:
         os.umask(old_umask)
+    # Group-owned by nginx (this container's user is a member via group_add).
     gid = cfg["socket_gid"]
-    os.chown(sock, 0, gid if isinstance(gid, int) else grp.getgrnam(gid).gr_gid)
+    os.chown(sock, -1, gid if isinstance(gid, int) else grp.getgrnam(gid).gr_gid)
     os.chmod(sock, 0o660)
     print(f"webui listening on {sock}", flush=True)
     server.serve_forever()

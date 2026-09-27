@@ -1,6 +1,6 @@
 # fabric Library Scripts Documentation
 
-The `fabric/lib/` directory contains modular Bash scripts sourced by the main executables (`setup.sh`, `offline.sh`, etc.), as well as the Python engines (`interactive.py`, `deploy.py`, `keycloak_bootstrap.py`, the `webui/` package) and legacy bash wrapper (`manage.sh`) that power the `fabricctl` CLI and the webui UI. These scripts provide specific functional domains to keep the entry point scripts clean.
+The `fabric/lib/` directory contains modular Bash scripts sourced by the main executables (`setup.sh`, `offline.sh`, etc.), as well as the Python engines (`interactive.py`, `deploy.py`, `keycloak_bootstrap.py`, the `agent/` and `webui/` packages) and legacy bash wrapper (`manage.sh`) that power the `fabricctl` CLI and the webui UI. These scripts provide specific functional domains to keep the entry point scripts clean.
 
 > **Note**: The bash files are designed to be sourced (e.g., `source fabric/lib/output.sh`) and should not be executed directly.
 
@@ -22,6 +22,7 @@ The `fabric/lib/` directory contains modular Bash scripts sourced by the main ex
 - [15. `ldap_migrate.sh` / `ldap_migrate.py`](#15-ldap_migratesh--ldap_migratepy)
 - [16. `keycloak_bootstrap.py`](#16-keycloak_bootstrappy)
 - [17. `webui/`](#17-webui)
+- [18. `agent/`](#18-agent)
 
 ### 1. `archive.sh`
 **Purpose**: Backup and snapshot utilities.
@@ -40,7 +41,7 @@ The `fabric/lib/` directory contains modular Bash scripts sourced by the main ex
 - Directly loads Jinja2 and variable context, rendering templates natively without Ansible overhead.
 - Compares generated configurations against live states, performing surgical restarts (via `systemctl`) or safe reloads (via `rndc` or `nginx -s reload`) to apply structural changes (like `host_ram_capacity`).
 - Zone files are compared ignoring the SOA serial; each changed dynamic zone is updated with `rndc freeze` → file swap → `.jnl` removal → `rndc thaw` (`reload_zone()`).
-- Generates missing secrets (LDAP role-account passwords, `webui_oidc_secret`), renders the 389-DS seed LDIFs and webui config/unit, runs `dirsrv.sh seed` when seed files change and restarts `webui` (non-blocking) when its config changes.
+- Generates missing secrets (LDAP role-account passwords, `webui_oidc_secret`), renders the 389-DS seed LDIFs, the webui config and the `fabric-agent` unit, copies the webui image build context (`fabric/jinja/webui/build` + `lib/webui` → `/opt/webui/build/app`), and runs `dirsrv.sh seed` when seed files change. `fabric-agent` is restarted (non-blocking) when its unit changes; `webui` is rebuilt if its build context changed and restarted last (non-blocking) when anything of it changed.
 
 ### 4. `dns.sh`
 **Purpose**: DNS record management workflows.
@@ -68,7 +69,7 @@ The `fabric/lib/` directory contains modular Bash scripts sourced by the main ex
 ### 8. `package.sh`
 **Purpose**: Offline prerequisite staging and installation.
 - Orchestrates the `offline.sh` operations.
-- Defines the canonical arrays for `CONTROLLER_APT_PACKAGES`, `ANSIBLE_COLLECTIONS`, `TARGET_APT_PACKAGES`, and `DOCKER_IMAGES`.
+- Defines the canonical arrays for `CONTROLLER_APT_PACKAGES`, `ANSIBLE_COLLECTIONS`, `TARGET_APT_PACKAGES`, `DOCKER_IMAGES`, and `CONTEXT_IMAGES` (locally built images, `tag|context-dir[|app-dir]`: `fabric/dirsrv:local`, `fabric/webui:local` with `lib/webui` copied in as `app/`).
 - Contains `do_package()` which downloads and packages these dependencies into `.tar` or `.zip` bundles for air-gapped deployments.
 
 ### 9. `prereqs.sh`
@@ -112,9 +113,14 @@ The `fabric/lib/` directory contains modular Bash scripts sourced by the main ex
 - Realm role `webui_admin_role` → group `webui_admin_group`; confidential client `fabric-webui` (PKCE S256, exact redirect URI, `fullScopeAllowed: false`, roles in ID token); flow `fabric-webui-mfa` (TOTP required) bound to that client only.
 
 ### 17. `webui/`
-**Purpose**: The webui management UI (Python stdlib + `jinja2`/`pyyaml`), run by systemd `webui` on a unix socket behind nginx. See [webui.md](webui.md).
-- `server.py` — HTTP server and security gates (client-cert issuer/CN/fingerprint, sessions, CSRF/Origin); config from `/opt/webui/webui.json`.
+**Purpose**: The webui management UI (Python stdlib + `jinja2`), baked into the unprivileged `webui` container image and serving a unix socket behind nginx. Holds no privilege; every operation goes to `fabric-agent`. See [webui.md](webui.md).
+- `server.py` — HTTP server and security gates (client-cert issuer/CN/fingerprint, sessions, CSRF/Origin); config from `/config/webui.json` (host `/opt/webui/config/webui.json`). Returns `503` when the agent is unreachable.
 - `oidc.py` — OIDC authorization code + PKCE client; verifies ID token signature (RS256/JWKS), issuer, audience, azp, expiry, nonce.
 - `tlsclient.py` — HTTPS client pinned to the core root CA (reaches Keycloak by container IP, verifies by hostname).
-- `actions.py` — service status, DNS zone/record add/delete, apply (same code path as `fabricctl --apply`), audit log (`/opt/fabric/archive/audit.log`).
+- `agentclient.py` — JSON client for the `fabric-agent` socket (`agent_socket`, `/agent/agent.sock`); same function names the UI used before (imported as `actions`). Raises `ValidationError` (agent `400`) or `AgentError` (agent down / other error).
 - `views.py` — autoescaped Jinja2 templates; no inline script/style (strict CSP).
+
+### 18. `agent/`
+**Purpose**: `fabric-agent`, the privileged half of the web UI. Runs on the host as root (systemd `fabric-agent`, sandboxed, no network listener) and serves a fixed JSON API on `/opt/webui/agent/agent.sock` (`0660 root:<webui gid>`). See [webui.md](webui.md#privilege-separation).
+- `server.py` — unix-socket HTTP server; `SO_PEERCRED` check on every connection (webui uid + root only); routes `GET /v1/version|services|zones|zones/<key>|audit`, `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED`); everything else `404`. Validates actor names, 64 KiB body limit.
+- `actions.py` — service status, DNS zone/record add/delete, apply (same code path as `fabricctl --apply`), audit log (`/opt/fabric/archive/audit.log`); edits and applies take `/opt/fabric/config/.webui.lock`.

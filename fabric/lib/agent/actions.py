@@ -18,7 +18,7 @@ VARS_FILE = interactive.CUSTOM_VARS_FILE
 AUDIT_FILE = os.path.join(FABRIC_DIR, "archive", "audit.log")
 LOCK_FILE = os.path.join(FABRIC_DIR, "config", ".webui.lock")
 
-SERVICES = ["nginx", "bind9", "stepca", "ldap", "postgres", "keycloak", "webui"]
+SERVICES = ["nginx", "bind9", "stepca", "ldap", "postgres", "keycloak", "webui", "fabric-agent"]
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 
 LABEL = r"[A-Za-z0-9_](?:[A-Za-z0-9_-]{0,61}[A-Za-z0-9])?"

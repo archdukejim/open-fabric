@@ -571,7 +571,9 @@
             - dirsrv
             - keycloak
             - postgres
+            - webui
           when: >
+            (item != 'webui' or (install_webui | default(false) | bool)) and
             (item not in ['postgres', 'keycloak'] or (install_keycloak | default(false) | bool)) and
             (item != 'dirsrv' or (install_ldap | default(true) | bool))
           delegate_to: localhost

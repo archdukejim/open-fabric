@@ -807,7 +807,8 @@ def update_containers_mode():
         {'service': 'stepca', 'folder': 'stepca'},
         {'service': 'ldap', 'folder': 'dirsrv'},
         {'service': 'postgres', 'folder': 'postgres'},
-        {'service': 'keycloak', 'folder': 'keycloak'}
+        {'service': 'keycloak', 'folder': 'keycloak'},
+        {'service': 'webui', 'folder': 'webui'}
     ]
     
     def get_svc_timeout(s):
@@ -818,8 +819,8 @@ def update_containers_mode():
     for svc in sys_svcs:
         dc_path = f"/opt/fabric/{svc['folder']}/docker-compose.yml"
         if os.path.exists(dc_path):
-            # dirsrv is built locally: rebuild on a fresh Debian base instead of pulling.
-            action = ["build", "--pull"] if svc['folder'] == 'dirsrv' else ["pull"]
+            # dirsrv and webui are built locally: rebuild on a fresh Debian base instead of pulling.
+            action = ["build", "--pull"] if svc['folder'] in ('dirsrv', 'webui') else ["pull"]
             print(f"\n{BLUE}Updating images for {svc['service']} ({' '.join(action)})...{NC}")
             try:
                 res = subprocess.run(["docker", "compose", "-f", dc_path] + action, timeout=900)

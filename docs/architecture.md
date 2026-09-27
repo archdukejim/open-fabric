@@ -23,17 +23,18 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 ├── fabric
 │   ├── jinja
 │   │   ├── bind9
-│   │   ├── webui         # webui.json.j2
+│   │   ├── webui         # docker-compose.yml.j2, webui.json.j2, build/Dockerfile
 │   │   ├── dirsrv          # docker-compose.yml.j2, seed.py, seed/*.ldif.j2
 │   │   ├── docker-compose.yml.j2
 │   │   ├── nginx
 │   │   ├── stepca
-│   │   ├── systemd         # wrapper.service.j2, webui.service.j2
+│   │   ├── systemd         # wrapper.service.j2, fabric-agent.service.j2
 │   │   └── vars.yaml.j2
 │   ├── lib
 │   │   ├── archive.sh
 │   │   ├── certs.sh
-│   │   ├── webui/        # webui package (server, oidc, tlsclient, actions, views)
+│   │   ├── agent/        # fabric-agent: privileged host API for webui (server, actions)
+│   │   ├── webui/        # webui container app (server, oidc, tlsclient, agentclient, views)
 │   │   ├── deploy.py
 │   │   ├── dirsrv.sh
 │   │   ├── dns.sh
@@ -102,8 +103,11 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   ├── src/            # Managed: A full mirror of the deployment repository
 │   └── vars.yaml       # User-managed: Safely merged and preserved
 ├── webui             # Managed (only when install_webui)
-│   ├── webui.json    # Managed: webui config incl. OIDC client secret (root, 0600)
-│   └── run/web.sock    # Runtime: unix socket (dir root:nginx 0750), mounted into nginx at /srv/webui
+│   ├── docker-compose.yml # Managed: unprivileged webui container
+│   ├── build/        # Managed: image build context (Dockerfile + app/ = fabric/lib/webui)
+│   ├── config/webui.json # Managed: webui config incl. OIDC client secret (webui uid, 0400; dir root:webui 0750)
+│   ├── run/web.sock    # Runtime: created by the container (dir webui:nginx 0750), mounted into nginx at /srv/webui
+│   └── agent/agent.sock # Runtime: fabric-agent socket (0660 root:webui; dir root:webui 0750), mounted ro into webui
 ├── dirsrv              # Managed/Persistent mix
 │   ├── data            # Persistent: 389-DS /data (config, db, logs)
 │   │   └── tls         # Managed: server.crt, server.key, ca/*.crt (imported into NSS on start)
@@ -148,9 +152,10 @@ graph TB
         STEPCA["step-ca :10.255.0.40"]
         LDAP["dirsrv (389-DS) :10.255.0.50\n:3389 StartTLS · :3636 LDAPS"]
         KC["keycloak :10.255.0.60"]
+        WEB["webui :10.255.0.80\nunprivileged, no ports"]
     end
 
-    WEB["webui (host systemd)\nunix socket"]
+    AGENT["fabric-agent (host systemd, root)\nunix socket only"]
 
     CLIENT -->|"DNS · HTTPS · LDAPS"| HOST
     HOST --> NGINX
@@ -159,6 +164,7 @@ graph TB
     NGINX -->|"389 → :3389 · 636 → :3636 (TCP passthrough)"| LDAP
     NGINX -->|"mgr.<domain> (mTLS) → unix socket"| WEB
     WEB -->|"OIDC · admin REST"| KC
+    WEB -->|"unix socket · fixed JSON API"| AGENT
     KC -->|"LDAPS :3636"| LDAP
     NGINX -->|"HTTPS :443 → :9000"| STEPCA
     BIND9 -.->|"internal DNS"| STEPCA
@@ -184,6 +190,7 @@ The services are strictly clamped to their minimal footprint, leaving sufficient
 - BIND9: `40M`
 - Nginx: `15M`
 - Step-CA: `30M`
+- webui: `96M` (3–4GB only)
 
 **At 4GB+ Capacity:**
 - Keycloak and Postgres proportionally expand to utilize available memory:
@@ -301,7 +308,8 @@ All `.j2` files in this repo are rendered by the Ansible playbook or the `fabric
 | `fabric/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<octet3>.<octet2>.<octet1>.in-addr.arpa` (PTR — auto-generated) |
 | `fabric/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
 | `fabric/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
-| `fabric/jinja/webui/webui.json.j2` | `/opt/webui/webui.json` |
-| `fabric/jinja/systemd/webui.service.j2` | `/etc/systemd/system/webui.service` |
+| `fabric/jinja/webui/webui.json.j2` | `/opt/webui/config/webui.json` |
+| `fabric/jinja/webui/build/*` + `fabric/lib/webui/` | `/opt/webui/build/` (+ `app/`) — copied, not rendered; image `fabric/webui:local` |
+| `fabric/jinja/systemd/fabric-agent.service.j2` | `/etc/systemd/system/fabric-agent.service` |
 | `fabric/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
 | `fabric/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |

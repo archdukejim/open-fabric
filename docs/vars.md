@@ -114,14 +114,14 @@ These variables define top-level identity and basic settings.
 
 **Effected Jinja Templates:**
 - `bind9/docker-compose.yml.j2`
-- `webui/webui.json.j2`
+- `webui/docker-compose.yml.j2`
 - `dirsrv/docker-compose.yml.j2`
 - `docs/testplan.md.j2`
 - `keycloak/docker-compose.yml.j2`
 - `nginx/docker-compose.yml.j2`
 - `postgres/docker-compose.yml.j2`
 - `stepca/docker-compose.yml.j2`
-- `systemd/webui.service.j2`
+- `systemd/fabric-agent.service.j2`
 - `systemd/wrapper.service.j2`
 - `vars.yaml.j2`
 
@@ -525,7 +525,7 @@ Allows deep customization of the container orchestration, including overriding i
 ### `project_containers`
 **Description:** List of containers to include in deployment.
 
-**Default Value:** `['nginx', 'step-ca', 'bind9']` plus `dirsrv` (if `install_ldap`) and `keycloak`, `postgres` (if `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render; stale `openldap` entries are dropped.
+**Default Value:** `['nginx', 'step-ca', 'bind9']` plus `dirsrv` (if `install_ldap`), `keycloak`, `postgres` (if `install_keycloak`) and `webui` (if `install_webui` and `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render; stale `openldap` entries are dropped.
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
@@ -590,6 +590,7 @@ Allows deep customization of the container orchestration, including overriding i
 | `ip_ldap` | `"10.255.0.50"` |
 | `ip_keycloak` | `"10.255.0.60"` |
 | `ip_postgres` | `"10.255.0.70"` |
+| `ip_webui` | `"10.255.0.80"` (webui container; on `fabric_net` only to reach Keycloak, no published ports) |
 
 ### Container Images
 | Variable | Default Value |
@@ -600,6 +601,7 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_dirsrv`| `"fabric/dirsrv:local"` (built locally from `fabric/jinja/dirsrv/build`, Debian stable + `389-ds-base`) |
 | `image_keycloak`| `"keycloak/keycloak:latest"` |
 | `image_postgres`| `"postgres:latest"` |
+| `image_webui`| `"fabric/webui:local"` (built locally from `fabric/jinja/webui/build`, `debian:trixie-slim` + `python3`, `python3-jinja2`, `openssl`, `tini`; app = `fabric/lib/webui`) |
 
 ### Service CNAMEs
 Allows overriding the default short hostnames (CNAMEs) automatically assigned to the services.
@@ -647,7 +649,7 @@ Toggle features and control system-level UNIX isolation mapping.
 - `vars.yaml.j2`
 
 ### `install_webui`
-**Description:** Deploys the webui management UI (systemd `webui`, nginx vhost `hostname_mgr`, `mgr` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
+**Description:** Deploys the webui management UI (unprivileged container `webui` + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `mgr` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
 
 **Default Value:** `true` (effective only with Keycloak)
 
@@ -655,6 +657,7 @@ Toggle features and control system-level UNIX isolation mapping.
 - `nginx/docker-compose.yml.j2`
 - `nginx/nginx.conf.j2`
 - `vars.yaml.j2`
+- `webui/docker-compose.yml.j2`, `webui/webui.json.j2`, `systemd/fabric-agent.service.j2` (rendered only when enabled)
 
 ### webui Settings
 | Variable | Default Value | Description |
@@ -672,6 +675,8 @@ Toggle features and control system-level UNIX isolation mapping.
 
 **Default Value:** *(See default configuration below)*
 
+**Merge behaviour:** user entries are merged over the defaults (not a replacement), so a `vars.yaml` rendered by an older release still gains new accounts such as `webui`.
+
 **Effected Jinja Templates:**
 - `bind9/docker-compose.yml.j2`
 - `keycloak/docker-compose.yml.j2`
@@ -679,6 +684,9 @@ Toggle features and control system-level UNIX isolation mapping.
 - `nginx/nginx.conf.j2`
 - `postgres/docker-compose.yml.j2`
 - `stepca/docker-compose.yml.j2`
+- `systemd/fabric-agent.service.j2`
+- `webui/docker-compose.yml.j2`
+- `webui/webui.json.j2`
 - `vars.yaml.j2`
 
 ### `service_dirs`
@@ -701,6 +709,7 @@ service_users:
   step:     { uid: 135, gid: 135 }
   keycloak: { uid: 900, gid: 0 }
   postgres: { uid: 901, gid: 901 }
+  webui:    { uid: 912, gid: 912 }   # webui container user; also the fabric-agent socket group
 ```
 
 **`service_dirs` Default:**

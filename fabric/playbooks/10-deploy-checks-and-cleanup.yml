@@ -205,6 +205,15 @@
           delay: 5
           failed_when: not (webui_sock.stat.exists | default(false))
 
+        - name: Verify fabric-agent socket exists and is not world-accessible
+          when: install_webui | default(false) | bool
+          ansible.builtin.stat:
+            path: "{{ deploy_base_dir }}/webui/agent/agent.sock"
+          register: agent_sock
+          failed_when: >
+            not (agent_sock.stat.exists | default(false)) or
+            agent_sock.stat.mode != '0660' or agent_sock.stat.gid != (service_users.webui.gid | int)
+
         - name: Verify webui rejects connections without a client certificate
           when: install_webui | default(false) | bool
           ansible.builtin.command:
@@ -230,6 +239,7 @@
           loop:
             - nginx
             - webui
+            - fabric-agent
             - keycloak
             - postgres
             - ldap

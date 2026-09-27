@@ -479,6 +479,7 @@
             - dirsrv
             - postgres
             - keycloak
+            - webui
           ignore_errors: true
 
         - name: Ensure 389-DS seed directory exists
@@ -521,42 +522,57 @@
           when: install_ldap | default(true) | bool
 
     # ----------------------------------------------------------------
-    # 4h — webui management UI (runs on the host as root, reachable
-    #      only through nginx over a unix socket)
+    # 4h — webui management UI: unprivileged container (reached only by
+    #      nginx over a unix socket) + fabric-agent, the privileged host API
     # ----------------------------------------------------------------
-    - name: Section 4h - Deploy webui
+    - name: Section 4h - Deploy webui container and fabric-agent
       tags: [file-structure, webui]
       when: install_webui | default(false) | bool
       block:
         - name: Ensure webui directories exist
           ansible.builtin.file:
-            path: "{{ item.path }}"
+            path: "{{ deploy_base_dir }}/webui/{{ item.path }}"
             state: directory
-            owner: root
+            owner: "{{ item.owner }}"
             group: "{{ item.group }}"
             mode: "{{ item.mode }}"
           loop:
-            - { path: "{{ deploy_base_dir }}/webui", group: "root", mode: "0755" }
-            # nginx (container gid) may traverse and connect to the socket; nobody else.
-            - { path: "{{ deploy_base_dir }}/webui/run", group: "{{ service_users.nginx.gid }}", mode: "0750" }
+            - { path: "",       owner: 0, group: 0, mode: "0755" }
+            - { path: "build",  owner: 0, group: 0, mode: "0755" }
+            - { path: "config", owner: 0, group: "{{ service_users.webui.gid }}", mode: "0750" }
+            # container creates web.sock here; nginx (gid) may traverse and connect
+            - { path: "run",    owner: "{{ service_users.webui.uid }}", group: "{{ service_users.nginx.gid }}", mode: "0750" }
+            # fabric-agent creates agent.sock here; only the webui gid may traverse
+            - { path: "agent",  owner: 0, group: "{{ service_users.webui.gid }}", mode: "0750" }
 
-        - name: Deploy webui config
+        - name: Deploy webui config (contains the OIDC client secret)
           ansible.builtin.copy:
             src: "/tmp/fabric-render/webui/webui.json"
-            dest: "{{ deploy_base_dir }}/webui/webui.json"
-            owner: root
-            group: root
-            mode: '0600'
-          register: webui_config
+            dest: "{{ deploy_base_dir }}/webui/config/webui.json"
+            owner: "{{ service_users.webui.uid }}"
+            group: "{{ service_users.webui.gid }}"
+            mode: '0400'
 
-        - name: Deploy webui systemd unit
-          ansible.builtin.template:
-            src: "{{ playbook_dir }}/../jinja/systemd/webui.service.j2"
-            dest: "/etc/systemd/system/webui.service"
+        - name: Deploy webui image build context
+          ansible.builtin.copy:
+            src: "{{ item.src }}"
+            dest: "{{ deploy_base_dir }}/webui/build/{{ item.dest }}"
             owner: root
             group: root
             mode: '0644'
-          register: webui_unit
+            directory_mode: '0755'
+          loop:
+            - { src: "{{ playbook_dir }}/../jinja/webui/build/", dest: "" }
+            - { src: "{{ playbook_dir }}/../lib/webui/", dest: "app/" }
+
+        - name: Deploy fabric-agent systemd unit
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/../jinja/systemd/fabric-agent.service.j2"
+            dest: "/etc/systemd/system/fabric-agent.service"
+            owner: root
+            group: root
+            mode: '0644'
+          register: agent_unit
 
     - name: Section 4a - Deploy Systemd wrappers
       tags: [file-structure, update, systemd]
@@ -591,7 +607,12 @@
           compose: keycloak
           folder: keycloak
           requires: ["postgres"]
+        - service: webui
+          compose: webui
+          folder: webui
+          requires: ["fabric-agent"]
       when: >
+        (item.service != 'webui' or (install_webui | default(false) | bool)) and
         (item.service not in ['postgres', 'keycloak'] or (install_keycloak | default(false) | bool)) and
         (item.service != 'ldap' or (install_ldap | default(true) | bool))
       register: systemd_wrappers
@@ -600,7 +621,7 @@
       tags: [file-structure, update, systemd]
       ansible.builtin.systemd:
         daemon_reload: true
-      when: systemd_wrappers.changed or (webui_unit.changed | default(false))
+      when: systemd_wrappers.changed or (agent_unit.changed | default(false))
 
     - name: Section 4c - Global Executable
       tags: [file-structure]

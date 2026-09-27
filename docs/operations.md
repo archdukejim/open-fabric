@@ -51,7 +51,7 @@ Apply any manual changes made directly to `vars.yaml`. `fabricctl` leverages the
 - If `bind9` configuration changes, BIND9 gets `rndc reconfig`; if `nginx` configuration changes, `nginx -s reload`.
 - **DNS zones** are compared ignoring the SOA serial, so only zones whose records actually changed are touched. Forward zones are dynamic (they carry an `update-policy`), so each changed zone is updated with `rndc freeze` → swap the zone file → delete the stale `.jnl` → `rndc thaw` (static zones get `rndc reload <zone>`). Non-disruptive; dynamic updates made since the last apply (e.g. ACME TXT records) are discarded for that zone.
 - If a **389-DS seed file** (`/opt/dirsrv/seed/*.ldif`) changes, it is applied live with `dirsrv.sh seed`; the `ldap` service is restarted only if `cn=config` changed.
-- If the **webui** config or unit changes, `webui` is restarted (queued, so an apply started from webui completes).
+- If the **webui** config, app code or Dockerfile changes, the `webui` image is rebuilt (if needed) and the container restarted last (queued with `--no-block`, so an apply started from webui completes). If the `fabric-agent` unit changes, `fabric-agent` is restarted (also queued).
 - A full container restart (`docker compose down/up` via systemctl) is ONLY triggered if immutable service definitions (like `docker-compose.yml` or the systemd `.service` wrapper) or service-specific config files (like StepCA templates) actually change their rendered contents.
 
 ```bash
@@ -59,7 +59,7 @@ sudo fabricctl --apply
 ```
 
 #### `--update-containers`
-Pulls the latest images for all deployed containers and recreates them. The 389-DS image is built locally, so for `dirsrv` this runs `docker compose build --pull` instead — a fresh `debian:trixie-slim` base plus the current Debian `389-ds-base` packages, which is how its security updates arrive. Each step is protected by a timeout (pull 300 s, build 900 s) to prevent indefinite hangs if registries or mirrors are slow.
+Pulls the latest images for all deployed containers and recreates them. The 389-DS and webui images are built locally, so for `dirsrv` and `webui` this runs `docker compose build --pull` instead — a fresh `debian:trixie-slim` base plus the current Debian packages (`389-ds-base`; `python3`, `python3-jinja2`, `openssl`), which is how their security updates arrive. Each step is protected by a timeout (pull 300 s, build 900 s) to prevent indefinite hangs if registries or mirrors are slow.
 
 ```bash
 sudo fabricctl --update-containers
@@ -195,14 +195,14 @@ links:
 
 ## Resource Utilization
 
-The following chart outlines the memory footprint and CPU impact of the deployed applications. When `host_ram_capacity` is set to a value between 3 and 4, the infrastructure automatically enforces Docker Compose memory constraints (389-DS: `256M` at 3 GB, `384M` at 4 GB) to prevent these services from exceeding the host's physical memory boundaries.
+The following chart outlines the memory footprint and CPU impact of the deployed applications. When `host_ram_capacity` is set to a value between 3 and 4, the infrastructure automatically enforces Docker Compose memory constraints (389-DS: `256M` at 3 GB, `384M` at 4 GB; webui: `96M`) to prevent these services from exceeding the host's physical memory boundaries.
 
 | Service | Startup (Peak RAM) | Idle (RAM) | Typical Usage | CPU Impact |
 |---------|--------------------|------------|---------------|------------|
 | Keycloak | 800MB – 1.2GB | 500MB – 700MB | 800MB – 1.2GB | High (during auth) |
 | Postgres | 150MB | 80MB | 100MB – 200MB | Low |
 | 389-DS | 150MB – 250MB | 60MB – 120MB | 100MB – 250MB | Very Low |
-| webui | 30MB | 20MB – 30MB | 20MB – 40MB | Minimal |
+| webui (container) + fabric-agent (host) | 30MB + 20MB | 20MB – 30MB each | 20MB – 40MB each | Minimal |
 | AdGuardHome | 100MB | 30MB – 50MB | 60MB – 120MB | Low (sustained) |
 | BIND9 | 60MB | 30MB – 40MB | 40MB – 80MB | Very Low |
 | Nginx | 20MB | 5MB – 10MB | 15MB – 40MB | Very Low |
@@ -264,13 +264,13 @@ ansible-playbook fabric/playbooks/09-start-and-configure.yml -e target_host=fabr
 | `prereqs`,`validation` | 00 | `00-controller-check.yml` | Validate controller environment |
 | *(always)* `handle-vars`, `render-jinja` | 01 | `01-gen-vars-and-render-jinja.yml` | Generate CA password + TSIG secrets into `fabric-secrets.yml` (idempotent); Merge all vars + secrets; render every template to `/tmp/fabric-render` |
 | `users` | 03 | `03-target-service-accounts.yml` | Create service accounts (nginx, bind, step, ldap) |
-| `file-structure`, `bind9`, `stepca`, `nginx`, `add-ldap`, `dirsrv`, `webui`, `systemd` | 04 | `04-target-file-structure.yml` | Create directory tree; deploy configs, stepca dirs, bind9 runtime dirs, 389-DS seed files, webui config + unit; create `fabricctl` global wrapper |
+| `file-structure`, `bind9`, `stepca`, `nginx`, `add-ldap`, `dirsrv`, `webui`, `systemd` | 04 | `04-target-file-structure.yml` | Create directory tree; deploy configs, stepca dirs, bind9 runtime dirs, 389-DS seed files, webui config + image build context, `fabric-agent` unit, `webui` compose wrapper; create `fabricctl` global wrapper |
 | `network`, `firewall` | 05 | `05-target-network.yml` | Harden systemd-resolved; configure UFW (LAN allow-list) |
 | `pki`, `stepca` | 06 | `06-configure-stepca.yml` | Sign intermediate CA CSR (if deployed); initialize and configure step-ca |
 | `pki`, `bootstrap` | 07 | `07-bootstrap-containers.yml` | Bootstrap bind9+step-ca containers safely |
 | `pki`, `mint-certs` | 08 | `08-mint-service-certs.yml` | Mint BIND9 TLS, service certs (incl. `mgr.<domain>`), and `extra_certs`; install 389-DS TLS files and the webui client-CA bundle |
-| `start`, `configure`, `keycloak` | 09 | `09-start-and-configure.yml` | Start full stack; seed 389-DS; run `keycloak_bootstrap.py`; start `webui` |
-| `verify`, `deploy-checks`, `cleanup` | 10 | `10-deploy-checks-and-cleanup.yml` | dig DNS; check nginx/HTTPS; LDAP role-account binds, plaintext-bind refusal, LDAPS cert; webui socket + `400` without client cert; export 30s logs; drop stack if `no_start` |
+| `start`, `configure`, `keycloak` | 09 | `09-start-and-configure.yml` | Start full stack; seed 389-DS; run `keycloak_bootstrap.py`; start `fabric-agent`, build (`--pull`, online only) and start `webui` |
+| `verify`, `deploy-checks`, `cleanup` | 10 | `10-deploy-checks-and-cleanup.yml` | dig DNS; check nginx/HTTPS; LDAP role-account binds, plaintext-bind refusal, LDAPS cert; webui socket, `fabric-agent` socket (`0660`, webui gid) + `400` without client cert; export 30s logs; drop stack if `no_start` |
 
 ---
 
@@ -281,7 +281,7 @@ ansible-playbook fabric/playbooks/09-start-and-configure.yml -e target_host=fabr
 | 53 | TCP + UDP | nginx | `bind9:53` (container-to-container) |
 | 80 | TCP | nginx | health check · ACME passthrough · HTTPS redirect |
 | 389 | TCP | nginx | `dirsrv:3389` (TCP passthrough; 389-DS requires StartTLS before bind) |
-| 443 | TCP | nginx | `step-ca:9000` · `bind9:8053` (`/dns-query`) · Keycloak · webui (`mgr.<domain>`, mTLS → `/opt/webui/run/web.sock`) |
+| 443 | TCP | nginx | `step-ca:9000` · `bind9:8053` (`/dns-query`) · Keycloak · webui (`mgr.<domain>`, mTLS → `/opt/webui/run/web.sock`; the webui container publishes no ports, fabric-agent has no network listener) |
 | 636 | TCP | nginx | `dirsrv:3636` (TCP passthrough; LDAPS terminated by 389-DS) |
 | `bind_dns_port` | TCP + UDP | bind9 | host-facing (mapped `bind_dns_port:53`); default `53` |
 | `bind9_doh_port` | TCP | bind9 | plain-HTTP DoH; default `8053` |

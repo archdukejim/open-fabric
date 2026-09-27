@@ -1,9 +1,10 @@
 # webui Management UI
 
-webui is a browser front end for `fabricctl`. It runs on the host as systemd service `webui` and is reachable only through nginx at `https://mgr.<domain>` (`hostname_mgr`).
+webui is a browser front end for `fabricctl`. It runs as an unprivileged container (`webui`, systemd service `webui`) and is reachable only through nginx at `https://mgr.<domain>` (`hostname_mgr`). Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
 
 ### Table of Contents
 - [Features](#features)
+- [Architecture](#architecture)
 - [Components](#components)
 - [Security Model](#security-model)
 - [Configuration](#configuration)
@@ -16,12 +17,24 @@ webui is a browser front end for `fabricctl`. It runs on the host as systemd ser
 
 | Page | What it does |
 |------|--------------|
-| Dashboard (`/`) | `systemctl is-active` status of `nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `webui`; zone list; version/build |
+| Dashboard (`/`) | `systemctl is-active` status of `nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `webui`, `fabric-agent`; zone list; version/build |
 | Zone (`/zone/<zone>`) | View records (A, AAAA, CNAME, MX, TXT, SRV); add or delete a record in `vars.yaml` |
-| Apply | Runs the same apply as `sudo fabricctl --apply` (`interactive.py --apply`) and shows its output |
+| Apply | fabric-agent runs the same apply as `sudo fabricctl --apply` (`interactive.py --apply`); the output is shown |
 | Audit (`/audit`) | Last 200 lines of `/opt/fabric/archive/audit.log` (logins, denials, record edits, applies) |
 
 Record edits only change `vars.yaml`; nothing is published until **Apply**. Edits and applies take a lock file (`/opt/fabric/config/.webui.lock`) so concurrent web sessions do not interleave.
+
+---
+
+## Architecture
+
+```
+browser ──mTLS──> nginx ──unix──> webui container ──unix──> fabric-agent (host, root)
+                  (container)     /opt/webui/run/web.sock   /opt/webui/agent/agent.sock
+                                  uid 912, no caps, ro FS   fixed API, audited
+```
+
+The web app (TLS header checks, OIDC, sessions, HTML) holds no privilege: no Docker socket, no host config, no capabilities, read-only root FS. It joins `fabric_net` only to reach Keycloak and publishes no ports. The privileged half (`fabric-agent`) edits `vars.yaml`, runs the apply, reads `systemctl` status and writes the audit log — only through its fixed API, never as a general executor.
 
 ---
 
@@ -29,10 +42,15 @@ Record edits only change `vars.yaml`; nothing is published until **Apply**. Edit
 
 | Item | Location |
 |------|----------|
-| Code | `/opt/fabric/lib/webui/` (`server.py`, `oidc.py`, `tlsclient.py`, `actions.py`, `views.py`; stdlib + `jinja2`/`pyyaml`) |
-| Config | `/opt/webui/webui.json` (root, `0600`; contains the OIDC client secret) — from `fabric/jinja/webui/webui.json.j2` |
-| Unit | `/etc/systemd/system/webui.service` — from `fabric/jinja/systemd/webui.service.j2` (runs as root, sandboxed; IP access limited to localhost + `fabric_net`) |
-| Socket | `/opt/webui/run/web.sock` (dir `root:nginx 0750`), mounted into nginx at `/srv/webui` |
+| Container | `webui` — `/opt/webui/docker-compose.yml` from `fabric/jinja/webui/docker-compose.yml.j2`; image `image_webui` (`fabric/webui:local`) built locally from `fabric/jinja/webui/build/Dockerfile` (`debian:trixie-slim` + `python3`, `python3-jinja2`, `openssl`, `tini`) |
+| Container code | `fabric/lib/webui/` (`server.py`, `oidc.py`, `tlsclient.py`, `agentclient.py`, `views.py`; stdlib + `jinja2`), copied to `/opt/webui/build/app/` at deploy time and baked into the image |
+| Container user | `service_users.webui` (default uid/gid `912`) + `group_add` nginx gid; `read_only`, `cap_drop: ALL`, `no-new-privileges`, tmpfs `/tmp`; `ip_webui` (default `10.255.0.80`) on `fabric_net` |
+| Container mounts | `/opt/webui/config` → `/config` (ro); `/opt/stepca/data/certs` → `/certs` (ro, public CA certs only); `/opt/webui/run` → `/run/webui`; `/opt/webui/agent` → `/agent` (ro) |
+| Config | `/opt/webui/config/webui.json` (webui uid, `0400`; contains the OIDC client secret; in-container paths incl. `agent_socket`) — from `fabric/jinja/webui/webui.json.j2` |
+| webui unit | `/etc/systemd/system/webui.service` — standard compose wrapper; requires `fabric-agent` |
+| Web socket | `/opt/webui/run/web.sock` (socket `0660`, group nginx; dir `webui:nginx 0750`), created by the container, mounted into nginx at `/srv/webui` |
+| fabric-agent | `/opt/fabric/lib/agent/` (`server.py`, `actions.py`); unit `/etc/systemd/system/fabric-agent.service` from `fabric/jinja/systemd/fabric-agent.service.j2` (root, sandboxed, no network listener) |
+| Agent socket | `/opt/webui/agent/agent.sock` (`root:<webui gid> 0660`; dir `root:<webui gid> 0750`) |
 | nginx vhost | `server_name hostname_mgr`; `ssl_verify_client on`, `ssl_verify_depth 2`, trust `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root) |
 | Server cert | `mgr.<domain>` offline Step-CA leaf, minted by playbook 08 |
 | Keycloak | realm `webui_realm`, client `fabric-webui`, role `fabric-admin`, flow `fabric-webui-mfa` — created by `keycloak_bootstrap.py` |
@@ -56,6 +74,19 @@ Every request must pass all gates:
 
 nginx always overwrites the `X-SSL-Client-*` headers, and webui listens only on a unix socket that only nginx can reach, so the certificate headers cannot be forged. Responses carry a strict CSP, `no-store`, `X-Frame-Options: DENY`, and `__Host-` cookies.
 
+### Privilege separation
+
+A compromise of the web app yields only the webui container: uid 912, no capabilities, read-only FS, no Docker socket, no host config (only its own `webui.json` and the public CA certs are mounted). The only path to the host is `fabric-agent`:
+
+| Control | Detail |
+|---------|--------|
+| Socket access | `agent.sock` is `0660 root:<webui gid>` in a `0750` dir; other host users cannot reach it |
+| Peer check | `SO_PEERCRED` on every connection: only the webui uid and root are accepted (right group, wrong uid → `403`) |
+| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only). Anything else → `404` |
+| Validation | Record input validated in `agent/actions.py`; actor must match `^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$`; body ≤ 64 KiB |
+| Audit | Every change is written to `/opt/fabric/archive/audit.log` with the acting user |
+| Sandbox | systemd hardening (`NoNewPrivileges`, `ProtectHome`, `ProtectKernel*`, `RestrictNamespaces`, ...); no network listener; IP access limited to localhost + `fabric_subnet` |
+
 ---
 
 ## Configuration
@@ -73,7 +104,11 @@ Enabled by default whenever `install_keycloak: true` (`install_webui` is forced 
 | `webui_session_max` | `28800` | Seconds |
 | `webui_oidc_secret` | *(generated)* | In `fabric-secrets.yml` |
 
+Related: `image_webui` (`fabric/webui:local`), `ip_webui` (`10.255.0.80`), `service_users.webui` (uid/gid `912`) — see [vars.md](vars.md).
+
 After changing the realm/role/group vars: `sudo fabricctl --apply` then `sudo fabricctl --keycloak-sync`.
+
+Image updates: `sudo fabricctl --update-containers` rebuilds the image on a fresh Debian base (`build --pull`). An apply that changes the app code or Dockerfile rebuilds the image; `webui` is always restarted last with `--no-block`, since the apply may have been started from the web UI.
 
 ---
 
@@ -104,8 +139,9 @@ Use **Logout** to end both the webui session and the Keycloak session.
 | `403` "missing the 'fabric-admin' role" | User not in `admins` (or role mapping drifted). Fix membership, then `sudo fabricctl --keycloak-sync`. |
 | `403` "CSRF check failed" | Stale page or cross-origin post. Reload and retry. |
 | Login loops / "Login expired" | Login took over 10 min or started in another browser. Start again at `/`. |
-| `502 Bad Gateway` | `webui` not running or socket missing: `systemctl status webui`, `ls -l /opt/webui/run/`. |
-| `500` / any error | `journalctl -u webui -e` |
+| `502 Bad Gateway` | `webui` container not running or socket missing: `systemctl status webui`, `docker ps -a --filter name=webui`, `ls -l /opt/webui/run/`. |
+| `503` "fabric-agent service is unavailable" | Agent down or socket missing: `systemctl status fabric-agent`, `journalctl -u fabric-agent -e`, `ls -l /opt/webui/agent/`. |
+| `500` / any error | `journalctl -u webui -e` (container), `journalctl -u fabric-agent -e` (agent) |
 | Keycloak client/flow missing or wrong | `sudo fabricctl --keycloak-sync` (idempotent) |
 
 Denied logins are recorded as `LOGIN_DENIED` in `/opt/fabric/archive/audit.log`.
