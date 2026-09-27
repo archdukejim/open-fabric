@@ -1,0 +1,320 @@
+{# ----------------------------------------------------------------- #}
+{# nginx.conf — rendered by Ansible from nginx/nginx.conf.j2         #}
+{# ----------------------------------------------------------------- #}
+
+# Global settings
+worker_processes  auto;
+worker_rlimit_nofile 65535;
+error_log  /var/log/nginx/error.log notice;
+pid        /tmp/nginx.pid;
+
+events {
+    multi_accept on;
+    worker_connections  16384;
+}
+
+# DNS / LDAP stream proxies
+stream {
+    resolver 127.0.0.11 valid=30s;
+
+{% if install_ldap | default(true) | bool %}
+    # 389 Directory Server terminates TLS itself, so both listeners are plain
+    # TCP passthrough and the directory's certificate reaches the client.
+    # LDAP (389): 389-DS rejects everything except StartTLS and the rootDSE
+    # until the connection is encrypted (nsslapd-minssf).
+    server {
+        listen 389;
+        set $ldap_backend "{{ nginx_backend_ldap }}";
+        proxy_pass $ldap_backend;
+        proxy_timeout 300s;
+        proxy_connect_timeout 5s;
+    }
+
+    # LDAPS (636)
+    server {
+        listen 636;
+        set $ldaps_backend "{{ nginx_backend_ldaps }}";
+        proxy_pass $ldaps_backend;
+        proxy_timeout 300s;
+        proxy_connect_timeout 5s;
+    }
+{% endif %}
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    include       /etc/nginx/conf.d/*.conf;
+    default_type  application/octet-stream;
+
+    # Non-root user (UID {{ service_users.nginx.uid }}) temp paths
+    client_body_temp_path /tmp/client_temp;
+    proxy_temp_path       /tmp/proxy_temp;
+    fastcgi_temp_path     /tmp/fastcgi_temp;
+    uwsgi_temp_path       /tmp/uwsgi_temp;
+    scgi_temp_path        /tmp/scgi_temp;
+
+    resolver 127.0.0.11 valid=30s;
+
+    # HTTP — health check, ACME passthrough, redirect everything else to HTTPS
+    server {
+        listen 80 default_server;
+        server_name _;
+
+        location /health {
+            access_log off;
+            return 200 'OK';
+        }
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # HTTPS — DNS-over-HTTPS via BIND9
+    # nginx terminates TLS; BIND9 serves plain HTTP DoH on port {{ bind9_doh_port }}.
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_bind9 }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_bind9 }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_bind9 }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+        location /dns-query {
+            set $bind9_doh_backend "http://bind9:{{ bind9_doh_port }}";
+            proxy_pass $bind9_doh_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_http_version 1.1;
+        }
+    }
+
+    # Step-CA — pass HTTPS through to Step-CA's native TLS on port {{ stepca_port }}
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_stepca }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_stepca }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_stepca }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+        set $stepca_backend "{{ nginx_backend_stepca }}";
+
+        # PKI info page and certificate downloads
+        location = /certificates {
+            return 301 /certificates/;
+        }
+        location = /certificates/ {
+            alias /srv/www/certificates/;
+            index index.html;
+        }
+        location = /certificates/index.html {
+            alias /srv/www/certificates/index.html;
+        }
+        location = /certificates/{{ root_cert_name }}.crt {
+            alias /srv/www/certificates/{{ root_cert_name }}.crt;
+            default_type application/x-pem-file;
+            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}.crt"';
+        }
+        location = /certificates/{{ root_cert_name }}_win.cer {
+            alias /srv/www/certificates/{{ root_cert_name }}_win.cer;
+            default_type application/x-x509-ca-cert;
+            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}_win.cer"';
+        }
+        location = /certificates/{{ domain_file }}_ca.crt {
+            alias /srv/www/certificates/{{ domain_file }}_ca.crt;
+            default_type application/x-pem-file;
+            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_ca.crt"';
+        }
+        location = /certificates/{{ domain_file }}_win_ca.cer {
+            alias /srv/www/certificates/{{ domain_file }}_win_ca.cer;
+            default_type application/x-x509-ca-cert;
+            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_win_ca.cer"';
+        }
+        location = /certificates/install-certs-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-certs-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-certs-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-firefox-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-firefox-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-firefox-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-chrome-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-chrome-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-chrome-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-all-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-all-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-all-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-python-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-python-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-python-{{ domain_file }}.sh"';
+        }
+
+        location / {
+            proxy_pass $stepca_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_ssl_verify off;
+        }
+    }
+
+    # Fabric Landing Portal (Landing, Certificates, Manual)
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_landing }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_landing }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_landing }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+        location = /style.css {
+            alias /srv/www/shared/style.css;
+        }
+
+        location / {
+            alias /srv/www/landing/;
+            index index.html;
+            default_type text/html;
+        }
+
+        location /manual/ {
+            alias /srv/www/manual/;
+            index index.html;
+            default_type text/html;
+        }
+
+        location /ldap/ {
+            alias /srv/www/ldap/;
+            index index.html;
+            default_type text/html;
+        }
+
+        location = /ldap/install-ldap-{{ domain_file }}.sh {
+            alias /srv/www/ldap/install-ldap.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-ldap-{{ domain_file }}.sh"';
+        }
+
+        location /certificates/ {
+            alias /srv/www/certificates/;
+            index index.html;
+            default_type text/html;
+        }
+
+        location = /certificates/{{ root_cert_name }}.crt {
+            alias /srv/www/certificates/{{ root_cert_name }}.crt;
+            default_type application/x-pem-file;
+            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}.crt"';
+        }
+        location = /certificates/{{ root_cert_name }}_win.cer {
+            alias /srv/www/certificates/{{ root_cert_name }}_win.cer;
+            default_type application/x-x509-ca-cert;
+            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}_win.cer"';
+        }
+        location = /certificates/{{ domain_file }}_ca.crt {
+            alias /srv/www/certificates/{{ domain_file }}_ca.crt;
+            default_type application/x-pem-file;
+            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_ca.crt"';
+        }
+        location = /certificates/{{ domain_file }}_win_ca.cer {
+            alias /srv/www/certificates/{{ domain_file }}_win_ca.cer;
+            default_type application/x-x509-ca-cert;
+            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_win_ca.cer"';
+        }
+        location = /certificates/install-certs-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-certs-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-certs-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-firefox-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-firefox-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-firefox-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-chrome-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-chrome-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-chrome-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-all-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-all-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-all-{{ domain_file }}.sh"';
+        }
+        location = /certificates/install-python-{{ domain_file }}.sh {
+            alias /srv/www/certificates/install-python-{{ domain_file }}.sh;
+            default_type text/x-shellscript;
+            add_header Content-Disposition 'attachment; filename="install-python-{{ domain_file }}.sh"';
+        }
+    }
+
+{% if install_keycloak | default(false) | bool %}
+    # Keycloak Web UI / API
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_keycloak }};
+
+        ssl_certificate /etc/nginx/certs/{{ hostname_keycloak }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_keycloak }}/privkey.pem;
+
+        location / {
+            set $keycloak_backend "https://keycloak:8443";
+            proxy_pass $keycloak_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port 443;
+            proxy_ssl_verify off;
+        }
+    }
+{% endif %}
+{% if install_webui | default(false) | bool %}
+
+    # webui management UI — mutual TLS, then Keycloak OIDC in the app.
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_mgr }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_mgr }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_mgr }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_session_tickets off;
+
+        # Only certificates issued directly by the Step-CA intermediate:
+        # depth 2 = leaf -> intermediate -> root. Leaves under a subordinate
+        # CA minted with --intermediate-ca are one level deeper and fail.
+        ssl_client_certificate /etc/nginx/certs/client-ca/ca-bundle.pem;
+        ssl_verify_client on;
+        ssl_verify_depth 2;
+
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        client_max_body_size 64k;
+
+        location / {
+            proxy_pass http://unix:/srv/webui/web.sock:;
+            proxy_http_version 1.1;
+            proxy_read_timeout 900s;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            # Always overwritten here, so a client can never supply them.
+            proxy_set_header X-SSL-Client-Verify $ssl_client_verify;
+            proxy_set_header X-SSL-Client-S-DN $ssl_client_s_dn;
+            proxy_set_header X-SSL-Client-I-DN $ssl_client_i_dn;
+            proxy_set_header X-SSL-Client-Fingerprint $ssl_client_fingerprint;
+        }
+    }
+{% endif %}
+}

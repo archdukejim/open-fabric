@@ -1,8 +1,8 @@
 # ============================================================
-# CORE TEMPLATE — CONFIGURATION
+# FABRIC — CONFIGURATION
 # ============================================================
 domain: example.com
-hostname: core-server
+hostname: fabric
 friendly_name: "Example Org"
 service_mark: ""
 care_of: ""
@@ -19,7 +19,7 @@ address_line2: ""
 lan_cidr: 192.168.1.0/24
 lan_gateway: 192.168.1.1
 host_ip: 192.168.1.100
-core_subnet: 10.255.0.0/24
+fabric_subnet: 10.255.0.0/24
 
 dns:
   dynamic_zone_var:

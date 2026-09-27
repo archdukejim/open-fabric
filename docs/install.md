@@ -1,6 +1,6 @@
 # Setup and Installation
 
-This guide covers the detailed setup and installation instructions for the `core-template` infrastructure, building upon the prerequisites described in the main README.
+This guide covers the detailed setup and installation instructions for the `fabric` infrastructure, building upon the prerequisites described in the main README.
 
 ### Table of Contents
 - [Configure vars](#configure-vars)
@@ -44,7 +44,7 @@ cp custom-vars-tpl.yml custom-vars.yaml
 
 - **`custom-vars.yaml`** (repo root) — deployment settings: domain, network, DNS records, PKI identity, infrastructure defaults, Docker container IPs, image refs, port numbers, TSIG key definitions, LDAP groups and OUs. Edit this file to customise your deployment.
 
-`01-gen-vars-and-render-jinja.yml` generates secrets (CA password, one TSIG secret per key, Directory Manager and per-role-account LDAP passwords, Keycloak credentials, the core-web OIDC client secret) and writes them to `core-secrets.yml` (git-ignored) on the first run; existing secrets are preserved on re-runs. It then loads `custom-vars.yaml` and `core-secrets.yml`, renders `core/jinja/vars.yaml.j2`, and writes the fully-resolved result to `/tmp/core-template-render/vars.yaml`. All subsequent playbooks read from that rendered file.
+`01-gen-vars-and-render-jinja.yml` generates secrets (CA password, one TSIG secret per key, Directory Manager and per-role-account LDAP passwords, Keycloak credentials, the webui OIDC client secret) and writes them to `fabric-secrets.yml` (git-ignored) on the first run; existing secrets are preserved on re-runs. It then loads `custom-vars.yaml` and `fabric-secrets.yml`, renders `fabric/jinja/vars.yaml.j2`, and writes the fully-resolved result to `/tmp/fabric-render/vars.yaml`. All subsequent playbooks read from that rendered file.
 
 Minimum required changes in `custom-vars.yaml`:
 
@@ -68,12 +68,12 @@ dns:
     zone_authority: true        # emit NS A record pointing to host_ip
     tsig: acme_dns-01           # primary TSIG key for this zone
     A:
-    - { name: core, ip: "{{ host_ip }}" }
+    - { name: fabric, ip: "{{ host_ip }}" }
     - { name: nas,  ip: 10.0.3.10 }
     CNAME:
-    - { name: dns,  canonical: core }
-    - { name: ldap, canonical: core }
-    - { name: ca,   canonical: core }
+    - { name: dns,  canonical: fabric }
+    - { name: ldap, canonical: fabric }
+    - { name: ca,   canonical: fabric }
 ```
 
 Key tunables with their defaults:
@@ -100,7 +100,7 @@ Before your first install, review and set these in `custom-vars.yaml`.
 - [ ] `byoc` / `ca_crt_path` / `ica_crt_path` — enable BYOC and point these to an offline PKI generation directory instead of utilizing the dynamic PKI.
 - [ ] `dns:` block — A and CNAME records for your hosts
 - [ ] `ldap_groups` / `ldap_organizational_units` — directory structure
-- [ ] `install_keycloak` / `install_coreweb` — core-web (`mgr.<domain>`) is enabled by default whenever Keycloak is; see [coreweb.md](coreweb.md)
+- [ ] `install_keycloak` / `install_webui` — webui (`mgr.<domain>`) is enabled by default whenever Keycloak is; see [webui.md](webui.md)
 - [ ] `tsig_keys` — add non-primary entries for external services that need DNS update rights (optional)
 - [ ] `bind_dns_port` — change from `5353` if that port conflicts with an existing service
 - [ ] `image_nginx` / `image_bind9` / `image_stepca` / `image_dirsrv` — override to pin images to specific digests or a local registry (optional; defaults to `:latest` tags)
@@ -172,16 +172,16 @@ Runs a safe uninstallation but preserves your CA infrastructure and service cert
 
 **Final Deployed Structure:**
 When deployed, the infrastructure resides securely in `/opt` (or your chosen `DEPLOY_BASE_DIR`):
-*   `/opt/core/`: The central brain. Contains `config/` (holding `vars.yaml`, `link-vars.yaml`, and `core-secrets.yml`), the deployed python deployment engine (`lib/deploy.py`), and the `core-mgr` script.
+*   `/opt/fabric/`: The central brain. Contains `config/` (holding `vars.yaml`, `link-vars.yaml`, and `fabric-secrets.yml`), the deployed python deployment engine (`lib/deploy.py`), and the `fabricctl` script.
 *   `/opt/bind9/`: Core DNS service. Contains `config/` (holding `named.conf.*`), `data/` (holding all `db.<zone>` zone data and journals), `log/`, and `cache/`.
 *   `/opt/nginx/`: Core reverse proxy. Contains `config/` (`nginx.conf`), `www/` (holding the generated HTML documentation, scripts, and portal assets), and `certs/` (public-facing service certificates).
 *   `/opt/stepca/`: Core PKI. Contains `data/` (Internal DB, CA keys in `secrets/`, signed CA certs in `certs/`, and issued leaf certificates in `artifacts/`) and custom `templates/`.
 *   `/opt/dirsrv/`: Core directory service (389 Directory Server). Contains `data/` (389-DS `/data`: config, database, logs, and `tls/` with `server.crt`, `server.key`, `ca/*.crt`) and `seed/` (seed LDIFs + `seed.py`).
-*   `/opt/coreweb/`: core-web management UI (only when `install_coreweb`). Contains `coreweb.json` and `run/web.sock`; the service itself runs on the host as systemd `coreweb`.
+*   `/opt/webui/`: webui management UI (only when `install_webui`). Contains `webui.json` and `run/web.sock`; the service itself runs on the host as systemd `webui`.
 *   `/opt/keycloak/`: Core SSO identity provider. Contains `certs/`.
 *   `/opt/postgres/`: Backend DB for Keycloak. Contains persistent `data/`.
 
-*Note: During day-2 operations, `core-mgr --apply` uses an intelligent file-tracking system against this structure. It renders templates to `/tmp/core-template-render/` and compares them against the live `/opt/` files. A container is ONLY restarted if its critical templates or configuration files structurally changed.*
+*Note: During day-2 operations, `fabricctl --apply` uses an intelligent file-tracking system against this structure. It renders templates to `/tmp/fabric-render/` and compares them against the live `/opt/` files. A container is ONLY restarted if its critical templates or configuration files structurally changed.*
 
 #### Combined Short Flags
 You can combine short flags into a single string for rapid execution. If `-s` is included in a combined string without a direct argument, the script will securely prompt you for the remote target.
@@ -224,7 +224,7 @@ Installs before 1.5.0 ran `osixia/openldap` in `/opt/openldap`. Re-running `setu
 
 ## Teardown / Uninstall
 
-To stop and remove all containers (and the `coreweb` service), remove service accounts, and delete `/opt/{core,nginx,bind9,stepca,dirsrv,keycloak,postgres,coreweb}/`:
+To stop and remove all containers (and the `webui` service), remove service accounts, and delete `/opt/{fabric,nginx,bind9,stepca,dirsrv,keycloak,postgres,webui}/`:
 
 ```bash
 sudo ./setup.sh --uninstall

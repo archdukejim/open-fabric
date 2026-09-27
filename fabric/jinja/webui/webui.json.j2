@@ -1,0 +1,18 @@
+{
+  "socket": "{{ deploy_base_dir }}/webui/run/web.sock",
+  "socket_gid": {{ service_users.nginx.gid }},
+  "public_url": "https://{{ hostname_mgr }}",
+  "ca_file": "{{ deploy_base_dir }}/stepca/data/certs/root_ca.crt",
+  "intermediate_ca": "{{ deploy_base_dir }}/stepca/data/certs/intermediate_ca.crt",
+  "admin_role": {{ webui_admin_role | to_json }},
+  "session_idle": {{ webui_session_idle | default(900) | int }},
+  "session_max": {{ webui_session_max | default(28800) | int }},
+  "keycloak": {
+    "ip": "{{ ip_keycloak }}",
+    "port": 8443,
+    "hostname": "{{ hostname_keycloak }}",
+    "realm": {{ webui_realm | to_json }},
+    "client_id": "fabric-webui",
+    "client_secret": {{ webui_oidc_secret | to_json }}
+  }
+}

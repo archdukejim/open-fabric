@@ -1,0 +1,32 @@
+---
+# fabric — main playbook entry point
+#
+# Imports each section playbook in sequence for a full install.
+# Individual playbooks can be run directly for targeted operations:
+#
+#   ansible-playbook fabric/playbooks/04-target-file-structure.yml -e target_host=fabric --tags dns-record
+#   ansible-playbook fabric/playbooks/07-bootstrap-containers.yml  -e target_host=fabric
+#   ansible-playbook fabric/playbooks/08-mint-service-certs.yml    -e target_host=fabric
+#   ansible-playbook fabric/playbooks/09-deploy-checks.yml         -e target_host=fabric -e start=true
+#
+# Prerequisite — run once before the installer:
+#   bash fabric/pki/rootca.sh init
+#
+# Full install (all sections):
+#   ansible-playbook fabric/playbooks/fabric-config.yml -e target_host=fabric
+#
+# Full install + leave stack running:
+#   ansible-playbook fabric/playbooks/fabric-config.yml -e target_host=fabric -e start=true
+
+- import_playbook: 00-controller-check.yml
+- import_playbook: 00b-migrate-from-core.yml
+- import_playbook: 01-gen-vars-and-render-jinja.yml
+- import_playbook: 02-target-system-conditioning.yml
+- import_playbook: 03-target-service-accounts.yml
+- import_playbook: 04-target-file-structure.yml
+- import_playbook: 05-target-network.yml
+- import_playbook: 06-configure-stepca.yml
+- import_playbook: 07-bootstrap-containers.yml
+- import_playbook: 08-mint-service-certs.yml
+- import_playbook: 09-start-and-configure.yml
+- import_playbook: 10-deploy-checks-and-cleanup.yml

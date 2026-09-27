@@ -1,6 +1,6 @@
 # Keycloak Deployment Documentation
 
-This document tracks connections, variables, configuration nuances, and gotchas for the Keycloak ↔ LDAP (389 Directory Server) integration. The core-web management UI that authenticates through this realm is covered in [coreweb.md](coreweb.md).
+This document tracks connections, variables, configuration nuances, and gotchas for the Keycloak ↔ LDAP (389 Directory Server) integration. The webui management UI that authenticates through this realm is covered in [webui.md](webui.md).
 
 ## Phase 1: Infrastructure and Bootstrapping
 
@@ -9,9 +9,9 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 *   **Host IP**: Ensure `host_ip` is correctly set in `custom-vars.yaml`. Mismatched IPs will cause Nginx (and other containers) to fail when binding ports.
 
 ### Secrets and Credentials
-*   **Locating Passwords**: All generated credentials are safely stored on the target machine in `/opt/core/config/core-secrets.yml`. You can view them by running `cat /opt/core/config/core-secrets.yml`.
+*   **Locating Passwords**: All generated credentials are safely stored on the target machine in `/opt/fabric/config/fabric-secrets.yml`. You can view them by running `cat /opt/fabric/config/fabric-secrets.yml`.
 *   **LDAP Service Account**: Keycloak uses a dedicated, isolated service account password (`ldap_keycloak_password`) generated automatically by the installer. Every other LDAP role account also has its own generated password (`ldap_super_admin_password`, `ldap_group_admin_password`, `ldap_user_creator_password`, `ldap_user_modifier_password`); there is no shared default password.
-*   **core-web Client Secret**: `coreweb_oidc_secret` is the client secret of the `core-mgr` OIDC client.
+*   **webui Client Secret**: `webui_oidc_secret` is the client secret of the `fabric-webui` OIDC client.
 *   **Keycloak Admin**: The admin credentials (`keycloak_admin_user`, `keycloak_admin_password`) and the PostgreSQL database password (`keycloak_db_password`) are also generated automatically by the installer.
 
 ### Identity Preconditioning & Gotchas
@@ -35,20 +35,20 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 ## Phase 3: LDAP Federation Configuration
 
 ### Automated Configuration (`keycloak_bootstrap.py`)
-Playbook 09 runs `core/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from `core-secrets.yml` — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
+Playbook 09 runs `fabric/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from `fabric-secrets.yml` — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
 
 ```bash
-sudo core-mgr --keycloak-sync
+sudo fabricctl --keycloak-sync
 ```
 
 | Object | Configuration |
 |--------|---------------|
-| Realm | `coreweb_realm` (default: `domain`); brute-force protection on (5 failures, temporary lockout) |
+| Realm | `webui_realm` (default: `domain`); brute-force protection on (5 failures, temporary lockout) |
 | User federation | LDAP provider `389-DS`: vendor `rhds`, `ldaps://<hostname_ldap>:3636`, UUID attribute `entryUUID`, username/RDN `uid`, edit mode `WRITABLE`, sync registrations on. An existing provider named `OpenLDAP` is **updated in place** so federated user links survive the migration. |
 | Group mapper | `LDAP Groups` (`group-ldap-mapper`) on `ou=groups,<base_dn>`, synced into Keycloak |
-| Realm role | `coreweb_admin_role` (default `core-admin`), granted to group `coreweb_admin_group` (default `admins`) |
-| OIDC client | `core-mgr` — confidential, code flow + PKCE `S256`, exact redirect `https://<hostname_mgr>/oidc/callback`, `fullScopeAllowed: false`, realm roles in the ID token `roles` claim |
-| Auth flow | `core-mgr-browser-mfa` — browser flow with TOTP **REQUIRED**, bound to the `core-mgr` client only (other clients keep the realm default flow) |
+| Realm role | `webui_admin_role` (default `fabric-admin`), granted to group `webui_admin_group` (default `admins`) |
+| OIDC client | `fabric-webui` — confidential, code flow + PKCE `S256`, exact redirect `https://<hostname_mgr>/oidc/callback`, `fullScopeAllowed: false`, realm roles in the ID token `roles` claim |
+| Auth flow | `fabric-webui-mfa` — browser flow with TOTP **REQUIRED**, bound to the `fabric-webui` client only (other clients keep the realm default flow) |
 
 ### Manual kcadm.sh Notes
 These still apply if you drive `kcadm.sh` by hand inside the container.
@@ -65,7 +65,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 *   Keycloak is bound to 389-DS using the dedicated `cn=keycloak_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}` service account, utilizing the isolated `ldap_keycloak_password`.
 *   Users are searched in `ou=users,ou=accounts,{{ ldap_base_dn }}`.
 *   Groups are searched in `ou=groups,{{ ldap_base_dn }}`.
-*   **Gotcha**: Keycloak connects to the `dirsrv` container directly on `core_net` (not through nginx), so the URL must use the container-side port **3636** and the exact LDAP hostname: `ldaps://{{ hostname_ldap }}:3636`. The bare `ldap` name fails resolution (`UnknownHostException`) — only `hostname_ldap` is a Docker alias — and the hostname must match the certificate SAN.
+*   **Gotcha**: Keycloak connects to the `dirsrv` container directly on `fabric_net` (not through nginx), so the URL must use the container-side port **3636** and the exact LDAP hostname: `ldaps://{{ hostname_ldap }}:3636`. The bare `ldap` name fails resolution (`UnknownHostException`) — only `hostname_ldap` is a Docker alias — and the hostname must match the certificate SAN.
 *   **UUID attribute**: `entryUUID` (provided by the 389-DS `entryuuid` plugin, enabled by the seed). Keycloak links federated users by this value, which is why the OpenLDAP migration preserves it.
 
 ---
@@ -74,7 +74,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 ## Phase 4: Security & ACLs
 
 ### 389-DS Seeding (cn=config and the tree)
-*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`dirsrv.sh seed`, run by playbook 09 and by `core-mgr --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
+*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`dirsrv.sh seed`, run by playbook 09 and by `fabricctl --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
 *   `00-config.ldif` hardens the server: `nsslapd-require-secure-binds: on`, `nsslapd-minssf: 56` (rootDSE excluded), TLS 1.2 minimum, `PBKDF2-SHA512` password storage, password syntax checks (min length 12, 3 categories), lockout after 5 failures for 900 s, and enables the `memberOf` and `entryUUID` plugins.
 *   `10-tree.ldif` creates the suffix, OUs and groups (`groupOfNames` + `posixGroup`, so both `member` and `gidNumber` work). `20-accounts.ldif` creates the role accounts. `30-aci.ldif` holds the ACIs.
 

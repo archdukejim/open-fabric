@@ -1,0 +1,93 @@
+---
+# Section 9 — Start and Configure Services
+#
+# Starts the full docker-compose stack via the nginx systemd wrapper,
+# seeds 389-DS, configures Keycloak (federation, webui client, MFA) and
+# starts the webui management UI.
+- name: Section 9 - Start and Configure Services
+  hosts: "{{ target_host }}"
+  become: true
+  vars_files:
+    - /tmp/fabric-render/vars.yaml
+    - "{{ playbook_dir }}/../../fabric-secrets.yml"
+
+  tasks:
+    - name: Section 9 - Start and Configure Services
+      tags: [start, configure, keycloak]
+      block:
+        - name: Pull new images for upgrade
+          ansible.builtin.command:
+            cmd: "docker compose -f {{ deploy_base_dir | default('/opt') }}/{{ item.folder }}/docker-compose.yml pull"
+          loop:
+            - { folder: 'nginx', pull: true }
+            - { folder: 'bind9', pull: true }
+            - { folder: 'stepca', pull: true }
+            - { folder: 'postgres', pull: "{{ install_keycloak | default(false) | bool }}" }
+            - { folder: 'keycloak', pull: "{{ install_keycloak | default(false) | bool }}" }
+          when: 
+            - is_upgrade | default(false) | bool
+            - not offline | default(false) | bool
+            - item.pull | bool
+          ignore_errors: true
+          changed_when: true
+
+        # 389-DS is built locally; --pull refreshes the Debian base (security updates).
+        - name: Build 389-DS image
+          when:
+            - install_ldap | default(true) | bool
+            - not offline | default(false) | bool
+          ansible.builtin.command:
+            cmd: "docker compose -f {{ deploy_base_dir }}/dirsrv/docker-compose.yml build --pull"
+          changed_when: true
+
+        - name: Start or Restart full stack via systemd
+          ansible.builtin.systemd:
+            name: "{{ item.name }}"
+            state: "{{ 'restarted' if is_upgrade | default(false) | bool else 'started' }}"
+            enabled: true
+          loop:
+            - { name: 'nginx', start: true }
+            - { name: 'bind9', start: true }
+            - { name: 'stepca', start: true }
+            - { name: 'ldap', start: "{{ install_ldap | default(true) | bool }}" }
+            - { name: 'postgres', start: "{{ install_keycloak | default(false) | bool }}" }
+            - { name: 'keycloak', start: "{{ install_keycloak | default(false) | bool }}" }
+          when: item.start | bool
+
+        - name: Wait for Keycloak container to be healthy
+          when: install_keycloak | default(false) | bool
+          ansible.builtin.command:
+            cmd: "docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' keycloak"
+          register: keycloak_health
+          until: keycloak_health.stdout == 'healthy'
+          retries: 30
+          delay: 10
+          changed_when: false
+
+        - name: Seed 389 Directory Server (tree, role accounts, ACIs, hardening)
+          when: install_ldap | default(true) | bool
+          ansible.builtin.command:
+            cmd: "bash {{ deploy_base_dir }}/fabric/lib/dirsrv.sh seed"
+          register: dirsrv_seed
+          changed_when: "' 0 added, 0 modified' not in dirsrv_seed.stdout"
+
+        - name: Configure Keycloak (realm, LDAP federation, webui client, MFA)
+          when: install_keycloak | default(false) | bool
+          ansible.builtin.command:
+            cmd: >
+              python3 {{ deploy_base_dir }}/fabric/lib/keycloak_bootstrap.py
+              --vars {{ deploy_base_dir }}/fabric/config/vars.yaml
+              --secrets {{ deploy_base_dir }}/fabric/config/fabric-secrets.yml
+          register: kc_bootstrap
+          retries: 5
+          delay: 15
+          until: kc_bootstrap.rc == 0
+          changed_when: "'  - ' in kc_bootstrap.stdout"
+
+        - name: Start webui management UI
+          when: install_webui | default(false) | bool
+          ansible.builtin.systemd:
+            name: webui
+            state: restarted
+            enabled: true
+            daemon_reload: true

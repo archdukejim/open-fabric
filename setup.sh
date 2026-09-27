@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # -----------------------------------------------------------------------
-# setup.sh — Install or uninstall core-template
+# setup.sh — Install or uninstall fabric
 #
 # Flags:
 #   --remote <user>@<ip> Run against a remote host (e.g. root@192.168.1.5)
@@ -13,8 +13,14 @@ set -euo pipefail
 # -----------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CORE_DIR="$SCRIPT_DIR/core"
-PLAYBOOKS_DIR="$CORE_DIR/playbooks"
+
+# Pre-fabric (core-template) checkouts kept secrets in core-secrets.yml.
+if [ -f "$SCRIPT_DIR/core-secrets.yml" ] && [ ! -f "$SCRIPT_DIR/fabric-secrets.yml" ]; then
+    mv "$SCRIPT_DIR/core-secrets.yml" "$SCRIPT_DIR/fabric-secrets.yml"
+    echo "Renamed core-secrets.yml -> fabric-secrets.yml"
+fi
+FABRIC_DIR="$SCRIPT_DIR/fabric"
+PLAYBOOKS_DIR="$FABRIC_DIR/playbooks"
 if [ -f "$SCRIPT_DIR/custom-vars.yaml" ]; then
     CUSTOM_VARS_FILE="$SCRIPT_DIR/custom-vars.yaml"
 elif [ -f "$SCRIPT_DIR/config/vars.yaml" ]; then
@@ -32,9 +38,9 @@ else
 fi
 
 # Source library modules
-source "$CORE_DIR/lib/output.sh"
-source "$CORE_DIR/lib/ssh.sh"
-source "$CORE_DIR/lib/services.sh"
+source "$FABRIC_DIR/lib/output.sh"
+source "$FABRIC_DIR/lib/ssh.sh"
+source "$FABRIC_DIR/lib/services.sh"
 
 # --- Defaults ---
 TARGET_BASE="/opt"
@@ -48,7 +54,7 @@ EXTRA_ANSIBLE_ARGS=()
 
 # Directories that contain the live installation state
 # openldap: legacy dir from pre-389-DS installs, kept so snapshots/uninstall still cover it
-SERVICE_DIRS=(nginx bind9 stepca dirsrv keycloak postgres coreweb openldap)
+SERVICE_DIRS=(nginx bind9 stepca dirsrv keycloak postgres webui openldap)
 SERVICE_USERS_LIST=(nginx bind step ldap keycloak postgres)
 
 # --- Parse arguments ---
@@ -75,7 +81,7 @@ while [[ $# -gt 0 ]]; do
             cat <<EOF
 Usage: $0 [OPTIONS] [ANSIBLE_ARGS...]
 
-Install or uninstall the core-template infrastructure.
+Install or uninstall the fabric infrastructure.
 
 Options:
   -h, --help            Show this help message and exit.
@@ -157,11 +163,11 @@ if ! command -v git &>/dev/null || ! git -C "$SCRIPT_DIR" rev-parse --git-dir &>
     warn "Not a git repository: $SCRIPT_DIR — version tracking uses serial numbers only."
 fi
 
-# Stamp core/BUILD so the deployed core-mgr can report exactly what it runs.
+# Stamp fabric/BUILD so the deployed fabricctl can report exactly what it runs.
 {
     echo "commit: $(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)$(git -C "$SCRIPT_DIR" diff --quiet HEAD 2>/dev/null || echo '-dirty')"
     echo "built:  $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-} > "$SCRIPT_DIR/core/BUILD"
+} > "$SCRIPT_DIR/fabric/BUILD"
 
 # -----------------------------------------------------------------------
 # shared helper: run_playbook
@@ -175,7 +181,7 @@ run_playbook() {
         exit 1
     fi
 
-    local playbook_path="$PLAYBOOKS_DIR/core-config.yml"
+    local playbook_path="$PLAYBOOKS_DIR/fabric-config.yml"
     if [[ "${1:-}" == *.yml ]]; then
         playbook_path="$1"
         shift
@@ -226,9 +232,9 @@ run_playbook() {
     local exit_code=$?
 
     # Export the final idempotency variables used for this run
-    if [ -f "/tmp/core-template-render/vars.yaml" ]; then
+    if [ -f "/tmp/fabric-render/vars.yaml" ]; then
         local vars_file="$log_dir/vars-${timestamp}.yaml"
-        cp "/tmp/core-template-render/vars.yaml" "$vars_file"
+        cp "/tmp/fabric-render/vars.yaml" "$vars_file"
         info "Exported final idempotency variables to: $vars_file"
     fi
 
@@ -239,7 +245,7 @@ run_playbook() {
 # MODE: install (default)
 # -----------------------------------------------------------------------
 do_install() {
-    echo -e "${BOLD}core-template execution${NC}"
+    echo -e "${BOLD}fabric execution${NC}"
     info "Target: ${TARGET}"
     echo ""
 
@@ -255,10 +261,10 @@ do_install() {
             dns_server=${dns_server:-"1.1.1.1"}
 
             info "Ensuring DNS resolution via ${dns_server}..."
-            if [ ! -f "/etc/systemd/resolved.conf.d/core-dns.conf" ]; then
+            if [ ! -f "/etc/systemd/resolved.conf.d/fabric-dns.conf" ]; then
                 info "Configuring systemd-resolved..."
                 sudo mkdir -p /etc/systemd/resolved.conf.d/
-                sudo tee /etc/systemd/resolved.conf.d/core-dns.conf > /dev/null <<EOF
+                sudo tee /etc/systemd/resolved.conf.d/fabric-dns.conf > /dev/null <<EOF
 [Resolve]
 DNS=$dns_server
 DNSStubListener=no
@@ -304,14 +310,14 @@ do_uninstall() {
         ensure_ssh_access "$TARGET"
     fi
 
-    echo -e "${BOLD}core-template uninstall${NC}"
+    echo -e "${BOLD}fabric uninstall${NC}"
     echo ""
     warn "This will ${RED}permanently destroy${NC} the following on ${TARGET}:"
     echo ""
-    echo "  - All Docker containers and networks managed by core-template"
+    echo "  - All Docker containers and networks managed by fabric"
     echo "  - Service accounts: ${SERVICE_USERS_LIST[*]}"
     echo "  - All data under ${TARGET_BASE}/:"
-    for dir in core "${SERVICE_DIRS[@]}"; do
+    for dir in fabric "${SERVICE_DIRS[@]}"; do
         echo "      ${TARGET_BASE}/${dir}/"
     done
     echo ""
@@ -321,30 +327,30 @@ do_uninstall() {
         local ask_snap=false
         if $is_remote; then
             ask_snap=true
-        elif [ -f "$TARGET_BASE/core/.version" ]; then
+        elif [ -f "$TARGET_BASE/fabric/.version" ]; then
             ask_snap=true
         fi
 
         if $ask_snap; then
             read -rp "Save a final snapshot to this machine before uninstalling? [y/N] " snap_choice
             if [[ "$snap_choice" =~ ^[yY] ]]; then
-                read -rp "Local destination [${HOME}/core-template-backup]: " snap_dest
-                snap_dest="${snap_dest:-${HOME}/core-template-backup}"
+                read -rp "Local destination [${HOME}/fabric-backup]: " snap_dest
+                snap_dest="${snap_dest:-${HOME}/fabric-backup}"
                 mkdir -p "$snap_dest"
                 info "Saving snapshot to ${snap_dest}..."
                 if $is_remote; then
-                    for dir in core "${SERVICE_DIRS[@]}"; do
+                    for dir in fabric "${SERVICE_DIRS[@]}"; do
                         rsync -az "${SSH_USER}@${TARGET}:${TARGET_BASE}/${dir}/" \
                             "$snap_dest/${dir}/" 2>/dev/null || true
                     done
-                    rsync -az "${SSH_USER}@${TARGET}:${TARGET_BASE}/core/.version" \
+                    rsync -az "${SSH_USER}@${TARGET}:${TARGET_BASE}/fabric/.version" \
                         "$snap_dest/.version" 2>/dev/null || true
                 else
-                    for dir in core "${SERVICE_DIRS[@]}"; do
+                    for dir in fabric "${SERVICE_DIRS[@]}"; do
                         [ -d "$TARGET_BASE/$dir" ] && rsync -a "$TARGET_BASE/$dir/" "$snap_dest/$dir/"
                     done
-                    [ -f "$TARGET_BASE/core/.version" ] && \
-                        cp "$TARGET_BASE/core/.version" "$snap_dest/.version"
+                    [ -f "$TARGET_BASE/fabric/.version" ] && \
+                        cp "$TARGET_BASE/fabric/.version" "$snap_dest/.version"
                 fi
                 ok "Snapshot saved to ${snap_dest}/"
                 echo ""
@@ -374,7 +380,7 @@ do_uninstall() {
         info "Running teardown on ${TARGET}..."
         # Expand lists locally so the remote script has literal values
         local users_list="${SERVICE_USERS_LIST[*]}"
-        local dirs_list="core ${SERVICE_DIRS[*]}"
+        local dirs_list="fabric ${SERVICE_DIRS[*]}"
         # Parse tsig_keys names from vars.yaml for credential dir cleanup
         local tsig_dirs
         tsig_dirs=$(grep -h -A10 '^tsig_keys:' "$CUSTOM_VARS_FILE" 2>/dev/null | grep -E '^[[:space:]]*-.*name:' | awk -F'name:' '{print $2}' | awk -F',' '{print $1}' | tr -d " '\"" || true)
@@ -385,7 +391,7 @@ do_uninstall() {
         local pg_data_local
         pg_data_local=$(awk '/^postgres_data_dir:/ {print $2}' "$CUSTOM_VARS_FILE" 2>/dev/null | tr -d '"' | tr -d "'" || true)
 
-        local tmpscript="/tmp/.core-template-uninstall-$$.sh"
+        local tmpscript="/tmp/.fabric-uninstall-$$.sh"
 
         # Step 1: upload the teardown script (heredoc → no TTY conflict)
         ssh "${SSH_USER}@${TARGET}" "cat > ${tmpscript} && chmod 700 ${tmpscript}" << REMOTE
@@ -394,16 +400,16 @@ set -euo pipefail
 TARGET_BASE="${TARGET_BASE}"
 
 echo "[*] Stopping and removing systemd services..."
-for svc in coreweb nginx bind9 ldap stepca keycloak postgres; do
+for svc in webui nginx bind9 ldap stepca keycloak postgres; do
     systemctl stop \$svc 2>/dev/null || true
     systemctl disable \$svc 2>/dev/null || true
     rm -f /etc/systemd/system/\$svc.service
 done
 systemctl daemon-reload || true
 
-if [ -f "\${TARGET_BASE}/core/docker-compose.yml" ]; then
+if [ -f "\${TARGET_BASE}/fabric/docker-compose.yml" ]; then
     echo "[*] Stopping remaining containers..."
-    docker compose -f "\${TARGET_BASE}/core/docker-compose.yml" down -v 2>/dev/null || true
+    docker compose -f "\${TARGET_BASE}/fabric/docker-compose.yml" down -v 2>/dev/null || true
 fi
 
 echo "[*] Pruning Docker networks..."
@@ -423,11 +429,11 @@ done
 echo "[*] Removing heavy workload data mounts..."
 KC_DATA="${kc_data_local}"
 if [[ -z "\$KC_DATA" ]]; then
-    KC_DATA=\$(awk '/^keycloak_data_dir:/ {print \$2}' "\${TARGET_BASE}/core/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
+    KC_DATA=\$(awk '/^keycloak_data_dir:/ {print \$2}' "\${TARGET_BASE}/fabric/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
 fi
 PG_DATA="${pg_data_local}"
 if [[ -z "\$PG_DATA" ]]; then
-    PG_DATA=\$(awk '/^postgres_data_dir:/ {print \$2}' "\${TARGET_BASE}/core/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
+    PG_DATA=\$(awk '/^postgres_data_dir:/ {print \$2}' "\${TARGET_BASE}/fabric/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
 fi
 
 if [[ -n "\$KC_DATA" && "\$KC_DATA" != "\${TARGET_BASE}/keycloak/data" && -d "\$KC_DATA" ]]; then
@@ -454,7 +460,7 @@ done
 find "\${TARGET_BASE}" -maxdepth 1 -name 'acme_*' -type d -exec rm -rf {} + 2>/dev/null || true
 
 echo "[*] Removing global executable..."
-rm -f /usr/local/bin/core-mgr
+rm -f /usr/local/bin/fabricctl /usr/local/bin/core-mgr
 REMOTE
 
         # Step 2: execute remotely
@@ -466,16 +472,16 @@ REMOTE
         fi
     else
         info "Stopping and removing systemd services..."
-        for svc in coreweb nginx bind9 ldap stepca keycloak postgres; do
+        for svc in webui nginx bind9 ldap stepca keycloak postgres; do
             systemctl stop $svc 2>/dev/null || true
             systemctl disable $svc 2>/dev/null || true
             rm -f /etc/systemd/system/$svc.service
         done
         systemctl daemon-reload || true
 
-        if [ -f "$TARGET_BASE/core/docker-compose.yml" ]; then
+        if [ -f "$TARGET_BASE/fabric/docker-compose.yml" ]; then
             info "Stopping remaining containers..."
-            docker compose -f "$TARGET_BASE/core/docker-compose.yml" down -v 2>/dev/null || true
+            docker compose -f "$TARGET_BASE/fabric/docker-compose.yml" down -v 2>/dev/null || true
         fi
 
         info "Pruning Docker networks..."
@@ -495,11 +501,11 @@ REMOTE
         info "Removing heavy workload data mounts..."
         KC_DATA=$(awk '/^keycloak_data_dir:/ {print $2}' "$CUSTOM_VARS_FILE" 2>/dev/null | tr -d '"' | tr -d "'" || true)
         if [[ -z "$KC_DATA" ]]; then
-            KC_DATA=$(awk '/^keycloak_data_dir:/ {print $2}' "${TARGET_BASE}/core/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
+            KC_DATA=$(awk '/^keycloak_data_dir:/ {print $2}' "${TARGET_BASE}/fabric/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
         fi
         PG_DATA=$(awk '/^postgres_data_dir:/ {print $2}' "$CUSTOM_VARS_FILE" 2>/dev/null | tr -d '"' | tr -d "'" || true)
         if [[ -z "$PG_DATA" ]]; then
-            PG_DATA=$(awk '/^postgres_data_dir:/ {print $2}' "${TARGET_BASE}/core/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
+            PG_DATA=$(awk '/^postgres_data_dir:/ {print $2}' "${TARGET_BASE}/fabric/config/vars.yaml" 2>/dev/null | tr -d '"' | tr -d "'" || true)
         fi
 
         if [[ -n "$KC_DATA" && "$KC_DATA" != "${TARGET_BASE}/keycloak/data" && -d "$KC_DATA" ]]; then
@@ -512,7 +518,7 @@ REMOTE
         fi
 
         info "Removing project directories from ${TARGET_BASE}/..."
-        for dir in core "${SERVICE_DIRS[@]}"; do
+        for dir in fabric "${SERVICE_DIRS[@]}"; do
             rm -rf "${TARGET_BASE:?}/${dir}"
         done
         rm -rf "${TARGET_BASE:?}/step-ca" 2>/dev/null || true
@@ -526,7 +532,7 @@ REMOTE
         find "${TARGET_BASE}" -maxdepth 1 -name 'acme_*' -type d -exec rm -rf {} + 2>/dev/null || true
         
         info "Removing global executable..."
-        rm -f /usr/local/bin/core-mgr
+        rm -f /usr/local/bin/fabricctl /usr/local/bin/core-mgr
     fi
 
     echo ""
@@ -537,26 +543,26 @@ REMOTE
 # MODE: reinstall backup & cleanup helpers
 # -----------------------------------------------------------------------
 do_reinstall_backup() {
-    echo -e "${BOLD}core-template reinstall backup${NC}"
+    echo -e "${BOLD}fabric reinstall backup${NC}"
     local is_remote=false
     if [ "$TARGET" != "localhost" ] && [ "$TARGET" != "127.0.0.1" ]; then
         is_remote=true
         ensure_ssh_access "$TARGET"
     fi
 
-    BACKUP_DIR="/root/.core-reinstall-backup-$$"
+    BACKUP_DIR="/root/.fabric-reinstall-backup-$$"
     info "Backing up CA and certificates to ${BACKUP_DIR}..."
     
     if $is_remote; then
-        local tmpscript="/tmp/.core-reinstall-backup-$$.sh"
-        scp "${SCRIPT_DIR}/core/lib/reinstall_backup.sh" "${SSH_USER}@${TARGET}:${tmpscript}" >/dev/null 2>&1
+        local tmpscript="/tmp/.fabric-reinstall-backup-$$.sh"
+        scp "${SCRIPT_DIR}/fabric/lib/reinstall_backup.sh" "${SSH_USER}@${TARGET}:${tmpscript}" >/dev/null 2>&1
         if [ -n "${REMOTE_SUDO_PASS:-}" ]; then
             printf "%s\n" "$REMOTE_SUDO_PASS" | ssh "${SSH_USER}@${TARGET}" "sudo -S bash ${tmpscript} ${BACKUP_DIR} ${TARGET_BASE}; rm -f ${tmpscript}"
         else
             ssh -t "${SSH_USER}@${TARGET}" "sudo bash ${tmpscript} ${BACKUP_DIR} ${TARGET_BASE}; rm -f ${tmpscript}"
         fi
     else
-        sudo bash "${SCRIPT_DIR}/core/lib/reinstall_backup.sh" "${BACKUP_DIR}" "${TARGET_BASE}"
+        sudo bash "${SCRIPT_DIR}/fabric/lib/reinstall_backup.sh" "${BACKUP_DIR}" "${TARGET_BASE}"
     fi
     
     EXTRA_ANSIBLE_ARGS+=("-e" "reinstall_backup_dir=${BACKUP_DIR}")

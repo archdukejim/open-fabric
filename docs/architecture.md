@@ -1,6 +1,6 @@
 # Architecture and Reference
 
-This document provides an in-depth breakdown of the `core-template` infrastructure, covering the request flows, the underlying directory structures (both source and target), and technical references for PKI, DNS, and Jinja2 rendering.
+This document provides an in-depth breakdown of the `fabric` infrastructure, covering the request flows, the underlying directory structures (both source and target), and technical references for PKI, DNS, and Jinja2 rendering.
 
 ### Table of Contents
 - [Repository Structure](#repository-structure)
@@ -20,20 +20,20 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 
 ```text
 .
-├── core
+├── fabric
 │   ├── jinja
 │   │   ├── bind9
-│   │   ├── coreweb         # coreweb.json.j2
+│   │   ├── webui         # webui.json.j2
 │   │   ├── dirsrv          # docker-compose.yml.j2, seed.py, seed/*.ldif.j2
 │   │   ├── docker-compose.yml.j2
 │   │   ├── nginx
 │   │   ├── stepca
-│   │   ├── systemd         # wrapper.service.j2, coreweb.service.j2
+│   │   ├── systemd         # wrapper.service.j2, webui.service.j2
 │   │   └── vars.yaml.j2
 │   ├── lib
 │   │   ├── archive.sh
 │   │   ├── certs.sh
-│   │   ├── coreweb/        # core-web package (server, oidc, tlsclient, actions, views)
+│   │   ├── webui/        # webui package (server, oidc, tlsclient, actions, views)
 │   │   ├── deploy.py
 │   │   ├── dirsrv.sh
 │   │   ├── dns.sh
@@ -62,13 +62,13 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 │   │   ├── 09-start-and-configure.yml
 │   │   ├── 10-deploy-checks-and-cleanup.yml
 │   │   ├── ansible.cfg
-│   │   └── core-config.yml
-│   └── VERSION             # core-mgr version (BUILD is stamped by setup.sh, git-ignored)
+│   │   └── fabric-config.yml
+│   └── VERSION             # fabricctl version (BUILD is stamped by setup.sh, git-ignored)
 ├── custom-vars.yaml
 ├── docs
 │   ├── ansible-doc.md
 │   ├── architecture.md
-│   ├── coreweb.md
+│   ├── webui.md
 │   ├── install.md
 │   ├── keycloak.md
 │   ├── lib-doc.md
@@ -92,18 +92,18 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 │   ├── data            # Managed: db.* (zones) managed by idempotent deploy (except dynamic journals)
 │   ├── docker-compose.yml # Managed: Re-rendered and managed by idempotent deploy
 │   └── log             # Persistent: BIND9 log directory
-├── core                # Managed/Persistent mix
+├── fabric              # Managed/Persistent mix
 │   ├── archive         # Persistent: Automated snapshots and audit logs
-│   ├── core-secrets.yml # Persistent: Safely preserved secrets for TLS and DNS
+│   ├── fabric-secrets.yml # Persistent: Safely preserved secrets for TLS and DNS
 │   ├── lib/            # Managed: Utility library with python engines and bash wrappers
 │   │   ├── deploy.py   # Managed: Python rendering and state-aware deployment engine
 │   │   ├── interactive.py # Managed: Python interactive categorical CLI engine
 │   │   └── manage.sh   # Managed: Legacy shell function wrapper
 │   ├── src/            # Managed: A full mirror of the deployment repository
 │   └── vars.yaml       # User-managed: Safely merged and preserved
-├── coreweb             # Managed (only when install_coreweb)
-│   ├── coreweb.json    # Managed: core-web config incl. OIDC client secret (root, 0600)
-│   └── run/web.sock    # Runtime: unix socket (dir root:nginx 0750), mounted into nginx at /srv/coreweb
+├── webui             # Managed (only when install_webui)
+│   ├── webui.json    # Managed: webui config incl. OIDC client secret (root, 0600)
+│   └── run/web.sock    # Runtime: unix socket (dir root:nginx 0750), mounted into nginx at /srv/webui
 ├── dirsrv              # Managed/Persistent mix
 │   ├── data            # Persistent: 389-DS /data (config, db, logs)
 │   │   └── tls         # Managed: server.crt, server.key, ca/*.crt (imported into NSS on start)
@@ -111,7 +111,7 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 │   └── docker-compose.yml # Managed
 ├── nginx               # Managed: config updated by installer
 │   ├── docker-compose.yml # Managed: Re-rendered and managed by idempotent deploy
-│   ├── certs           # Managed: service certs; client-ca/ca-bundle.pem (core-web mTLS trust)
+│   ├── certs           # Managed: service certs; client-ca/ca-bundle.pem (webui mTLS trust)
 │   ├── config          # Managed: Nginx main and stream configurations
 │   │   ├── nginx.conf  # Managed: Main config managed by idempotent deploy
 │   │   ├── dns.conf    # Managed: DNS stream routing
@@ -142,7 +142,7 @@ graph TB
         HOST[Pi / bare-metal host]
     end
 
-    subgraph CORE["Docker bridge — core_net (10.255.0.0/24)"]
+    subgraph FABRIC["Docker bridge — fabric_net (10.255.0.0/24)"]
         NGINX["nginx :10.255.0.10\nports 53 · 80 · 389 · 443 · 636 · 853"]
         BIND9["bind9 :10.255.0.30\nhost port bind_dns_port → :53"]
         STEPCA["step-ca :10.255.0.40"]
@@ -150,7 +150,7 @@ graph TB
         KC["keycloak :10.255.0.60"]
     end
 
-    WEB["coreweb (host systemd)\nunix socket"]
+    WEB["webui (host systemd)\nunix socket"]
 
     CLIENT -->|"DNS · HTTPS · LDAPS"| HOST
     HOST --> NGINX
@@ -168,10 +168,10 @@ graph TB
 
 ## Dynamic Resource Constraints & Boot Staggering
 
-To guarantee stability on resource-constrained hardware (e.g. Raspberry Pi), `core-template` natively enforces dynamic memory ceilings (`mem_limit`) and staggered boot sequences across its Docker containers via the `host_ram_capacity` variable.
+To guarantee stability on resource-constrained hardware (e.g. Raspberry Pi), `fabric` natively enforces dynamic memory ceilings (`mem_limit`) and staggered boot sequences across its Docker containers via the `host_ram_capacity` variable.
 
 ### Validation Enforcement
-The minimum supported value for `host_ram_capacity` is **3** (GB). If defined (i.e. `> 0`) but less than 3, the `setup.sh` installer and `core-mgr` interactive Python engine will hard-fail to prevent the system from entering an unstable state. A value of `0` denotes an unlimited capacity (the default).
+The minimum supported value for `host_ram_capacity` is **3** (GB). If defined (i.e. `> 0`) but less than 3, the `setup.sh` installer and `fabricctl` interactive Python engine will hard-fail to prevent the system from entering an unstable state. A value of `0` denotes an unlimited capacity (the default).
 
 ### Docker Compose Memory Ceilings
 When `host_ram_capacity` is enabled, Jinja2 automatically injects memory constraints into the `docker-compose.yml` templates for all active services.
@@ -212,7 +212,7 @@ BIND9 runs as an **authoritative-only** server (recursion disabled). It serves:
 - Each zone with `zone_authority: true` gets an NS A record pointing to `host_ip`
 - Reverse zones (PTR) auto-generated from A records — one `/24` `in-addr.arpa` zone per unique subnet; `reverse_zone_names` computed in `vars.yaml.j2`
 - ACME challenge and zone records updateable per `tsig_keys[].record_types` (primary keys → `subdomain _acme-challenge`; others → `zonesub`)
-- Any additional keys managed by `core-mgr --tsig-keys`
+- Any additional keys managed by `fabricctl --tsig-keys`
 
 nginx fronts BIND9 on all public DNS ports:
 
@@ -248,9 +248,9 @@ Root CA  (offline — manually generated, key never deployed to target)
             ├── Offline leaf certs      (issued at install time via step-ca)
             │       ├── dns.<domain>    → nginx DoT / DoH
             │       ├── ldap.<domain>   → 389-DS (StartTLS + LDAPS, served by dirsrv itself)
-            │       ├── mgr.<domain>    → nginx → core-web (only when install_coreweb)
+            │       ├── mgr.<domain>    → nginx → webui (only when install_webui)
             │       └── ca.<domain>     → nginx → Step-CA
-            ├── core-web admin client certs  (core-mgr --client-cert <user>; CN = Keycloak username)
+            ├── webui admin client certs  (fabricctl --client-cert <user>; CN = Keycloak username)
             └── extra_certs  (offline or ACME, per-entry config)
 ```
 
@@ -267,7 +267,7 @@ Internal CA files are distributed to services as `root_ca.crt` volume mounts. Th
 
 ## Certificate Relay
 
-Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `landing_page_cname.<domain>`, and `mgr.<domain>` when core-web is enabled) are offline Step-CA leaf certs with a 10-year lifetime, issued at install time via `step certificate create`. There is no certbot container or cert-relay service. nginx reads the issued certs directly from the volume paths set during install. The LDAP cert is copied to `/opt/dirsrv/data/tls/` (`server.crt`, `server.key`, `ca/root_ca.crt`, `ca/intermediate_ca.crt`), which 389-DS imports on start. For core-web client-certificate verification nginx trusts `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root).
+Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `landing_page_cname.<domain>`, and `mgr.<domain>` when webui is enabled) are offline Step-CA leaf certs with a 10-year lifetime, issued at install time via `step certificate create`. There is no certbot container or cert-relay service. nginx reads the issued certs directly from the volume paths set during install. The LDAP cert is copied to `/opt/dirsrv/data/tls/` (`server.crt`, `server.key`, `ca/root_ca.crt`, `ca/intermediate_ca.crt`), which 389-DS imports on start. For webui client-certificate verification nginx trusts `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root).
 
 ---
 
@@ -287,21 +287,21 @@ sequenceDiagram
 
 ## Jinja2 Templates
 
-All `.j2` files in this repo are rendered by the Ansible playbook or the `core-mgr` deployment engine into `/opt/<service>/`. The `.j2` source files are removed from `/opt` after rendering — only rendered outputs remain on the host.
+All `.j2` files in this repo are rendered by the Ansible playbook or the `fabricctl` deployment engine into `/opt/<service>/`. The `.j2` source files are removed from `/opt` after rendering — only rendered outputs remain on the host.
 
 | Template | Rendered to |
 |----------|------------|
-| `core/jinja/vars.yaml.j2` | `/tmp/core-template-render/vars.yaml` (resolved vars — merged at run time) |
-| `core/jinja/<service>/docker-compose.yml.j2` | `/opt/<service>/docker-compose.yml` (e.g. nginx, bind9) |
-| `core/jinja/nginx/nginx.conf.j2` | `/opt/nginx/config/nginx.conf` |
-| `core/jinja/nginx/www/certificates/index.html.j2` | `/opt/nginx/www/certificates/index.html` |
-| `core/jinja/nginx/www/ldap/index.html.j2` | `/opt/nginx/www/ldap/index.html` |
-| `core/jinja/bind9/config/named.conf*.j2` | `/opt/bind9/config/named.conf*` |
-| `core/jinja/bind9/data/zone.j2` | `/opt/bind9/data/db.<zone>` (forward zones) |
-| `core/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<octet3>.<octet2>.<octet1>.in-addr.arpa` (PTR — auto-generated) |
-| `core/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
-| `core/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
-| `core/jinja/coreweb/coreweb.json.j2` | `/opt/coreweb/coreweb.json` |
-| `core/jinja/systemd/coreweb.service.j2` | `/etc/systemd/system/coreweb.service` |
-| `core/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
-| `core/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |
+| `fabric/jinja/vars.yaml.j2` | `/tmp/fabric-render/vars.yaml` (resolved vars — merged at run time) |
+| `fabric/jinja/<service>/docker-compose.yml.j2` | `/opt/<service>/docker-compose.yml` (e.g. nginx, bind9) |
+| `fabric/jinja/nginx/nginx.conf.j2` | `/opt/nginx/config/nginx.conf` |
+| `fabric/jinja/nginx/www/certificates/index.html.j2` | `/opt/nginx/www/certificates/index.html` |
+| `fabric/jinja/nginx/www/ldap/index.html.j2` | `/opt/nginx/www/ldap/index.html` |
+| `fabric/jinja/bind9/config/named.conf*.j2` | `/opt/bind9/config/named.conf*` |
+| `fabric/jinja/bind9/data/zone.j2` | `/opt/bind9/data/db.<zone>` (forward zones) |
+| `fabric/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<octet3>.<octet2>.<octet1>.in-addr.arpa` (PTR — auto-generated) |
+| `fabric/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
+| `fabric/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
+| `fabric/jinja/webui/webui.json.j2` | `/opt/webui/webui.json` |
+| `fabric/jinja/systemd/webui.service.j2` | `/etc/systemd/system/webui.service` |
+| `fabric/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
+| `fabric/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |

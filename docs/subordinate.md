@@ -1,9 +1,9 @@
 # Subordinate CA Infrastructure (Nested Layouts)
 
-The `core-template` infrastructure natively supports multi-tier, nested PKI deployments. This allows you to build a comprehensive hierarchy where a "First Level Intermediate CA" can issue both local application certificates AND sign further Subordinate ICAs for segmented environments (Second Level Intermediate CAs, Third Level, etc.).
+The `fabric` infrastructure natively supports multi-tier, nested PKI deployments. This allows you to build a comprehensive hierarchy where a "First Level Intermediate CA" can issue both local application certificates AND sign further Subordinate ICAs for segmented environments (Second Level Intermediate CAs, Third Level, etc.).
 
 ### Are Subordinate CAs minted from the Root or the ICA?
-When you use `core-template`'s `core-mgr` to mint a subordinate CA, it is **minted and signed by the Intermediate CA**, not the Root CA. The `step-ca` daemon running on your host operates exclusively using the Intermediate CA's private key. The Root CA remains isolated and is not used for day-to-day operations.
+When you use `fabric`'s `fabricctl` to mint a subordinate CA, it is **minted and signed by the Intermediate CA**, not the Root CA. The `step-ca` daemon running on your host operates exclusively using the Intermediate CA's private key. The Root CA remains isolated and is not used for day-to-day operations.
 
 ```mermaid
 flowchart TD
@@ -65,7 +65,7 @@ As long as the client devices have the **Root CA** installed, they will implicit
 Log in to the host machine running your First Level infrastructure. Use the built-in management script to mint a new intermediate CA certificate.
 
 ```bash
-sudo core-mgr --mint-certs --intermediate-ca
+sudo fabricctl --mint-certs --intermediate-ca
 ```
 
 **Interactive Prompts:**
@@ -79,7 +79,7 @@ This will generate two files in the output directory:
 
 ## Hardware Keys: Signing a CSR
 
-If you are using a **Hardware Security Module (HSM)** or a **YubiKey** to store the private key for your Second Level Intermediate CA, you will generate a Certificate Signing Request (CSR) locally on the hardware instead of letting `core-mgr` generate the key for you.
+If you are using a **Hardware Security Module (HSM)** or a **YubiKey** to store the private key for your Second Level Intermediate CA, you will generate a Certificate Signing Request (CSR) locally on the hardware instead of letting `fabricctl` generate the key for you.
 
 Once you have your CSR file (e.g., `hardware-key.csr`), you can use the First Level infrastructure's `step-ca` backend to sign it.
 

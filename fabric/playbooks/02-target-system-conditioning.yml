@@ -1,0 +1,222 @@
+---
+# Section 2 — Target System Conditioning
+#
+# Validates the target OS, installs system packages and Docker Engine,
+# removes any stale project containers from a previous run, and confirms
+# that Docker BuildKit is available (required by 06-build-root-ca.yml).
+#
+# Replaces: Target system portions of 00-system-check.yml
+- name: Section 2 - Target System Conditioning
+  hosts: "{{ target_host }}"
+  become: true
+  vars_files:
+    - "/tmp/fabric-render/vars.yaml"
+
+  tasks:
+    # ----------------------------------------------------------------
+    # 2a — OS Validation
+    # ----------------------------------------------------------------
+    - name: Section 2a - Target OS validation
+      tags: [preconditioning, validation, prereqs, always]
+      block:
+        - name: Ensure target OS is Ubuntu
+          ansible.builtin.assert:
+            that:
+              - ansible_facts["distribution"] == "Ubuntu"
+            fail_msg: "This playbook requires Ubuntu. Detected: {{ ansible_facts['distribution'] }}"
+
+        - name: Warn if not Ubuntu 24.04
+          ansible.builtin.debug:
+            msg: "WARNING: Running Ubuntu {{ ansible_facts['distribution_version'] }}. Optimized for 24.04."
+          when: ansible_facts["distribution_version"] != "24.04"
+
+    # ----------------------------------------------------------------
+    # 2b — System packages
+    # ----------------------------------------------------------------
+    - name: Section 2b - System package installation
+      tags: [preconditioning, pkg_mgmt]
+      block:
+        - name: Purge corrupt Docker repository files before APT update to prevent GPG conflicts
+          when: offline_prereqs_dir is not defined and not (offline | default(false) | bool)
+          ansible.builtin.shell: rm -f /etc/apt/sources.list.d/*docker*.list /etc/apt/sources.list.d/*-docker.com-*.list
+          changed_when: false
+
+        - name: Install prerequisite packages from offline bundle
+          when: offline_prereqs_dir is defined
+          ansible.builtin.shell:
+            cmd: |
+              set -euo pipefail
+              DEB_DIR="{{ offline_prereqs_dir }}/apt"
+              mapfile -t _debs < <(find "$DEB_DIR" -name "*.deb" 2>/dev/null | sort)
+              [ "${#_debs[@]}" -gt 0 ] || { echo "No .deb files found in ${DEB_DIR}"; exit 1; }
+              echo "Installing ${#_debs[@]} packages from bundle..."
+              dpkg -i --force-depends "${_debs[@]}" 2>&1 | \
+                grep -v '^\(Reading database\|Preparing to unpack\|Unpacking\|Setting up\|Processing triggers\)' || true
+              apt-get install -f -y --no-install-recommends \
+                -o Dir::Cache::Archives="${DEB_DIR}" \
+                -o APT::Get::AllowUnauthenticated=true 2>/dev/null || true
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Install prerequisite system packages
+          when: offline_prereqs_dir is not defined and not (offline | default(false) | bool)
+          ansible.builtin.apt:
+            name:
+              - openssl
+              - ca-certificates
+              - curl
+              - gnupg
+              - ufw
+              - libssl-dev
+              - dnsutils
+            state: present
+            update_cache: true
+          environment:
+            DEBIAN_FRONTEND: noninteractive
+            NEEDRESTART_MODE: a
+
+    # ----------------------------------------------------------------
+    # 2c — Docker Engine
+    # ----------------------------------------------------------------
+    - name: Section 2c - Docker Engine installation
+      tags: [preconditioning, docker_engine]
+      block:
+        - name: Check if Docker is installed
+          ansible.builtin.shell: command -v docker
+          register: docker_installed
+          failed_when: false
+          changed_when: false
+
+        - name: Check if Docker Buildx is installed
+          ansible.builtin.shell: docker buildx version
+          register: docker_buildx_installed
+          failed_when: false
+          changed_when: false
+
+        - name: Check if Docker Compose is installed
+          ansible.builtin.shell: docker compose version
+          register: docker_compose_installed
+          failed_when: false
+          changed_when: false
+
+        - name: Fail if Docker is missing in offline mode without a bundle
+          ansible.builtin.fail:
+            msg: "Docker is missing! You are running in offline mode (-o) but no offline_prereqs_dir was provided. Cannot download Docker."
+          when: >
+            (docker_installed.rc != 0 or
+             docker_buildx_installed.rc != 0 or
+             docker_compose_installed.rc != 0) and
+            offline_prereqs_dir is not defined and
+            (offline | default(false) | bool)
+
+        - name: Install Docker from official repository
+          when: >
+            (docker_installed.rc != 0 or
+             docker_buildx_installed.rc != 0 or
+             docker_compose_installed.rc != 0) and
+            offline_prereqs_dir is not defined and
+            not (offline | default(false) | bool)
+          block:
+            - name: Create keyrings directory
+              ansible.builtin.file:
+                path: /etc/apt/keyrings
+                state: directory
+                mode: '0755'
+
+            - name: Download Docker GPG key
+              ansible.builtin.get_url:
+                url: https://download.docker.com/linux/ubuntu/gpg
+                dest: /etc/apt/keyrings/docker.asc
+                mode: '0644'
+
+            - name: Get dpkg architecture
+              ansible.builtin.command: dpkg --print-architecture
+              register: dpkg_arch
+              changed_when: false
+
+            - name: Add Docker repository
+              ansible.builtin.apt_repository:
+                repo: "deb [arch={{ dpkg_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_facts['distribution_release'] }} stable"
+                state: present
+                filename: docker
+                update_cache: true
+
+            - name: Install Docker Engine and Python SDK
+              ansible.builtin.apt:
+                name:
+                  - docker-ce
+                  - docker-ce-cli
+                  - containerd.io
+                  - docker-buildx-plugin
+                  - docker-compose-plugin
+                  - python3-docker
+                state: present
+                update_cache: true
+
+        - name: Load Docker images from offline bundle
+          when: offline_prereqs_dir is defined
+          ansible.builtin.shell:
+            cmd: |
+              set -euo pipefail
+              IMG_DIR="{{ offline_prereqs_dir }}/images"
+              loaded=0
+              for tar in "${IMG_DIR}"/*.tar; do
+                [ -f "$tar" ] || continue
+                echo "Loading $(basename "$tar")..."
+                docker load -i "$tar"
+                (( loaded++ )) || true
+              done
+              echo "Loaded ${loaded} image(s) from bundle."
+            executable: /bin/bash
+          changed_when: true
+
+        - name: Ensure Docker service is running and enabled
+          ansible.builtin.systemd:
+            name: docker
+            state: started
+            enabled: true
+
+        - name: Verify Docker API responsiveness
+          ansible.builtin.command: docker info
+          changed_when: false
+          register: docker_info
+          failed_when: "'Containers' not in docker_info.stdout"
+          retries: 6
+          delay: 5
+          until: docker_info.rc == 0
+
+    # ----------------------------------------------------------------
+    # 2d — Pre-run cleanup (remove stale containers)
+    # ----------------------------------------------------------------
+    - name: Section 2d - Remove existing project containers
+      tags: [preconditioning, cleanup]
+      block:
+        - name: Remove existing project containers
+          community.docker.docker_container:
+            name: "{{ item }}"
+            state: absent
+          loop: "{{ project_containers }}"
+          failed_when: false
+
+    # ----------------------------------------------------------------
+    # 2e — Confirm docker buildx / BuildKit available
+    # ----------------------------------------------------------------
+    - name: Section 2e - Confirm BuildKit available
+      tags: [preconditioning, validation, always]
+      block:
+        - name: Check docker buildx version
+          ansible.builtin.command: docker buildx version
+          register: buildx_check
+          changed_when: false
+          failed_when: buildx_check.rc != 0
+
+        - name: Verify DOCKER_BUILDKIT or buildx default builder
+          ansible.builtin.command: docker buildx inspect
+          register: buildx_inspect
+          changed_when: false
+
+        - name: Assert BuildKit driver is active
+          ansible.builtin.assert:
+            that:
+              - buildx_inspect.rc == 0
+            fail_msg: "docker buildx is not working correctly. Check 'docker buildx inspect'."

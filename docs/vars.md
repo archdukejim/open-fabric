@@ -1,4 +1,4 @@
-# Core Template Configuration Variables
+# fabric Configuration Variables
 
 This document details all available configuration variables that can be defined in your `custom-vars.yaml` file. 
 
@@ -6,7 +6,7 @@ The `custom-vars.yaml` file acts as the single source of truth for rendering the
 
 ---
 
-## 1. Global / Core Options
+## 1. Global Options
 These variables define top-level identity and basic settings.
 
 ### `domain`
@@ -37,7 +37,7 @@ These variables define top-level identity and basic settings.
 ### `hostname`
 **Description:** The hostname of the Docker host server. **Required.**
 
-**Default Value:** *(Mandatory - Template: `core-server`)*
+**Default Value:** *(Mandatory - Template: `fabric`)*
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
@@ -114,14 +114,14 @@ These variables define top-level identity and basic settings.
 
 **Effected Jinja Templates:**
 - `bind9/docker-compose.yml.j2`
-- `coreweb/coreweb.json.j2`
+- `webui/webui.json.j2`
 - `dirsrv/docker-compose.yml.j2`
 - `docs/testplan.md.j2`
 - `keycloak/docker-compose.yml.j2`
 - `nginx/docker-compose.yml.j2`
 - `postgres/docker-compose.yml.j2`
 - `stepca/docker-compose.yml.j2`
-- `systemd/coreweb.service.j2`
+- `systemd/webui.service.j2`
 - `systemd/wrapper.service.j2`
 - `vars.yaml.j2`
 
@@ -170,8 +170,8 @@ These settings dictate how containers route traffic and how the BIND9 DNS server
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
 
-### `core_subnet`
-**Description:** The internal Docker bridge subnet for the core template.
+### `fabric_subnet`
+**Description:** The internal Docker bridge subnet for the fabric services.
 
 **Default Value:** `10.255.0.0/24`
 
@@ -517,7 +517,7 @@ Allows deep customization of the container orchestration, including overriding i
 ### `compose_file`
 **Description:** Path to the generated `docker-compose.yml` file.
 
-**Default Value:** `deploy_base_dir` + `"/core/docker-compose.yml"`
+**Default Value:** `deploy_base_dir` + `"/fabric/docker-compose.yml"`
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
@@ -597,7 +597,7 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_nginx` | `"nginx:latest"` |
 | `image_bind9` | `"ubuntu/bind9:latest"` |
 | `image_stepca` | `"smallstep/step-ca:latest"` |
-| `image_dirsrv`| `"core-template/dirsrv:local"` (built locally from `core/jinja/dirsrv/build`, Debian stable + `389-ds-base`) |
+| `image_dirsrv`| `"fabric/dirsrv:local"` (built locally from `fabric/jinja/dirsrv/build`, Debian stable + `389-ds-base`) |
 | `image_keycloak`| `"keycloak/keycloak:latest"` |
 | `image_postgres`| `"postgres:latest"` |
 
@@ -610,7 +610,7 @@ Allows overriding the default short hostnames (CNAMEs) automatically assigned to
 | `cname_dns` | `"dns"` |
 | `cname_ldap` | `"ldap"` |
 | `cname_sso` | `"sso"` |
-| `cname_mgr` | `"mgr"` (DNS CNAME added only when core-web is enabled) |
+| `cname_mgr` | `"mgr"` (DNS CNAME added only when webui is enabled) |
 
 ### Internal Subdomain Routing (Nginx)
 By default, the fully qualified hostnames are constructed using the CNAMEs above appended with the base `domain`.
@@ -622,7 +622,7 @@ By default, the fully qualified hostnames are constructed using the CNAMEs above
 | `hostname_landing` | `landing_page_cname + "." + domain` (or `domain` if empty) |
 | `hostname_ldap` | `cname_ldap + "." + domain` |
 | `hostname_keycloak`| `cname_sso + "." + domain` |
-| `hostname_mgr`| `cname_mgr + "." + domain` (core-web vhost; `redirect_uri` is `https://<hostname_mgr>/oidc/callback`) |
+| `hostname_mgr`| `cname_mgr + "." + domain` (webui vhost; `redirect_uri` is `https://<hostname_mgr>/oidc/callback`) |
 
 ## 5. Security Contexts & Features
 Toggle features and control system-level UNIX isolation mapping.
@@ -646,8 +646,8 @@ Toggle features and control system-level UNIX isolation mapping.
 - `nginx/www/landing/index.html.j2`
 - `vars.yaml.j2`
 
-### `install_coreweb`
-**Description:** Deploys the core-web management UI (systemd `coreweb`, nginx vhost `hostname_mgr`, `mgr` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [coreweb.md](coreweb.md).
+### `install_webui`
+**Description:** Deploys the webui management UI (systemd `webui`, nginx vhost `hostname_mgr`, `mgr` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
 
 **Default Value:** `true` (effective only with Keycloak)
 
@@ -656,16 +656,16 @@ Toggle features and control system-level UNIX isolation mapping.
 - `nginx/nginx.conf.j2`
 - `vars.yaml.j2`
 
-### core-web Settings
+### webui Settings
 | Variable | Default Value | Description |
 |----------|---------------|-------------|
-| `coreweb_realm` | `domain` | Keycloak realm used for login and created/configured by `keycloak_bootstrap.py` |
-| `coreweb_admin_role` | `"core-admin"` | Realm role required to use core-web |
-| `coreweb_admin_group` | `"admins"` | LDAP/Keycloak group granted `coreweb_admin_role` |
-| `coreweb_session_idle` | `900` | Session idle timeout (seconds) |
-| `coreweb_session_max` | `28800` | Absolute session lifetime (seconds) |
+| `webui_realm` | `domain` | Keycloak realm used for login and created/configured by `keycloak_bootstrap.py` |
+| `webui_admin_role` | `"fabric-admin"` | Realm role required to use webui |
+| `webui_admin_group` | `"admins"` | LDAP/Keycloak group granted `webui_admin_role` |
+| `webui_session_idle` | `900` | Session idle timeout (seconds) |
+| `webui_session_max` | `28800` | Absolute session lifetime (seconds) |
 
-`coreweb_realm`, `coreweb_admin_role` and `coreweb_admin_group` are rendered into `vars.yaml`; the session timeouts are read only by `coreweb/coreweb.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `coreweb_oidc_secret` is generated into `core-secrets.yml`.
+`webui_realm`, `webui_admin_role` and `webui_admin_group` are rendered into `vars.yaml`; the session timeouts are read only by `webui/webui.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `webui_oidc_secret` is generated into `fabric-secrets.yml`.
 
 ### `service_users`
 **Description:** Dictionary mapping container names to UID/GID objects for setting permissions.
@@ -712,12 +712,12 @@ service_dirs:
   - { folder: dirsrv,   owner: ldap }
   - { folder: keycloak, owner: keycloak }
   - { folder: postgres, owner: postgres }
-  - { folder: coreweb,  owner: root }
+  - { folder: webui,  owner: root }
 ```
 Built-in folders always come from these defaults (a legacy `openldap` entry is dropped); user-added folders are kept.
 
 ## 6. 389 Directory Server (LDAP) Specifics
-If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `core/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
+If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabric/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 
 ### `ldap_base_dn`
 **Description:** Base distinguished name (389-DS suffix), automatically computed from `domain`.
@@ -757,7 +757,7 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 | `dirsrv_errorlog_level` | `8192` | `dirsrv/docker-compose.yml.j2` |
 
 ### Role Accounts
-Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated into `core-secrets.yml` (there is no shared default password):
+Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated into `fabric-secrets.yml` (there is no shared default password):
 
 | Account | Secret |
 |---------|--------|
@@ -788,7 +788,7 @@ ldap_organizational_units:
 ```
 
 ## 7. Landing Page Links (`link-vars.yaml`)
-The `link-vars.yaml` file (or `link-vars-template.yaml`) defines the dynamic list of quick links shown on the Core Infrastructure Landing Portal. It is managed interactively via `core-mgr` under the **Landing Page Links** menu.
+The `link-vars.yaml` file (or `link-vars-template.yaml`) defines the dynamic list of quick links shown on the Fabric Landing Portal. It is managed interactively via `fabricctl` under the **Landing Page Links** menu.
 
 ### `links`
 **Description:** A list of dictionaries containing `name` and `link` keys for each quick link to display on the landing page. The `link` values can use Jinja variables like `{{ domain }}` or `{{ hostname_keycloak }}` which will be evaluated natively during deployment.

@@ -1,6 +1,7 @@
+fabric-secrets.yml
 core-secrets.yml
-core/pki/
-core/tests
+fabric/pki/
+fabric/tests
 network_backup.txt
 custom-vars-picore.yaml
 custom-vars.yaml
@@ -9,4 +10,4 @@ become_pass
 test/
 custom-vars-test.yaml
 link-vars.yaml
-core/BUILD
+fabric/BUILD

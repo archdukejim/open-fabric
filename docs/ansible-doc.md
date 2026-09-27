@@ -1,6 +1,6 @@
 # Ansible Playbooks and Configurations
 
-The `core-template` infrastructure is deployed via a sequential set of Ansible playbooks. The main entry point is `core/playbooks/core-config.yml`, which imports the individual playbook sections in order.
+The `fabric` infrastructure is deployed via a sequential set of Ansible playbooks. The main entry point is `fabric/playbooks/fabric-config.yml`, which imports the individual playbook sections in order.
 
 ### Table of Contents
 - [Playbook Breakdown](#playbook-breakdown)
@@ -18,13 +18,13 @@ The `core-template` infrastructure is deployed via a sequential set of Ansible p
 | `01-gen-vars-and-render-jinja.yml` | Idempotent generation of secrets, evaluates state/upgrade flags, and renders Jinja2 templates via Python. |
 | `02-target-system-conditioning.yml` | Prepares the target host environment, configures UFW with a LAN allow-list. |
 | `03-target-service-accounts.yml` | Creates localized system groups and service users (`nginx`, `bind`, `step`, `ldap`) on the target machine with specific UIDs/GIDs. |
-| `04-target-file-structure.yml` | Replicates the directory tree onto the target (`/opt/...`), deploys the rendered configurations (incl. 389-DS seed LDIFs + `seed.py`, core-web config and `coreweb.service`), systemd wrappers, and sets appropriate file ownership/permissions. |
+| `04-target-file-structure.yml` | Replicates the directory tree onto the target (`/opt/...`), deploys the rendered configurations (incl. 389-DS seed LDIFs + `seed.py`, webui config and `webui.service`), systemd wrappers, and sets appropriate file ownership/permissions. |
 | `05-target-network.yml` | Hardens `systemd-resolved` to prevent port 53 conflicts and performs additional network setup. |
 | `06-configure-stepca.yml` | Initializes Step-CA, signs the intermediate CA CSR if deployed via BYOC, and establishes the foundational PKI structure. |
 | `07-bootstrap-containers.yml` | Securely bootstraps foundational containers into existence. |
-| `08-mint-service-certs.yml` | Uses the running Step-CA container to mint offline TLS certificates for BIND9, core services (incl. `mgr.<domain>`), and any `extra_certs`; installs the 389-DS TLS files (`/opt/dirsrv/data/tls`) and the core-web client-CA bundle. |
-| `09-start-and-configure.yml` | Starts the full stack via systemd wrappers, seeds 389-DS (`dirsrv.sh seed`), configures Keycloak via `keycloak_bootstrap.py` (realm, LDAP federation, core-web client, MFA), and starts `coreweb`. |
-| `10-deploy-checks-and-cleanup.yml` | Verifies DNS resolution, checks HTTPS health endpoints, verifies LDAP role accounts bind with their generated secrets, plaintext binds are refused and the LDAPS cert verifies, checks the core-web socket and that nginx returns `400` without a client cert, exports startup logs, and cleans up temporary render directories. |
+| `08-mint-service-certs.yml` | Uses the running Step-CA container to mint offline TLS certificates for BIND9, core services (incl. `mgr.<domain>`), and any `extra_certs`; installs the 389-DS TLS files (`/opt/dirsrv/data/tls`) and the webui client-CA bundle. |
+| `09-start-and-configure.yml` | Starts the full stack via systemd wrappers, seeds 389-DS (`dirsrv.sh seed`), configures Keycloak via `keycloak_bootstrap.py` (realm, LDAP federation, webui client, MFA), and starts `webui`. |
+| `10-deploy-checks-and-cleanup.yml` | Verifies DNS resolution, checks HTTPS health endpoints, verifies LDAP role accounts bind with their generated secrets, plaintext binds are refused and the LDAPS cert verifies, checks the webui socket and that nginx returns `400` without a client cert, exports startup logs, and cleans up temporary render directories. |
 
 ---
 
@@ -50,7 +50,7 @@ The execution heavily relies on standard Ansible collections. These must be pres
 
 ## `ansible.cfg` Nuances
 
-The repository ships with its own `ansible.cfg` located in `core/playbooks/ansible.cfg`. It enforces several strict modernizations that developers modifying the playbooks must adhere to:
+The repository ships with its own `ansible.cfg` located in `fabric/playbooks/ansible.cfg`. It enforces several strict modernizations that developers modifying the playbooks must adhere to:
 
 ### 1. Python Interpreter Pinning
 ```ini
