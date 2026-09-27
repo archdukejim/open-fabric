@@ -67,11 +67,11 @@ Key tunables with their defaults:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `bind_dns_port` | `5353` | Host port mapped to BIND9 container port 53 (`bind_dns_port:53`) — for direct host access and coexistence with other resolvers |
+| `bind_dns_port` | `53` | Host port (on `host_ip`) mapped to BIND9's port 53 — the LAN's DNS port |
 | `bind9_doh_port` | `8053` | BIND9 plain-HTTP DoH port (nginx terminates TLS) |
 | `stepca_port` | `9000` | Step-CA HTTPS port |
 
-> **`bind_dns_port`** is the host-side port Docker maps to BIND9's internal port 53 (e.g. `5353:53`). This keeps BIND9 off host port 53 so nginx can own it, while still letting host tools query directly: `dig @<host_ip> -p 5353`. nginx proxies public port 53 → `bind9:53` (container-to-container). nginx's port 53 (and all other LAN-facing ports) is bound to `host_ip` rather than `0.0.0.0` to avoid conflicts with `systemd-resolved`, which holds the loopback interface on Ubuntu.
+> BIND9 answers DNS itself: Docker publishes `host_ip:bind_dns_port` → the container's port 53 (TCP and UDP). Binding to `host_ip` rather than `0.0.0.0` avoids a conflict with `systemd-resolved` on loopback. DNS-over-HTTPS goes through nginx (`https://dns.<domain>/dns-query` → `bind9:8053`); DNS-over-TLS (853) is not exposed yet.
 
 ### Customization Checklist
 
@@ -87,7 +87,8 @@ Key tunables with their defaults:
 - [ ] `install_ldap` / `install_keycloak` / `install_webui` — see [the default plan](#the-default-plan) and [webui.md](webui.md)
 - [ ] `security.firewall` / `security.firewall_allow` / `security.docker_daemon_hardening`
 - [ ] `tsig_keys` — add non-primary entries for external services that need DNS update rights (optional)
-- [ ] `bind_dns_port` — change from `5353` if that port conflicts with an existing service
+- [ ] `bind_dns_port` — change from `53` only if another DNS server must keep port 53 on `host_ip`
+- [ ] `webui_admin_user` — the first web UI admin setup creates (default: the account that ran `sudo`)
 - [ ] `image_nginx` / `image_bind9` / `image_stepca` / `image_dirsrv` — override to pin images to specific digests or a local registry (optional)
 
 ---
@@ -156,6 +157,12 @@ sudo ./setup.sh --file vars.yaml --non-interactive --yes
 
 After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time.
 
+### The login kit
+
+With the web UI enabled, setup finishes by creating your first admin and leaving everything your computer needs in `~/fabric-admin/` (of the account that ran `sudo`): the client certificate `<user>.p12` and its password, the initial Keycloak password (you choose a new one at first login), the fabric root CA (`.crt`, and `.cer` for Windows) and a README with the remaining steps: copy the folder to your computer, trust the CA, import the `.p12`, open `https://mgr.<domain>`. Details: [webui.md](webui.md#first-time-setup).
+
+On this host setup already trusts the fabric CA (`/usr/local/share/ca-certificates`), and every service has its certificate from it.
+
 ### Steps
 
 | Step | What it does |
@@ -172,7 +179,8 @@ After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time.
 | `bootstrap` | Start BIND9 and Step-CA; validate every zone |
 | `certs` | Issue/renew service certificates |
 | `start` | Start the stack; seed 389-DS; configure Keycloak; fabric-agent + web UI |
-| `verify` | DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services |
+| `admin` | First web UI admin: LDAP user in `admins`, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
+| `verify` | DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, admin role + client cert, services |
 
 ---
 
@@ -205,7 +213,9 @@ Installs before 1.5.0 ran `osixia/openldap` in `/opt/openldap`. Setup deploys 38
 
 ```bash
 # Uninstall + setup, keeping config, secrets, the CA and certificates
-# (clients keep trusting the CA)
+# (clients keep trusting the CA). NOT kept: the directory (389-DS users,
+# groups) and Keycloak's database (TOTP enrolments); setup re-creates the
+# first admin with a new login kit.
 sudo fabricctl reinstall
 
 # Remove fabric: its containers, images, network, units, service accounts

@@ -80,6 +80,10 @@ def install_zone_file(src, dst, uid, gid):
     shutil.copy2(src, dst)
     os.chown(dst, uid, gid)
     os.chmod(dst, 0o640)
+    # A journal written against the old file no longer matches it: BIND
+    # would refuse to load the zone ("journal out of sync").
+    if os.path.exists(dst + ".jnl"):
+        os.remove(dst + ".jnl")
 
 def deploy_zone_files(src_dir, dst_dir, uid, gid):
     """Return [(zone, src, dst)] for zone files whose records actually changed."""
@@ -572,11 +576,38 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
             os.chmod(dst, 0o600)
 
     if not start_services:
-        # Nothing is running yet: zone files are simply put in place.
-        for zone, src, dst in changed_zones:
-            install_zone_file(src, dst, bind_uid, bind_gid)
+        # fabricctl setup: start nothing here, but a re-run finds the stack
+        # live. Zones are swapped safely, changed images rebuilt, and every
+        # service whose config changed is returned for setup to restart.
+        bind9_up = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}", "bind9"],
+                                  capture_output=True, text=True).stdout.strip() == "true"
+        if bind9_up and (bind9_config_changed or "bind9" in services_to_restart):
+            for zone, src, dst in changed_zones:
+                rndc(f"freeze {zone}")          # sync the journal; the restart loads the new file
+                install_zone_file(src, dst, bind_uid, bind_gid)
+            services_to_restart.add("bind9")
+        elif bind9_up:
+            for zone, src, dst in changed_zones:
+                reload_zone(zone, src, dst, bind_uid, bind_gid)
+        else:
+            for zone, src, dst in changed_zones:
+                install_zone_file(src, dst, bind_uid, bind_gid)
+        if nginx_config_changed:
+            services_to_restart.add("nginx")
+        if webui_changed:
+            services_to_restart.add("webui")
+        if agent_unit_changed:
+            services_to_restart.add("fabric-agent")
         if daemon_reload_needed:
             subprocess.run(["systemctl", "daemon-reload"], timeout=30)
+        # No --pull: setup never takes a new base image implicitly.
+        for folder in sorted(images_to_rebuild):
+            print(f"Building {folder} image...")
+            res = subprocess.run(["docker", "compose", "-f", os.path.join(DEPLOY_BASE_DIR, folder, "docker-compose.yml"),
+                                  "build"], capture_output=True, text=True, timeout=1800)
+            if res.returncode != 0:
+                print(f"Error: building the {folder} image failed:\n{res.stdout[-1500:]}{res.stderr[-1500:]}")
+                sys.exit(1)
         print("Configuration deployed (services not started).")
         return services_to_restart
 

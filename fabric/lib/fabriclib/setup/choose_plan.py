@@ -45,7 +45,10 @@ def choose_plan(ctx):
             mark = "✓" if on else f"{YELLOW}✗{NC}"
             print(f"  {mark} {does}" + ("" if on else f"  {YELLOW}(disabled: {key}){NC}"))
         print("  ✓ Run every service non-root with no capabilities and a read-only filesystem")
-        print("  ✓ Create an internal CA (Step-CA) and TLS certificates for every service")
+        print("  ✓ Create an internal CA (Step-CA) and TLS certificates for every service; trust it on this host")
+        if _get(ctx.vars, "install_webui", True):
+            print(f"  ✓ Create the first web UI admin '{ctx.vars.get('webui_admin_user')}' with a client certificate; "
+                  "login kit in ~/fabric-admin")
 
     # Record the effective value of every item, so what was shown is what
     # gets rendered (template defaults differ, e.g. install_keycloak).

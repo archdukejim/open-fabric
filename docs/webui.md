@@ -100,6 +100,9 @@ Enabled by default whenever `install_keycloak: true` (`install_webui` is forced 
 | `webui_realm` | `domain` | Keycloak realm |
 | `webui_admin_role` | `fabric-admin` | Required realm role |
 | `webui_admin_group` | `admins` | Group granted the role |
+| `webui_admin_user` | account that ran `sudo`, else `fabricadmin` | First admin, created by setup (asked for interactively) |
+| `webui_admin_email` | `<user>@<domain>` | Mail attribute of that user (Keycloak's profile needs one) |
+| `webui_client_cert_days` | `365` | Lifetime of the admins' client certificates |
 | `webui_session_idle` | `900` | Seconds |
 | `webui_session_max` | `28800` | Seconds |
 | `webui_oidc_secret` | *(generated)* | In `fabric-secrets.yml` |
@@ -114,15 +117,32 @@ Image updates: `sudo fabricctl --update-containers` rebuilds the image on a fres
 
 ## First-Time Setup
 
-1. **Keycloak user in `admins`.** Make sure your user exists in LDAP and is a member of `cn=admins,ou=groups,<base_dn>` (or add it in the Keycloak admin console: *Users → Groups → Join group → admins*). Group membership grants `fabric-admin`.
-2. **Mint a client certificate** on the core host. `<username>` must be the exact Keycloak username:
-   ```bash
-   sudo fabricctl --client-cert <username>
-   ```
-   You are asked for a password; the result is `~/<username>-fabricctl.p12` (mode `0600`). The private key exists only inside the `.p12`.
-3. **Import the `.p12`** into your browser (or OS certificate store) using that password. The core root CA must also be trusted — see `https://<domain>/` or `https://ca.<domain>/pki/`.
-4. **Browse** to `https://mgr.<domain>` and select the certificate when prompted.
-5. **Sign in** to Keycloak and **enrol TOTP** on first login (scan the QR code with an authenticator app). Later logins ask for the one-time code.
+`fabricctl setup` does the server side for you (the `admin` step):
+
+- creates the first admin `webui_admin_user` in 389-DS (default: the account that ran `sudo`, else `fabricadmin`) and adds it to `admins`, which Keycloak maps to `fabric-admin`;
+- gives it a generated initial password that Keycloak makes you change at the first login;
+- issues its client certificate (CN = the username) as a password-protected `.p12`;
+- puts all of it, with the fabric root CA and a README, in **`~/fabric-admin/`** of the account that ran setup (secrets `0600`).
+
+Re-running setup keeps the user and its password, and renews the certificate only when it is due. `fabricctl doctor` checks the whole chain: Keycloak grants the admin `fabric-admin` and the certificate chains to the CA with CN = username.
+
+What is left is your computer, which setup cannot touch:
+
+1. **Copy the kit** to your computer, e.g. `scp -r <you>@<fabric-host>:fabric-admin .`
+2. **Trust the root CA**: the `.crt` (or `_win.cer` on Windows) from the kit; Linux install scripts for the system, Firefox and Chrome are on `https://<domain>/`.
+3. **Import `<user>.p12`** into your browser (password in `p12-password.txt`).
+4. **Resolve `mgr.<domain>`**: use fabric as your DNS server (or add a hosts entry).
+5. **Browse** to `https://mgr.<domain>`, pick the certificate, log in with the password from `initial-password.txt`, choose a new password and **enrol TOTP** (scan the QR code with an authenticator app). Later logins ask for the one-time code.
+
+Then delete `initial-password.txt` and `p12-password.txt`.
+
+**More admins:** add the user to `admins` (LDAP, or the Keycloak admin console: *Users → Groups → Join group → admins*), then
+
+```bash
+sudo fabricctl client-cert <keycloak-username>
+```
+
+which writes `~/fabric-admin/<username>.p12` and shows its password once. `fabricctl --client-cert <user>` is the same command.
 
 Use **Logout** to end both the webui session and the Keycloak session.
 
@@ -133,7 +153,7 @@ Use **Logout** to end both the webui session and the Keycloak session.
 | Symptom | Cause / Fix |
 |---------|-------------|
 | `400 No required SSL certificate was sent` | No client cert presented. Import the `.p12`; restart the browser if it cached "no certificate" for the site. |
-| `400 The SSL certificate error` | Cert not from this fabric's CA (or expired). Mint a new one with `--client-cert`. |
+| `400 The SSL certificate error` | Cert not from this fabric's CA (or expired). Mint a new one with `fabricctl client-cert <user>`. |
 | `403` "client certificate issued by this fabric's certificate authority is required" | Cert chains to the root but was not issued directly by the Step-CA intermediate (e.g. under a sub-CA). |
 | `403` "certificate does not belong to this user" | Keycloak username ≠ cert CN. Mint a cert for the exact username. |
 | `403` "missing the 'fabric-admin' role" | User not in `admins` (or role mapping drifted). Fix membership, then `sudo fabricctl --keycloak-sync`. |

@@ -5,6 +5,7 @@ from fabriclib.common.console import ok
 from fabriclib.pki.install_cert import install_cert
 from fabriclib.pki.mint_cert import mint_cert
 from fabriclib.pki.needs_renewal import needs_renewal
+from fabriclib.setup.mint_extra_certs import mint_extra_certs
 
 
 def _targets(ctx):
@@ -56,7 +57,7 @@ def run(ctx):
         first = dests[0][0]
         check = ctx.path("dirsrv", "data", "tls", "server.crt") if first == "dirsrv-tls" \
             else os.path.join(first, "fullchain.pem")
-        if not ctx.force_certs and not needs_renewal(check, [cn, *sans]):
+        if not ctx.force_certs and not needs_renewal(check, [cn, *sans], (root_ca, intermediate)):
             ok(f"{cn}: current")
             continue
         crt, key = mint_cert(ctx, cn, sans, cn.replace(".", "-"))
@@ -82,3 +83,4 @@ def run(ctx):
         os.chmod(bundle, 0o644)
         ok("web UI client-certificate CA bundle")
     ctx.restart_services.update(restart)
+    mint_extra_certs(ctx)

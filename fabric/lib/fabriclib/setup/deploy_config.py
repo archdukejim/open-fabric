@@ -57,7 +57,8 @@ def run(ctx):
     if LIB_DIR not in sys.path:
         sys.path.insert(0, LIB_DIR)
     deploy = importlib.reload(importlib.import_module("deploy"))   # reads DEPLOY_BASE_DIR at import
-    deploy.apply_deployment(start_services=False)
+    # Services whose config, unit or image changed: the start step restarts them.
+    ctx.restart_services.update(deploy.apply_deployment(start_services=False) or ())
     ctx.load_state()
     ok(f"configuration deployed to {ctx.deploy_base}")
 

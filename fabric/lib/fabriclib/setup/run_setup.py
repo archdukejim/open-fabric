@@ -73,7 +73,7 @@ def main(argv=None):
                 ctx.load_state()
         heading(f"{BOLD}fabric is ready{NC} ({time.time() - start:.0f}s)")
         if ctx.vars.get("install_webui"):
-            ok(f"web UI: https://{ctx.vars.get('hostname_mgr')}  (first: sudo fabricctl --client-cert <keycloak-user>)")
+            ok(f"web UI: https://{ctx.vars.get('hostname_mgr')}  (login kit: ~/fabric-admin/README.txt)")
         ok("checks any time: sudo fabricctl doctor")
         return 0
     except SetupError as e:

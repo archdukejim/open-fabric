@@ -1,3 +1,4 @@
+import filecmp
 import json
 import os
 import shutil
@@ -38,22 +39,33 @@ def _configure_ca_json(ca_json, v):
 
 
 def _publish_ca_certs(ctx, certs_dir):
-    """CA certs on the landing page (PEM + DER for Windows) and in the host trust store."""
+    """CA certs on the landing page (PEM + DER for Windows) and in the host
+    trust store. Runs on every setup: a reinstall keeps the CA but not
+    /opt/nginx or the host trust entries. Returns True if anything changed."""
     v = ctx.vars
     www = ctx.path("nginx", "www", "certificates")
     os.makedirs(www, exist_ok=True)
     nginx_uid, nginx_gid = ctx.uid("nginx")
+    changed = trust_changed = False
     for src, name, der_name in (("root_ca.crt", v["root_cert_name"], f"{v['root_cert_name']}_win"),
                                 ("intermediate_ca.crt", f"{v['domain_file']}_ca", f"{v['domain_file']}_win_ca")):
-        pem = os.path.join(www, f"{name}.crt")
-        shutil.copy2(os.path.join(certs_dir, src), pem)
-        der = os.path.join(www, f"{der_name}.cer")
-        subprocess.run(["openssl", "x509", "-in", pem, "-out", der, "-outform", "der"], check=True)
+        src = os.path.join(certs_dir, src)
+        pem, der = os.path.join(www, f"{name}.crt"), os.path.join(www, f"{der_name}.cer")
+        trusted = f"/usr/local/share/ca-certificates/{name}.crt"
+        if not (os.path.exists(pem) and filecmp.cmp(src, pem, shallow=False) and os.path.exists(der)):
+            shutil.copy2(src, pem)
+            subprocess.run(["openssl", "x509", "-in", pem, "-out", der, "-outform", "der"], check=True)
+            changed = True
         for path in (pem, der):
             os.chown(path, nginx_uid, nginx_gid)
             os.chmod(path, 0o644)
-        shutil.copy2(pem, f"/usr/local/share/ca-certificates/{name}.crt")
-    subprocess.run(["update-ca-certificates", "--fresh"], check=True, capture_output=True)
+        if not (os.path.exists(trusted) and filecmp.cmp(src, trusted, shallow=False)):
+            shutil.copy2(src, trusted)
+            os.chmod(trusted, 0o644)
+            trust_changed = True
+    if trust_changed:
+        subprocess.run(["update-ca-certificates", "--fresh"], check=True, capture_output=True)
+    return changed or trust_changed
 
 
 def _public_certs_readable(certs_dir):
@@ -69,14 +81,16 @@ def _public_certs_readable(certs_dir):
 def run(ctx):
     """Initialise Step-CA once (its own chain, or a bring-your-own root +
     intermediate when byoc), configure ca.json, publish the CA certs and
-    trust them on the host. Skipped when ca.json already exists."""
+    trust them on the host. With an existing ca.json only the publishing and
+    trust are (re)done."""
     v = ctx.vars
     data = ctx.path("stepca", "data")
     ca_json = os.path.join(data, "config", "ca.json")
     uid, gid = ctx.uid("step")
     if os.path.exists(ca_json):
         _public_certs_readable(os.path.join(data, "certs"))
-        ok("Step-CA already initialised")
+        published = _publish_ca_certs(ctx, os.path.join(data, "certs"))
+        ok("Step-CA already initialised" + ("; CA certs re-published and trusted" if published else ""))
         return
 
     if v.get("byoc"):

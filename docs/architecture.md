@@ -261,7 +261,7 @@ Root CA  (offline — manually generated, key never deployed to target)
             │       ├── ldap.<domain>   → 389-DS (StartTLS + LDAPS, served by dirsrv itself)
             │       ├── mgr.<domain>    → nginx → webui (only when install_webui)
             │       └── ca.<domain>     → nginx → Step-CA
-            ├── webui admin client certs  (fabricctl --client-cert <user>; CN = Keycloak username)
+            ├── webui admin client certs  (setup's first admin; fabricctl client-cert <user>; CN = Keycloak username)
             └── extra_certs  (offline or ACME, per-entry config)
 ```
 
@@ -278,7 +278,7 @@ Internal CA files are distributed to services as `root_ca.crt` volume mounts. Th
 
 ## Certificate Relay
 
-Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `landing_page_cname.<domain>`, and `mgr.<domain>` when webui is enabled) are offline Step-CA leaf certs with a 10-year lifetime, issued at install time via `step certificate create`. There is no certbot container or cert-relay service. nginx reads the issued certs directly from the volume paths set during install. The LDAP cert is copied to `/opt/dirsrv/data/tls/` (`server.crt`, `server.key`, `ca/root_ca.crt`, `ca/intermediate_ca.crt`), which 389-DS imports on start. For webui client-certificate verification nginx trusts `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root).
+Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `landing_page_cname.<domain>`, and `mgr.<domain>` when webui is enabled) are Step-CA leaf certs (`cert_service_days`, default 15 years) issued by the running CA (`step ca certificate`) during setup's `certs` step, and renewed by setup or `fabricctl certs` when missing, within 30 days of expiry, or missing a name. `extra_certs` and admin client certificates are signed offline with the intermediate. There is no certbot container or cert-relay service. nginx reads the issued certs directly from the volume paths set during install. The LDAP cert is copied to `/opt/dirsrv/data/tls/` (`server.crt`, `server.key`, `ca/root_ca.crt`, `ca/intermediate_ca.crt`), which 389-DS imports on start. For webui client-certificate verification nginx trusts `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root).
 
 ---
 

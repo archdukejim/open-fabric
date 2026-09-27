@@ -77,6 +77,8 @@ image_keycloak: {{ image_keycloak | default('keycloak/keycloak:latest') }}
 image_postgres: {{ image_postgres | default('postgres:latest') }}
 {# Built locally from fabric/jinja/webui/build (Debian + python3-jinja2). #}
 image_webui: {{ image_webui | default('fabric/webui:local') }}
+{# image_* keys set explicitly by the admin; kept across upgrades (others follow the release). #}
+image_pins: {{ image_pins | default([], true) | to_json }}
 
 install_ldap: {{ install_ldap | default(true) | bool }}
 install_keycloak: {{ install_keycloak | default(false) | bool }}
@@ -85,6 +87,10 @@ install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak |
 webui_realm: {{ webui_realm | default(domain) }}
 webui_admin_role: {{ webui_admin_role | default('fabric-admin') }}
 webui_admin_group: {{ webui_admin_group | default('admins') }}
+{# First web UI admin, created by `fabricctl setup` (LDAP user + client certificate). #}
+webui_admin_user: {{ webui_admin_user | default('fabricadmin', true) }}
+webui_admin_email: {{ webui_admin_email | default('', true) }}
+webui_client_cert_days: {{ webui_client_cert_days | default(365) }}
 
 # ============================================================
 # SECURITY (fabricctl setup; relaxations are shown by fabricctl status)

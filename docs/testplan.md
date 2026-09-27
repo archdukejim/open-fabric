@@ -55,8 +55,8 @@ This document outlines the testing strategy for an AI agent to execute, validate
 ### 3.5 webui
 - [ ] **Action**: `curl --cacert /opt/stepca/data/certs/root_ca.crt https://mgr.<domain>/` without a client certificate.
 - [ ] **Expected**: HTTP `400` from nginx.
-- [ ] **Action**: `sudo fabricctl --client-cert <user>` for a Keycloak user in LDAP group `admins`; import the `.p12`; browse to `https://mgr.<domain>`.
-- [ ] **Expected**: Keycloak login with TOTP enrolment/prompt, then the dashboard. A user without `fabric-admin`, or a cert whose CN differs from the username, gets `403`. Actions appear in `/opt/fabric/archive/audit.log`.
+- [ ] **Action**: use the login kit setup wrote to `~/fabric-admin/` (automated: `tests/sandbox/login_test.py`, run by `tests/sandbox/run.sh`): trust the root CA, import the `.p12`, browse to `https://mgr.<domain>`, log in with `initial-password.txt`.
+- [ ] **Expected**: Keycloak asks for a new password and TOTP enrolment, then the dashboard; the initial password no longer works afterwards. A user without `fabric-admin`, or a cert whose CN differs from the username, gets `403`. Actions appear in `/opt/fabric/archive/audit.log`.
 - [ ] **Action**: `sudo systemctl stop fabric-agent`, reload the dashboard, then `sudo systemctl start fabric-agent`.
 - [ ] **Expected**: `503` "fabric-agent service is unavailable" while stopped; dashboard works again after start.
 

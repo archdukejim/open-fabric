@@ -15,7 +15,8 @@ set -euo pipefail
 #                                          pathLen=0: can sign leaf certs, cannot issue further CAs.
 #   --service-cert  Re-issue core service TLS certs (dns, ldap, ca, certificates) via Step-CA.
 #   --render-jinja <j2>  Render a Jinja2 template using fabric vars.
-#   --client-cert <user> Mint a webui client certificate (.p12) for a Keycloak user.
+#   --client-cert <user> Mint a webui client certificate (.p12) for a Keycloak user
+#                        (same as: fabricctl client-cert <user>).
 #   --keycloak-sync      Re-run the idempotent Keycloak configuration (federation, webui client, MFA).
 #   --migrate-ldap [dir] One-time import of users/groups from the old OpenLDAP data dir into 389-DS.
 #
@@ -46,7 +47,7 @@ FABRIC_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Lifecycle commands are Python (fabric/lib/fabriclib/cli.py).
 case "${1:-}" in
-    setup|doctor|certs|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
+    setup|doctor|certs|client-cert|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
 esac
 VARS_FILE="$FABRIC_DIR/config/vars.yaml"
 
@@ -217,7 +218,7 @@ case "$MODE" in
     interactive)  python3 "${FABRIC_DIR}/lib/interactive.py" --interactive ;;
     apply)        python3 "${FABRIC_DIR}/lib/interactive.py" --apply ;;
     update-containers) python3 "${FABRIC_DIR}/lib/interactive.py" --update-containers ;;
-    client-cert)  do_client_cert ;;
+    client-cert)  exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" client-cert "$CLIENT_CERT_USER" ;;
     keycloak-sync) python3 "${FABRIC_DIR}/lib/keycloak_bootstrap.py" --vars "$VARS_FILE" --secrets "${FABRIC_DIR}/config/fabric-secrets.yml" ;;
     migrate-ldap) bash "${FABRIC_DIR}/lib/ldap_migrate.sh" ${MIGRATE_DIR:+"$MIGRATE_DIR"} ;;
     version)      echo "fabricctl version $(cat "$FABRIC_DIR/VERSION" 2>/dev/null || echo unknown)"

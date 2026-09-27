@@ -592,6 +592,8 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_postgres`| `"postgres:latest"` |
 | `image_webui`| `"fabric/webui:local"` (built locally from `fabric/jinja/webui/build`, `debian:trixie-slim` + `python3`, `python3-jinja2`, `openssl`, `tini`; app = `fabric/lib/webui`) |
 
+**Upgrades:** re-running `fabricctl setup` on an existing install takes this release's default for every `image_*` key, except the ones you pinned: keys set in a `--file` or the checkout's `custom-vars.yaml` are recorded in `image_pins` and kept on every later run. To unpin, remove the key from `image_pins` in `/opt/fabric/config/vars.yaml`.
+
 ### Service CNAMEs
 Allows overriding the default short hostnames (CNAMEs) automatically assigned to the services.
 | Variable | Default Value |

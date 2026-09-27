@@ -55,5 +55,7 @@ def run(ctx):
 
     if v.get("install_webui"):
         subprocess.run(["systemctl", "enable", "--now", "fabric-agent"], check=True, capture_output=True)
+        if "fabric-agent" in ctx.restart_services:
+            subprocess.run(["systemctl", "restart", "fabric-agent"], check=True)
         ok(f"fabric-agent: {'restarted' if 'fabric-agent' in ctx.restart_services else 'running'}")
         ok(f"webui: {_start('webui', 'webui', 'webui' in ctx.restart_services)}")

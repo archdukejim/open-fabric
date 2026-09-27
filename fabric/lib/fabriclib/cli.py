@@ -4,13 +4,20 @@
   fabricctl setup [options]      install or re-converge (fabricctl setup --help)
   fabricctl doctor               end-to-end checks of the running install
   fabricctl certs [--force]      renew service certificates that need it (--force: all)
+  fabricctl client-cert <user> [--days N]
+                                 web UI client certificate (.p12) into ~/fabric-admin
   fabricctl uninstall [--yes]    remove fabric from this host
   fabricctl reinstall [--yes]    uninstall + setup, keeping config, secrets, the CA and certificates
 """
+import json
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Run as a script, Python puts fabriclib/ itself first on sys.path, where its
+# folders (dns/, ldap/, keycloak/) would shadow real packages. Use fabric/lib.
+sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
+from fabriclib.pki.mint_extra_cert import mint_extra_cert  # noqa: E402
 from fabriclib.setup import run_setup  # noqa: E402
 from fabriclib.setup.backup_install import backup_install  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
@@ -40,6 +47,15 @@ def main(argv):
         return run_setup.main(["--doctor", *args])
     if cmd == "certs":
         renew_service_certs(SetupContext(deploy_base=_base(args)), force="--force" in args)
+        return 0
+    if cmd == "client-cert" and args and not args[0].startswith("-"):
+        days = int(args[args.index("--days") + 1]) if "--days" in args else 365
+        p12, password = hand_out_client_cert(SetupContext(deploy_base=_base(args)).load_state().vars, args[0], days)
+        print(f"client certificate for '{args[0]}': {p12}")
+        print(f".p12 password (shown once): {password}")
+        return 0
+    if cmd == "extra-cert" and args:        # internal: fabricctl --mint-certs (certs.sh) -> one JSON entry
+        print(mint_extra_cert(SetupContext(deploy_base=_base(args)).load_state().vars, json.loads(args[0])))
         return 0
     if cmd == "uninstall":
         ctx = SetupContext(deploy_base=_base(args))

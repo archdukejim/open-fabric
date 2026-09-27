@@ -14,6 +14,8 @@ split as they are touched (see [stale-code register](maintenance/stale-code.md) 
 | `fabriclib/dns/` | Zones and records in `vars.yaml` — validated add/remove, zone listing, BIND sync status. The **only** DNS implementation: used by `fabric-agent` (web UI) and the `fabricctl --interactive` editor | [README](../fabric/lib/fabriclib/dns/README.md) |
 | `fabriclib/system/` | Version, service status, apply | [README](../fabric/lib/fabriclib/system/README.md) |
 | `fabriclib/pki/` | Mint a service certificate from the running Step-CA, install it for a service uid, decide when to renew | [README](../fabric/lib/fabriclib/pki/README.md) |
+| `fabriclib/ldap/` | 389-DS operations over LDAPI (first admin user) | [README](../fabric/lib/fabriclib/ldap/README.md) |
+| `fabriclib/keycloak/` | Keycloak admin-API operations (required actions, role checks) | [README](../fabric/lib/fabriclib/keycloak/README.md) |
 | `fabriclib/security/` | Host security: `DOCKER-USER` firewall rules for Docker-published ports | [README](../fabric/lib/fabriclib/security/README.md) |
 | `fabriclib/setup/` | `fabricctl setup` / `doctor` / `certs` / `reinstall` / `uninstall`: one idempotent step per file | [README](../fabric/lib/fabriclib/setup/README.md) |
 | `fabriclib/cli.py` | Routes the lifecycle commands above (`setup.sh` and `manage.sh` hand over to it) | — |
@@ -35,7 +37,7 @@ split as they are touched (see [stale-code register](maintenance/stale-code.md) 
 | `manage.sh` | `fabricctl` dispatcher: lifecycle subcommands → `fabriclib/cli.py`; `--interactive`, `--apply`, `--print`, `--update-containers`, `--tsig-keys`/`--list-tsig`/`--remove-tsig`, `--mint-certs`, `--service-cert`, `--client-cert`, `--keycloak-sync`, `--migrate-ldap`, `--render-jinja`, `--version`. |
 | `interactive.py` | `--interactive` menus (variables, DNS editor on `fabriclib.dns`, links, cert minting), `--apply` (→ `deploy.py`), `--update-containers` (pull; `build --pull` for `dirsrv`/`webui`). |
 | `deploy.py` | Native render + deploy: secrets, templates, compose files, systemd units; restarts only what changed; zones compared ignoring the serial and swapped with `rndc freeze`/`thaw`; 389-DS seed; webui build context; fabric-agent unit. |
-| `certs.sh` | `--mint-certs`, `--client-cert` (webui `.p12`, CN = Keycloak user); `--service-cert` → `fabricctl certs --force`. |
+| `certs.sh` | `--mint-certs` menu (→ `fabriclib/pki/mint_extra_cert.py`), `--service-cert` (→ `fabricctl certs --force`). `--client-cert` → `fabricctl client-cert`. |
 | `tsig.sh` | TSIG keys for dynamic DNS (`--tsig-keys`, `--list-tsig`, `--remove-tsig`). |
 | `vars.sh` | Comment-preserving YAML list append (`_vars_list_append`) and pre-change backups (`_vars_archive`) used by `certs.sh`/`tsig.sh`. |
 | `output.sh` | `info` / `ok` / `warn` / `err` console helpers. |

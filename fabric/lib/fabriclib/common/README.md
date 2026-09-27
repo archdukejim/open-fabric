@@ -13,3 +13,4 @@
 | `console.py` | `heading` / `info` / `ok` / `warn` / `err` output (colour only on a terminal) |
 | `wait_healthy.py` | Wait for a container's Docker healthcheck |
 | `dns_query.py` | A-record lookup against one DNS server (stdlib; no `dig` needed) |
+| `sudo_owner.py` | Login, home, uid and gid of the account that ran `sudo` (files handed to the admin) |

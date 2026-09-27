@@ -4,12 +4,15 @@ import subprocess
 
 from fabriclib.common.console import err, ok
 from fabriclib.common.dns_query import dns_query
+from fabriclib.common.sudo_owner import sudo_owner
+from fabriclib.keycloak.user_has_role import user_has_role
 from fabriclib.setup.errors import SetupError
 
 
 def _curl(url, host, ip, port, root_ca, client_cert=False):
+    ca = ["--cacert", root_ca] if root_ca else []      # None: the host's own trust store
     res = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10",
-                          "--cacert", root_ca, "--resolve", f"{host}:{port}:{ip}", url],
+                          *ca, "--resolve", f"{host}:{port}:{ip}", url],
                          capture_output=True, text=True)
     return res.returncode, res.stdout
 
@@ -46,6 +49,8 @@ def checks(ctx):
     for host in (v["hostname_landing"], v["hostname_stepca"], v["hostname_bind9"]):
         rc, code = _curl(f"https://{host}/", host, v["ip_nginx"], 443, root_ca)
         add(f"HTTPS {host} (cert verified)", rc == 0, f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
+    rc, code = _curl(f"https://{v['hostname_landing']}/", v["hostname_landing"], v["ip_nginx"], 443, None)
+    add("this host trusts the fabric CA (system store)", rc == 0, f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
 
     if v.get("install_ldap", True):
         res = subprocess.run(["openssl", "s_client", "-connect", f"{v['ip_ldap']}:3636",
@@ -67,6 +72,25 @@ def checks(ctx):
         st = os.stat(sock) if os.path.exists(sock) else None
         add("fabric-agent socket 0660, webui group only",
             st and stat.S_IMODE(st.st_mode) == 0o660 and st.st_gid == ctx.uid("webui")[1])
+
+        # The first admin, end to end: LDAP user -> admin group -> Keycloak role,
+        # and a client certificate from this CA whose CN is that user.
+        admin, role = v.get("webui_admin_user"), v.get("webui_admin_role", "fabric-admin")
+        if admin and v.get("install_keycloak"):
+            try:
+                add(f"Keycloak grants {admin} {role}", user_has_role(v, s, admin, role))
+            except (SystemExit, OSError) as e:
+                add(f"Keycloak grants {admin} {role}", False, str(e))
+            crt = os.path.join(sudo_owner()[1], "fabric-admin", f"{admin}.crt")
+            if os.path.exists(crt):
+                certs = ctx.path("stepca", "data", "certs")
+                res = subprocess.run(["openssl", "verify", "-CAfile", os.path.join(certs, "root_ca.crt"),
+                                      "-untrusted", os.path.join(certs, "intermediate_ca.crt"), crt],
+                                     capture_output=True, text=True)
+                subj = subprocess.run(["openssl", "x509", "-in", crt, "-noout", "-subject", "-nameopt", "RFC2253"],
+                                      capture_output=True, text=True).stdout
+                add(f"client certificate for {admin} (CN, chain)", res.returncode == 0 and f"CN={admin}" in subj,
+                    (res.stdout + res.stderr).strip()[-200:])
 
     for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "fabric-agent", "webui", "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):

@@ -468,20 +468,13 @@ def mint_certificates_interactive(data):
             print(f"{YELLOW}Saved configuration. Minting certificate...{NC}")
             
             try:
-                env = os.environ.copy()
-                # Use VARS_FILE to match certs.sh logic
-                env['VARS_FILE'] = CUSTOM_VARS_FILE
-                
-                # Format exactly like do_extra_certs in certs.sh
-                import shlex
-                json_arg = shlex.quote(json.dumps(entry))
-                cmd = f"source {FABRIC_DIR}/lib/certs.sh && _mint_extra_cert {json_arg}"
-                res = subprocess.run(["bash", "-c", cmd], env=env)
-                
+                # fabriclib/pki/mint_extra_cert.py — same code setup uses
+                res = subprocess.run(["python3", os.path.join(FABRIC_DIR, "lib", "fabriclib", "cli.py"),
+                                      "extra-cert", json.dumps(entry)], capture_output=True, text=True)
                 if res.returncode == 0:
-                    print(f"{GREEN}Certificate successfully minted!{NC}")
+                    print(f"{GREEN}Certificate minted: {res.stdout.strip()}{NC}")
                 else:
-                    print(f"{RED}Minting failed with exit code {res.returncode}.{NC}")
+                    print(f"{RED}Minting failed: {(res.stderr or res.stdout).strip()[-500:]}{NC}")
             except Exception as e:
                 import traceback
                 print(f"{RED}Error minting certificate: {e}{NC}")

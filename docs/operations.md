@@ -74,7 +74,7 @@ sudo fabricctl --version
 ```
 
 #### `--client-cert <user>`
-Mint a webui admin client certificate. The CN is `<user>` and **must equal the Keycloak username**. Issued offline by the Step-CA intermediate (RSA 3072, 365 days), bundled with the chain into a password-protected `~/<user>-fabricctl.p12` (home of `SUDO_USER`, mode `0600`). The private key exists only inside the `.p12`. See [webui.md](webui.md).
+Mint a webui admin client certificate (same as `fabricctl client-cert <user>`). The CN is `<user>` and **must equal the Keycloak username**. Issued offline by the Step-CA intermediate (RSA 3072, `webui_client_cert_days`, default 365), bundled with the chain into `~/fabric-admin/<user>.p12` (home of the account that ran `sudo`, mode `0600`) with a generated password that is shown once. The private key exists only inside the `.p12`. Setup already does this for the first admin — see [webui.md](webui.md#first-time-setup).
 
 ```bash
 sudo fabricctl --client-cert jdoe
@@ -254,8 +254,9 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 | `sudo fabricctl setup [--file vars.yaml]` | Install or re-converge. Re-run after changing settings. |
 | `sudo fabricctl setup --step <name>` | Run one step, e.g. `--step firewall` after editing `security.firewall_allow` |
 | `sudo fabricctl doctor` | End-to-end checks of the running install (the `verify` step) |
+| `sudo fabricctl client-cert <user>` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`) |
 | `sudo fabricctl certs [--force]` | Renew service certificates that are missing, expiring within 30 days or missing a name (`--force`: all of them); restarts only the services whose certificates changed |
-| `sudo fabricctl reinstall` | Uninstall + setup, keeping config, secrets, the CA and certificates |
+| `sudo fabricctl reinstall` | Uninstall + setup, keeping config, secrets, the CA and certificates. Directory users/groups and Keycloak's database are **not** kept; the first admin is re-created with a new login kit |
 | `sudo fabricctl uninstall` | Remove fabric's containers, images, network, units, accounts and `/opt` directories (nothing else) |
 
 ---
@@ -264,12 +265,11 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 
 | Port | Proto | Handler | Backend |
 |------|-------|---------|---------|
-| 53 | TCP + UDP | nginx | `bind9:53` (container-to-container) |
 | 80 | TCP | nginx | health check · ACME passthrough · HTTPS redirect |
 | 389 | TCP | nginx | `dirsrv:3389` (TCP passthrough; 389-DS requires StartTLS before bind) |
 | 443 | TCP | nginx | `step-ca:9000` · `bind9:8053` (`/dns-query`) · Keycloak · webui (`mgr.<domain>`, mTLS → `/opt/webui/run/web.sock`; the webui container publishes no ports, fabric-agent has no network listener) |
 | 636 | TCP | nginx | `dirsrv:3636` (TCP passthrough; LDAPS terminated by 389-DS) |
-| `bind_dns_port` | TCP + UDP | bind9 | host-facing (mapped `bind_dns_port:53`); default `53` |
+| `bind_dns_port` | TCP + UDP | bind9 | DNS for the LAN (`host_ip:bind_dns_port` → container 53); default `53` |
 | `bind9_doh_port` | TCP | bind9 | plain-HTTP DoH; default `8053` |
 | `stepca_port` | TCP | step-ca | internal HTTPS; default `9000` |
 

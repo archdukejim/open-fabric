@@ -67,10 +67,37 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
+echo "--- admin login kit"
+check "kit: .p12, passwords and root CA in ~/fabric-admin" \
+    "in_box 'cd /root/fabric-admin && ls fabricadmin.p12 p12-password.txt initial-password.txt README.txt *.crt' >/dev/null"
+check "kit: secrets are 0600" \
+    "[ \"\$(in_box 'stat -c %a /root/fabric-admin/fabricadmin.p12 /root/fabric-admin/p12-password.txt /root/fabric-admin/initial-password.txt' | sort -u)\" = 600 ]"
+
+echo "--- real login: client cert -> web UI -> Keycloak (new password, TOTP) -> dashboard"
+docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
+in_box 'python3 /root/login_test.py /opt/fabric/config/vars.yaml' 2>&1 | tee "$OUT/login.log"
+check "real web UI login end to end" "! grep -q '^FAIL' '$OUT/login.log' && grep -q '^PASS dashboard' '$OUT/login.log'"
+
 echo "--- setup again (must converge without changes)"
 in_box 'fabricctl setup --non-interactive --yes' 2>&1 | tee "$OUT/setup2.log"
 check "re-run completes" "grep -q 'fabric is ready' '$OUT/setup2.log'"
 check "re-run re-issues no certificates" "! grep -q ': issued' '$OUT/setup2.log'"
+check "re-run keeps the admin and their certificate" \
+    "grep -q \"admin 'fabricadmin' exists\" '$OUT/setup2.log' && grep -q 'is current' '$OUT/setup2.log'"
+
+echo "--- setup with a changed setting (live DNS zone must update, bind9 keeps serving)"
+cat > "$OUT/change.yaml" <<EOF
+dns:
+  dynamic_zone_var:
+    zone_authority: true
+    A:
+    - { name: rerun-test, ip: 10.77.0.99 }
+EOF
+docker cp "$OUT/change.yaml" "$NAME:/root/change.yaml"
+in_box 'fabricctl setup --file /root/change.yaml --non-interactive --yes' > "$OUT/setup3.log" 2>&1
+check "re-run with a change completes" "grep -q 'fabric is ready' '$OUT/setup3.log'"
+check "new record served by the running bind9" \
+    "in_box 'dig +short @$IP rerun-test.lan.test' | grep -qx 10.77.0.99"
 
 cat > "$OUT/argv_check.py" <<'PY'
 import glob, yaml

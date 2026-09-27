@@ -8,120 +8,12 @@
 # the live vars.yaml deployed by fabric.
 # -----------------------------------------------------------------------
 _mint_extra_cert() {
-    local json_entry="$1"
-    local vars_file="$VARS_FILE"
-    [ -f "$vars_file" ] || { err "Live vars not found: ${vars_file}. Is fabric deployed?"; exit 1; }
     [[ "$(id -u)" -eq 0 ]] || { err "Must be run as root."; exit 1; }
-
-    # Parse cert entry + runtime vars into shell variables via shlex-quoted output
-    local _tmp; _tmp=$(mktemp)
-    # shellcheck disable=SC2064
-    trap "rm -f '${_tmp}'" RETURN
-
-    CERT_JSON="$json_entry" RUNTIME_VARS="$vars_file" \
-    python3 - > "$_tmp" <<'PYEOF'
-import json, yaml, os, shlex
-
-e = json.loads(os.environ['CERT_JSON'])
-with open(os.environ['RUNTIME_VARS']) as f:
-    v = yaml.safe_load(f)
-
-su = v['service_users']['step']
-
-print(f"DEPLOY_BASE={shlex.quote(v['deploy_base_dir'])}")
-print(f"STEPCA_PORT={v.get('stepca_port', 9000)}")
-print(f"STEP_UID={su['uid']}")
-print(f"STEP_GID={su['gid']}")
-print(f"CERT_CN={shlex.quote(e['cn'])}")
-print(f"CERT_DAYS={e.get('days', 365)}")
-print(f"CERT_OUT_DIR={shlex.quote(e.get('out_dir', ''))}")
-print(f"CERT_KTY={shlex.quote(str(e.get('kty', 'RSA')))}")
-print(f"CERT_SIZE={e.get('size', 4096)}")
-print(f"CERT_IS_CA={'true' if e.get('is_ca', False) else 'false'}")
-print(f"CERT_PATH_LEN={e.get('path_len', 0)}")
-print(f"CERT_SANS_JSON={shlex.quote(json.dumps(e.get('sans', [])))}")
-PYEOF
-
-    # shellcheck source=/dev/null
-    source "$_tmp"
-
-    local stepca_data="${DEPLOY_BASE}/stepca/data"
-    local artifacts="${stepca_data}/artifacts"
-
-    # Determine output directory (same logic as 07-mint-service-certs.yml)
-    local target_dir
-    if [ -n "$CERT_OUT_DIR" ]; then
-        target_dir="$CERT_OUT_DIR"
-    elif [ -n "${SUDO_USER:-}" ]; then
-        target_dir=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-    else
-        target_dir="$HOME"
-    fi
-    [ -d "$target_dir" ] || { err "Output directory does not exist: ${target_dir}"; exit 1; }
-
-    local safe_cn; safe_cn=$(echo "$CERT_CN" | tr './ ' '---')
-    local key_out="${target_dir}/${safe_cn}.key"
-    local crt_out="${target_dir}/${safe_cn}.crt"
-
-    mkdir -p "$artifacts"
-    chown "${STEP_UID}:${STEP_GID}" "$artifacts"
-
-    # Build SAN / extra args
-    local san_args=() extra_args=() cert_template
-    if [ "$CERT_IS_CA" = "true" ]; then
-        cert_template="/home/step/templates/certs/subca.tpl"
-        extra_args=(--set "pathLen=${CERT_PATH_LEN}")
-    else
-        cert_template="/home/step/templates/certs/leaf.tpl"
-        san_args=(--san "$CERT_CN")
-        while IFS= read -r san; do
-            [ -n "$san" ] && san_args+=(--san "$san")
-        done < <(python3 -c "import json,sys; [print(s) for s in json.loads(sys.argv[1])]" "$CERT_SANS_JSON")
-    fi
-
-    echo "Generating certificate for ${CERT_CN} (validity: ${CERT_DAYS} days)..."
-    local cmd=(
-        step ca certificate "$CERT_CN"
-        /home/step/artifacts/leaf.crt /home/step/artifacts/leaf.key
-        --ca-url "https://127.0.0.1:${STEPCA_PORT}"
-        --root "/home/step/certs/root_ca.crt"
-        --provisioner "admin"
-        --provisioner-password-file "/home/step/secrets/password"
-        --kty "$CERT_KTY" --size "$CERT_SIZE"
-        --not-after "$(( CERT_DAYS * 24 ))h"
-    )
-    cmd+=("${san_args[@]}")
-    cmd+=("${extra_args[@]}")
-
-    docker exec \
-        --user "${STEP_UID}:${STEP_GID}" \
-        step-ca \
-        "${cmd[@]}"
-
-    # Bundle intermediate CA into the leaf cert if not already present
-    local int_ca="${stepca_data}/certs/intermediate_ca.crt"
-    if [ -f "$int_ca" ]; then
-        local cert_count; cert_count=$(grep -c 'BEGIN CERTIFICATE' "${artifacts}/leaf.crt" || true)
-        if [ "$cert_count" -lt 2 ]; then
-            cat "$int_ca" >> "${artifacts}/leaf.crt"
-        fi
-    fi
-
-    mv "${artifacts}/leaf.key" "$key_out"
-    mv "${artifacts}/leaf.crt" "$crt_out"
-
-    if [ -n "${SUDO_USER:-}" ]; then
-        local sudo_gid; sudo_gid=$(id -g "$SUDO_USER")
-        chown "${SUDO_USER}:${sudo_gid}" "$key_out" "$crt_out"
-    fi
-    chmod 0600 "$key_out"
-    chmod 0644 "$crt_out"
-
-    echo "Certificate minted:"
-    echo "  Key:  ${key_out}"
-    echo "  Cert: ${crt_out}"
-    openssl x509 -in "$crt_out" -noout -subject -dates \
-        -ext basicConstraints -ext subjectAltName 2>/dev/null || true
+    # One implementation for setup and this menu: fabriclib/pki/mint_extra_cert.py
+    local crt
+    crt=$(python3 "$FABRIC_DIR/lib/fabriclib/cli.py" extra-cert "$1") || exit 1
+    ok "Certificate minted: ${crt} (key: ${crt%.crt}.key)"
+    openssl x509 -in "$crt" -noout -subject -dates -ext basicConstraints -ext subjectAltName 2>/dev/null || true
 }
 
 # -----------------------------------------------------------------------
@@ -296,54 +188,5 @@ do_service_cert() {
     echo ""
     python3 "$FABRIC_DIR/lib/fabriclib/cli.py" certs --force
     echo ""
-    ok "Service certificates re-issued."
-    info "Reload nginx to apply: docker exec nginx nginx -s reload"
-}
-
-# -----------------------------------------------------------------------
-# do_client_cert <username>
-# Mint a webui client certificate. The CN must equal the user's Keycloak
-# username — webui rejects a login whose certificate CN differs.
-# Produces <username>-fabricctl.p12 (password-protected) for browser import.
-# -----------------------------------------------------------------------
-do_client_cert() {
-    local user="$CLIENT_CERT_USER"
-    echo -e "${BOLD}fabric client-cert${NC}"
-    echo ""
-    [[ "$user" =~ ^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$ ]] || {
-        err "Usage: fabricctl --client-cert <keycloak-username>"; exit 1; }
-
-    local deploy_base target_dir
-    deploy_base=$(python3 -c "import yaml; print(yaml.safe_load(open('$VARS_FILE'))['deploy_base_dir'])")
-    if [ -n "${SUDO_USER:-}" ]; then
-        target_dir=$(getent passwd "$SUDO_USER" | cut -d: -f6)
-    else
-        target_dir="$HOME"
-    fi
-
-    _mint_extra_cert "{\"cn\": \"${user}\", \"days\": ${CERT_DAYS:-365}, \"kty\": \"RSA\", \"size\": 3072}"
-
-    local safe; safe=$(echo "$user" | tr './ ' '---')
-    local key="${target_dir}/${safe}.key" crt="${target_dir}/${safe}.crt"
-    local p12="${target_dir}/${safe}-fabricctl.p12"
-    local chain; chain=$(mktemp)
-    cat "${deploy_base}/stepca/data/certs/intermediate_ca.crt" "${deploy_base}/stepca/data/certs/root_ca.crt" > "$chain"
-
-    echo ""
-    info "Choose a password to protect the .p12 bundle (asked for on browser import):"
-    openssl pkcs12 -export -in "$crt" -inkey "$key" -certfile "$chain" \
-        -name "${user} (fabric)" -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256 \
-        -out "$p12"
-    rm -f "$chain"
-    # The .p12 is now the only copy of the private key.
-    shred -u "$key" 2>/dev/null || rm -f "$key"
-
-    if [ -n "${SUDO_USER:-}" ]; then
-        chown "${SUDO_USER}:$(id -g "$SUDO_USER")" "$p12"
-    fi
-    chmod 0600 "$p12"
-    echo ""
-    ok "Client certificate for '${user}': ${p12}"
-    info "Import it into your browser, then open https://$(python3 -c "import yaml; print(yaml.safe_load(open('$VARS_FILE')).get('hostname_mgr',''))")/"
-    info "The Keycloak user '${user}' must hold the fabric-admin role (members of the LDAP 'admins' group do)."
+    ok "Service certificates re-issued (affected services restarted)."
 }
