@@ -42,42 +42,6 @@ CATEGORIES = [
     ("Docker & Services", ["host_ram_capacity", "compose_file", "project_containers", "nginx_backend_ldap", "nginx_backend_stepca", "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_ldap", "ip_keycloak", "ip_postgres", "image_nginx", "image_bind9", "image_stepca", "image_dirsrv", "image_keycloak", "image_postgres", "cname_ca", "landing_page_cname", "cname_dns", "cname_ldap", "cname_sso", "cname_mgr", "hostname_nginx", "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_ldap", "hostname_keycloak", "hostname_mgr"])
 ]
 
-IMPACT_MAP = {
-    "domain": ["nginx", "bind9", "stepca", "ldap", "keycloak", "postgres"],
-    "host_ip": ["nginx", "bind9"],
-    "byoc": ["nginx", "stepca"],
-    "ca_crt_path": ["nginx", "stepca"],
-    "ica_crt_path": ["nginx", "stepca"],
-    "cert_service_days": ["nginx", "bind9", "stepca"],
-    "install_ldap": ["ldap", "nginx"],
-    "install_keycloak": ["keycloak", "postgres", "nginx"],
-    "install_webui": ["webui", "nginx"],
-    "dns_server": ["bind9"],
-    "use_host_dns": ["nginx"],
-    "bind_dns_port": ["bind9"],
-    "stepca_port": ["stepca", "nginx"],
-    "postgres_data_dir": ["postgres"],
-    "keycloak_data_dir": ["keycloak"],
-    "dns": ["bind9"],
-    "tsig_keys": ["bind9"],
-    "reverse_zone_names": ["bind9"],
-    "extra_certs": ["nginx"],
-    "ldap_groups": ["ldap"],
-    "ldap_organizational_units": ["ldap"],
-}
-
-def map_service(key):
-    if key in IMPACT_MAP:
-        return IMPACT_MAP[key]
-    if key.startswith("image_"):
-        img = key.replace("image_", "")
-        if img == "dirsrv": return ["ldap"]
-        if img == "stepca": return ["stepca"]
-        return [img]
-    if key.startswith("cname_") or key.startswith("hostname_"):
-        return ["nginx", "bind9", "stepca", "ldap", "keycloak", "postgres"]
-    return ["nginx"]
-
 def load_yaml(path):
     if not os.path.exists(path):
         return {}

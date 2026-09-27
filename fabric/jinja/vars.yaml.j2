@@ -86,7 +86,6 @@ install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak |
 webui_realm: {{ webui_realm | default(domain) }}
 webui_admin_role: {{ webui_admin_role | default('fabric-admin') }}
 webui_admin_group: {{ webui_admin_group | default('admins') }}
-enforce_ldaps: {{ enforce_ldaps | default(true) | bool }}
 
 # ============================================================
 # DOCKER / SERVICE INFRASTRUCTURE

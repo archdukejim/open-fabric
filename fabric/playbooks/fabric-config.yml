@@ -7,7 +7,7 @@
 #   ansible-playbook fabric/playbooks/04-target-file-structure.yml -e target_host=fabric --tags dns-record
 #   ansible-playbook fabric/playbooks/07-bootstrap-containers.yml  -e target_host=fabric
 #   ansible-playbook fabric/playbooks/08-mint-service-certs.yml    -e target_host=fabric
-#   ansible-playbook fabric/playbooks/09-deploy-checks.yml         -e target_host=fabric -e start=true
+#   ansible-playbook fabric/playbooks/09-start-and-configure.yml   -e target_host=fabric
 #
 # Prerequisite — run once before the installer:
 #   bash fabric/pki/rootca.sh init

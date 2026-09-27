@@ -327,7 +327,7 @@ do_uninstall() {
         local ask_snap=false
         if $is_remote; then
             ask_snap=true
-        elif [ -f "$TARGET_BASE/fabric/.version" ]; then
+        elif [ -d "$TARGET_BASE/fabric" ]; then
             ask_snap=true
         fi
 
@@ -343,14 +343,10 @@ do_uninstall() {
                         rsync -az "${SSH_USER}@${TARGET}:${TARGET_BASE}/${dir}/" \
                             "$snap_dest/${dir}/" 2>/dev/null || true
                     done
-                    rsync -az "${SSH_USER}@${TARGET}:${TARGET_BASE}/fabric/.version" \
-                        "$snap_dest/.version" 2>/dev/null || true
                 else
                     for dir in fabric "${SERVICE_DIRS[@]}"; do
                         [ -d "$TARGET_BASE/$dir" ] && rsync -a "$TARGET_BASE/$dir/" "$snap_dest/$dir/"
                     done
-                    [ -f "$TARGET_BASE/fabric/.version" ] && \
-                        cp "$TARGET_BASE/fabric/.version" "$snap_dest/.version"
                 fi
                 ok "Snapshot saved to ${snap_dest}/"
                 echo ""

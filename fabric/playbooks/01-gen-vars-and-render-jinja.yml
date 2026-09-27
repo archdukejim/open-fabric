@@ -499,11 +499,14 @@
             mode: '0644'
           delegate_to: localhost
 
-        - name: Copy nginx manual marked.min.js
+        - name: Copy nginx manual scripts (marked, mermaid)
           ansible.builtin.copy:
-            src: "{{ playbook_dir }}/../jinja/nginx/www/manual/marked.min.js"
-            dest: "/tmp/fabric-render/nginx/www/manual/marked.min.js"
+            src: "{{ playbook_dir }}/../jinja/nginx/www/manual/{{ item }}"
+            dest: "/tmp/fabric-render/nginx/www/manual/{{ item }}"
             mode: '0644'
+          loop:
+            - marked.min.js
+            - mermaid.min.js
           delegate_to: localhost
 
         - name: Render nginx ldap client page

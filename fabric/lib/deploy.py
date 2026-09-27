@@ -48,7 +48,6 @@ def unique_filter(x, attribute=None):
     res = []
     for item in x:
         val = item.get(attribute, item) if isinstance(item, dict) and attribute else item
-        now = datetime.utcnow()
         try:
             hash_val = val
             if isinstance(val, (dict, list)):
@@ -342,7 +341,8 @@ def apply_deployment():
     os.makedirs(os.path.join(render_tmp, 'nginx/www/shared'), exist_ok=True)
     os.makedirs(os.path.join(render_tmp, 'nginx/www/manual'), exist_ok=True)
     shutil.copy(os.path.join(jinja_dir, 'nginx/www/shared/style.css'), os.path.join(render_tmp, 'nginx/www/shared/style.css'))
-    shutil.copy(os.path.join(jinja_dir, 'nginx/www/manual/marked.min.js'), os.path.join(render_tmp, 'nginx/www/manual/marked.min.js'))
+    for asset in ('marked.min.js', 'mermaid.min.js'):
+        shutil.copy(os.path.join(jinja_dir, 'nginx/www/manual', asset), os.path.join(render_tmp, 'nginx/www/manual', asset))
     
     domain_file = merged_context.get('domain_file', 'example_com')
     for script in ['certs', 'firefox-ubuntu', 'chrome-ubuntu', 'all-ubuntu', 'python-ubuntu']:

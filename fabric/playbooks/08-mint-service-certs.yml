@@ -15,7 +15,7 @@
 # BIND9 TLS cert is additionally installed to /opt/bind9/ssl/.
 #
 # After minting, the bootstrap stack is brought down. The full stack
-# is started by 09-deploy-checks.yml.
+# is started by 09-start-and-configure.yml.
 #
 # Replaces: 07-mint-service-certs.yml (cert sections only)
 - name: Section 8 - Mint Service Certificates
