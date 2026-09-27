@@ -274,6 +274,41 @@ signature and digest checks. No Watchtower and no Docker-socket container;
 the updater is part of `fabricctl` and uses the same systemd units as
 everything else.
 
+## 7c. Secrets: OpenBao
+
+**OpenBao** (MPL-2.0, Linux Foundation fork of Vault; Vault-compatible API,
+CLI and clients) rather than HashiCorp Vault, whose BSL licence is not open
+source. Multi-arch images; ~150 MB at 4 GB (fits the §7a budget).
+
+- **Deployment:** container `openbao` on `fabric_net`, integrated **Raft**
+  storage in `/opt/openbao/data`, TLS listener with a Step-CA certificate;
+  published as `https://vault.<domain>` through nginx (CNAME `vault`). Same
+  hardening as every container (§7a); image pinned via the channel (§7b).
+- **Unseal (decided: auto-unseal from a local key file):** the unseal key
+  lives in `/etc/fabric/openbao/unseal.key` (root, 0400) — optionally on a
+  removable USB stick mounted at boot. OpenBao unseals itself on start, so a
+  power cut does not need a human. **Trade-off, stated in the installer:**
+  whoever holds the SD card (or USB stick) holds the vault. Recovery shares
+  and the initial root token are shown once at `init`; the root token is
+  revoked after bootstrap.
+- **Boot independence:** no core service (DNS, DHCP, LDAP, SSO, nginx) reads
+  OpenBao to *start*. fabricctl renders secrets into each service's config at
+  deploy time; if OpenBao is down or sealed, the last rendered config keeps
+  running and deploys that need a changed secret wait and report.
+
+**Uses (all four selected):**
+
+| Use | How |
+|---|---|
+| fabric's own secrets | KV v2 at `fabric/`. `fabric-secrets.yml` is imported once, then OpenBao is the source of truth; fabricctl and fabric-agent authenticate with AppRole (credentials root-only on the host). The plaintext file is removed after import (kept only inside encrypted backups). |
+| Secrets for your apps | KV v2 at `apps/`. Humans log in with **Keycloak OIDC** (client `fabric-openbao`); LDAP group → OpenBao policy (e.g. `admins` → admin, `<app>-owners` → `apps/<app>/*`). |
+| Dynamic / rotated credentials | Database engine on the fabric Postgres; **static roles** with scheduled rotation for Keycloak's DB user (Keycloak needs a stable password in its config, so fabricctl re-renders and restarts it on rotation). LDAP engine rotates the 389-DS role accounts (`keycloak_admin`, …). Apps can use true dynamic, per-lease DB users. |
+| SSH certificate CA | SSH engine signs short-lived user certificates (`bao ssh`/`fabricctl ssh`), principals from LDAP groups; hosts trust the CA key via `TrustedUserCAKeys` (the install-ldap client script gains an option for it). |
+
+The web UI gains a Secrets section (browse/edit `apps/`, rotate, issue SSH
+certs) through fabric-agent, which talks to OpenBao with its own AppRole —
+the webui container still holds no secrets itself.
+
 ## 8. Phases
 
 | Phase | Deliverable | Depends on |
@@ -281,6 +316,8 @@ everything else.
 | 0 ✅ | Rename to fabric, `fabricctl`, migration from core-template | — |
 | 0.5 | Foundations: container hardening, version lock with digest pinning, LF line endings, arm64 + amd64 CI running the real-container suites, Pi preflight | — |
 | 0.6 | Signed image channels on GitHub Pages, local registry, `fabric-update` timer with rollback, offline export/import | 0.5 |
+| 0.7 | OpenBao: container, auto-unseal from key file, OIDC login via Keycloak, KV for fabric (import `fabric-secrets.yml`) and apps | 0.5 |
+| 0.8 | OpenBao: rotated DB/LDAP credentials, SSH certificate CA, web UI Secrets section | 0.7 |
 | 1 | `fabricctl init` natively (port 02, 03, 05–10); Ansible kept as fallback | — |
 | 2 | `.deb` build + signed apt repo in CI (amd64 + arm64 test runs); `setup.sh` becomes a wrapper | 1 |
 | 3 | Kea DHCP + DDNS + reservations (CLI + UI) | 2 |
@@ -302,6 +339,11 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D6 | Which switches/APs must 802.1X support (vendor affects VLAN attributes, CoA, RadSec) | Needs your inventory |
 | D7 | Apt repo hosting: GitHub Pages vs Cloudsmith/packagecloud | GitHub Pages (no third party, free, signed) |
 | D8 | Keep `setup.sh`/Ansible for remote install after phase 2? | One release as a wrapper, then remove |
+| D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b) |
+| D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b) |
+| D11 ✅ | Docker privilege | Harden all containers + daemon; installer asks about userns-remap; no rootless (§7a) |
+| D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
+| D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 
 ## References
 
