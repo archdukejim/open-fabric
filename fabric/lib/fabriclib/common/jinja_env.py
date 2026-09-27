@@ -12,7 +12,7 @@ import yaml
 
 class _RelativeEnvironment(jinja2.Environment):
     """Resolve `{% extends "../shared/base.html.j2" %}` relative to the
-    including template, as the former Ansible renderer did."""
+    including template."""
 
     def join_path(self, template, parent):
         if template.startswith(("./", "../")):
@@ -50,7 +50,7 @@ def _bool(value):
 
 
 def _lookup(kind, arg):
-    """The one Ansible lookup fabric's templates use: pipe('date +%s')."""
+    """The one lookup() fabric's templates use: pipe('date +%s')."""
     if kind == "pipe" and arg == "date +%s":
         return str(int(time.time()))
     return ""
@@ -58,7 +58,7 @@ def _lookup(kind, arg):
 
 def jinja_env(template_dir):
     """The Jinja2 environment every fabric template is rendered with:
-    Ansible-compatible filters, relative extends, trim_blocks/lstrip_blocks."""
+    fabric's filters, relative extends, trim_blocks/lstrip_blocks."""
     env = _RelativeEnvironment(loader=jinja2.FileSystemLoader(template_dir), keep_trailing_newline=True,
                                trim_blocks=True, lstrip_blocks=True)
     env.filters.update({

@@ -3,7 +3,7 @@ RECORD_TYPES = ("A", "AAAA", "CNAME", "MX", "TXT", "SRV")
 
 def upgrade_vars(data, pinned):
     """Adjust an existing install's rendered vars before they are re-rendered
-    by a newer fabric (same rules the Ansible installer applied):
+    by a newer fabric:
 
     - image_* keys are dropped unless `pinned` sets them, so an upgrade picks
       up the new release's images instead of freezing the old ones.
