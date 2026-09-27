@@ -95,7 +95,7 @@ Every setting can be changed later (`fabricctl security …`,
 | `fabric/lib/webui/` (container app), `fabric/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh`, `ldap_migrate.*` | Ship as-is inside the package |
 | `fabric/jinja/**` templates | Ship as-is (package data) |
 | Playbooks 02, 03, 05–10 | **Port** to Python modules (see §4) |
-| `package.sh` offline bundles | Becomes an image bundle next to the `.deb` |
+| `fabriclib/` (one operation per file) | The package's library layout from day one |
 
 Only the "first install" half of the Ansible code needs porting; the
 day-2 half is already native.

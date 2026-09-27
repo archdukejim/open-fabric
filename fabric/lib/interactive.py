@@ -3,9 +3,18 @@ import sys
 import os
 import yaml
 import subprocess
-import datetime
 
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, SCRIPT_DIR)
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.common.load_vars import load_vars  # noqa: E402
+from fabriclib.common.write_audit import write_audit  # noqa: E402
+from fabriclib.dns.add_record import add_record  # noqa: E402
+from fabriclib.dns.constants import RECORD_TYPES  # noqa: E402
+from fabriclib.dns.format_value import format_value  # noqa: E402
+from fabriclib.dns.remove_record import remove_record  # noqa: E402
+from fabriclib.dns.sync_status import sync_status  # noqa: E402
+from fabriclib.dns.validate_record import HOST_RE  # noqa: E402
 FABRIC_DIR = os.path.dirname(SCRIPT_DIR)
 PLAYBOOKS_DIR = os.path.join(FABRIC_DIR, "playbooks")
 CUSTOM_VARS_FILE = os.path.abspath(os.path.join(FABRIC_DIR, "config/vars.yaml"))
@@ -64,21 +73,9 @@ def save_yaml(path, data):
         yaml.dump(cleaned, f, default_flow_style=False, sort_keys=False)
 
 def audit_log(key, old_val, new_val, action="MODIFIED"):
-    audit_dir = "/opt/fabric/archive"
-    if not os.path.exists(audit_dir):
-        try:
-            os.makedirs(audit_dir, mode=0o700)
-        except Exception:
-            pass
-    
-    audit_file = os.path.join(audit_dir, "audit.log")
-    timestamp = datetime.datetime.now().isoformat()
-    user = os.environ.get("SUDO_USER") or os.environ.get("USER") or "unknown"
-    
     try:
-        with open(audit_file, "a") as f:
-            f.write(f"[{timestamp}] User: {user} | Action: {action} | Key: {key} | Old: {old_val} | New: {new_val}\n")
-    except Exception:
+        write_audit(_actor(), action, f"Key: {key} | Old: {old_val} | New: {new_val}")
+    except OSError:
         pass
 
 def print_vars():
@@ -96,122 +93,87 @@ def print_vars():
     print("")
 
 
-def format_record_value(rtype, record):
-    """Human-readable right-hand side of a DNS record, matching zone.j2."""
+def _actor():
+    return os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
+
+
+def _reload(full_data):
+    """Re-read vars.yaml into the caller's dict after a locked fabriclib write,
+    so later saves from this editor cannot overwrite it with a stale copy."""
+    fresh = load_vars()
+    full_data.clear()
+    full_data.update(fresh)
+
+
+def _prompt_record(rtype):
+    """Ask for the fields fabriclib.dns.validate_record expects for rtype."""
+    form = {"name": input("Record name (e.g. '@', 'www'): ").strip()}
     if rtype in ('A', 'AAAA'):
-        return str(record.get('ip', ''))
-    if rtype == 'CNAME':
-        return str(record.get('canonical', ''))
-    if rtype == 'TXT':
-        return f'"{record.get("text", "")}"'
-    if rtype == 'MX':
-        return f"{record.get('priority', '')} {record.get('exchange', '')}"
-    if rtype == 'SRV':
-        return f"{record.get('priority', '')} {record.get('weight', '')} {record.get('port', '')} {record.get('target', '')}"
-    return str(record.get('value', record.get('target', '')))
+        form["ip"] = input("IP address: ").strip()
+    elif rtype == 'CNAME':
+        form["target"] = input("Canonical name / target: ").strip()
+    elif rtype == 'TXT':
+        form["text"] = input("Text: ").strip()
+    elif rtype == 'MX':
+        form["priority"] = input("Priority [10]: ").strip() or "10"
+        form["target"] = input("Mail exchange: ").strip()
+    elif rtype == 'SRV':
+        form["priority"] = input("Priority [0]: ").strip() or "0"
+        form["weight"] = input("Weight [0]: ").strip() or "0"
+        form["port"] = input("Port: ").strip()
+        form["target"] = input("Target: ").strip()
+    return form
 
-def zone_sync_status(zone):
-    """Compare the serial BIND is serving with the serial in the deployed zone file."""
-    import re
-    file_serial = None
-    zone_file = os.path.join(BIND_DATA_DIR, f"db.{zone}")
-    if os.path.exists(zone_file):
-        with open(zone_file) as f:
-            m = re.search(r"^\s*(\d+)\s*;\s*Serial", f.read(), re.MULTILINE)
-            file_serial = m.group(1) if m else None
-    try:
-        res = subprocess.run(["docker", "exec", "-u", "bind", "bind9", "rndc", "zonestatus", zone],
-                             capture_output=True, text=True, timeout=10)
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return f"{YELLOW}? BIND9 not reachable{NC}"
-    m = re.search(r"^serial:\s*(\d+)", res.stdout, re.MULTILINE)
-    if res.returncode != 0 or not m:
-        return f"{RED}NOT LOADED in BIND9{NC}"
-    live = m.group(1)
-    if file_serial and int(live) < int(file_serial):
-        return f"{YELLOW}OUT OF SYNC (serving serial {live}, file has {file_serial}; run 'l'){NC}"
-    return f"{GREEN}IN SYNC (serial {live}){NC}"
 
-def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
-    if zone_key not in dns_data:
-        dns_data[zone_key] = {}
-    zone_data = dns_data[zone_key]
+_SYNC_COLOURS = {"in_sync": GREEN, "out_of_sync": YELLOW, "not_loaded": RED, "unreachable": YELLOW}
+
+
+def edit_dns_zone(full_data, zone_key, domain_var):
     disp_zone = domain_var if zone_key == 'dynamic_zone_var' else zone_key
-    
+
     while True:
+        zone_data = ((full_data.get('dns') or {}).get(zone_key)) or {}
         os.system('clear')
         print(f"{BOLD}--- DNS Zone: {disp_zone} ---{NC}\n")
-        
-        print(f"  {zone_sync_status(disp_zone)}")
-        print()
-        
-        record_types = [k for k in zone_data.keys() if k != 'zone_authority' and isinstance(zone_data[k], list)]
-        
-        idx = 1
+        state, message = sync_status(disp_zone)
+        print(f"  {_SYNC_COLOURS.get(state, NC)}{message}{NC}\n")
+
         record_map = {}
-        for rtype in record_types:
-            for ridx, record in enumerate(zone_data[rtype]):
+        idx = 1
+        for rtype in RECORD_TYPES:
+            for ridx, record in enumerate(zone_data.get(rtype) or []):
                 name = record.get('name') or f"{RED}(missing name){NC}"
-                print(f"  {idx}) [{rtype}] {name} -> {format_record_value(rtype, record)}")
-                record_map[idx] = (rtype, ridx, record)
+                print(f"  {idx}) [{rtype}] {name} -> {format_value(rtype, record)}")
+                record_map[idx] = (rtype, ridx, record.get('name') or "")
                 idx += 1
-                
+
         print(f"\n  a) Add new record")
         if record_map:
             print(f"  d) Delete record")
-        print(f"  l) Live update (rndc sync & reload)")
-        print(f"  f) Force update (rm journal, recreate zone, reboot bind9)")
+        print(f"  l) Live update (apply: publish changed zones)")
+        print(f"  f) Force update (rm journal, recreate zone, restart bind9)")
         print(f"  b) Back to zones")
-        
+
         choice = input(f"Select an option: ").strip().lower()
         if choice == 'b':
             break
-        elif choice == 'd' and record_map:
-            del_idx = input(f"Enter record number to delete (1-{len(record_map)}): ").strip()
-            if del_idx.isdigit() and int(del_idx) in record_map:
-                rtype, ridx, _ = record_map[int(del_idx)]
-                zone_data[rtype].pop(ridx)
-                if not zone_data[rtype]:
-                    del zone_data[rtype]
-                save_yaml(CUSTOM_VARS_FILE, full_data)
-                audit_log("dns", "record", "None", "DELETED")
-        elif choice == 'a':
-            rtype = input("Record type (A, CNAME, TXT, MX, etc): ").strip().upper()
-            if rtype:
-                name = input("Record name (e.g. '@', 'www'): ").strip()
-                if not name:
-                    print(f"{RED}Record name is required.{NC}")
-                    input("Press Enter to continue...")
-                    continue
-                if rtype == 'A' or rtype == 'AAAA':
-                    val = input("IP Address: ").strip()
-                    new_rec = {'name': name, 'ip': val}
-                elif rtype == 'CNAME':
-                    val = input("Canonical Name/Target: ").strip()
-                    new_rec = {'name': name, 'canonical': val}
-                elif rtype == 'TXT':
-                    val = input("Text Data: ").strip()
-                    new_rec = {'name': name, 'text': val}
-                elif rtype == 'MX':
-                    priority = input("Priority (e.g. 10): ").strip()
-                    exchange = input("Exchange (e.g. mail.domain.com.): ").strip()
-                    new_rec = {'name': name, 'priority': int(priority) if priority.isdigit() else 10, 'exchange': exchange}
-                elif rtype == 'SRV':
-                    priority = input("Priority (e.g. 0): ").strip()
-                    weight = input("Weight (e.g. 5): ").strip()
-                    port = input("Port (e.g. 5060): ").strip()
-                    target = input("Target: ").strip()
-                    new_rec = {'name': name, 'priority': int(priority) if priority.isdigit() else 0, 'weight': int(weight) if weight.isdigit() else 0, 'port': int(port) if port.isdigit() else 0, 'target': target}
-                else:
-                    val = input("Value: ").strip()
-                    new_rec = {'name': name, 'value': val}
-                
-                if rtype not in zone_data:
-                    zone_data[rtype] = []
-                zone_data[rtype].append(new_rec)
-                save_yaml(CUSTOM_VARS_FILE, full_data)
-                audit_log("dns", "None", f"Added {rtype} {name}", "MODIFIED")
-        elif choice == 'l':
+        try:
+            if choice == 'd' and record_map:
+                del_idx = input(f"Enter record number to delete (1-{len(record_map)}): ").strip()
+                if del_idx.isdigit() and int(del_idx) in record_map:
+                    rtype, ridx, name = record_map[int(del_idx)]
+                    remove_record(_actor(), zone_key, rtype, ridx, name)
+                    _reload(full_data)
+            elif choice == 'a':
+                rtype = input(f"Record type ({', '.join(RECORD_TYPES)}): ").strip().upper()
+                if rtype:
+                    add_record(_actor(), zone_key, rtype, _prompt_record(rtype))
+                    _reload(full_data)
+        except ValidationError as exc:
+            print(f"{RED}{exc}{NC}")
+            input("Press Enter to continue...")
+            continue
+        if choice == 'l':
             # deploy.py freezes/thaws each changed zone itself.
             try:
                 apply_mode()
@@ -239,41 +201,40 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
             input("Press Enter to continue...")
 
 def edit_dns(data):
-    if 'dns' not in data or not isinstance(data['dns'], dict):
-        data['dns'] = {}
-        
-    dns_data = data['dns']
-    
     while True:
+        dns_data = data.get('dns') if isinstance(data.get('dns'), dict) else {}
         os.system('clear')
         print(f"{BOLD}--- DNS Records Editor ---{NC}\n")
-        
+
         domain_var = data.get('domain', 'example.com')
-        
+
         zones = list(dns_data.keys())
         if 'dynamic_zone_var' not in zones:
             zones.insert(0, 'dynamic_zone_var')
-            
+
         print("Available Zones:")
         for i, z in enumerate(zones, 1):
             disp = domain_var if z == 'dynamic_zone_var' else z
             print(f"  {i}) {disp} ({z})")
-            
+
         print(f"\n  a) Add a new zone")
         print(f"  b) Back to variables")
-        
+
         choice = input(f"Select a zone (1-{len(zones)}), 'a', or 'b': ").strip().lower()
         if choice == 'b':
             break
         elif choice == 'a':
-            new_zone = input("New zone name: ").strip()
-            if new_zone and new_zone not in dns_data:
-                dns_data[new_zone] = {}
+            # The zone name becomes a file name (db.<zone>) and goes into named.conf.
+            new_zone = input("New zone name: ").strip().rstrip('.')
+            if not HOST_RE.match(new_zone):
+                print(f"{RED}Invalid zone name.{NC}")
+                input("Press Enter to continue...")
+            elif new_zone not in dns_data:
+                data.setdefault('dns', {})[new_zone] = {}
                 save_yaml(CUSTOM_VARS_FILE, data)
                 audit_log("dns", "None", f"Added zone {new_zone}", "MODIFIED")
         elif choice.isdigit() and 1 <= int(choice) <= len(zones):
-            zone_key = zones[int(choice)-1]
-            edit_dns_zone(data, dns_data, zone_key, domain_var)
+            edit_dns_zone(data, zones[int(choice)-1], domain_var)
 
 def edit_list_of_dicts(key, data, schema):
     if key not in data or not isinstance(data[key], list):

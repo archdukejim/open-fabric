@@ -31,21 +31,20 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   │   ├── systemd         # wrapper.service.j2, fabric-agent.service.j2
 │   │   └── vars.yaml.j2
 │   ├── lib
-│   │   ├── archive.sh
-│   │   ├── certs.sh
-│   │   ├── agent/        # fabric-agent: privileged host API for webui (server, actions)
+│   │   ├── fabriclib/    # domain code, one operation per file (common/, dns/, system/)
+│   │   ├── agent/        # fabric-agent: privileged host API for webui (routes to fabriclib)
 │   │   ├── webui/        # webui container app (server, oidc, tlsclient, agentclient, views)
+│   │   ├── certs.sh
 │   │   ├── deploy.py
 │   │   ├── dirsrv.sh
-│   │   ├── dns.sh
 │   │   ├── interactive.py
 │   │   ├── keycloak_bootstrap.py
 │   │   ├── ldap_migrate.py
 │   │   ├── ldap_migrate.sh
 │   │   ├── manage.sh
 │   │   ├── output.sh
-│   │   ├── package.sh
-│   │   ├── prereqs.sh
+│   │   ├── reinstall_backup.sh
+│   │   ├── reinstall_restore.sh
 │   │   ├── services.sh
 │   │   ├── ssh.sh
 │   │   ├── tsig.sh

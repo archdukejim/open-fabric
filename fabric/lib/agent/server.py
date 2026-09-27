@@ -4,7 +4,7 @@
 Runs on the host as root (systemd `fabric-agent`) and serves a small JSON API
 on a unix socket that is mounted into the unprivileged `webui` container.
 It is deliberately not a general executor: every endpoint maps to one
-fixed operation in actions.py, inputs are validated there, and every change
+fixed operation in fabriclib (one file per operation), inputs are validated there, and every change
 is written to the audit log with the acting user.
 
 Only peers whose uid is listed in --allow-uid (the webui container user) or
@@ -30,7 +30,17 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agent import actions  # noqa: E402
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.common.read_audit import read_audit  # noqa: E402
+from fabriclib.common.write_audit import write_audit  # noqa: E402
+from fabriclib.dns.add_record import add_record  # noqa: E402
+from fabriclib.dns.constants import RECORD_TYPES  # noqa: E402
+from fabriclib.dns.list_zones import list_zones  # noqa: E402
+from fabriclib.dns.remove_record import remove_record  # noqa: E402
+from fabriclib.dns.zone_detail import zone_detail  # noqa: E402
+from fabriclib.system.apply_changes import apply_changes  # noqa: E402
+from fabriclib.system.service_status import service_status  # noqa: E402
+from fabriclib.system.version_info import version_info  # noqa: E402
 
 MAX_BODY = 64 * 1024
 ACTOR_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
@@ -64,17 +74,17 @@ class Handler(BaseHTTPRequestHandler):
     def body(self):
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY:
-            raise actions.ValidationError("request too large")
+            raise ValidationError("request too large")
         data = json.loads(self.rfile.read(length) or b"{}")
         if not isinstance(data, dict):
-            raise actions.ValidationError("expected a JSON object")
+            raise ValidationError("expected a JSON object")
         return data
 
     @staticmethod
     def actor(data):
         actor = str(data.get("actor", ""))
         if not ACTOR_RE.match(actor):
-            raise actions.ValidationError("invalid actor")
+            raise ValidationError("invalid actor")
         return actor
 
     def do_GET(self):
@@ -93,42 +103,42 @@ class Handler(BaseHTTPRequestHandler):
             route = parts[1:]
             if method == "GET":
                 if route == ["version"]:
-                    return self.reply(200, actions.version_info())
+                    return self.reply(200, version_info())
                 if route == ["services"]:
-                    return self.reply(200, actions.service_status())
+                    return self.reply(200, service_status())
                 if route == ["zones"]:
-                    return self.reply(200, actions.list_zones())
+                    return self.reply(200, list_zones())
                 if len(route) == 2 and route[0] == "zones":
-                    return self.reply(200, actions.zone_detail(route[1]))
+                    return self.reply(200, zone_detail(route[1]))
                 if route == ["audit"]:
-                    return self.reply(200, actions.read_audit())
+                    return self.reply(200, read_audit())
                 return self.reply(404, {"error": "not found"})
 
             data = self.body()
             actor = self.actor(data)
             if len(route) == 3 and route[0] == "zones" and route[2] == "records":
                 rtype = data.get("type", "")
-                if rtype not in actions.RECORD_TYPES:
-                    raise actions.ValidationError("unsupported record type")
-                return self.reply(200, actions.add_record(actor, route[1], rtype, data))
+                if rtype not in RECORD_TYPES:
+                    raise ValidationError("unsupported record type")
+                return self.reply(200, add_record(actor, route[1], rtype, data, source="web"))
             if len(route) == 4 and route[0] == "zones" and route[2:] == ["records", "delete"]:
                 try:
                     index = int(data.get("index", -1))
                 except (TypeError, ValueError):
-                    raise actions.ValidationError("invalid index")
-                return self.reply(200, actions.delete_record(actor, route[1], str(data.get("type", "")),
-                                                             index, str(data.get("name", ""))))
+                    raise ValidationError("invalid index")
+                return self.reply(200, remove_record(actor, route[1], str(data.get("type", "")),
+                                                    index, str(data.get("name", "")), source="web"))
             if route == ["apply"]:
-                ok, output = actions.apply_changes(actor)
+                ok, output = apply_changes(actor, source="web")
                 return self.reply(200, {"ok": ok, "output": output})
             if route == ["events"]:
                 action = data.get("action")
                 if action not in EVENT_ACTIONS:
-                    raise actions.ValidationError("unsupported event")
-                actions.audit(actor, action, str(data.get("detail", ""))[:200])
+                    raise ValidationError("unsupported event")
+                write_audit(actor, action, str(data.get("detail", ""))[:200], source="web")
                 return self.reply(200, {})
             return self.reply(404, {"error": "not found"})
-        except actions.ValidationError as exc:
+        except ValidationError as exc:
             self.reply(400, {"error": str(exc)})
         except (ValueError, json.JSONDecodeError):
             self.reply(400, {"error": "malformed request"})

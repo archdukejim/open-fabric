@@ -14,8 +14,6 @@ set -euo pipefail
 #                   --intermediate-ca [N]  Issue as a subordinate CA cert (pathLen=N, default 0).
 #                                          pathLen=0: can sign leaf certs, cannot issue further CAs.
 #   --service-cert  Re-issue core service TLS certs (dns, ldap, ca, certificates) via Step-CA.
-#   --dns-record         Add a DNS record to vars.yaml and reload BIND9.
-#   --remove-dns-record  Remove a DNS record from vars.yaml and reload BIND9.
 #   --render-jinja <j2>  Render a Jinja2 template using fabric vars.
 #   --client-cert <user> Mint a webui client certificate (.p12) for a Keycloak user.
 #   --keycloak-sync      Re-run the idempotent Keycloak configuration (federation, webui client, MFA).
@@ -39,9 +37,6 @@ set -euo pipefail
 #   sudo ./manage.sh --mint-certs --apply                      # Non-interactive: mint all extra_certs from vars.yaml
 #   sudo ./manage.sh --service-cert               # Interactive: re-issue core service certs
 #   sudo ./manage.sh --service-cert --apply       # Non-interactive: re-issue all core service certs
-#   sudo ./manage.sh --dns-record                 # Interactive: add a DNS record
-#   sudo ./manage.sh --dns-record --apply         # Non-interactive: re-render zones and reload BIND9
-#   sudo ./manage.sh --remove-dns-record          # Interactive: pick and remove a DNS record
 # -----------------------------------------------------------------------
 
 # Resolve the actual script path even if invoked via a symlink
@@ -57,7 +52,6 @@ source "$FABRIC_DIR/lib/services.sh"
 source "$FABRIC_DIR/lib/vars.sh"
 source "$FABRIC_DIR/lib/tsig.sh"
 source "$FABRIC_DIR/lib/certs.sh"
-source "$FABRIC_DIR/lib/dns.sh"
 
 # --- Globals ---
 TARGET_BASE="$(dirname "$FABRIC_DIR")"
@@ -87,8 +81,6 @@ for arg in "${ARGS[@]}"; do
         --remove-tsig)  MODE="remove-tsig" ;;
         --mint-certs)   MODE="mint-certs" ;;
         --service-cert) MODE="service-cert" ;;
-        --dns-record)          MODE="dns-record" ;;
-        --remove-dns-record)   MODE="remove-dns-record" ;;
         --render-jinja) MODE="render-jinja" ;;
         --print)        MODE="print" ;;
         --interactive)  MODE="interactive" ;;
@@ -113,7 +105,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)    usage ;;
         --version)    shift ;;
-        --tsig-keys|--list-tsig|--mint-certs|--service-cert|--dns-record|--remove-dns-record|--print|--interactive|--update-containers)  shift ;;
+        --tsig-keys|--list-tsig|--mint-certs|--service-cert|--print|--interactive|--update-containers)  shift ;;
         --client-cert)  CLIENT_CERT_USER="${2:-}"; shift; [ -n "$CLIENT_CERT_USER" ] && shift || true ;;
         --migrate-ldap) MIGRATE_DIR="${2:-}"; shift; [ -n "$MIGRATE_DIR" ] && shift || true ;;
         --keycloak-sync) shift ;;
@@ -263,8 +255,6 @@ case "$MODE" in
     remove-tsig)  do_remove_tsig ;;
     mint-certs)   do_extra_certs ;;
     service-cert) do_service_cert ;;
-    dns-record)          do_dns_record ;;
-    remove-dns-record)   do_remove_dns_record ;;
     render-jinja) do_render_jinja ;;
     print)        python3 "${FABRIC_DIR}/lib/interactive.py" --print ;;
     interactive)  python3 "${FABRIC_DIR}/lib/interactive.py" --interactive ;;

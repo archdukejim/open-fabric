@@ -50,7 +50,7 @@ The installer will automatically pull and load these images on the target:
 ### Deployment Modes
 - **Local:** Deploy directly to the machine running the installer.
 - **Remote:** Deploy over SSH to a remote target.
-- **Offline (Air-gapped):** Fully supported via `offline.sh` which bundles all required APT packages, Python dependencies, Ansible collections, and Docker images.
+- **Offline (Air-gapped):** `setup.sh --offline` skips network preconditioning and image pulls; images must already be present on the target. Signed offline image bundles (`fabricctl images export/import`) are planned — see [the design](docs/design/fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases).
 
 ---
 

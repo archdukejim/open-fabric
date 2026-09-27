@@ -30,7 +30,7 @@ The `fabric` infrastructure is deployed via a sequential set of Ansible playbook
 
 ## Ansible Collections
 
-The execution heavily relies on standard Ansible collections. These must be present on the controller machine (they are automatically packaged and installed by `offline.sh`).
+The execution heavily relies on standard Ansible collections. These must be present on the controller machine.
 
 1. **`community.docker`**
    - **Usage**: ~15+ tasks across the repository.
