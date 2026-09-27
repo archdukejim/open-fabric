@@ -1,6 +1,6 @@
 #!/bin/bash
 # Keycloak bootstrap integration test. Reuses $OUT/dirsrv (PKI + seeded and
-# migrated 389-DS data, incl. uid=jim in cn=admins) from dstest/run.sh.
+# 389-DS data, incl. uid=jim in cn=admins) from tests/dirsrv/run.sh.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -29,7 +29,7 @@ docker network create --subnet 10.254.9.0/24 kctest >/dev/null
 docker run -d --name kc-dirsrv --network kctest --ip 10.254.9.50 --network-alias ldap.lan.j-j.family \
   --user 911:911 --cap-drop ALL --security-opt no-new-privileges:true \
   -e DS_SUFFIX_NAME="$BASE" -e DS_DM_PASSWORD=DmPass1 -v "$D/data:/data" \
-  --health-cmd "/usr/libexec/dirsrv/dscontainer -H" --health-interval 5s core-template/dirsrv:local >/dev/null
+  --health-cmd "/usr/libexec/dirsrv/dscontainer -H" --health-interval 5s fabric/dirsrv:test >/dev/null
 docker run -d --name kc-keycloak --network kctest --ip 10.254.9.60 \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=KcAdmin1 \
   -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=KcAdmin1 \
@@ -61,17 +61,17 @@ webui_realm: lan.j-j.family
 webui_admin_role: fabric-admin
 webui_admin_group: admins
 EOF
-cat > opt/fabric/config/core-secrets.yml <<EOF
+cat > opt/fabric/config/fabric-secrets.yml <<EOF
 keycloak_admin_user: admin
 keycloak_admin_password: KcAdmin1
 ldap_keycloak_password: KcPass1
 webui_oidc_secret: OidcSecret1
 EOF
 
-run1=$(python3 "$REPO/fabric/lib/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/core-secrets.yml 2>&1)
+run1=$(python3 "$REPO/fabric/lib/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/fabric-secrets.yml 2>&1)
 echo "$run1" | sed 's/^/    /'
 check "bootstrap run 1 succeeds" "grep -q 'Keycloak configuration complete' <<<\"\$run1\""
-run2=$(python3 "$REPO/fabric/lib/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/core-secrets.yml 2>&1)
+run2=$(python3 "$REPO/fabric/lib/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/fabric-secrets.yml 2>&1)
 echo "$run2" | sed 's/^/    /'
 check "bootstrap run 2 converges (no creates)" "grep -q 'complete' <<<\"\$run2\" && ! grep -q 'created' <<<\"\$run2\""
 
@@ -79,7 +79,7 @@ verify=$(REPO="$REPO" W="$W" python3 "$HERE/verify.py" 2>&1)
 echo "$verify"
 PASS=$((PASS + $(grep -c '^PASS' <<<"$verify"))); FAIL=$((FAIL + $(grep -c '^FAIL' <<<"$verify")))
 
-# ---- real browser login as the migrated LDAP user -> must be forced into TOTP setup
+# ---- real browser login as the LDAP user -> must be forced into TOTP setup
 CURL="curl -s -c $W/jar -b $W/jar --cacert $D/root.crt --connect-to sso.lan.j-j.family:443:10.254.9.60:8443"
 AUTH="https://sso.lan.j-j.family/realms/lan.j-j.family/protocol/openid-connect/auth?client_id=fabric-webui&response_type=code&scope=openid&redirect_uri=https%3A%2F%2Fmgr.lan.j-j.family%2Foidc%2Fcallback&state=s&nonce=n&code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM&code_challenge_method=S256"
 page=$($CURL "$AUTH")
@@ -90,7 +90,7 @@ loc=$(grep -i '^location:' <<<"$resp" | tr -d '
 ' | cut -d' ' -f2)
 [ -n "$loc" ] && { resp2=$($CURL "$loc"); echo '--- after redirect:'; grep -ioE 'totp|authenticator|one-time|code=[^&"]*' <<<"$resp2" | sort | uniq -c | head; resp="$resp$resp2"; }
 check "LDAP user jim authenticates via 389-DS federation" "! grep -qi 'Invalid username or password' <<<\"\$resp\""
-check "core-mgr login forces TOTP enrolment (MFA enforced)" "grep -qiE 'totp|authenticator|one-time' <<<\"\$resp\" && ! grep -qi 'mgr.lan.j-j.family/oidc/callback?.*code=' <<<\"\$resp\""
+check "web UI login forces TOTP enrolment (MFA enforced)" "grep -qiE 'totp|authenticator|one-time' <<<\"\$resp\" && ! grep -qi 'mgr.lan.j-j.family/oidc/callback?.*code=' <<<\"\$resp\""
 bad=$($CURL "${AUTH/mgr.lan.j-j.family%2Foidc/evil.test%2Foidc}")
 check "redirect_uri not registered is rejected" "grep -qi 'Invalid parameter: redirect_uri' <<<\"\$bad\""
 

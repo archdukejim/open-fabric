@@ -13,15 +13,12 @@ Use `fabricctl` (the global wrapper powered by the interactive Python engine) fo
   - [`--version`](#--version)
   - [`--client-cert <user>`](#--client-cert-user)
   - [`--keycloak-sync`](#--keycloak-sync)
-  - [`--migrate-ldap [old_dir]`](#--migrate-ldap-old_dir)
 - [Interactive Menu Categories](#interactive-menu-categories)
   - [DNS Configuration](#dns-configuration)
   - [Mint Certificates](#mint-certificates)
-  - [TSIG Keys](#tsig-keys)
+  - [TSIG Keys (RFC2136)](#tsig-keys-rfc2136-dynamic-updates)
   - [Landing Page Links](#landing-page-links)
-- [Migrating from OpenLDAP](#migrating-from-openldap)
 - [Lifecycle Commands](#lifecycle-commands)
-- [Upgrading from core-template](#upgrading-from-core-template)
 - [Service Ports](#service-ports)
 
 ---
@@ -81,17 +78,10 @@ sudo fabricctl --client-cert jdoe
 ```
 
 #### `--keycloak-sync`
-Re-run `keycloak_bootstrap.py`: realm, LDAP federation to 389-DS, group mapper and sync, `fabric-admin` role → `admins` group, the `fabric-webui` OIDC client and its TOTP flow. Idempotent — use after changing `webui_*` vars, after an LDAP migration, or to repair drift made in the admin console.
+Re-run `keycloak_bootstrap.py`: realm, LDAP federation to 389-DS, group mapper and sync, `fabric-admin` role → `admins` group, the `fabric-webui` OIDC client and its TOTP flow. Idempotent — use after changing `webui_*` vars or to repair drift made in the admin console.
 
 ```bash
 sudo fabricctl --keycloak-sync
-```
-
-#### `--migrate-ldap [old_dir]`
-One-time import of an old OpenLDAP deployment into 389-DS (default `old_dir`: `/opt/openldap`). See [Migrating from OpenLDAP](#migrating-from-openldap).
-
-```bash
-sudo fabricctl --migrate-ldap
 ```
 
 ---
@@ -151,32 +141,42 @@ extra_certs:
 
 **ACME mode:** issued via Step-CA's ACME provisioner with DNS-01 validation against BIND9 using the primary TSIG key. All core service certs (`dns.internal`, `ldap.internal`, `ca.internal`) are offline Step-CA certs issued at install time.
 
-#### TSIG Keys
+#### TSIG Keys (RFC2136 dynamic updates)
 
-TSIG keys grant named DNS update rights to external services (NAS, reverse proxies, other hosts) for specific hostnames only. Manage keys (Add, Modify, Delete) directly through the interactive menu.
-
-All TSIG keys are managed in the `tsig_keys` list in `vars.yaml`. Each key carries a `record_types` list that drives its `update-policy` grant in BIND9:
-
-- `primary: true` + `record_types` → `grant key subdomain _acme-challenge <types>` (ACME DNS-01 scope)
-- no `primary` + `record_types` → `grant key zonesub <types>` (zone-wide update rights for those types)
+TSIG keys let other systems update DNS over RFC2136 — typically a reverse proxy obtaining Let's Encrypt certificates with DNS-01, like nginx-proxy-manager's certbot `rfc2136` plugin. A key is a `tsig_keys` entry in the vars; its secret lives only in `fabric-secrets.yml` (`0600`). From them fabric renders the BIND key, its `update-policy` grants and an `rfc2136.ini` for the client; nothing edits the rendered BIND files by hand, so keys survive every apply and setup re-run.
 
 ```yaml
 tsig_keys:
-- name: acme_dns-01       # primary ACME key — managed by installer
-  algorithm: hmac-sha256
-  domain: '{{ domain }}'
-  primary: true
-  record_types: [TXT]     # may update _acme-challenge TXT records
-- name: acme_nas-proxy    # extra key — applied by fabricctl
-  algorithm: hmac-sha256
-  domain: '{{ domain }}'
-  record_types: [TXT, A]  # zone-wide TXT and A update rights
+- name: npm                   # nginx-proxy-manager
+  records: [npm, shelfmark]   # may only set _acme-challenge.npm.<domain> and _acme-challenge.shelfmark.<domain>
+  secret: "base64..."         # OPTIONAL: keep an existing key (its clients keep working unchanged)
+- name: acme_nas-proxy
+  record_types: [TXT, A]      # no records: may update these types anywhere in the zone (zonesub)
 ```
 
-All TSIG key names are also collected into a `tsig-updaters` ACL in `named.conf.acl` so they can be referenced in other BIND9 directives. Each key generates:
-- An entry in `named.conf.keys` with a random 256-bit secret
-- `update-policy` grant(s) in `named.conf.zones` based on `record_types`
-- A `rfc2136.ini` credentials file for the consuming service
+| Field | Default | Meaning |
+|---|---|---|
+| `name` | — | Key name the client uses (`dns_rfc2136_name`) |
+| `secret` | generated once | Base64 secret. Given in the vars, it is moved into `fabric-secrets.yml` and removed from the vars files; it always wins over a stored one |
+| `algorithm` | `hmac-sha256` | `hmac-sha256/384/512/224`, `hmac-sha1`, `hmac-md5` |
+| `domain` | the fabric domain | Zone the key may update |
+| `records` | — | Hosts allowed a DNS-01 challenge: `grant <key> name _acme-challenge.<record>.<zone>. <types>` |
+| `record_types` | `[TXT]` | Record types it may change |
+| `primary` | — | The zone's own ACME key: `grant <key> subdomain _acme-challenge <types>` |
+| `out` | `/opt/<name>/rfc2136.ini` | Credentials file for the client (`0600`): server = `host_ip`, port = `bind_dns_port`, key, secret, algorithm |
+
+Without `records` or `primary`, the key gets `zonesub` for its `record_types`.
+
+```bash
+sudo fabricctl tsig list
+sudo fabricctl tsig add npm --record npm --record shelfmark              # new secret -> /opt/npm/rfc2136.ini
+sudo fabricctl tsig add npm --record npm --secret-file /root/npm.secret   # keep an existing key's secret
+sudo fabricctl tsig remove npm
+```
+
+`add` and `remove` update the vars and secrets and apply at once (BIND reloads its configuration). A secret is never taken on the command line: `--secret-file` or `--secret-prompt`.
+
+**Keeping an existing key (rebuilding a host):** put its `name`, `records` and `secret` in the vars file you give `fabricctl setup --file`, with the same `domain`. BIND on the new host then accepts the same client configuration unchanged (server = `host_ip`, port 53).
 
 #### Landing Page Links
 
@@ -211,40 +211,6 @@ The following chart outlines the memory footprint and CPU impact of the deployed
 
 ---
 
-## Upgrading from core-template
-
-fabric was previously named core-template. Re-running `sudo ./setup.sh` from a fabric checkout migrates an existing install in place (the `migrate` setup step, a no-op on fresh or already-migrated hosts):
-
-| Before | After |
-|---|---|
-| `/opt/core` | `/opt/fabric` |
-| `config/core-secrets.yml` (on the target and in the repo root) | `config/fabric-secrets.yml` |
-| vars key `core_subnet` | `fabric_subnet` (the old key is still honoured) |
-| Docker network `core_net` | `fabric_net` (same subnet; containers are recreated on start) |
-| `/usr/local/bin/core-mgr` | `/usr/local/bin/fabricctl` — `core-mgr` remains as an alias for one release |
-| `/etc/systemd/resolved.conf.d/core-dns.conf` | `fabric-dns.conf` |
-
-Services are stopped briefly while the Docker network is replaced. Service data directories (`/opt/nginx`, `/opt/bind9`, `/opt/stepca`, ...) are not touched.
-
-## Migrating from OpenLDAP
-
-Deployments before 1.5.0 ran `osixia/openldap` from `/opt/openldap`. The upgrade deploys 389-DS in `/opt/dirsrv` with a fresh tree and fresh role-account passwords; user and group data is moved with `--migrate-ldap`.
-
-1. **Back up** `/opt/openldap` (and `/opt/fabric/config/fabric-secrets.yml`), e.g. `sudo tar -czf ~/openldap-backup.tgz -C /opt openldap`.
-2. **Deploy** the new version: `sudo ./setup.sh`. `/opt/openldap` is left untouched by the upgrade (snapshots and uninstall still include it). If a stopped `openldap` container still exists, it can be removed with `docker rm openldap`.
-3. **Migrate**: `sudo fabricctl --migrate-ldap [old_dir]`.
-   - Runs `slapcat` against a *copy* of the old `data/` and `config/` using the `osixia/openldap:1.5.0` image (must be pullable or already loaded).
-   - Exports the current 389-DS database to `/opt/dirsrv/data/ldif/pre-migrate-<timestamp>.ldif` (your rollback point), merges the OpenLDAP entries into it and **imports** the result with `dsconf backend import`. An import is used rather than LDAP adds because 389-DS always generates a new `entryUUID` on add (and refuses to modify it), but keeps it on import.
-   - Merge rules: entries already in 389-DS (suffix, OUs, seeded role accounts) win; `entryUUID` and password hashes are preserved (389-DS re-hashes to PBKDF2-SHA512 on next bind); missing group `member` values are merged; osixia's `cn=admin` is dropped, including from group membership; `memberOf` is rebuilt afterwards.
-   - Re-runs the Keycloak bootstrap (if `keycloak` is running), which repoints the existing `OpenLDAP` federation provider to 389-DS in place, so federated users keep their Keycloak links.
-   - Safe to re-run.
-4. **Verify**: log in to Keycloak (and webui) as a migrated user; check group membership in the Keycloak admin console. To roll back the directory, import the `pre-migrate-*.ldif` backup: `docker exec dirsrv dsconf localhost backend import userroot /data/ldif/pre-migrate-<timestamp>.ldif`.
-5. **Remove** the old data once satisfied: `sudo rm -rf /opt/openldap`.
-
-> Role accounts (`super_admin`, `group_admin`, `user_creator_admin`, `user_modifier_admin`, `keycloak_admin`) are **not** migrated — they now have per-account generated passwords in `fabric-secrets.yml`. Update any client that used the old shared password.
-
----
-
 ## Lifecycle Commands
 
 Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fabriclib/setup/`). All are idempotent. See [install.md](install.md#run-the-installer) for options and the step list.
@@ -254,6 +220,7 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 | `sudo fabricctl setup [--file vars.yaml]` | Install or re-converge. Re-run after changing settings. |
 | `sudo fabricctl setup --step <name>` | Run one step, e.g. `--step firewall` after editing `security.firewall_allow` |
 | `sudo fabricctl doctor` | End-to-end checks of the running install (the `verify` step) |
+| `sudo fabricctl tsig list/add/remove` | TSIG keys for RFC2136 clients — see [TSIG Keys](#tsig-keys-rfc2136-dynamic-updates) |
 | `sudo fabricctl client-cert <user>` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`) |
 | `sudo fabricctl certs [--force]` | Renew service certificates that are missing, expiring within 30 days or missing a name (`--force`: all of them); restarts only the services whose certificates changed |
 | `sudo fabricctl reinstall` | Uninstall + setup, keeping config, secrets, the CA and certificates. Directory users/groups and Keycloak's database are **not** kept; the first admin is re-created with a new login kit |

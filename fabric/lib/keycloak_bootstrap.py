@@ -8,8 +8,8 @@ Talks to the Keycloak admin REST API over TLS pinned to the core root CA
 (no credentials on any command line). Safe to re-run: it converges.
 
   * realm <webui_realm> with brute-force protection
-  * LDAP user federation -> 389 Directory Server (updates an existing
-    "OpenLDAP" provider in place so federated user links survive)
+  * LDAP user federation -> 389 Directory Server (an existing LDAP
+    provider is updated in place)
   * group mapper for ou=groups, synced into Keycloak
   * realm role <webui_admin_role>, granted to group <webui_admin_group>
   * confidential OIDC client "fabric-webui" (code flow + PKCE S256, exact

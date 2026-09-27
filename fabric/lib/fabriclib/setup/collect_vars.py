@@ -5,6 +5,8 @@ import re
 import yaml
 
 from fabriclib.common.console import info, ok
+from fabriclib.common.errors import ValidationError
+from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.setup.detect_network import detect_network
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.upgrade_vars import upgrade_vars
@@ -103,6 +105,25 @@ def collect_vars(ctx):
 
     data["deploy_base_dir"] = ctx.deploy_base
     os.makedirs(ctx.config_dir, mode=0o750, exist_ok=True)
+
+    # Embedded TSIG secrets (existing keys whose RFC2136 clients must keep
+    # working) go to the 0600 secrets file, never into fabric.yaml/vars.yaml.
+    try:
+        data["tsig_keys"], embedded = normalize_tsig_keys(data.get("tsig_keys"), data["domain"],
+                                                          data.pop("tsig_secrets", None))
+    except ValidationError as e:
+        raise SetupError(str(e)) from None
+    if embedded:
+        secrets = _load(ctx.secrets_file)
+        secrets.setdefault("tsig_secrets", {}).update(embedded)
+        old = os.umask(0o077)
+        try:
+            with open(ctx.secrets_file, "w") as f:
+                yaml.safe_dump(secrets, f, sort_keys=False)
+        finally:
+            os.umask(old)
+        os.chmod(ctx.secrets_file, 0o600)
+        ok(f"TSIG secrets for {', '.join(sorted(embedded))} stored in {ctx.secrets_file}")
     path = os.path.join(ctx.config_dir, "fabric.yaml")
     with open(path, "w") as f:
         yaml.safe_dump(data, f, sort_keys=False)

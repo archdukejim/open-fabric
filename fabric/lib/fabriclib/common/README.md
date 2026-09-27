@@ -14,3 +14,4 @@
 | `wait_healthy.py` | Wait for a container's Docker healthcheck |
 | `dns_query.py` | A-record lookup against one DNS server (stdlib; no `dig` needed) |
 | `sudo_owner.py` | Login, home, uid and gid of the account that ran `sudo` (files handed to the admin) |
+| `set_tsig_secrets.py` | Set or remove TSIG secrets in `fabric-secrets.yml` (kept `0600`) |

@@ -308,7 +308,7 @@ def handle_complex_variable(k, data):
         edit_dns(data)
     elif k in ['tsig_keys', 'ldap_groups', 'ldap_organizational_units']:
         schemas = {
-            'tsig_keys': ['name', 'algorithm', 'domain', 'record_types'],
+            'tsig_keys': ['name', 'algorithm', 'domain', 'record_types', 'records'],
             'ldap_groups': ['gidNumber', 'name', 'permissions'],
             'ldap_organizational_units': ['name', 'description', 'parent', 'uid_range']
         }
@@ -559,7 +559,7 @@ def interactive_mode():
             continue
         elif choice == '4':
             schemas = {
-                'tsig_keys': ['name', 'algorithm', 'domain', 'record_types']
+                'tsig_keys': ['name', 'algorithm', 'domain', 'record_types', 'records']
             }
             edit_list_of_dicts('tsig_keys', data, schemas['tsig_keys'])
             continue

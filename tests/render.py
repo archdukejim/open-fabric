@@ -1,5 +1,5 @@
 """Render every template the way deploy.py does, against a vars file shaped like a
-long-running install (old keys, round-tripped values). Usage: render.py <out-dir>"""
+long-running install (round-tripped values). Usage: render.py <out-dir>"""
 import json
 import os
 import sys
@@ -16,14 +16,19 @@ secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
                ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
                ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1',
-               webui_oidc_secret='OidcSecret1', tsig_secrets={})
+               webui_oidc_secret='OidcSecret1',
+               tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA=='})
 user = dict(deploy_base_dir='/opt', domain='lan.j-j.family', hostname='pi-core',
             host_ip='192.168.7.53', lan_cidr='192.168.7.0/24', lan_gateway='192.168.7.1',
-            core_subnet='10.255.0.0/24', landing_page_cname=None, install_keycloak=True,
+            fabric_subnet='10.255.0.0/24', landing_page_cname=None, install_keycloak=True,
             cert_country='US', cert_province='S', cert_city='C', cert_org='O', cert_ou='IT', ca_name='CA',
-            project_containers=['nginx', 'step-ca', 'bind9', 'openldap', 'keycloak', 'postgres', 'openldap'],
-            service_dirs=[{'folder': 'openldap', 'owner': 'ldap'}, {'folder': 'extra', 'owner': 'root'}],
-            nginx_backend_ldap='openldap:389',
+            project_containers=['nginx', 'step-ca', 'bind9', 'dirsrv', 'keycloak', 'postgres', 'dirsrv'],
+            service_dirs=[{'folder': 'dirsrv', 'owner': 'ldap'}, {'folder': 'extra', 'owner': 'root'}],
+            # as normalize_tsig_keys leaves them: an NPM-style per-host key and a primary one
+            tsig_keys=[{'name': 'npm', 'algorithm': 'hmac-sha256', 'domain': 'lan.j-j.family',
+                        'record_types': ['TXT'], 'records': ['npm', 'shelfmark']},
+                       {'name': 'acme_dns-01', 'algorithm': 'hmac-sha256', 'domain': 'lan.j-j.family',
+                        'record_types': ['TXT'], 'primary': True}],
             dns={'dynamic_zone_var': {'zone_authority': True,
                                       'CNAME': [{'name': 'None', 'canonical': 'pi-core'},
                                                 {'name': 'calibre', 'canonical': 'nas25-apps'}]}})
@@ -54,7 +59,7 @@ if out:
     with open(os.path.join(out, 'vars.yaml'), 'w') as f:
         yaml.safe_dump(v2, f)
 for tpl in sorted(env.list_templates()):
-    if not tpl.endswith('.j2') or tpl.startswith('openldap/') or tpl == 'vars.yaml.j2':
+    if not tpl.endswith('.j2') or tpl == 'vars.yaml.j2':
         continue
     extra = {}
     if tpl.startswith('bind9/data/zone'):
@@ -72,4 +77,13 @@ for tpl in sorted(env.list_templates()):
         open(dest, 'w', encoding='utf-8').write(text)
     if tpl.endswith(('.yml.j2', '.yaml.j2')):
         yaml.safe_load(text)
+zones = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
+keys = env.get_template('bind9/config/named.conf.keys.j2').render(**full)
+for want in ('grant "npm" name _acme-challenge.npm.lan.j-j.family. TXT;',
+             'grant "npm" name _acme-challenge.shelfmark.lan.j-j.family. TXT;',
+             'grant "acme_dns-01" subdomain _acme-challenge TXT;'):
+    assert want in zones, f'missing update-policy grant: {want}'
+assert 'zonesub' not in zones, 'a records-limited key must not get zonesub'
+assert 'secret "bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch";' in keys, 'embedded TSIG secret not rendered'
+print('TSIG keys and RFC2136 grants rendered')
 print('all templates rendered')

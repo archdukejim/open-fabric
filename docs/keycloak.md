@@ -44,7 +44,7 @@ sudo fabricctl --keycloak-sync
 | Object | Configuration |
 |--------|---------------|
 | Realm | `webui_realm` (default: `domain`); brute-force protection on (5 failures, temporary lockout) |
-| User federation | LDAP provider `389-DS`: vendor `rhds`, `ldaps://<hostname_ldap>:3636`, UUID attribute `entryUUID`, username/RDN `uid`, edit mode `WRITABLE`, sync registrations on. An existing provider named `OpenLDAP` is **updated in place** so federated user links survive the migration. |
+| User federation | LDAP provider `389-DS`: vendor `rhds`, `ldaps://<hostname_ldap>:3636`, UUID attribute `entryUUID`, username/RDN `uid`, edit mode `WRITABLE`, sync registrations on. An existing LDAP provider is updated in place (idempotent). |
 | Group mapper | `LDAP Groups` (`group-ldap-mapper`) on `ou=groups,<base_dn>`, synced into Keycloak |
 | Realm role | `webui_admin_role` (default `fabric-admin`), granted to group `webui_admin_group` (default `admins`) |
 | OIDC client | `fabric-webui` — confidential, code flow + PKCE `S256`, exact redirect `https://<hostname_mgr>/oidc/callback`, `fullScopeAllowed: false`, realm roles in the ID token `roles` claim |
@@ -66,7 +66,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 *   Users are searched in `ou=users,ou=accounts,{{ ldap_base_dn }}`.
 *   Groups are searched in `ou=groups,{{ ldap_base_dn }}`.
 *   **Gotcha**: Keycloak connects to the `dirsrv` container directly on `fabric_net` (not through nginx), so the URL must use the container-side port **3636** and the exact LDAP hostname: `ldaps://{{ hostname_ldap }}:3636`. The bare `ldap` name fails resolution (`UnknownHostException`) — only `hostname_ldap` is a Docker alias — and the hostname must match the certificate SAN.
-*   **UUID attribute**: `entryUUID` (provided by the 389-DS `entryuuid` plugin, enabled by the seed). Keycloak links federated users by this value, which is why the OpenLDAP migration preserves it.
+*   **UUID attribute**: `entryUUID` (provided by the 389-DS `entryuuid` plugin, enabled by the seed). Keycloak links federated users by this value.
 
 ---
 *End of Phase 3 Notes*

@@ -210,7 +210,7 @@ These settings dictate how containers route traffic and how the BIND9 DNS server
 
 *   **`dns`**: A structured dictionary that defines your DNS records. Keys represent zone files (where `dynamic_zone_var` automatically correlates to your base `domain`).
 *   **`bind_acls`**: Lists of IP ranges granted query/update permissions.
-*   **`tsig_keys`**: List of dictionaries defining ACME update keys (used for DNS-01 challenges).
+*   **`tsig_keys`**: TSIG keys for RFC2136 dynamic updates (e.g. DNS-01 from nginx-proxy-manager): `name`, optional `secret` (keep an existing key), `records`, `record_types`, `algorithm`, `domain`, `primary`, `out`. Fields and grants: [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates).
 
 **Example DNS Configuration (`custom-vars.yaml`):**
 ```yaml
@@ -514,13 +514,13 @@ Allows deep customization of the container orchestration, including overriding i
 ### `project_containers`
 **Description:** List of containers to include in deployment.
 
-**Default Value:** `['nginx', 'step-ca', 'bind9']` plus `dirsrv` (if `install_ldap`), `keycloak`, `postgres` (if `install_keycloak`) and `webui` (if `install_webui` and `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render; stale `openldap` entries are dropped.
+**Default Value:** `['nginx', 'step-ca', 'bind9']` plus `dirsrv` (if `install_ldap`), `keycloak`, `postgres` (if `install_keycloak`) and `webui` (if `install_webui` and `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render.
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
 
 ### `nginx_backend_ldap`
-**Description:** Upstream for the nginx stream listener on port 389 (plain TCP passthrough; 389-DS requires StartTLS). A legacy `openldap:*` value is rewritten to the default automatically.
+**Description:** Upstream for the nginx stream listener on port 389 (plain TCP passthrough; 389-DS requires StartTLS).
 
 **Default Value:** `"dirsrv:3389"`
 
@@ -714,7 +714,7 @@ service_dirs:
   - { folder: postgres, owner: postgres }
   - { folder: webui,  owner: root }
 ```
-Built-in folders always come from these defaults (a legacy `openldap` entry is dropped); user-added folders are kept.
+Built-in folders always come from these defaults; user-added folders are kept.
 
 ## 6. 389 Directory Server (LDAP) Specifics
 If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabric/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.

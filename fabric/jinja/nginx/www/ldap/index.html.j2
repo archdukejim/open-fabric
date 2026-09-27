@@ -2,7 +2,7 @@
 
 {% block title %}{{ friendly_name | default(ca_name) }} &mdash; LDAP Authentication{% endblock %}
 
-{% block header_subtitle %}Infrastructure Authentication &mdash; OpenLDAP{% endblock %}
+{% block header_subtitle %}Infrastructure Authentication &mdash; 389 Directory Server{% endblock %}
 
 {% block content %}
     <!-- Top Tabs -->
@@ -25,18 +25,18 @@
         
         <strong>Keycloak as the Single Pane of Glass</strong>
         <p style="margin-top:.5rem;">
-          This infrastructure uses <strong>Keycloak</strong> as the primary Identity Provider (IdP) with OpenLDAP configured as a federated backend in <code>WRITABLE</code> mode.
+          This infrastructure uses <strong>Keycloak</strong> as the primary Identity Provider (IdP) with 389 Directory Server configured as a federated backend in <code>WRITABLE</code> mode.
         </p>
         <p>
-          You do <em>not</em> need to use standard LDAP utilities (like <code>ldapadd</code> or <code>ldapmodify</code>) to create users. Instead, any user created, modified, or deleted within the Keycloak Administration Console is instantly and synchronously pushed down to the OpenLDAP directory.
+          You do <em>not</em> need to use standard LDAP utilities (like <code>ldapadd</code> or <code>ldapmodify</code>) to create users. Instead, any user created, modified, or deleted within the Keycloak Administration Console is instantly and synchronously pushed down to the 389 Directory Server.
         </p>
 
         <strong style="display:block;margin-top:1.5rem;">SSSD for Linux Authentication</strong>
         <p style="margin-top:.5rem;">
-          Ubuntu and other Linux clients authenticate against the OpenLDAP backend using <strong>SSSD</strong> (System Security Services Daemon). 
+          Ubuntu and other Linux clients authenticate against the 389 Directory Server backend using <strong>SSSD</strong> (System Security Services Daemon). 
         </p>
         <p>
-          Because SSSD talks directly to OpenLDAP via LDAPS (Port 636), you can log into any connected Linux machine using the exact same username and password that you use for Keycloak SSO.
+          Because SSSD talks directly to 389 Directory Server via LDAPS (Port 636), you can log into any connected Linux machine using the exact same username and password that you use for Keycloak SSO.
         </p>
       </div>
     </div>
@@ -107,7 +107,7 @@ enumerate = true</code></pre>
 
         <strong>Why use Keycloak for this?</strong>
         <p style="margin-top:.5rem;margin-bottom:1.5rem;">
-          Instead of manually writing LDAP modification scripts, you can use Keycloak's LDAP Federation mappers to write the smart card mapping attributes directly back to the OpenLDAP database. This allows Keycloak to remain your single pane of glass for identity management.
+          Instead of manually writing LDAP modification scripts, you can use Keycloak's LDAP Federation mappers to write the smart card mapping attributes directly back to the 389 Directory Server database. This allows Keycloak to remain your single pane of glass for identity management.
         </p>
 
         <strong>1. Set up the LDAP Mapper in Keycloak:</strong>
@@ -118,7 +118,7 @@ enumerate = true</code></pre>
           <li><strong>Name:</strong> <code>smartcard-dn-mapper</code></li>
           <li><strong>Mapper Type:</strong> <code>user-attribute-ldap-mapper</code></li>
           <li><strong>User Model Attribute:</strong> <code>smartcard_dn</code> (or your preferred Keycloak attribute name)</li>
-          <li><strong>LDAP Attribute:</strong> <code>userCertificate</code> (or your chosen OpenLDAP attribute)</li>
+          <li><strong>LDAP Attribute:</strong> <code>userCertificate</code> (or your chosen LDAP attribute)</li>
           <li><strong>Read Only:</strong> <code>OFF</code> (This ensures Keycloak writes changes back to LDAP)</li>
         </ul>
 
@@ -129,7 +129,7 @@ enumerate = true</code></pre>
 
         <strong style="display:block;margin-top:1.5rem;">3. Desktop Authentication (SSSD):</strong>
         <p style="margin-top:.5rem;">
-          Keycloak will immediately sync this attribute down to OpenLDAP. When the user inserts their smart card at the Ubuntu login screen, SSSD will query OpenLDAP, match the certificate against the attribute you just pushed, and securely authenticate the user.
+          Keycloak will immediately sync this attribute down to 389 Directory Server. When the user inserts their smart card at the Ubuntu login screen, SSSD will query 389 Directory Server, match the certificate against the attribute you just pushed, and securely authenticate the user.
         </p>
       </div>
     </div>

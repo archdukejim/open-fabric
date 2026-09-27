@@ -1,6 +1,6 @@
 #!/bin/bash
 # 389-DS integration test: real image, compose-equivalent hardening, our seed
-# data (rendered by tests/render.py into $FABRIC_TEST_OUT/rendered), TLS and migration.
+# data (rendered by tests/render.py into $FABRIC_TEST_OUT/rendered), TLS and the first-admin user.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
@@ -10,8 +10,8 @@ DM_PW='DmPass1'
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 
-docker rm -f dstest oldldap >/dev/null 2>&1
-docker build -q --build-arg DS_UID=911 --build-arg DS_GID=911 -t core-template/dirsrv:local "$REPO/fabric/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
+docker rm -f dstest >/dev/null 2>&1
+docker build -q --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabric/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
 rm -rf "$W"; mkdir -p "$W/data/tls/ca" "$W/seed"
 cd "$W"
 
@@ -33,14 +33,17 @@ start() {
     -e DS_SUFFIX_NAME="$BASE" -e DS_DM_PASSWORD="$DM_PW" \
     -v "$W/data:/data" -v "$W/seed:/seed:ro" \
     --health-cmd "/usr/libexec/dirsrv/dscontainer -H" --health-interval 5s --health-start-period 120s \
-    core-template/dirsrv:local >/dev/null
+    fabric/dirsrv:test >/dev/null
   for i in $(seq 1 60); do
     [ "$(docker inspect -f '{{.State.Health.Status}}' dstest 2>/dev/null)" = healthy ] && return 0; sleep 3
   done
   docker logs dstest | tail -30; return 1
 }
 seed() {  # same steps as dirsrv_seed in fabric/lib/dirsrv.sh
-  docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null
+  for _ in $(seq 1 12); do
+    docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null 2>&1 && break
+    sleep 5
+  done
   docker exec dstest sh -c 'python3 /seed/seed.py /seed/*.ldif'; }
 pybind() { # uri dn pw  -> prints BOUND or the LDAP error name
   docker exec -e U="$1" -e D="$2" -e P="$3" dstest python3 -c "
@@ -92,64 +95,20 @@ c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_
 print(c.search_s('$SA', ldap.SCOPE_BASE, attrlist=['memberOf', 'entryUUID']))" 2>&1)
 check "memberOf and entryUUID plugins active" "grep -q 'cn=admins' <<<\"\$mo\" && grep -q entryUUID <<<\"\$mo\""
 
-# ---- migration from a real osixia OpenLDAP
-echo "--- migration"
-mkdir -p old/data old/config
-docker run -d --name oldldap -e LDAP_DOMAIN=lan.j-j.family -e LDAP_ADMIN_PASSWORD=admin \
-  -v "$W/old/data:/var/lib/ldap" -v "$W/old/config:/etc/ldap/slapd.d" osixia/openldap:1.5.0 >/dev/null
-sleep 25
-cat > old.ldif <<EOF
-dn: ou=accounts,$BASE
-objectClass: organizationalUnit
-ou: accounts
-
-dn: ou=users,ou=accounts,$BASE
-objectClass: organizationalUnit
-ou: users
-
-dn: ou=groups,$BASE
-objectClass: organizationalUnit
-ou: groups
-
-dn: uid=jim,ou=users,ou=accounts,$BASE
-objectClass: inetOrgPerson
-objectClass: posixAccount
-uid: jim
-cn: Jim
-sn: Church
-uidNumber: 5001
-gidNumber: 5000
-homeDirectory: /home/jim
-userPassword: {SSHA}$(python3 -c "import hashlib,os,base64;s=os.urandom(4);print(base64.b64encode(hashlib.sha1(b'JimPass!23'+s).digest()+s).decode())")
-
-dn: cn=admins,ou=groups,$BASE
-objectClass: groupOfNames
-cn: admins
-member: cn=admin,$BASE
-member: uid=jim,ou=users,ou=accounts,$BASE
-EOF
-docker cp old.ldif oldldap:/tmp/old.ldif
-docker exec oldldap ldapadd -x -H ldap://localhost -D "cn=admin,$BASE" -w admin -f /tmp/old.ldif >/dev/null
-OLD_UUID=$(docker exec oldldap ldapsearch -x -H ldap://localhost -D "cn=admin,$BASE" -w admin -b "uid=jim,ou=users,ou=accounts,$BASE" -s base entryUUID | awk '/^entryUUID/{print $2}')
-docker stop oldldap >/dev/null
-# run the real migration script, minus the Keycloak step
-sed -e 's/^DS=dirsrv$/DS=dstest/' \
-    -e "s#^LIB_DIR=.*#LIB_DIR=$REPO/fabric/lib#" -e 's/^dirsrv_wait_healthy$/true/' -e 's/systemctl is-active --quiet keycloak/false/' \
-    "$REPO/fabric/lib/ldap_migrate.sh" > migrate.sh
-mig=$(bash migrate.sh "$W/old" osixia/openldap:1.5.0 2>&1); echo "$mig" | sed 's/^/    /'
-check "migration imports user and merges group" "grep -q 'migrate: 1 added, 1 groups merged' <<<\"\$mig\""
-check "migrated user keeps entryUUID ($OLD_UUID)" "docker exec -e P=Sa1 dstest python3 -c \"
+# ---- first admin (fabriclib/ldap/ensure_admin_user.py, setup's admin step)
+echo "--- admin user"
+USERDN="uid=jim,ou=users,ou=accounts,$BASE"
+first=$(REPO="$REPO" BASE="$BASE" PW='JimPass!23' python3 "$REPO/tests/dirsrv/admin_user.py" 2>&1)
+check "admin user created and added to admins" "[ \"\$first\" = created+member ]"
+check "admin user binds with its initial password" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' '$USERDN' 'JimPass!23' | grep -q BOUND"
+check "admin user is a member of cn=admins" "docker exec -e P=Sa1 dstest python3 -c \"
 import ldap, os
 c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$SA', os.environ['P'])
-print(c.search_s('uid=jim,ou=users,ou=accounts,$BASE', ldap.SCOPE_BASE, attrlist=['entryUUID']))\" | grep -q '$OLD_UUID'"
-check "migrated user logs in with old SSHA password" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' 'uid=jim,ou=users,ou=accounts,$BASE' 'JimPass!23' | grep -q BOUND"
-check "osixia cn=admin dropped from group" "! docker exec -e P=Sa1 dstest python3 -c \"
-import ldap, os
-c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$SA', os.environ['P'])
-print(c.search_s('cn=admins,ou=groups,$BASE', ldap.SCOPE_BASE, attrlist=['member']))\" | grep -q 'cn=admin,dc'"
-mig2=$(bash migrate.sh "$W/old" osixia/openldap:1.5.0 2>&1)
-check "migration is re-runnable" "grep -q 'migrate: 0 added, 0 groups merged' <<<\"\$mig2\""
+print(c.search_s('cn=admins,ou=groups,$BASE', ldap.SCOPE_BASE, attrlist=['member']))\" | grep -qi 'uid=jim'"
+second=$(REPO="$REPO" BASE="$BASE" PW='Other!pw9' python3 "$REPO/tests/dirsrv/admin_user.py" 2>&1)
+check "re-run leaves an existing user alone" "[ \"\$second\" = exists ]"
+check "re-run did not change the password" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' '$USERDN' 'JimPass!23' | grep -q BOUND"
 
 echo; echo "$PASS passed, $FAIL failed"
-docker rm -f dstest oldldap >/dev/null 2>&1
+docker rm -f dstest >/dev/null 2>&1
 exit $FAIL

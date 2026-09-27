@@ -41,11 +41,8 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   │   ├── dirsrv.sh
 │   │   ├── interactive.py
 │   │   ├── keycloak_bootstrap.py
-│   │   ├── ldap_migrate.py
-│   │   ├── ldap_migrate.sh
 │   │   ├── manage.sh
 │   │   ├── output.sh
-│   │   ├── tsig.sh
 │   │   └── vars.sh
 │   └── VERSION             # fabricctl version (BUILD is stamped by setup.sh, git-ignored)
 ├── custom-vars.yaml
@@ -222,8 +219,7 @@ BIND9 runs as an **authoritative-only** server (recursion disabled). It serves:
 - Internal forward zones defined in the `dns:` block of `custom-vars.yaml` (`dynamic_zone_var` key resolved to `domain` at render time)
 - Each zone with `zone_authority: true` gets an NS A record pointing to `host_ip`
 - Reverse zones (PTR) auto-generated from A records — one `/24` `in-addr.arpa` zone per unique subnet; `reverse_zone_names` computed in `vars.yaml.j2`
-- ACME challenge and zone records updateable per `tsig_keys[].record_types` (primary keys → `subdomain _acme-challenge`; others → `zonesub`)
-- Any additional keys managed by `fabricctl --tsig-keys`
+- RFC2136 updates per `tsig_keys`: `records` → only `_acme-challenge.<record>.<zone>`; `primary` → `subdomain _acme-challenge`; otherwise `zonesub` for `record_types`. Keys and secrets live in vars + `fabric-secrets.yml` (managed with `fabricctl tsig`)
 
 nginx fronts BIND9 on all public DNS ports:
 

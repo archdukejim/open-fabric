@@ -13,7 +13,7 @@ fabric installs on the host it runs on: clone the repo there and run `setup.sh`,
   - [Options](#options)
   - [Steps](#steps)
 - [Deployed Structure](#deployed-structure)
-- [Upgrading from core-template / OpenLDAP](#upgrading-from-core-template--openldap)
+- [Rebuilding a host (keep the CA, DNS and TSIG keys)](#rebuilding-a-host-keep-the-ca-dns-and-tsig-keys)
 - [Reinstall / Uninstall](#reinstall--uninstall)
 
 ---
@@ -86,7 +86,7 @@ Key tunables with their defaults:
 - [ ] `ldap_groups` / `ldap_organizational_units` — directory structure
 - [ ] `install_ldap` / `install_keycloak` / `install_webui` — see [the default plan](#the-default-plan) and [webui.md](webui.md)
 - [ ] `security.firewall` / `security.firewall_allow` / `security.docker_daemon_hardening`
-- [ ] `tsig_keys` — add non-primary entries for external services that need DNS update rights (optional)
+- [ ] `tsig_keys` — keys for RFC2136 clients (e.g. nginx-proxy-manager); an existing key's `secret` can be given so its clients keep working — see [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates)
 - [ ] `bind_dns_port` — change from `53` only if another DNS server must keep port 53 on `host_ip`
 - [ ] `webui_admin_user` — the first web UI admin setup creates (default: the account that ran `sudo`)
 - [ ] `image_nginx` / `image_bind9` / `image_stepca` / `image_dirsrv` — override to pin images to specific digests or a local registry (optional)
@@ -168,7 +168,6 @@ On this host setup already trusts the fabric CA (`/usr/local/share/ca-certificat
 | Step | What it does |
 |---|---|
 | `preflight` | Root, architecture, OS, RAM, cgroup memory controller, conflicting listeners |
-| `migrate` | Move a core-template install to fabric in place (no-op otherwise) |
 | `host` | Host packages; Docker Engine if missing |
 | `docker` | Docker daemon hardening |
 | `deploy` | Render and deploy all configuration (nothing started); install `fabricctl` |
@@ -201,11 +200,15 @@ The install lives under `/opt` (or `--deploy-base`):
 
 ---
 
-## Upgrading from core-template / OpenLDAP
+## Rebuilding a host (keep the CA, DNS and TSIG keys)
 
-Running `sudo ./setup.sh` from a fabric checkout on a core-template host migrates it in place (the `migrate` step): paths, units, secrets and the `core-mgr` command (kept as an alias). See [operations.md](operations.md#upgrading-from-core-template).
+fabric has no in-place upgrade from pre-fabric (core-template) installs: rebuild the host and carry over what clients depend on.
 
-Installs before 1.5.0 ran `osixia/openldap` in `/opt/openldap`. Setup deploys 389-DS alongside it but does **not** move directory data. Follow [operations.md](operations.md#migrating-from-openldap).
+- **DNS records and zone:** copy the `domain` and the `dns:` block into your vars file.
+- **TSIG keys** (RFC2136 clients such as nginx-proxy-manager): add each key to `tsig_keys` with its existing `secret` — see [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates). Clients keep their configuration.
+- **Root CA:** bring your root and intermediate (with its key) as [BYOC](#generate-pki-optional-before-install), so every client that trusts the old root trusts the new host. Step-CA reads the intermediate key with `ca_password` from `/opt/fabric/config/fabric-secrets.yml`: if your key is encrypted, create that file (`0600`) with `ca_password: <the old CA password>` before running setup.
+
+LDAP and Keycloak start empty; setup creates the first admin.
 
 ---
 

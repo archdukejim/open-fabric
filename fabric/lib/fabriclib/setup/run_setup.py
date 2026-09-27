@@ -21,7 +21,7 @@ from fabriclib.setup.errors import SetupError  # noqa: E402
 from fabriclib.setup.steps import STEPS  # noqa: E402
 from fabriclib.setup.verify_install import run as verify  # noqa: E402
 
-NEEDS_INPUT = {"preflight", "migrate", "host", "docker", "deploy"}   # before the rendered vars exist
+NEEDS_INPUT = {"preflight", "host", "docker", "deploy"}   # before the rendered vars exist
 
 
 def main(argv=None):

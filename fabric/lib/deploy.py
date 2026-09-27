@@ -7,6 +7,8 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
 import filecmp
 import json
 import re
@@ -119,13 +121,8 @@ def apply_deployment(start_services=True):
     started, restarted or reloaded: certificates do not exist yet."""
     print("Starting native Python deployment...")
     
-    custom_vars_path = os.environ.get("CUSTOM_VARS_PATH", os.path.join(TARGET_FABRIC, "config/custom-vars.yaml"))
+    custom_vars_path = os.environ.get("CUSTOM_VARS_PATH", os.path.join(TARGET_FABRIC, "config/vars.yaml"))
     secrets_path = os.environ.get("SECRETS_FILE_OVERRIDE", os.path.join(TARGET_FABRIC, "config/fabric-secrets.yml"))
-    
-    if not os.path.exists(custom_vars_path):
-        custom_vars_path = os.path.join(REPO_DIR, "custom-vars.yaml")
-    if not os.path.exists(secrets_path):
-        secrets_path = os.path.join(REPO_DIR, "fabric-secrets.yml")
 
     # 1. Load Custom Vars
     custom_vars = load_yaml(custom_vars_path)
@@ -168,7 +165,20 @@ def apply_deployment(start_services=True):
         secrets['tsig_secrets'] = {}
         changed_secrets = True
         
-    tsig_keys = custom_vars.get('tsig_keys', [])
+    # TSIG keys: defaults + validation; an embedded `secret` (an existing
+    # key whose RFC2136 clients must keep working) moves into the secrets
+    # file and always wins; otherwise one is generated once and kept.
+    try:
+        tsig_keys, embedded = normalize_tsig_keys(custom_vars.get('tsig_keys', []), custom_vars.get('domain', ''),
+                                                  custom_vars.pop('tsig_secrets', None))
+    except ValidationError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+    custom_vars['tsig_keys'] = tsig_keys
+    for kname, secret in embedded.items():
+        if secrets['tsig_secrets'].get(kname) != secret:
+            secrets['tsig_secrets'][kname] = secret
+            changed_secrets = True
     for key in tsig_keys:
         kname = key.get('name')
         if kname and kname not in secrets['tsig_secrets']:
@@ -356,11 +366,11 @@ def apply_deployment(start_services=True):
             os.makedirs(kdir, exist_ok=True)
             with open(os.path.join(kdir, "rfc2136.ini"), 'w') as f:
                 f.write(f"""# RFC2136 credentials for TSIG key: {kname}
-dns_rfc2136_server = {final_vars.get('ip_bind9')}
-dns_rfc2136_port = {final_vars.get('bind_dns_port')}
+dns_rfc2136_server = {final_vars.get('host_ip')}
+dns_rfc2136_port = {final_vars.get('bind_dns_port', 53)}
 dns_rfc2136_name = {kname}
 dns_rfc2136_secret = {secrets['tsig_secrets'].get(kname)}
-dns_rfc2136_algorithm = HMAC-SHA256
+dns_rfc2136_algorithm = {key.get('algorithm', 'hmac-sha256').upper()}
 dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
 """)
 
@@ -661,7 +671,14 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
     if bind9_live_reload:
         if bind9_config_changed:
             print("Reloading BIND9 configuration...")
-            rndc("reconfig")
+            # Keys and update-policy grants (TSIG) take effect here; a
+            # silent failure would leave a removed key working. Generous
+            # timeout: reconfig is slow on a loaded Pi.
+            res = rndc("reconfig", timeout=90)
+            if res is None or res.returncode != 0:
+                print("Error: BIND9 did not accept the new configuration "
+                      f"({(res.stderr or res.stdout).strip() if res else 'timeout'}); check `docker logs bind9`.")
+                sys.exit(1)
         for zone, src, dst in changed_zones:
             reload_zone(zone, src, dst, bind_uid, bind_gid)
         

@@ -59,8 +59,7 @@ nsslapd-pluginEnabled: on
 replace: memberOfAutoAddOC
 memberOfAutoAddOC: nsMemberOf
 
-# Keycloak links federated users by entryUUID. Keeping it (and importing it
-# with migrated entries) preserves those links across the OpenLDAP move.
+# Keycloak links federated users by entryUUID.
 dn: cn=entryuuid,cn=plugins,cn=config
 changetype: modify
 replace: nsslapd-pluginEnabled

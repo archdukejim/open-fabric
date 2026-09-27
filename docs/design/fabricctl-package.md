@@ -93,7 +93,7 @@ Every setting can be changed later (`fabricctl security …`,
 | Today | Reuse |
 |---|---|
 | `fabric/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
-| `fabric/lib/webui/` (container app), `fabric/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh`, `ldap_migrate.*` | Ship as-is inside the package |
+| `fabric/lib/webui/` (container app), `fabric/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh` | Ship as-is inside the package |
 | `fabric/jinja/**` templates | Ship as-is (package data) |
 | `fabriclib/setup/` — the native installer (§4) | Ships as-is |
 | `fabriclib/` (one operation per file) | The package's library layout from day one |
@@ -126,7 +126,7 @@ fabricctl_<ver>_<arch>.deb
 - **Config location:** move from `/opt/fabric/config` to `/etc/fabric`
   (config) and `/var/lib/fabric` (state) per FHS; service data stays in
   `/opt/<service>` (or becomes `/var/lib/fabric/<service>`, decision D3).
-  `fabricctl` migrates `/opt/fabric` on first run (like the `migrate` step does for core-template).
+  `fabricctl` moves an existing `/opt/fabric` on first run.
 - **Distribution:** a signed apt repository published from GitHub Actions to
   GitHub Pages (`aptly`/`reprepro`, GPG key in repo secrets). Users add one
   `sources.list.d` entry + keyring. Releases also attach the `.deb` for
@@ -150,7 +150,7 @@ playbooks were deleted. Mapping:
 | Playbook | `fabricctl` step | Notes |
 |---|---|---|
 | 00 controller check | *(gone)* | No controller any more |
-| 00b migrate-from-core | `migrate` | Later (phase 2) also `/opt/fabric` → `/etc` + `/var/lib` |
+| 00b migrate-from-core | *(dropped)* | Owner decision 2026-09-27: pre-fabric hosts are rebuilt (CA via BYOC, DNS and TSIG keys via the vars file) |
 | 01 gen vars + render | `deploy` | deploy.py; settings from `collect_vars` + `choose_plan` |
 | 02 system conditioning | `preflight`, `host`, `docker` | Checks, packages + Docker Engine, daemon hardening; later packages come from `Depends:` |
 | 03 service accounts | `accounts` | Later a `systemd-sysusers` snippet in the package |
@@ -241,8 +241,7 @@ Role split (Keycloak realm roles): `fabric-admin` (everything),
 
 - **Architectures:** everything runs on **arm64 and amd64**. Every upstream
   image used publishes both (verified 2026-09-27: nginx, ubuntu/bind9,
-  step-ca, keycloak, postgres, debian, registry, osixia/openldap for the
-  migration). Locally built images (`dirsrv`, `webui`) start from
+  step-ca, keycloak, postgres, debian, registry). Locally built images (`dirsrv`, `webui`) start from
   `debian:trixie-slim` and build natively on either.
 - **Reference hardware:** Raspberry Pi, **4 GB**, Ubuntu Server 24.04 LTS
   (arm64). Development/testing on amd64. Memory limits at 4 GB total ≈ 2.3 GB
@@ -420,7 +419,7 @@ the webui container still holds no secrets itself.
 
 | Phase | Deliverable | Depends on |
 |---|---|---|
-| 0 ✅ | Rename to fabric, `fabricctl`, migration from core-template | — |
+| 0 ✅ | Rename to fabric, `fabricctl` (no migration: pre-fabric hosts are rebuilt) | — |
 | 0.5 | Foundations: container hardening, version lock with digest pinning, LF line endings, arm64 + amd64 CI running the real-container suites, Pi preflight | — |
 | 0.6 | Signed image channels on GitHub Pages, local registry, `fabric-update` timer with rollback, offline export/import | 0.5 |
 | 0.7 | OpenBao: container, auto-unseal from key file, OIDC login via Keycloak, KV for fabric (import `fabric-secrets.yml`) and apps | 0.5 |
@@ -440,7 +439,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 |---|---|---|
 | D1 | Python-in-.deb vs Go binary | Python (§3) |
 | D2 | Target OSes | Ubuntu 24.04 (reference: Raspberry Pi 4 GB, arm64), Debian 13, Raspberry Pi OS (Debian 13-based); amd64 + arm64 |
-| D3 | Service data under `/opt/<svc>` or `/var/lib/fabric/<svc>` | `/var/lib/fabric` for new installs; keep `/opt` paths on migrated hosts |
+| D3 | Service data under `/opt/<svc>` or `/var/lib/fabric/<svc>` | `/var/lib/fabric` for new installs; keep `/opt` paths on existing hosts |
 | D4 | Kea in a container (host networking) or native package | Container, for parity with the other services and easy pinning |
 | D5 | Lease backend: memfile or Postgres | memfile; Postgres only if HA or large lease counts |
 | D6 | Which switches/APs must 802.1X support (vendor affects VLAN attributes, CoA, RadSec) | Needs your inventory |

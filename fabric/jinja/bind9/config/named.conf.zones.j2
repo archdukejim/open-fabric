@@ -6,9 +6,18 @@ zone "{{ zone_name }}" {
     allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
     allow-transfer { none; };
     update-policy {
-{% for key in tsig_keys %}
-{% if key.record_types is defined and key.domain == zone_name %}
-{% if key.primary is defined and key.primary %}
+{# tsig_keys (validated and defaulted by fabriclib/dns/normalize_tsig_keys.py):
+   records -> only _acme-challenge.<record>.<zone> (per-host DNS-01 clients, e.g.
+   certbot's rfc2136 plugin); primary -> the zone's ACME challenge name;
+   otherwise zonesub for the listed record types. #}
+{% for key in tsig_keys | default([]) %}
+{% if key.domain == zone_name %}
+{% if key.records is defined and key.records %}
+        // {{ key.name }} — DNS-01 challenges for {{ key.records | join(', ') }}
+{% for record in key.records %}
+        grant "{{ key.name }}" name _acme-challenge.{{ record }}.{{ zone_name }}. {{ key.record_types | join(' ') }};
+{% endfor %}
+{% elif key.primary is defined and key.primary %}
         // {{ key.name }} — ACME challenge updates
         grant "{{ key.name }}" subdomain _acme-challenge {{ key.record_types | join(' ') }};
 {% else %}
@@ -17,9 +26,6 @@ zone "{{ zone_name }}" {
 {% endif %}
 {% endif %}
 {% endfor %}
-        // --- additional keys ---
-        // Keys added by add-tsig-key.sh will appear below this line.
-        // (managed outside of the templates — do not remove this comment)
     };
 };
 

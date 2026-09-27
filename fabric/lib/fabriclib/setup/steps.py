@@ -2,12 +2,11 @@
 `fabricctl setup --step <name>`."""
 from fabriclib.setup import (condition_host, configure_firewall, configure_network, create_accounts, create_admin,
                              deploy_config,
-                             harden_docker, init_pki, migrate_from_core, mint_service_certs, preflight,
+                             harden_docker, init_pki, mint_service_certs, preflight,
                              start_bootstrap, start_services, verify_install)
 
 STEPS = [
     ("preflight", preflight.run, "check architecture, OS, RAM, cgroup memory controller, ports"),
-    ("migrate", migrate_from_core.run, "move a core-template install to fabric (no-op otherwise)"),
     ("host", condition_host.run, "host packages and Docker Engine"),
     ("docker", harden_docker.run, "harden the Docker daemon"),
     ("deploy", deploy_config.run, "render and deploy configuration; install the fabricctl command"),

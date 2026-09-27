@@ -7,7 +7,7 @@ from fabriclib.common.console import info, ok, warn
 
 UNITS = ["webui", "fabric-agent", "nginx", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
 CONTAINERS = ["webui", "nginx", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
-DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openldap"]
+DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui"]
 LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:local", "fabric/keycloak:local",
                 "fabric/webui:local"]
 
@@ -58,7 +58,7 @@ def uninstall(ctx):
         if name and os.path.exists(path):
             os.remove(path)
     subprocess.run(["update-ca-certificates", "--fresh"], capture_output=True)
-    for path in ("/usr/local/bin/fabricctl", "/usr/local/bin/core-mgr", "/etc/systemd/resolved.conf.d/fabric-dns.conf"):
+    for path in ("/usr/local/bin/fabricctl", "/etc/systemd/resolved.conf.d/fabric-dns.conf"):
         if os.path.exists(path):
             os.remove(path)
     ok("CA removed from the host trust store; fabricctl removed")

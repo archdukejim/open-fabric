@@ -19,11 +19,6 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Pre-fabric (core-template) checkouts kept secrets in core-secrets.yml.
-if [ -f "$HERE/core-secrets.yml" ] && [ ! -f "$HERE/fabric-secrets.yml" ]; then
-    mv "$HERE/core-secrets.yml" "$HERE/fabric-secrets.yml"
-fi
-
 # Stamp the build so the installed fabricctl reports exactly what it runs.
 {
     echo "commit: $(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || echo unknown)$(git -C "$HERE" diff --quiet HEAD 2>/dev/null || echo '-dirty')"
@@ -37,12 +32,7 @@ if ! python3 -c 'import yaml, jinja2' 2>/dev/null; then
 fi
 
 case "${1:-}" in
-    setup|doctor|certs|uninstall|reinstall)
+    setup|doctor|certs|client-cert|tsig|uninstall|reinstall)
         exec python3 "$HERE/fabric/lib/fabriclib/cli.py" "$@" ;;
-    -u|--uninstall|-r|--reinstall|-c|--clean-install|-s|--remote|--tags|--check|-[a-z][a-z]*)
-        echo "setup.sh no longer takes '$1' (the Ansible installer was removed)." >&2
-        echo "Use: sudo ./setup.sh [--file vars.yaml] | sudo ./setup.sh uninstall|reinstall [--yes]" >&2
-        echo "Remote hosts: clone fabric there and run setup.sh on the host itself." >&2
-        exit 2 ;;
 esac
 exec python3 "$HERE/fabric/lib/fabriclib/cli.py" setup "$@"

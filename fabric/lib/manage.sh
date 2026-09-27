@@ -7,9 +7,7 @@ set -euo pipefail
 # Run this script ON the target machine (must be root / sudo).
 #
 # Modes:
-#   --tsig-keys     Add a TSIG key to vars.yaml and reload BIND9.
-#   --list-tsig     List all active TSIG keys and grants from live BIND9 config.
-#   --remove-tsig   Remove a TSIG key and its grants from live BIND9 config.
+#   tsig list|add|remove  TSIG keys for RFC2136 updates (fabricctl tsig add --help).
 #   --mint-certs    Mint an offline certificate and save to vars.yaml.
 #                   --intermediate-ca [N]  Issue as a subordinate CA cert (pathLen=N, default 0).
 #                                          pathLen=0: can sign leaf certs, cannot issue further CAs.
@@ -18,7 +16,6 @@ set -euo pipefail
 #   --client-cert <user> Mint a webui client certificate (.p12) for a Keycloak user
 #                        (same as: fabricctl client-cert <user>).
 #   --keycloak-sync      Re-run the idempotent Keycloak configuration (federation, webui client, MFA).
-#   --migrate-ldap [dir] One-time import of users/groups from the old OpenLDAP data dir into 389-DS.
 #
 # Common flags:
 #   --apply            Apply without interactive prompting (uses existing vars.yaml)
@@ -28,10 +25,8 @@ set -euo pipefail
 #   --size <bits>      Key size (RSA: 2048/3072/4096, EC: 256/384) (default: 4096)
 #
 # Examples:
-#   sudo ./manage.sh --tsig-keys                  # Interactive: add a TSIG key
-#   sudo ./manage.sh --tsig-keys --apply          # Non-interactive: apply tsig_keys from vars.yaml
-#   sudo ./manage.sh --list-tsig                  # Show all active TSIG keys and grants
-#   sudo ./manage.sh --remove-tsig acme_npm       # Remove a TSIG key by name
+#   sudo fabricctl tsig add npm --record npm      # DNS-01 key for one host
+#   sudo fabricctl tsig list
 #   sudo ./manage.sh --mint-certs                              # Interactive: mint a leaf cert
 #   sudo ./manage.sh --mint-certs --intermediate-ca            # Interactive: mint a subordinate CA (pathLen=0)
 #   sudo ./manage.sh --mint-certs --intermediate-ca 1          # Subordinate CA that can sign one more CA level
@@ -47,21 +42,19 @@ FABRIC_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Lifecycle commands are Python (fabric/lib/fabriclib/cli.py).
 case "${1:-}" in
-    setup|doctor|certs|client-cert|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
+    setup|doctor|certs|client-cert|tsig|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
 esac
 VARS_FILE="$FABRIC_DIR/config/vars.yaml"
 
 # Source shared library modules
 source "$FABRIC_DIR/lib/output.sh"
 source "$FABRIC_DIR/lib/vars.sh"
-source "$FABRIC_DIR/lib/tsig.sh"
 source "$FABRIC_DIR/lib/certs.sh"
 
 # --- Globals ---
 TARGET_BASE="$(dirname "$FABRIC_DIR")"
 MODE=""
 SUB_MODE="interactive"
-REMOVE_TSIG_KEY=""
 IS_CA=false
 PATH_LEN=0
 CERT_KTY="RSA"
@@ -70,7 +63,6 @@ RENDER_TEMPLATE=""
 RENDER_VARS=""
 RENDER_OUTPUT=""
 CLIENT_CERT_USER=""
-MIGRATE_DIR=""
 
 ARCHIVE_DIR="$TARGET_BASE/fabric/archive"
 
@@ -80,9 +72,6 @@ ARGS=("$@")
 # Pass 1: extract mode
 for arg in "${ARGS[@]}"; do
     case "$arg" in
-        --tsig-keys)    MODE="tsig-keys" ;;
-        --list-tsig)    MODE="list-tsig" ;;
-        --remove-tsig)  MODE="remove-tsig" ;;
         --mint-certs)   MODE="mint-certs" ;;
         --service-cert) MODE="service-cert" ;;
         --render-jinja) MODE="render-jinja" ;;
@@ -92,7 +81,6 @@ for arg in "${ARGS[@]}"; do
         --update-containers) MODE="update-containers" ;;
         --client-cert)  MODE="client-cert" ;;
         --keycloak-sync) MODE="keycloak-sync" ;;
-        --migrate-ldap) MODE="migrate-ldap" ;;
         --apply)        [ -z "$MODE" ] && MODE="apply" ;;
     esac
 done
@@ -107,11 +95,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)    usage ;;
         --version)    shift ;;
-        --tsig-keys|--list-tsig|--mint-certs|--service-cert|--print|--interactive|--update-containers)  shift ;;
+        --mint-certs|--service-cert|--print|--interactive|--update-containers)  shift ;;
         --client-cert)  CLIENT_CERT_USER="${2:-}"; shift; [ -n "$CLIENT_CERT_USER" ] && shift || true ;;
-        --migrate-ldap) MIGRATE_DIR="${2:-}"; shift; [ -n "$MIGRATE_DIR" ] && shift || true ;;
         --keycloak-sync) shift ;;
-        --remove-tsig)  REMOVE_TSIG_KEY="${2:-}"; shift; [ -n "$REMOVE_TSIG_KEY" ] && shift || true ;;
         --render-jinja) RENDER_TEMPLATE="${2:-}"; shift; [ -n "$RENDER_TEMPLATE" ] && shift || true ;;
         --vars)         RENDER_VARS="${2:-}"; shift; [ -n "$RENDER_VARS" ] && shift || true ;;
         --output)       RENDER_OUTPUT="${2:-}"; shift; [ -n "$RENDER_OUTPUT" ] && shift || true ;;
@@ -208,9 +194,6 @@ except Exception as e:
 }
 
 case "$MODE" in
-    tsig-keys)    do_tsig_keys ;;
-    list-tsig)    do_list_tsig ;;
-    remove-tsig)  do_remove_tsig ;;
     mint-certs)   do_extra_certs ;;
     service-cert) do_service_cert ;;
     render-jinja) do_render_jinja ;;
@@ -220,7 +203,6 @@ case "$MODE" in
     update-containers) python3 "${FABRIC_DIR}/lib/interactive.py" --update-containers ;;
     client-cert)  exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" client-cert "$CLIENT_CERT_USER" ;;
     keycloak-sync) python3 "${FABRIC_DIR}/lib/keycloak_bootstrap.py" --vars "$VARS_FILE" --secrets "${FABRIC_DIR}/config/fabric-secrets.yml" ;;
-    migrate-ldap) bash "${FABRIC_DIR}/lib/ldap_migrate.sh" ${MIGRATE_DIR:+"$MIGRATE_DIR"} ;;
     version)      echo "fabricctl version $(cat "$FABRIC_DIR/VERSION" 2>/dev/null || echo unknown)"
                   cat "$FABRIC_DIR/BUILD" 2>/dev/null || true ;;
 esac

@@ -32,8 +32,7 @@ lan_cidr: {{ lan_cidr }}
 lan_gateway: {{ lan_gateway }}
 dns_server: {{ dns_server | default('8.8.8.8') }}
 use_host_dns: {{ use_host_dns | default(true) | lower }}
-{# core_subnet: pre-fabric name, still honoured #}
-fabric_subnet: {{ fabric_subnet | default(core_subnet | default('10.255.0.0/24')) }}
+fabric_subnet: {{ fabric_subnet | default('10.255.0.0/24') }}
 host_ip: {{ host_ip }}
 
 # ============================================================
@@ -109,7 +108,7 @@ keycloak_data_dir: {{ keycloak_data_dir | default((deploy_base_dir | default('/o
 postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/opt')) ~ '/postgres/data') }}
 {# Optional containers are derived from the install_* flags on every render, so
    strip them from any value read back from a previously rendered vars.yaml. #}
-{% set _optional_containers = ['openldap', 'dirsrv', 'keycloak', 'postgres', 'webui'] %}
+{% set _optional_containers = ['dirsrv', 'keycloak', 'postgres', 'webui'] %}
 {% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9'])) | reject('in', _optional_containers) | list %}
 {% if install_ldap | default(true) | bool %}{% set _ = _containers.append('dirsrv') %}{% endif %}
 {% if install_keycloak | default(false) | bool %}{% set _ = _containers.extend(['keycloak', 'postgres']) %}{% endif %}
@@ -126,7 +125,7 @@ project_containers:
   { 'folder': 'webui', 'owner': 'root' }
 ] %}
 {# Built-in folders always come from the defaults above; user-added folders are kept. #}
-{% set _default_folders = default_service_dirs | map(attribute='folder') | list + ['openldap'] %}
+{% set _default_folders = default_service_dirs | map(attribute='folder') | list %}
 service_dirs:
 {{ (default_service_dirs + ((service_dirs | default([])) | rejectattr('folder', 'in', _default_folders) | list)) | to_nice_yaml(indent=2) | indent(2, first=True) }}
 {% set default_service_users = {
@@ -181,7 +180,7 @@ cert_acme_lifetime_hours: {{ cert_acme_lifetime_hours | default('720h') }}
 # ============================================================
 bind_dns_port: {{ bind_dns_port | default(53) }}
 bind9_doh_port: {{ bind9_doh_port | default(8053) }}
-{% set _fabric_subnet = fabric_subnet | default(core_subnet | default('10.255.0.0/24')) %}
+{% set _fabric_subnet = fabric_subnet | default('10.255.0.0/24') %}
 {% set default_acls = {
   'acme-updaters': [_fabric_subnet],
   'dns-resolvers': ['127.0.0.1', lan_cidr, _fabric_subnet]
@@ -257,12 +256,12 @@ reverse_zone_names:
 # NGINX BACKENDS
 # ============================================================
 {# 389-DS terminates TLS itself; nginx only passes TCP through. #}
-nginx_backend_ldap: {{ 'dirsrv:3389' if (nginx_backend_ldap | default('', true)).startswith('openldap') or not nginx_backend_ldap | default('', true) else nginx_backend_ldap }}
+nginx_backend_ldap: {{ nginx_backend_ldap | default('dirsrv:3389', true) }}
 nginx_backend_ldaps: {{ nginx_backend_ldaps | default('dirsrv:3636') }}
 nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (stepca_port | default(9000))) }}
 
 # ============================================================
-# LDAP / OPENLDAP — base DN computed from domain
+# LDAP — base DN computed from domain
 # ============================================================
 ldap_base_dn: {{ domain.split('.') | map('regex_replace', '^', 'dc=') | join(',') }}
 ldap_domain_components:

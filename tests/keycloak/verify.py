@@ -29,7 +29,7 @@ st, sync = kc.call("POST", f"{R}/user-storage/{ldap[0]['id']}/sync?action=trigge
 check("full user sync over LDAPS works", st == 200 and not sync.get("failed"), sync)
 
 users = kc.call("GET", f"{R}/users?username=jim&exact=true")[1]
-check("migrated user jim visible in Keycloak", len(users) == 1, users)
+check("LDAP user jim visible in Keycloak", len(users) == 1, users)
 if users:
     roles = kc.call("GET", f"{R}/users/{users[0]['id']}/role-mappings/realm/composite")[1]
     check("jim gets fabric-admin via LDAP admins group", any(r["name"] == "fabric-admin" for r in roles),

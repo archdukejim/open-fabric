@@ -68,11 +68,6 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Action**: From the container, request a path outside the agent API (e.g. `GET /v1/exec`, `GET /`).
 - [ ] **Expected**: `404`.
 
-### 3.7 OpenLDAP Migration (upgrade from < 1.5.0 only)
-- [ ] **Action**: With `/opt/openldap` from an old install present, run `sudo fabricctl --migrate-ldap`.
-- [ ] **Expected**: Entries imported into 389-DS, group members merged, `cn=admin` dropped; a migrated user can log in to Keycloak with their old password. Re-running reports everything as skipped.
-
-## 4. Teardown
-- [ ] **Action**: Run `sudo ./setup.sh --uninstall --force`.
-- [ ] **Expected**: All containers, networks, and directories in `/opt/` are destroyed.
-- [ ] **Validation**: `docker ps -a` shows no fabric containers; `ls /opt/fabric` fails; `systemctl status fabric-agent` reports the unit not found; `id webui` fails.
+### 3.7 RFC2136 with an existing TSIG key
+- [ ] **Action**: give `tsig_keys: [{name: npm, records: [npm], secret: <existing>}]` in the vars; after setup, point nginx-proxy-manager (certbot `rfc2136`) at `host_ip:53` with that key (automated: `tests/sandbox/rfc2136_test.sh`).
+- [ ] **Expected**: the certificate is issued; `nsupdate` with the key sets `_acme-challenge.npm.<domain>` TXT; other names and wrong secrets are refused; the secret is only in `fabric-secrets.yml`; a setup re-run keeps it.

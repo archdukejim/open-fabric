@@ -35,7 +35,7 @@ print(state)
 '''
 
 
-def ensure_admin_user(v, user, password, email):
+def ensure_admin_user(v, user, password, email, container="dirsrv"):
     """Make sure `user` exists in 389-DS (ou=users,ou=accounts) and is a member
     of the web UI admin group (Keycloak maps that group to fabric-admin).
     An existing entry is never changed (its password stays); membership is
@@ -47,7 +47,7 @@ def ensure_admin_user(v, user, password, email):
            "F_GROUP": f"cn={v.get('webui_admin_group', 'admins')},ou=groups,{base}",
            "F_UID": user, "F_MAIL": email, "F_PW": password}
     res = subprocess.run(["docker", "exec", "-i", "-e", "F_DN", "-e", "F_GROUP", "-e", "F_UID", "-e", "F_MAIL",
-                          "-e", "F_PW", "dirsrv", "python3", "-"],
+                          "-e", "F_PW", container, "python3", "-"],
                          input=_IN_CONTAINER, env=env, capture_output=True, text=True, timeout=180)
     if res.returncode != 0:
         raise ValidationError(f"creating LDAP user {user} failed: {res.stderr.strip()[-500:]}")

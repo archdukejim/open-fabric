@@ -1,6 +1,5 @@
 import importlib
 import os
-import shutil
 import sys
 
 import yaml
@@ -18,10 +17,6 @@ if [[ "$EUID" -ne 0 ]]; then
   exit 1
 fi
 exec bash "{target}/lib/manage.sh" "$@"
-"""
-LEGACY_ALIAS = """#!/bin/bash
-echo "core-mgr is now fabricctl — this alias will be removed in the next release." >&2
-exec /usr/local/bin/fabricctl "$@"
 """
 
 
@@ -41,11 +36,7 @@ def run(ctx):
 
     # Secrets are created in the install, never in a git checkout.
     if not os.path.exists(ctx.secrets_file):
-        legacy = os.path.join(os.path.dirname(ctx.source_dir), "fabric-secrets.yml")
-        if os.path.exists(legacy):
-            shutil.copy2(legacy, ctx.secrets_file)
-        else:
-            open(ctx.secrets_file, "a").close()
+        open(ctx.secrets_file, "a").close()
     os.chmod(ctx.secrets_file, 0o600)
 
     os.environ.update({
@@ -63,5 +54,4 @@ def run(ctx):
     ok(f"configuration deployed to {ctx.deploy_base}")
 
     _write_exec("/usr/local/bin/fabricctl", CLI_WRAPPER.format(target=ctx.target_dir))
-    _write_exec("/usr/local/bin/core-mgr", LEGACY_ALIAS)
     ok("installed /usr/local/bin/fabricctl")

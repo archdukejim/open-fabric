@@ -88,8 +88,9 @@ The repo must stay easy to navigate. For all of our own code:
   (bundle / local registry / local mirror).
 - **Idempotent.** Every install, seed or configure step can be re-run safely
   and converges.
-- **Upgrades from existing installs** (including the renamed core-template
-  layout) — never only fresh installs.
+- **Upgrades from existing fabric installs** (re-running setup on a live
+  host) — never only fresh installs. No compatibility code for pre-fabric
+  (core-template) installs: those are rebuilt.
 
 ## 6. Testing
 

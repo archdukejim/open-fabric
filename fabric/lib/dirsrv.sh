@@ -25,8 +25,14 @@ dirsrv_seed() {
     dirsrv_wait_healthy || return 1
     local out
     # dscontainer only records DS_SUFFIX_NAME in .dsrc; create the backend on first run.
-    docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" \
-        || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' || return 1
+    # The healthcheck can pass a moment before LDAPI accepts connections: retry.
+    local tries=0
+    until docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" \
+            || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot'; do
+        tries=$((tries + 1))
+        [ "$tries" -ge 12 ] && { echo "389-DS backend could not be created" >&2; return 1; }
+        sleep 5
+    done
     out=$(docker exec dirsrv sh -c 'python3 /seed/seed.py /seed/*.ldif') || { echo "$out" >&2; return 1; }
     echo "$out"
     if grep -q '^RESTART_REQUIRED$' <<<"$out"; then

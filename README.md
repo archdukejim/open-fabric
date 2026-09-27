@@ -60,7 +60,7 @@ Comprehensive documentation is provided in the `docs/` directory to help you und
 - [**Full Setup Guide**](docs/install.md) — Requirements, the default plan, non-interactive and offline installs, reinstall/uninstall.
 - [**Configuration Variables**](docs/vars.md) — Detailed reference for all customizable variables in `custom-vars.yaml`.
 - [**Keycloak Deployment**](docs/keycloak.md) — Configuration nuances, architecture, and gotchas for the Keycloak and LDAP integration.
-- [**Operations**](docs/operations.md) — Live configuration changes via the `fabricctl` interactive editor (DNS records, TSIG keys), lifecycle commands (`setup`, `doctor`, `certs`, `reinstall`, `uninstall`), OpenLDAP → 389-DS migration.
+- [**Operations**](docs/operations.md) — Live configuration changes via the `fabricctl` interactive editor (DNS records, TSIG keys), lifecycle commands (`setup`, `doctor`, `certs`, `tsig`, `client-cert`, `reinstall`, `uninstall`), TSIG keys for RFC2136 clients.
 - [**webui Management UI**](docs/webui.md) — Browser front end for `fabricctl`: security model, client certificates, first login, troubleshooting.
 - [**Roadmap: `fabricctl` apt package, Kea DHCP, 802.1X**](docs/design/fabricctl-package.md) — `apt install fabricctl`, the `fabricd` privilege model, signed image channels and offline bundles, OpenBao, DHCP and 802.1X.
 - [**Architecture and Reference**](docs/architecture.md) — In-depth execution flow, directory structures, PKI chains, and template rendering logic.

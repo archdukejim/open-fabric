@@ -46,6 +46,9 @@ in_box 'mkdir -p /etc/docker && echo "{\"features\": {\"containerd-snapshotter\"
 docker exec "$NAME" mkdir -p /root/fabric
 docker cp "$OUT/src.tar" "$NAME:/root/src.tar"
 in_box 'tar -xf /root/src.tar -C /root/fabric && rm /root/src.tar'
+# An existing TSIG key (as on a host being rebuilt) whose RFC2136 client —
+# nginx-proxy-manager's certbot plugin — must keep working unchanged.
+TSIG_SECRET=$(openssl rand -base64 32)
 cat > "$OUT/vars.yaml" <<EOF
 domain: lan.test
 hostname: fabric-sbx
@@ -56,6 +59,8 @@ friendly_name: Sandbox
 install_keycloak: true
 install_ldap: true
 install_webui: true
+tsig_keys:
+- { name: npm, records: [npm], secret: "$TSIG_SECRET" }
 EOF
 docker cp "$OUT/vars.yaml" "$NAME:/root/vars.yaml"
 
@@ -66,6 +71,17 @@ check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
 echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
+
+echo "--- RFC2136 with the embedded TSIG key (what nginx-proxy-manager does)"
+docker cp "$REPO/tests/sandbox/rfc2136_test.sh" "$NAME:/root/rfc2136_test.sh"
+rfc2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test npm '$TSIG_SECRET' npm" 2>&1 | tee -a "$OUT/rfc2136.log"; }
+rfc2136 > /dev/null
+check "RFC2136: embedded key updates _acme-challenge.npm, other names and wrong keys refused" \
+    "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
+check "embedded secret kept exactly, and only in fabric-secrets.yml" \
+    "in_box \"grep -qF '$TSIG_SECRET' /opt/fabric/config/fabric-secrets.yml && ! grep -qF '$TSIG_SECRET' /opt/fabric/config/vars.yaml /opt/fabric/config/fabric.yaml\""
+check "rfc2136.ini for the key: host IP, port 53, 0600" \
+    "in_box \"grep -qx 'dns_rfc2136_server = $IP' /opt/npm/rfc2136.ini && grep -qx 'dns_rfc2136_port = 53' /opt/npm/rfc2136.ini && [ \\\$(stat -c %a /opt/npm/rfc2136.ini) = 600 ]\""
 
 echo "--- admin login kit"
 check "kit: .p12, passwords and root CA in ~/fabric-admin" \
@@ -98,6 +114,22 @@ in_box 'fabricctl setup --file /root/change.yaml --non-interactive --yes' > "$OU
 check "re-run with a change completes" "grep -q 'fabric is ready' '$OUT/setup3.log'"
 check "new record served by the running bind9" \
     "in_box 'dig +short @$IP rerun-test.lan.test' | grep -qx 10.77.0.99"
+: > "$OUT/rfc2136.log"; rfc2136 > /dev/null
+check "RFC2136 key still works after the re-runs (secret unchanged)" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
+
+echo "--- fabricctl tsig add/remove on the running install"
+S2=$(openssl rand -base64 32)
+in_box "umask 077; printf '%s' '$S2' > /root/nas.secret"
+in_box 'fabricctl tsig add nas --record nas --secret-file /root/nas.secret' > "$OUT/tsig.log" 2>&1
+check "tsig add with an existing secret applies" "grep -q \"TSIG key 'nas' active (existing secret kept)\" '$OUT/tsig.log'"
+check "the added key works over RFC2136" \
+    "in_box \"bash /root/rfc2136_test.sh $IP lan.test nas '$S2' nas\" | grep -q '4 passed, 0 failed'"
+in_box 'fabricctl tsig remove nas' >> "$OUT/tsig.log" 2>&1
+in_box "bash /root/rfc2136_test.sh $IP lan.test nas '$S2' nas" > "$OUT/tsig-removed.log" 2>&1
+check "removed key is refused by BIND" "grep -q '^FAIL RFC2136 update with the embedded key accepted' '$OUT/tsig-removed.log'"
+check "removed key's rfc2136.ini deleted" "! in_box 'test -e /opt/nas/rfc2136.ini'"
+check "the npm key is unaffected" \
+    "in_box \"bash /root/rfc2136_test.sh $IP lan.test npm '$TSIG_SECRET' npm\" | grep -q '4 passed, 0 failed'"
 
 cat > "$OUT/argv_check.py" <<'PY'
 import glob, yaml
