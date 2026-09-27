@@ -20,6 +20,9 @@ def remove_acl_entries(actor, acl, entries=None, source="cli"):
             if acl in builtin:
                 raise ValidationError(f"{acl!r} is built in; remove its added entries instead")
             del acls[acl]
+            policies = dict(data.get("bind_acl_policies") or {})
+            policies.pop(acl, None)
+            data["bind_acl_policies"] = policies
         else:
             kept = list(acls[acl])
             for entry in entries:

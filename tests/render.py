@@ -17,7 +17,8 @@ secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ
                ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
                ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1',
                webui_oidc_secret='OidcSecret1',
-               tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA=='})
+               tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA==',
+                             'dev1': 'ZGV2MS1zZWNyZXQ=', 'lonely': 'bG9uZWx5LXNlY3JldA=='})
 user = dict(deploy_base_dir='/opt', domain='lan.j-j.family', hostname='pi-core',
             host_ip='192.168.7.53', lan_cidr='192.168.7.0/24', lan_gateway='192.168.7.1',
             fabric_subnet='10.255.0.0/24', landing_page_cname=None, install_keycloak=True,
@@ -28,7 +29,13 @@ user = dict(deploy_base_dir='/opt', domain='lan.j-j.family', hostname='pi-core',
             tsig_keys=[{'name': 'npm', 'algorithm': 'hmac-sha256', 'domain': 'lan.j-j.family',
                         'record_types': ['TXT'], 'records': ['npm', 'shelfmark']},
                        {'name': 'acme_dns-01', 'algorithm': 'hmac-sha256', 'domain': 'lan.j-j.family',
-                        'record_types': ['TXT'], 'primary': True}],
+                        'record_types': ['TXT'], 'primary': True},
+                       {'name': 'dev1', 'algorithm': 'hmac-sha256', 'domain': 'lan.j-j.family', 'record_types': ['TXT']},
+                       {'name': 'lonely', 'algorithm': 'hmac-sha256', 'domain': 'lan.j-j.family', 'record_types': ['TXT']}],
+            # certbot devices: rights come from the ACL's policy
+            bind_acls={'certbot-devices': ['key "dev1"']},
+            bind_acl_policies={'certbot-devices': {'domain': 'lan.j-j.family', 'record_types': ['TXT'],
+                                                   'records': ['web', 'git']}},
             dns={'dynamic_zone_var': {'zone_authority': True,
                                       'CNAME': [{'name': 'None', 'canonical': 'pi-core'},
                                                 {'name': 'calibre', 'canonical': 'nas25-apps'}]}})
@@ -83,7 +90,13 @@ for want in ('grant "npm" name _acme-challenge.npm.lan.j-j.family. TXT;',
              'grant "npm" name _acme-challenge.shelfmark.lan.j-j.family. TXT;',
              'grant "acme_dns-01" subdomain _acme-challenge TXT;'):
     assert want in zones, f'missing update-policy grant: {want}'
-assert 'zonesub' not in zones, 'a records-limited key must not get zonesub'
+assert 'zonesub' not in zones, 'no key asked for any_name: nothing may get zonesub'
+for want in ('grant "dev1" name _acme-challenge.web.lan.j-j.family. TXT;',
+             'grant "dev1" name _acme-challenge.git.lan.j-j.family. TXT;'):
+    assert want in zones, f'missing ACL-policy grant: {want}'
+assert 'grant "lonely"' not in zones, 'a key with no records, policy or any_name must get no update rights'
+acl = env.get_template('bind9/config/named.conf.acl.j2').render(**full)
+assert 'acl "certbot-devices"' in acl and 'key "dev1";' in acl, 'policy ACL not rendered'
 assert 'secret "bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch";' in keys, 'embedded TSIG secret not rendered'
 print('TSIG keys and RFC2136 grants rendered')
 print('all templates rendered')

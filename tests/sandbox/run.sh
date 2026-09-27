@@ -153,6 +153,29 @@ check "acl remove: built-in ACL protected" "! in_box 'fabricctl acl remove dns-r
 in_box 'fabricctl acl remove lab 10.9.9.9' >> "$OUT/tsig.log" 2>&1
 check "acl remove: one entry" "! in_box \"grep -q '10.9.9.9' $ACLF\""
 
+echo "--- ACL policy: only certbot devices in the ACL may prove names for certificates"
+D1=$(openssl rand -base64 32); D2=$(openssl rand -base64 32)
+in_box "umask 077; printf '%s' '$D1' > /root/d1.secret; printf '%s' '$D2' > /root/d2.secret"
+in_box 'fabricctl acl policy certbot-devices --record web' >> "$OUT/tsig.log" 2>&1
+in_box 'fabricctl tsig add dev1 --acl certbot-devices --secret-file /root/d1.secret' >> "$OUT/tsig.log" 2>&1
+in_box 'fabricctl tsig add dev2 --secret-file /root/d2.secret' >> "$OUT/tsig.log" 2>&1
+check "policy: device key in the ACL may set _acme-challenge.web (other names refused)" \
+    "[ \"\$(t2136 dev1 '$D1' web)\" = '4 passed, 0 failed' ]"
+check "policy: a key outside the ACL has no update rights (deny by default)" \
+    "[ \"\$(t2136 dev2 '$D2' web | cut -d' ' -f1)\" != 4 ]"
+check "policy: tsig list shows rights via the ACL and none for the other key" \
+    "in_box 'fabricctl tsig list' | grep -A1 '^dev1' | grep -q 'via ACL certbot-devices' && in_box 'fabricctl tsig list' | grep '^dev2' | grep -q 'no update rights'"
+in_box 'fabricctl acl policy certbot-devices --record web --record git' >> "$OUT/tsig.log" 2>&1
+check "policy: widened to git, members follow" "[ \"\$(t2136 dev1 '$D1' git)\" = '4 passed, 0 failed' ]"
+in_box 'fabricctl tsig update dev1 --drop-acl certbot-devices' >> "$OUT/tsig.log" 2>&1
+check "policy: key taken out of the ACL loses the rights" "[ \"\$(t2136 dev1 '$D1' web | cut -d' ' -f1)\" != 4 ]"
+in_box 'fabricctl tsig update dev1 --acl certbot-devices' >> "$OUT/tsig.log" 2>&1
+in_box 'fabricctl acl policy certbot-devices --clear' >> "$OUT/tsig.log" 2>&1
+check "policy cleared: members lose the rights" "[ \"\$(t2136 dev1 '$D1' web | cut -d' ' -f1)\" != 4 ]"
+in_box 'fabricctl tsig remove dev1 && fabricctl tsig remove dev2 && fabricctl acl remove certbot-devices' >> "$OUT/tsig.log" 2>&1
+check "policy: cleanup leaves no trace in BIND's config" \
+    "! in_box \"grep -rqE 'dev1|dev2|certbot-devices' /opt/bind9/config\""
+
 in_box 'fabricctl tsig remove nas' >> "$OUT/tsig.log" 2>&1
 in_box "bash /root/rfc2136_test.sh $IP lan.test nas '$S2' web" > "$OUT/tsig-removed.log" 2>&1
 check "tsig remove: key refused by BIND" "grep -q '^FAIL RFC2136 update with the embedded key accepted' '$OUT/tsig-removed.log'"

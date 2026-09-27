@@ -18,7 +18,7 @@ through apply (`deploy.py`), which reloads only changed zones.
 | `normalize_tsig_keys.py` | Validate `tsig_keys`, fill defaults, take embedded secrets out (they belong in `fabric-secrets.yml`) |
 | `add_tsig_key.py` | Add a TSIG key (new or existing secret) to vars + secrets (locked, audited) |
 | `remove_tsig_key.py` | Remove a TSIG key and its secret (locked, audited) |
-| `list_tsig_keys.py` | TSIG keys and what each may update |
+| `list_tsig_keys.py` | TSIG keys with their effective update rights (own + ACL policies) and ACLs |
 | `replace_tsig_secret.py` | Give a key a secret you supply, or a newly generated one (locked, audited) |
 | `update_tsig_key.py` | Change what a key may update: records, types, zone, algorithm (locked, audited) |
 | `run_tsig_command.py` | `fabricctl tsig list/add/update/set-secret/rotate/remove` (applies after a change) |
@@ -26,4 +26,6 @@ through apply (`deploy.py`), which reloads only changed zones.
 | `builtin_acls.py` | The ACLs fabric always renders (protected from removal) |
 | `add_acl_entries.py` | Create a BIND ACL or add validated entries (IP, CIDR, `key <tsig>`, ACL, built-ins, `!`) |
 | `remove_acl_entries.py` | Remove ACL entries or a whole ACL (built-ins protected) |
-| `run_acl_command.py` | `fabricctl acl list/add/remove` (applies after a change) |
+| `normalize_acl_policies.py` | Validate ACL update policies (hosts or any name, record types, zone) |
+| `set_acl_policy.py` | Set or clear the update policy every TSIG key in an ACL inherits (locked, audited) |
+| `run_acl_command.py` | `fabricctl acl list/add/remove/policy` (applies after a change) |

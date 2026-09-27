@@ -205,6 +205,9 @@ bind9_doh_port: {{ bind9_doh_port | default(8053) }}
 {% endif %}
 bind_acls:
 {{ final_bind_acls | to_nice_yaml(indent=2) | indent(2, first=True) }}
+{# Update policies inherited by every TSIG key in the ACL (fabricctl acl policy). #}
+bind_acl_policies:
+{{ bind_acl_policies | default({}, true) | to_nice_yaml(indent=2) | indent(2, first=True) }}
 {% set default_cnames = [
   { 'canonical': hostname, 'name': cname_ca | default('ca') },
   { 'canonical': hostname, 'name': cname_dns | default('dns') },

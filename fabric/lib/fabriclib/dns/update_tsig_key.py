@@ -5,12 +5,12 @@ from fabriclib.common.vars_lock import vars_lock
 from fabriclib.common.write_audit import write_audit
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 
-FIELDS = ("records", "record_types", "domain", "algorithm", "out")
+FIELDS = ("records", "any_name", "record_types", "domain", "algorithm", "out")
 
 
 def update_tsig_key(actor, name, changes, source="cli"):
     """Change what an existing TSIG key may update (its secret is untouched).
-    `changes` may set records (a list; [] means any name in the zone),
+    `changes` may set records (a list), any_name (True; None removes it),
     record_types, domain, algorithm, out. Run apply afterwards. Returns the
     key as stored."""
     unknown = set(changes) - set(FIELDS)

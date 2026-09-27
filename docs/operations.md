@@ -153,8 +153,11 @@ tsig_keys:
   secret: "base64..."         # OPTIONAL: keep an existing key (its clients keep working unchanged)
   acls: [npm-updaters]        # OPTIONAL: BIND ACLs the key belongs to (created if missing)
 - name: acme_nas-proxy
-  record_types: [TXT, A]      # no records: may update these types anywhere in the zone (zonesub)
+  any_name: true              # may update any name in the zone (zonesub) — must be explicit
+  record_types: [TXT, A]
 ```
+
+**Update rights are deny-by-default.** A key may change only what is granted: its own `records`, `primary`, an explicit `any_name`, or the policy of an ACL it is in (below). A key with none of these can authenticate but change nothing.
 
 | Field | Default | Meaning |
 |---|---|---|
@@ -163,12 +166,13 @@ tsig_keys:
 | `algorithm` | `hmac-sha256` | `hmac-sha256/384/512/224`, `hmac-sha1`, `hmac-md5` |
 | `domain` | the fabric domain | Zone the key may update |
 | `records` | — | Hosts allowed a DNS-01 challenge: `grant <key> name _acme-challenge.<record>.<zone>. <types>` |
+| `any_name` | — | `grant <key> zonesub <types>`: any name in the zone (never implied) |
 | `record_types` | `[TXT]` | Record types it may change |
 | `primary` | — | The zone's own ACME key: `grant <key> subdomain _acme-challenge <types>` |
 | `out` | `/opt/<name>/rfc2136.ini` | Credentials file for the client (`0600`): server = `host_ip`, port = `bind_dns_port`, key, secret, algorithm |
 | `acls` | — | BIND ACLs holding `key "<name>"` (see [ACLs](#acls)) |
 
-Without `records` or `primary`, the key gets `zonesub` for its `record_types`.
+`tsig list` shows each key's effective rights, including those inherited from ACL policies, or `no update rights`.
 
 ```bash
 sudo fabricctl tsig list                                     # keys, what each may update, ACLs, credentials file
@@ -178,7 +182,7 @@ sudo fabricctl tsig add nas --record nas                     # new secret -> /op
 sudo fabricctl tsig set-secret npm --secret-prompt           # replace the secret with one you give
 sudo fabricctl tsig rotate npm                               # generate a new secret (update its clients)
 sudo fabricctl tsig update npm --record npm --record web     # change what it may update (secret untouched)
-sudo fabricctl tsig update npm --any-name --types TXT,A      # any name in the zone, TXT and A
+sudo fabricctl tsig update npm --any-name --types TXT,A      # any name in the zone, TXT and A (explicit)
 sudo fabricctl tsig update npm --acl lab --drop-acl npm-updaters
 sudo fabricctl tsig remove npm                               # also leaves every ACL; its rfc2136.ini is deleted
 ```
@@ -196,7 +200,30 @@ sudo fabricctl acl remove lab 10.9.9.9       # one entry
 sudo fabricctl acl remove lab                # the whole ACL
 ```
 
-Entries: an IP or CIDR, `key <tsig-key>` (must exist), another ACL, `any`/`none`/`localhost`/`localnets`; a leading `!` excludes. Assigning keys to ACLs is also `tsig add/update --acl`. Update rights come from each key's grants (above); ACL membership decides what the key's holder may query.
+Entries: an IP or CIDR, `key <tsig-key>` (must exist), another ACL, `any`/`none`/`localhost`/`localnets`; a leading `!` excludes. Assigning keys to ACLs is also `tsig add/update --acl`.
+
+##### ACL update policies (who may mint certificates)
+
+An ACL can carry an **update policy**; every TSIG key in the ACL inherits it as BIND `update-policy` grants. Together with deny-by-default keys this limits certificate issuance to authorized certbot devices: only a device holding a key in the ACL can set the DNS-01 challenge for the listed hosts.
+
+```bash
+sudo fabricctl acl policy certbot-devices --record web --record git     # TXT at _acme-challenge.web/git.<domain>
+sudo fabricctl tsig add laptop --acl certbot-devices --secret-prompt     # this device may now prove web and git
+sudo fabricctl tsig update laptop --drop-acl certbot-devices             # ...and no longer
+sudo fabricctl acl policy certbot-devices --any-name --types TXT         # or: any name in the zone
+sudo fabricctl acl policy certbot-devices --clear                        # members lose these rights
+```
+
+In the vars:
+
+```yaml
+bind_acl_policies:
+  certbot-devices: { records: [web, git], record_types: [TXT] }
+tsig_keys:
+- { name: laptop, acls: [certbot-devices], secret: "<existing>" }
+```
+
+BIND grants update rights per key, never per address: address entries in a policy ACL still control queries, but only its `key` members receive the policy. Removing an ACL removes its policy.
 
 **Keeping an existing key (rebuilding a host):** put its `name`, `records` and `secret` in the vars file you give `fabricctl setup --file`, with the same `domain`. BIND on the new host then accepts the same client configuration unchanged (server = `host_ip`, port 53).
 

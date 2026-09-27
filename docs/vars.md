@@ -210,7 +210,8 @@ These settings dictate how containers route traffic and how the BIND9 DNS server
 
 *   **`dns`**: A structured dictionary that defines your DNS records. Keys represent zone files (where `dynamic_zone_var` automatically correlates to your base `domain`).
 *   **`bind_acls`**: Lists of IP ranges granted query/update permissions.
-*   **`tsig_keys`**: TSIG keys for RFC2136 dynamic updates (e.g. DNS-01 from nginx-proxy-manager): `name`, optional `secret` (keep an existing key), `records`, `record_types`, `algorithm`, `domain`, `primary`, `out`. Fields and grants: [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates).
+*   **`tsig_keys`**: TSIG keys for RFC2136 dynamic updates (e.g. DNS-01 from nginx-proxy-manager): `name`, optional `secret` (keep an existing key), `records`, `any_name`, `record_types`, `algorithm`, `domain`, `primary`, `acls`, `out`. Update rights are deny-by-default. Fields and grants: [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates).
+*   **`bind_acl_policies`**: `{acl: {records: [host, ...] | any_name: true, record_types: [TXT], domain}}` — update rights every TSIG key in that ACL inherits (`fabricctl acl policy`); see [operations.md](operations.md#acl-update-policies-who-may-mint-certificates).
 
 **Example DNS Configuration (`custom-vars.yaml`):**
 ```yaml

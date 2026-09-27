@@ -6,10 +6,13 @@ zone "{{ zone_name }}" {
     allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
     allow-transfer { none; };
     update-policy {
-{# tsig_keys (validated and defaulted by fabriclib/dns/normalize_tsig_keys.py):
-   records -> only _acme-challenge.<record>.<zone> (per-host DNS-01 clients, e.g.
-   certbot's rfc2136 plugin); primary -> the zone's ACME challenge name;
-   otherwise zonesub for the listed record types. #}
+{# Update rights are deny-by-default; a TSIG key may change only what is
+   granted here (validated by fabriclib/dns/normalize_tsig_keys.py and
+   normalize_acl_policies.py):
+   - key records    -> _acme-challenge.<record>.<zone> (DNS-01 for those hosts)
+   - key primary    -> the zone's ACME challenge name
+   - key any_name   -> zonesub (any name) for its record types
+   - ACL policies   -> every key in the ACL gets the ACL's grants #}
 {% for key in tsig_keys | default([]) %}
 {% if key.domain == zone_name %}
 {% if key.records is defined and key.records %}
@@ -20,10 +23,28 @@ zone "{{ zone_name }}" {
 {% elif key.primary is defined and key.primary %}
         // {{ key.name }} — ACME challenge updates
         grant "{{ key.name }}" subdomain _acme-challenge {{ key.record_types | join(' ') }};
-{% else %}
-        // {{ key.name }} — zone record updates
+{% elif key.any_name is defined and key.any_name %}
+        // {{ key.name }} — any name in the zone
         grant "{{ key.name }}" zonesub {{ key.record_types | join(' ') }};
 {% endif %}
+{% endif %}
+{% endfor %}
+{% for acl_name, policy in (bind_acl_policies | default({})).items() %}
+{% if policy.domain == zone_name %}
+{% for entry in bind_acls.get(acl_name, []) %}
+{% if entry is string and entry.startswith('key ') %}
+{% set member = entry[4:] | replace('"', '') | trim %}
+{% if policy.records is defined and policy.records %}
+        // ACL {{ acl_name }}: {{ member }} — DNS-01 challenges for {{ policy.records | join(', ') }}
+{% for record in policy.records %}
+        grant "{{ member }}" name _acme-challenge.{{ record }}.{{ zone_name }}. {{ policy.record_types | join(' ') }};
+{% endfor %}
+{% elif policy.any_name is defined and policy.any_name %}
+        // ACL {{ acl_name }}: {{ member }} — any name in the zone
+        grant "{{ member }}" zonesub {{ policy.record_types | join(' ') }};
+{% endif %}
+{% endif %}
+{% endfor %}
 {% endif %}
 {% endfor %}
     };

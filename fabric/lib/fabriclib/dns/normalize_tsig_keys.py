@@ -16,6 +16,7 @@ def normalize_tsig_keys(keys, domain, secrets=None):
 
     Entry: {name, algorithm=hmac-sha256, domain=<domain>, record_types=[TXT],
     records=[host, ...] (optional: only _acme-challenge.<host>.<domain>),
+    any_name (optional: any name in the zone; never implied),
     primary (optional), out (optional rfc2136.ini path), acls (optional:
     BIND ACLs to put the key in),
     secret (optional: an existing key's base64 secret, e.g. from another
@@ -51,6 +52,13 @@ def normalize_tsig_keys(keys, domain, secrets=None):
             bad = [r for r in key["records"] if not LABEL_RE.match(r)]
             if bad:
                 raise ValidationError(f"TSIG key {name}: invalid record names {bad!r}")
+            key.pop("any_name", None)
+        else:
+            key.pop("records", None)
+            if key.get("any_name"):
+                key["any_name"] = True          # zonesub: any name in the zone — explicit only
+            else:
+                key.pop("any_name", None)
         if key.get("acls"):
             key["acls"] = [str(a) for a in key["acls"]]
             bad = [a for a in key["acls"] if not ACL_RE.match(a) or a in ("any", "none", "localhost", "localnets",

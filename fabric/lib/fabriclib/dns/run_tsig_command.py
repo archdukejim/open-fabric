@@ -45,6 +45,8 @@ def run_tsig_command(argv):
         p.add_argument("--domain", help="zone (default: the fabric domain)")
         p.add_argument("--record", action="append", default=None,
                        help="host allowed a DNS-01 challenge (_acme-challenge.<host>.<zone>); repeatable")
+        p.add_argument("--any-name", action="store_true",
+                       help="may update any name in the zone (explicit; otherwise only --record hosts or ACL policies)")
         p.add_argument("--types", help="record types it may change, comma-separated (default TXT)")
         p.add_argument("--algorithm", help="default hmac-sha256")
         p.add_argument("--out", help="where to write its rfc2136.ini (default /opt/<name>/rfc2136.ini)")
@@ -61,7 +63,6 @@ def run_tsig_command(argv):
     secret_opts(add)
     upd = sub.add_parser("update", help="change what a key may update (secret untouched)")
     scope(upd)
-    upd.add_argument("--any-name", action="store_true", help="drop --record limits: any name in the zone")
     upd.add_argument("--drop-acl", action="append", default=[], help="take the key out of this ACL; repeatable")
     setp = sub.add_parser("set-secret", help="replace a key's secret with one you give")
     setp.add_argument("name")
@@ -93,16 +94,22 @@ def run_tsig_command(argv):
                     entry[field] = val
             if args.types:
                 entry["record_types"] = [t.strip() for t in args.types.split(",") if t.strip()]
+            if args.any_name:
+                if args.record:
+                    raise ValidationError("--record and --any-name exclude each other")
+                entry["any_name"] = True
             key, _ = add_tsig_key("root", entry, secret)
             acls = set_key_acls("root", key["name"], add=args.acl) if args.acl else []
             msg = (f"TSIG key '{key['name']}' added ({'existing secret kept' if secret else 'new secret'})"
                    + (f", in ACL {', '.join(acls)}." if acls else "."))
         elif args.cmd == "update":
             changes = {}
+            if args.any_name and args.record:
+                raise ValidationError("--record and --any-name exclude each other")
             if args.any_name:
-                changes["records"] = []
+                changes.update(records=[], any_name=True)
             elif args.record:
-                changes["records"] = args.record
+                changes.update(records=args.record, any_name=None)
             if args.types:
                 changes["record_types"] = [t.strip() for t in args.types.split(",") if t.strip()]
             for field in ("domain", "algorithm", "out"):
@@ -115,9 +122,8 @@ def run_tsig_command(argv):
             if key is None:
                 raise ValidationError(f"no TSIG key named {args.name!r}")
             acls = set_key_acls("root", args.name, add=args.acl, drop=args.drop_acl)
-            msg = f"TSIG key '{args.name}' (ACLs: {', '.join(acls) or '-'}) may update: " + (
-                ", ".join(f"_acme-challenge.{r}.{key['domain']}" for r in key["records"])
-                if key.get("records") else f"any name in {key['domain']}") + f" ({' '.join(key['record_types'])})."
+            scope = next(k["scope"] for k in list_tsig_keys() if k["name"] == args.name)
+            msg = f"TSIG key '{args.name}' (ACLs: {', '.join(acls) or '-'}) may update: {scope}."
         elif args.cmd in ("set-secret", "rotate"):
             given = _secret(args) if args.cmd == "set-secret" else None
             if args.cmd == "set-secret" and not given:

@@ -8,6 +8,7 @@ import subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
 import filecmp
 import json
@@ -175,6 +176,12 @@ def apply_deployment(start_services=True):
         print(f"Error: {e}")
         sys.exit(1)
     custom_vars['tsig_keys'] = tsig_keys
+    try:
+        custom_vars['bind_acl_policies'] = normalize_acl_policies(custom_vars.get('bind_acl_policies'),
+                                                                  custom_vars.get('domain', ''))
+    except ValidationError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
     # A key's `acls` puts it in those BIND ACLs (same entries `fabricctl tsig
     # --acl` writes), so a vars file can assign keys to ACLs directly.
     acl_map = custom_vars.get('bind_acls') or {}
