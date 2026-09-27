@@ -8,10 +8,14 @@ services:
         DS_GID: "{{ service_users.ldap.gid }}"
     container_name: dirsrv
     user: "{{ service_users.ldap.uid }}:{{ service_users.ldap.gid }}"
+    read_only: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=16m
+      - /run:uid={{ service_users.ldap.uid }},gid={{ service_users.ldap.gid }},size=4m
     environment:
       DS_SUFFIX_NAME: "{{ ldap_base_dn }}"
       DS_DM_PASSWORD: "{{ ldap_admin_password }}"

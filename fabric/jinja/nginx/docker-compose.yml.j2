@@ -5,10 +5,10 @@ services:
     user: "{{ service_users.nginx.uid }}:{{ service_users.nginx.gid }}"
     security_opt:
       - no-new-privileges:true
+    # No capabilities: Docker lets non-root bind low ports inside the
+    # container's network namespace (ip_unprivileged_port_start=0).
     cap_drop:
       - ALL
-    cap_add:
-      - NET_BIND_SERVICE
     read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,size=10m,uid={{ service_users.nginx.uid }},gid={{ service_users.nginx.gid }}

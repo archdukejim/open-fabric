@@ -503,6 +503,17 @@
             directory_mode: '0755'
           when: install_ldap | default(true) | bool
 
+        # Thin local layers over upstream images (hardening; see each Dockerfile)
+        - name: Deploy bind9 / step-ca / keycloak image build contexts
+          ansible.builtin.copy:
+            src: "{{ playbook_dir }}/../jinja/{{ item }}/build/"
+            dest: "{{ deploy_base_dir }}/{{ item }}/build/"
+            owner: root
+            group: root
+            mode: '0644'
+            directory_mode: '0755'
+          loop: "{{ ['bind9', 'stepca'] + (['keycloak'] if install_keycloak | default(false) | bool else []) }}"
+
         # Readable by the dirsrv container user only: 20-accounts.ldif holds
         # the role-account passwords.
         - name: Deploy 389-DS seed files

@@ -235,7 +235,7 @@ reverse_zone_names:
    flatten |
    map(attribute='ip') |
    select('match', '^\d+\.\d+\.\d+\.\d+$') |
-   map('regex_replace', '^(\d+)\.(\d+)\.(\d+)\.\d+$', '\3.\2.\1.in-addr.arpa') |
+   map('regex_replace', '^(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+$', '\\3.\\2.\\1.in-addr.arpa') |
    unique |
    list |
    to_nice_yaml(indent=2) |

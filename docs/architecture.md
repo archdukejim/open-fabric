@@ -171,6 +171,28 @@ graph TB
 
 ---
 
+## Container Hardening
+
+Every container runs non-root, with `cap_drop: ALL` and **no** capabilities added back, `no-new-privileges`, a read-only root filesystem (writable paths are volumes or small tmpfs mounts), and a memory limit. Proven by the `hardening` test suite (`sudo tests/run-all.sh hardening`), which starts the real rendered compose files and checks each process from the host, including zero effective capabilities.
+
+Where an upstream image fights these settings, a thin **local build layer** (`fabric/jinja/<svc>/build/Dockerfile`, deployed to `/opt/<svc>/build`, image `fabric/<svc>:local`) fixes it once at build time instead of as root at every start. It always builds `FROM` the image given in `image_<svc>` (to be a pinned digest from the image channel).
+
+| Container | User | Local layer | Writable paths |
+|---|---|---|---|
+| `nginx` | `nginx` 443 | — | tmpfs: `/tmp`, `/var/cache/nginx`, `/var/run`, `/var/log/nginx` |
+| `bind9` | `bind` 53 | Yes: bind uid/gid baked in, runs `named` directly as `bind` (no root entrypoint, no SETUID/SETGID/CHOWN) | volumes: data, cache, log; tmpfs: `/run/named`, `/tmp` |
+| `step-ca` | `step` 135 | Yes: strips the upstream binary's `cap_net_bind_service` file capability (a no-new-privileges container refuses to exec it; step-ca listens on 9000 and never needed it) | volume: `/home/step`; tmpfs: `/tmp` |
+| `dirsrv` | `ldap` 911 | Yes: Debian `389-ds-base` build | volume: `/data`; tmpfs: `/tmp`, `/run` |
+| `postgres` | `postgres` 901 | — | volume: data; tmpfs: `/var/run/postgresql`, `/tmp` |
+| `keycloak` | 900:0 | Yes: pre-built (`kc.sh build`) so it starts with `start --optimized` — no re-augmentation at boot (read-only root, faster on a Pi) | volume: `/opt/keycloak/data`; tmpfs: `/tmp` |
+| `webui` | `webui` 912 | Yes: Debian + python3-jinja2 + app | tmpfs: `/tmp`; its socket dir |
+
+Low ports need no capability: Docker sets `net.ipv4.ip_unprivileged_port_start=0` inside each container's network namespace.
+
+`apply` rebuilds a local layer (without `--pull`) only when its build context changed; `fabricctl --update-containers` rebuilds all of them with `--pull`.
+
+---
+
 ## Dynamic Resource Constraints & Boot Staggering
 
 To guarantee stability on resource-constrained hardware (e.g. Raspberry Pi), `fabric` natively enforces dynamic memory ceilings (`mem_limit`) and staggered boot sequences across its Docker containers via the `host_ram_capacity` variable.

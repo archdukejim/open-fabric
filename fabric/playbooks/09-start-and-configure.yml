@@ -32,12 +32,16 @@
           changed_when: true
 
         # 389-DS is built locally; --pull refreshes the Debian base (security updates).
-        - name: Build 389-DS image
-          when:
-            - install_ldap | default(true) | bool
-            - not offline | default(false) | bool
+        # Local layers (bind9, stepca, dirsrv, keycloak; webui below). --pull refreshes
+        # the base image; later it will come pinned from the image channel.
+        - name: Build local image layers
+          when: not offline | default(false) | bool
           ansible.builtin.command:
-            cmd: "docker compose -f {{ deploy_base_dir }}/dirsrv/docker-compose.yml build --pull"
+            cmd: "docker compose -f {{ deploy_base_dir }}/{{ item }}/docker-compose.yml build --pull"
+          loop: >-
+            {{ ['bind9', 'stepca']
+               + (['dirsrv'] if install_ldap | default(true) | bool else [])
+               + (['keycloak'] if install_keycloak | default(false) | bool else []) }}
           changed_when: true
 
         - name: Start or Restart full stack via systemd

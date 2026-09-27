@@ -1,23 +1,35 @@
 services:
   keycloak:
-    image: {{ image_keycloak }}
+    # Pre-built (optimized) local layer: no re-augmentation at start, so the
+    # root filesystem can be read-only (see build/Dockerfile).
+    image: fabric/keycloak:local
+    build:
+      context: {{ deploy_base_dir }}/keycloak/build
+      args:
+        BASE_IMAGE: "{{ image_keycloak }}"
     container_name: keycloak
     user: "{{ service_users.keycloak.uid }}:{{ service_users.keycloak.gid }}"
-    command: start
+    command: ["start", "--optimized"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:nosuid,size=64m
     environment:
-      KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak?sslmode=verify-full&sslrootcert=/etc/keycloak/certs/root_ca.crt
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: "{{ keycloak_db_password }}"
       KC_HOSTNAME: "{{ hostname_keycloak }}"
       KC_PROXY_HEADERS: xforwarded
       KC_HTTP_ENABLED: "true"
-      KC_HEALTH_ENABLED: "true"
       KC_HTTPS_CERTIFICATE_FILE: /etc/keycloak/certs/fullchain.pem
       KC_HTTPS_CERTIFICATE_KEY_FILE: /etc/keycloak/certs/privkey.pem
       KC_TRUSTSTORE_PATHS: /etc/keycloak/certs/root_ca.crt
-      KEYCLOAK_ADMIN: "{{ keycloak_admin_user }}"
-      KEYCLOAK_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
+      # Bootstrap admin (Keycloak 26+ names; KEYCLOAK_ADMIN* are deprecated)
+      KC_BOOTSTRAP_ADMIN_USERNAME: "{{ keycloak_admin_user }}"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
 {% if host_ram_capacity | default(0) | int >= 3 %}
 {% set kc_mem = 800 if (host_ram_capacity | default(0) | int) == 3 else (1200 * ((host_ram_capacity | default(0) | int) / 4)) | int %}
       JAVA_OPTS_APPEND: "-Xmx{{ (kc_mem * 0.8) | int }}m"

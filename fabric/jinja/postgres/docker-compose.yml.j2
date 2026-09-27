@@ -3,6 +3,16 @@ services:
     image: {{ image_postgres }}
     container_name: postgres
     user: "{{ service_users.postgres.uid }}:{{ service_users.postgres.gid }}"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      # unix socket + lock files; /tmp for the entrypoint's init scripts
+      - /var/run/postgresql:uid={{ service_users.postgres.uid }},gid={{ service_users.postgres.gid }},mode=2775,size=4m
+      - /tmp:noexec,nosuid,size=16m
+    shm_size: 64m
     command:
       - postgres
       - -c

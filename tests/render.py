@@ -1,5 +1,6 @@
 """Render every template the way deploy.py does, against a vars file shaped like a
 long-running install (old keys, round-tripped values). Usage: render.py <out-dir>"""
+import json
 import os
 import sys
 import glob
@@ -21,7 +22,7 @@ for n, f in [('to_nice_yaml', deploy.to_nice_yaml_filter), ('unique', deploy.uni
 env.tests['match'] = deploy.match_test
 env.globals['lookup'] = deploy.lookup_func
 
-secrets = dict(ca_password='x', rndc_secret='x', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
+secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
                ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
                ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1',
@@ -37,9 +38,17 @@ user = dict(playbook_dir='/opt/core/playbooks', deploy_base_dir='/opt', domain='
                                       'CNAME': [{'name': 'None', 'canonical': 'pi-core'},
                                                 {'name': 'calibre', 'canonical': 'nas25-apps'}]}})
 
+# Suites that start real containers override install-specific values
+# (deploy path, host IP, ports) with a JSON object in FABRIC_TEST_VARS.
+user.update(json.loads(os.environ.get("FABRIC_TEST_VARS", "{}")))
+
 ctx = {**secrets, **user}
 v1 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**ctx))
 v2 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1}))
+import re as _re
+bad_rev = [z for z in v1.get('reverse_zone_names') or [] if not _re.fullmatch(r'\d+\.\d+\.\d+\.in-addr\.arpa', z)]
+assert not bad_rev, f'reverse zone names are malformed (Jinja escape bug?): {bad_rev!r}'
+print('reverse zones', v1.get('reverse_zone_names'))
 diff = {k: (v1.get(k), v2.get(k)) for k in set(v1) | set(v2) if v1.get(k) != v2.get(k)}
 assert not diff, diff
 print('project_containers', v2['project_containers'])
@@ -50,6 +59,10 @@ print('CNAMEs', [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']])
 
 full = {**secrets, **v2}
 out = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('--') else None
+if out:
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, 'vars.yaml'), 'w') as f:
+        yaml.safe_dump(v2, f)
 for tpl in sorted(env.list_templates()):
     if not tpl.endswith('.j2') or tpl.startswith(('nginx/www/', 'openldap/')) or tpl == 'vars.yaml.j2':
         continue

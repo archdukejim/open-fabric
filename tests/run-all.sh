@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------
 # Run fabric's test suites against real containers.
 #
-#   sudo tests/run-all.sh [suite ...]      suites: render nginx zone webui dirsrv keycloak
+#   sudo tests/run-all.sh [suite ...]      suites: render nginx zone webui dirsrv keycloak hardening
 #
 # Needs: Linux (amd64 or arm64), Docker with buildx, python3 with yaml +
 # jinja2, openssl, curl, setpriv. Runs as root (chown to service uids,
@@ -13,7 +13,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export FABRIC_TEST_OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(render nginx zone webui dirsrv keycloak)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(render nginx zone webui dirsrv keycloak hardening)
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo)." >&2; exit 2; }
 rm -rf "$FABRIC_TEST_OUT"; mkdir -p "$FABRIC_TEST_OUT"
@@ -37,6 +37,7 @@ for s in "${SUITES[@]}"; do
         webui)    run webui    python3 "$HERE/webui/test_container.py" ;;
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
         keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
+        hardening) run hardening bash "$HERE/hardening/run.sh" ;;
         *) echo "unknown suite: $s" >&2; exit 2 ;;
     esac
 done

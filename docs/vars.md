@@ -596,10 +596,10 @@ Allows deep customization of the container orchestration, including overriding i
 | Variable | Default Value |
 |----------|---------------|
 | `image_nginx` | `"nginx:latest"` |
-| `image_bind9` | `"ubuntu/bind9:latest"` |
+| `image_bind9` | `"ubuntu/bind9:latest"` — base of the local hardened layer `fabric/bind9:local` (`fabric/jinja/bind9/build`) |
 | `image_stepca` | `"smallstep/step-ca:latest"` |
 | `image_dirsrv`| `"fabric/dirsrv:local"` (built locally from `fabric/jinja/dirsrv/build`, Debian stable + `389-ds-base`) |
-| `image_keycloak`| `"keycloak/keycloak:latest"` |
+| `image_keycloak`| `"keycloak/keycloak:latest"` — base of the local pre-built layer `fabric/keycloak:local` (`fabric/jinja/keycloak/build`, `kc.sh build`, started with `start --optimized`) |
 | `image_postgres`| `"postgres:latest"` |
 | `image_webui`| `"fabric/webui:local"` (built locally from `fabric/jinja/webui/build`, `debian:trixie-slim` + `python3`, `python3-jinja2`, `openssl`, `tini`; app = `fabric/lib/webui`) |
 

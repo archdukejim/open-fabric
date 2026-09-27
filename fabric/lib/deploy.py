@@ -503,6 +503,7 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         
     # Service Directories, Config Files & Systemd Wrappers
     services_to_restart = set()
+    images_to_rebuild = set()
     daemon_reload_needed = False
 
     for svc_info in sys_svcs:
@@ -531,6 +532,19 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
                 shutil.copy2(src_dc, dest_dc)
                 os.chmod(dest_dc, 0o640)
                 os.chown(dest_dc, uid, gid)
+
+        # Thin local image layers (fabric/jinja/<svc>/build). webui also
+        # carries its app code. A changed context means rebuild + restart.
+        build_src = os.path.join(jinja_dir, svc_folder, "build")
+        if os.path.isdir(build_src) and os.path.exists(src_dc):
+            build_dst = os.path.join(svc_dir, "build")
+            context_changed = copy_tree_with_perms(build_src, build_dst, 0, 0, 0o644, 0o755)
+            if svc_folder == 'webui':
+                context_changed |= copy_tree_with_perms(os.path.join(FABRIC_DIR, "lib", "webui"),
+                                                        os.path.join(build_dst, "app"), 0, 0, 0o644, 0o755)
+            if context_changed:
+                images_to_rebuild.add(svc_folder)
+                needs_restart = True
             
         if os.path.exists(src_sys):
             if not os.path.exists(dest_sys) or not filecmp.cmp(src_sys, dest_sys, shallow=False):
@@ -569,14 +583,12 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
     if final_vars.get('install_ldap'):
         ldap_uid, ldap_gid = get_service_user(final_vars, 'ldap')
         ensure_dir(os.path.join(DEPLOY_BASE_DIR, "dirsrv/data"), 0o750, ldap_uid, ldap_gid)
-        copy_tree_with_perms(os.path.join(jinja_dir, "dirsrv/build"), os.path.join(DEPLOY_BASE_DIR, "dirsrv/build"),
-                             0, 0, 0o644, 0o755)
         ldap_seed_changed = copy_tree_with_perms(os.path.join(render_tmp, "dirsrv/seed"),
                                                  os.path.join(DEPLOY_BASE_DIR, "dirsrv/seed"),
                                                  0, ldap_gid, 0o640, 0o750)
 
     # webui container (config, build context) + fabric-agent host unit
-    webui_changed = webui_image_changed = agent_unit_changed = False
+    webui_changed = agent_unit_changed = False
     if final_vars.get('install_webui'):
         webui_uid, webui_gid = get_service_user(final_vars, 'webui')
         nginx_gid = get_service_user(final_vars, 'nginx')[1]
@@ -592,11 +604,6 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
             webui_changed = True
         os.chown(cfg_dst, webui_uid, webui_gid)
         os.chmod(cfg_dst, 0o400)
-        # Build context: Dockerfile + the app code (fabric/lib/webui)
-        webui_image_changed = copy_tree_with_perms(os.path.join(jinja_dir, "webui/build"),
-                                                   os.path.join(base, "build"), 0, 0, 0o644, 0o755)
-        webui_image_changed |= copy_tree_with_perms(os.path.join(FABRIC_DIR, "lib", "webui"),
-                                                    os.path.join(base, "build", "app"), 0, 0, 0o644, 0o755)
         unit_src = os.path.join(render_tmp, "systemd/fabric-agent.service")
         unit_dst = "/etc/systemd/system/fabric-agent.service"
         if not os.path.exists(unit_dst) or not filecmp.cmp(unit_src, unit_dst, shallow=False):
@@ -641,8 +648,15 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
 
     # webui is restarted last and without blocking: this apply may have been
     # started from the web UI, and restarting it drops that request.
-    restart_webui = "webui" in services_to_restart or webui_changed or webui_image_changed
+    restart_webui = "webui" in services_to_restart or webui_changed
     services_to_restart.discard("webui")
+
+    # No --pull on purpose: apply never takes a new base image; only an
+    # explicit update (`fabricctl --update-containers`) does.
+    for folder in sorted(images_to_rebuild):
+        print(f"Rebuilding {folder} image...")
+        subprocess.run(["docker", "compose", "-f", os.path.join(DEPLOY_BASE_DIR, folder, "docker-compose.yml"),
+                        "build"], timeout=1200)
 
     for svc in services_to_restart:
         print(f"Restarting {svc} due to configuration changes...")
@@ -677,12 +691,6 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         subprocess.run(["systemctl", "restart", "--no-block", "fabric-agent"], timeout=15)
 
     if restart_webui and subprocess.run(["systemctl", "is-enabled", "--quiet", "webui"]).returncode == 0:
-        if webui_image_changed:
-            # No --pull on purpose: apply never takes a new base image; only an
-            # explicit update (`fabricctl --update-containers`) does.
-            print("Rebuilding webui image...")
-            subprocess.run(["docker", "compose", "-f", os.path.join(DEPLOY_BASE_DIR, "webui/docker-compose.yml"),
-                            "build"], timeout=900)
         print("Restarting webui (queued)...")
         subprocess.run(["systemctl", "restart", "--no-block", "webui"], timeout=15)
         services_to_restart.add("webui")
