@@ -30,6 +30,9 @@ The repo must stay easy to navigate. For all of our own code:
 - **Group files by domain in folders** (`dns/`, `dhcp/`, `pki/`, `ldap/`,
   `keycloak/`, `vault/`, `images/`, `security/`, `setup/`, `fabricd/`,
   `webui/`, `common/`). Prefer a new folder over a crowded one.
+- Python domain code lives in **`fabric/lib/fabriclib/<domain>/`** and is
+  imported as `fabriclib.<domain>.<file>` — namespaced so it can never
+  collide with system packages (e.g. dnspython is also `dns`).
 - **Entry points only route.** CLI dispatchers (`fabricctl`), API routers
   (`fabricd`) and web handlers parse input and call one function file; no
   business logic in them.
