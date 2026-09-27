@@ -44,12 +44,12 @@ if [ -d "$BACKUP_DIR/certs" ]; then
     cp -r "$BACKUP_DIR/certs/"* "$TARGET_BASE/" 2>/dev/null || true
     
     # Fix ownership based on the directory they reside in
-    for d in nginx bind9 openldap keycloak postgres; do
+    for d in nginx bind9 dirsrv keycloak postgres; do
         if [ -d "$TARGET_BASE/$d" ] && id -u "$d" >/dev/null 2>&1; then
             find "$TARGET_BASE/$d" -type f \( -name '*.crt' -o -name '*.pem' -o -name '*.key' \) -exec chown "$d:$d" {} + 2>/dev/null || true
         elif [ "$d" = "bind9" ] && id -u "bind" >/dev/null 2>&1; then
             find "$TARGET_BASE/$d" -type f \( -name '*.crt' -o -name '*.pem' -o -name '*.key' \) -exec chown "bind:bind" {} + 2>/dev/null || true
-        elif [ "$d" = "openldap" ] && id -u "ldap" >/dev/null 2>&1; then
+        elif [ "$d" = "dirsrv" ] && id -u "ldap" >/dev/null 2>&1; then
             find "$TARGET_BASE/$d" -type f \( -name '*.crt' -o -name '*.pem' -o -name '*.key' \) -exec chown "ldap:ldap" {} + 2>/dev/null || true
         fi
     done

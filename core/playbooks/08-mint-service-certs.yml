@@ -38,8 +38,7 @@
                 [
                   { 'cn': hostname_bind9, 'safe': 'bind9_svc', 'sans': [hostname_bind9, 'ns.' ~ domain, '127.0.0.1'], 'dests': [ { 'path': deploy_base_dir ~ '/nginx/certs/' ~ hostname_bind9, 'owner': service_users.nginx.uid, 'group': service_users.nginx.gid } ] },
                   { 'cn': hostname_ldap,  'safe': 'ldap_svc',  'sans': [hostname_ldap], 'dests': [ 
-                    { 'path': deploy_base_dir ~ '/nginx/certs/' ~ hostname_ldap, 'owner': service_users.nginx.uid, 'group': service_users.nginx.gid },
-                    { 'path': deploy_base_dir ~ '/openldap/certs', 'owner': service_users.ldap.uid, 'group': service_users.ldap.gid }
+                    { 'path': deploy_base_dir ~ '/nginx/certs/' ~ hostname_ldap, 'owner': service_users.nginx.uid, 'group': service_users.nginx.gid }
                   ] },
                   { 'cn': hostname_stepca, 'safe': 'stepca_svc', 'sans': [hostname_stepca], 'dests': [ { 'path': deploy_base_dir ~ '/nginx/certs/' ~ hostname_stepca, 'owner': service_users.nginx.uid, 'group': service_users.nginx.gid } ] },
                   { 'cn': hostname_landing, 'safe': 'certs_svc', 'sans': [hostname_landing], 'dests': [ { 'path': deploy_base_dir ~ '/nginx/certs/' ~ hostname_landing, 'owner': service_users.nginx.uid, 'group': service_users.nginx.gid } ] }
@@ -55,6 +54,13 @@
                       ]
                     }
                   ] if install_keycloak | default(false) | bool else []
+                ) + (
+                  [
+                    { 'cn': hostname_mgr, 'safe': 'coreweb_svc', 'sans': [hostname_mgr], 'dests': [
+                        { 'path': deploy_base_dir ~ '/nginx/certs/' ~ hostname_mgr, 'owner': service_users.nginx.uid, 'group': service_users.nginx.gid }
+                      ]
+                    }
+                  ] if install_coreweb | default(false) | bool else []
                 )
               }}
 
@@ -147,6 +153,39 @@
           loop: "{{ service_cert_targets | subelements('dests') }}"
           loop_control:
             label: "{{ item.0.cn }} -> {{ item.1.path }}"
+
+        # Trust anchors nginx uses to verify core-web client certificates.
+        - name: Install client-certificate CA bundle for core-web
+          when: install_coreweb | default(false) | bool
+          ansible.builtin.shell:
+            cmd: |
+              set -euo pipefail
+              DIR="{{ deploy_base_dir }}/nginx/certs/client-ca"
+              install -d -m 0750 -o {{ service_users.nginx.uid }} -g {{ service_users.nginx.gid }} "$DIR"
+              cat "{{ deploy_base_dir }}/stepca/data/certs/intermediate_ca.crt" \
+                  "{{ deploy_base_dir }}/stepca/data/certs/root_ca.crt" > "$DIR/ca-bundle.pem"
+              chown {{ service_users.nginx.uid }}:{{ service_users.nginx.gid }} "$DIR/ca-bundle.pem"
+              chmod 0644 "$DIR/ca-bundle.pem"
+            executable: /bin/bash
+
+        # 389-DS (dscontainer) imports /data/tls/server.{crt,key} and every
+        # CA in /data/tls/ca/ into its NSS database on start.
+        - name: Install 389-DS TLS certificate
+          when: install_ldap | default(true) | bool
+          ansible.builtin.shell:
+            cmd: |
+              set -euo pipefail
+              ART="{{ deploy_base_dir }}/stepca/data/artifacts"
+              CERTS="{{ deploy_base_dir }}/stepca/data/certs"
+              TLS="{{ deploy_base_dir }}/dirsrv/data/tls"
+              install -d -m 0750 -o {{ service_users.ldap.uid }} -g {{ service_users.ldap.gid }} "{{ deploy_base_dir }}/dirsrv/data" "$TLS" "$TLS/ca"
+              openssl x509 -in "$ART/ldap_svc.crt" -out "$TLS/server.crt"
+              install -m 0600 -o {{ service_users.ldap.uid }} -g {{ service_users.ldap.gid }} "$ART/ldap_svc.key" "$TLS/server.key"
+              install -m 0644 -o {{ service_users.ldap.uid }} -g {{ service_users.ldap.gid }} "$CERTS/root_ca.crt" "$TLS/ca/root_ca.crt"
+              install -m 0644 -o {{ service_users.ldap.uid }} -g {{ service_users.ldap.gid }} "$CERTS/intermediate_ca.crt" "$TLS/ca/intermediate_ca.crt"
+              chown {{ service_users.ldap.uid }}:{{ service_users.ldap.gid }} "$TLS/server.crt"
+              chmod 0644 "$TLS/server.crt"
+            executable: /bin/bash
 
         # ----------------------------------------------------------------
         # 8e — Mint and install dedicated BIND9 TLS certificate

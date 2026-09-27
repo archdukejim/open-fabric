@@ -38,9 +38,16 @@ DOCKER_IMAGES=(
   "nginx:latest"
   "ubuntu/bind9:latest"
   "smallstep/step-ca:latest"
+  "keycloak/keycloak:latest"
+  "postgres:latest"
 )
 
 BUILT_IMAGES=()
+
+# Images built from a directory context in this repo: "tag|context-dir"
+CONTEXT_IMAGES=(
+  "core-template/dirsrv:local|core/jinja/dirsrv/build"
+)
 
 # -----------------------------------------------------------------------
 # do_package: Create offline bundles
@@ -181,6 +188,16 @@ except Exception as e:
         safe_name="${image//\//_}"; safe_name="${safe_name//:/_}.tar"
         info "  Building ${image}..."
         docker build --platform linux/amd64 -t "$image" - <<<"$dockerfile" >/dev/null
+        info "  Saving -> images/${safe_name}"
+        docker save -o "${WORK_TARGET}/images/${safe_name}" "$image"
+      done
+
+      for entry in "${CONTEXT_IMAGES[@]}"; do
+        image="${entry%%|*}"
+        context="${SCRIPT_DIR}/${entry#*|}"
+        safe_name="${image//\//_}"; safe_name="${safe_name//:/_}.tar"
+        info "  Building ${image} (fresh base, --pull)..."
+        docker build --pull --platform linux/amd64 -t "$image" "$context" >/dev/null
         info "  Saving -> images/${safe_name}"
         docker save -o "${WORK_TARGET}/images/${safe_name}" "$image"
       done

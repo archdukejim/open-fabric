@@ -12,6 +12,7 @@ This guide covers the detailed setup and installation instructions for the `core
   - [Installation Flags](#installation-flags)
     - [Remote Deployment](#remote-deployment) (`--remote`)
     - [Extra Ansible Arguments](#extra-ansible-arguments) (`--tags`, `--check`)
+- [Upgrading from OpenLDAP](#upgrading-from-openldap)
 - [Teardown / Uninstall](#teardown--uninstall)
 
 ---
@@ -43,7 +44,7 @@ cp custom-vars-tpl.yml custom-vars.yaml
 
 - **`custom-vars.yaml`** (repo root) — deployment settings: domain, network, DNS records, PKI identity, infrastructure defaults, Docker container IPs, image refs, port numbers, TSIG key definitions, LDAP groups and OUs. Edit this file to customise your deployment.
 
-`01-gen-vars-and-render-jinja.yml` generates secrets (CA password, one TSIG secret per key) and writes them to `core-secrets.yml` (git-ignored) on the first run; existing secrets are preserved on re-runs. It then loads `custom-vars.yaml` and `core-secrets.yml`, renders `core/jinja/vars.yaml.j2`, and writes the fully-resolved result to `/tmp/core-template-render/vars.yaml`. All subsequent playbooks read from that rendered file.
+`01-gen-vars-and-render-jinja.yml` generates secrets (CA password, one TSIG secret per key, Directory Manager and per-role-account LDAP passwords, Keycloak credentials, the core-web OIDC client secret) and writes them to `core-secrets.yml` (git-ignored) on the first run; existing secrets are preserved on re-runs. It then loads `custom-vars.yaml` and `core-secrets.yml`, renders `core/jinja/vars.yaml.j2`, and writes the fully-resolved result to `/tmp/core-template-render/vars.yaml`. All subsequent playbooks read from that rendered file.
 
 Minimum required changes in `custom-vars.yaml`:
 
@@ -99,9 +100,10 @@ Before your first install, review and set these in `custom-vars.yaml`.
 - [ ] `byoc` / `ca_crt_path` / `ica_crt_path` — enable BYOC and point these to an offline PKI generation directory instead of utilizing the dynamic PKI.
 - [ ] `dns:` block — A and CNAME records for your hosts
 - [ ] `ldap_groups` / `ldap_organizational_units` — directory structure
+- [ ] `install_keycloak` / `install_coreweb` — core-web (`mgr.<domain>`) is enabled by default whenever Keycloak is; see [coreweb.md](coreweb.md)
 - [ ] `tsig_keys` — add non-primary entries for external services that need DNS update rights (optional)
 - [ ] `bind_dns_port` — change from `5353` if that port conflicts with an existing service
-- [ ] `image_nginx` / `image_bind9` / `image_stepca` — override to pin images to specific digests or a local registry (optional; defaults to `:latest` tags)
+- [ ] `image_nginx` / `image_bind9` / `image_stepca` / `image_dirsrv` — override to pin images to specific digests or a local registry (optional; defaults to `:latest` tags)
 
 ---
 
@@ -174,7 +176,8 @@ When deployed, the infrastructure resides securely in `/opt` (or your chosen `DE
 *   `/opt/bind9/`: Core DNS service. Contains `config/` (holding `named.conf.*`), `data/` (holding all `db.<zone>` zone data and journals), `log/`, and `cache/`.
 *   `/opt/nginx/`: Core reverse proxy. Contains `config/` (`nginx.conf`), `www/` (holding the generated HTML documentation, scripts, and portal assets), and `certs/` (public-facing service certificates).
 *   `/opt/stepca/`: Core PKI. Contains `data/` (Internal DB, CA keys in `secrets/`, signed CA certs in `certs/`, and issued leaf certificates in `artifacts/`) and custom `templates/`.
-*   `/opt/openldap/`: Core directory service. Contains `data/` (LDAP database) and `certs/` (LDAPS keys).
+*   `/opt/dirsrv/`: Core directory service (389 Directory Server). Contains `data/` (389-DS `/data`: config, database, logs, and `tls/` with `server.crt`, `server.key`, `ca/*.crt`) and `seed/` (seed LDIFs + `seed.py`).
+*   `/opt/coreweb/`: core-web management UI (only when `install_coreweb`). Contains `coreweb.json` and `run/web.sock`; the service itself runs on the host as systemd `coreweb`.
 *   `/opt/keycloak/`: Core SSO identity provider. Contains `certs/`.
 *   `/opt/postgres/`: Backend DB for Keycloak. Contains persistent `data/`.
 
@@ -213,9 +216,15 @@ sudo ./setup.sh --check
 
 ---
 
+## Upgrading from OpenLDAP
+
+Installs before 1.5.0 ran `osixia/openldap` in `/opt/openldap`. Re-running `setup.sh` deploys 389-DS alongside it but does **not** move directory data. Follow the migration procedure in [operations.md](operations.md#migrating-from-openldap).
+
+---
+
 ## Teardown / Uninstall
 
-To stop and remove all containers, remove service accounts, and delete `/opt/{core,nginx,bind9,stepca,openldap}/`:
+To stop and remove all containers (and the `coreweb` service), remove service accounts, and delete `/opt/{core,nginx,bind9,stepca,dirsrv,keycloak,postgres,coreweb}/`:
 
 ```bash
 sudo ./setup.sh --uninstall

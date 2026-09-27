@@ -2,7 +2,8 @@
 # Section 9 — Start and Configure Services
 #
 # Starts the full docker-compose stack via the nginx systemd wrapper,
-# and configures Keycloak for LDAP federation.
+# seeds 389-DS, configures Keycloak (federation, core-web client, MFA) and
+# starts the core-web management UI.
 - name: Section 9 - Start and Configure Services
   hosts: "{{ target_host }}"
   become: true
@@ -21,7 +22,6 @@
             - { folder: 'nginx', pull: true }
             - { folder: 'bind9', pull: true }
             - { folder: 'stepca', pull: true }
-            - { folder: 'openldap', pull: "{{ install_ldap | default(false) | bool }}" }
             - { folder: 'postgres', pull: "{{ install_keycloak | default(false) | bool }}" }
             - { folder: 'keycloak', pull: "{{ install_keycloak | default(false) | bool }}" }
           when: 
@@ -29,6 +29,15 @@
             - not offline | default(false) | bool
             - item.pull | bool
           ignore_errors: true
+          changed_when: true
+
+        # 389-DS is built locally; --pull refreshes the Debian base (security updates).
+        - name: Build 389-DS image
+          when:
+            - install_ldap | default(true) | bool
+            - not offline | default(false) | bool
+          ansible.builtin.command:
+            cmd: "docker compose -f {{ deploy_base_dir }}/dirsrv/docker-compose.yml build --pull"
           changed_when: true
 
         - name: Start or Restart full stack via systemd
@@ -40,7 +49,7 @@
             - { name: 'nginx', start: true }
             - { name: 'bind9', start: true }
             - { name: 'stepca', start: true }
-            - { name: 'ldap', start: "{{ install_ldap | default(false) | bool }}" }
+            - { name: 'ldap', start: "{{ install_ldap | default(true) | bool }}" }
             - { name: 'postgres', start: "{{ install_keycloak | default(false) | bool }}" }
             - { name: 'keycloak', start: "{{ install_keycloak | default(false) | bool }}" }
           when: item.start | bool
@@ -55,105 +64,30 @@
           delay: 10
           changed_when: false
 
-        - name: Configure Keycloak LDAP Federation
+        - name: Seed 389 Directory Server (tree, role accounts, ACIs, hardening)
+          when: install_ldap | default(true) | bool
+          ansible.builtin.command:
+            cmd: "bash {{ deploy_base_dir }}/core/lib/dirsrv.sh seed"
+          register: dirsrv_seed
+          changed_when: "' 0 added, 0 modified' not in dirsrv_seed.stdout"
+
+        - name: Configure Keycloak (realm, LDAP federation, core-web client, MFA)
           when: install_keycloak | default(false) | bool
-          block:
-            - name: Authenticate to Keycloak Admin
-              ansible.builtin.shell:
-                cmd: >
-                  docker exec keycloak /opt/keycloak/bin/kcadm.sh config credentials --config /tmp/kcadm.config
-                  --server http://localhost:8080
-                  --realm master
-                  --user "{{ keycloak_admin_user }}"
-                  --password "{{ keycloak_admin_password }}"
-                  --insecure
-              register: kc_auth
-              changed_when: false
-              retries: 5
-              delay: 10
-              until: kc_auth.rc == 0
+          ansible.builtin.command:
+            cmd: >
+              python3 {{ deploy_base_dir }}/core/lib/keycloak_bootstrap.py
+              --vars {{ deploy_base_dir }}/core/config/vars.yaml
+              --secrets {{ deploy_base_dir }}/core/config/core-secrets.yml
+          register: kc_bootstrap
+          retries: 5
+          delay: 15
+          until: kc_bootstrap.rc == 0
+          changed_when: "'  - ' in kc_bootstrap.stdout"
 
-            - name: Check if Realm exists
-              ansible.builtin.shell:
-                cmd: >
-                  docker exec keycloak /opt/keycloak/bin/kcadm.sh get realms/{{ domain }} --config /tmp/kcadm.config
-              register: realm_check
-              changed_when: false
-              failed_when: false
-
-            - name: Create Realm
-              ansible.builtin.shell:
-                cmd: |
-                  docker exec keycloak /bin/bash -c "/opt/keycloak/bin/kcadm.sh create realms --config /tmp/kcadm.config \
-                    -s realm=\"{{ domain }}\" \
-                    -s displayName=\"{{ friendly_name | default(domain) }}\" \
-                    -s enabled=true"
-              when: realm_check.rc != 0
-
-            - name: Check if OpenLDAP Provider exists
-              ansible.builtin.shell:
-                cmd: >
-                  docker exec keycloak /opt/keycloak/bin/kcadm.sh get components --config /tmp/kcadm.config
-                  -r "{{ domain }}" -q provider=ldap -q name=OpenLDAP --fields id --format csv --noquotes
-              register: ldap_provider_check
-              changed_when: false
-
-            - name: Create OpenLDAP Provider
-              ansible.builtin.shell:
-                cmd: |
-                  docker exec keycloak /bin/bash -c "/opt/keycloak/bin/kcadm.sh create components --config /tmp/kcadm.config -r \"{{ domain }}\" \
-                    -s name=OpenLDAP \
-                    -s providerId=ldap \
-                    -s providerType=org.keycloak.storage.UserStorageProvider \
-                    -s 'config.editMode=[\"WRITABLE\"]' \
-                    -s 'config.syncRegistrations=[\"true\"]' \
-                    -s 'config.vendor=[\"other\"]' \
-                    -s 'config.usernameLDAPAttribute=[\"uid\"]' \
-                    -s 'config.rdnLDAPAttribute=[\"uid\"]' \
-                    -s 'config.uuidLDAPAttribute=[\"entryUUID\"]' \
-                    -s 'config.userObjectClasses=[\"inetOrgPerson, organizationalPerson\"]' \
-                    -s 'config.connectionUrl=[\"ldaps://{{ hostname_ldap }}:636\"]' \
-                    -s 'config.usersDn=[\"ou=users,ou=accounts,{{ ldap_base_dn }}\"]' \
-                    -s 'config.authType=[\"simple\"]' \
-                    -s 'config.bindDn=[\"cn=keycloak_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}\"]' \
-                    -s 'config.bindCredential=[\"{{ ldap_keycloak_password }}\"]' \
-                    -s 'config.searchScope=[\"1\"]' \
-                    -s 'config.useTruststoreSpi=[\"ldapsOnly\"]' \
-                    -s 'config.trustEmail=[\"true\"]'"
-              when: ldap_provider_check.stdout == ""
-
-            - name: Get OpenLDAP Provider ID
-              ansible.builtin.shell:
-                cmd: >
-                  docker exec keycloak /opt/keycloak/bin/kcadm.sh get components --config /tmp/kcadm.config
-                  -r "{{ domain }}" -q provider=ldap -q name=OpenLDAP --fields id --format csv --noquotes
-              register: ldap_provider_id
-              changed_when: false
-
-            - name: Check if OpenLDAP Group Mapper exists
-              ansible.builtin.shell:
-                cmd: >
-                  docker exec keycloak /bin/bash -c "/opt/keycloak/bin/kcadm.sh get components --config /tmp/kcadm.config
-                  -r \"{{ domain }}\" -q provider=group-ldap-mapper -q name=\"OpenLDAP Groups\"
-                  -q parentId=\"{{ ldap_provider_id.stdout }}\" --fields id --format csv --noquotes"
-              register: ldap_mapper_check
-              changed_when: false
-
-            - name: Create OpenLDAP Group Mapper
-              ansible.builtin.shell:
-                cmd: |
-                  docker exec keycloak /bin/bash -c "/opt/keycloak/bin/kcadm.sh create components --config /tmp/kcadm.config -r \"{{ domain }}\" \
-                    -s name=\"OpenLDAP Groups\" \
-                    -s providerId=group-ldap-mapper \
-                    -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
-                    -s parentId=\"{{ ldap_provider_id.stdout }}\" \
-                    -s 'config.\"groups.dn\"=[\"ou=groups,{{ ldap_base_dn }}\"]' \
-                    -s 'config.\"group.name.ldap.attribute\"=[\"cn\"]' \
-                    -s 'config.\"group.object.classes\"=[\"groupOfNames\"]' \
-                    -s 'config.\"membership.ldap.attribute\"=[\"member\"]' \
-                    -s 'config.\"membership.attribute.type\"=[\"DN\"]' \
-                    -s 'config.\"membership.user.ldap.attribute\"=[\"uid\"]' \
-                    -s 'config.\"groups.path\"=[\"/\"]' \
-                    -s 'config.mode=[\"IMPORT\"]' \
-                    -s 'config.\"user.roles.retrieve.strategy\"=[\"LOAD_GROUPS_BY_MEMBER_ATTRIBUTE\"]'"
-              when: ldap_mapper_check.stdout == ""
+        - name: Start core-web management UI
+          when: install_coreweb | default(false) | bool
+          ansible.builtin.systemd:
+            name: coreweb
+            state: restarted
+            enabled: true
+            daemon_reload: true

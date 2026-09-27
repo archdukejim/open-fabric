@@ -47,7 +47,8 @@ OFFLINE=false
 EXTRA_ANSIBLE_ARGS=()
 
 # Directories that contain the live installation state
-SERVICE_DIRS=(nginx bind9 stepca openldap keycloak postgres)
+# openldap: legacy dir from pre-389-DS installs, kept so snapshots/uninstall still cover it
+SERVICE_DIRS=(nginx bind9 stepca dirsrv keycloak postgres coreweb openldap)
 SERVICE_USERS_LIST=(nginx bind step ldap keycloak postgres)
 
 # --- Parse arguments ---
@@ -155,6 +156,12 @@ fi
 if ! command -v git &>/dev/null || ! git -C "$SCRIPT_DIR" rev-parse --git-dir &>/dev/null 2>&1; then
     warn "Not a git repository: $SCRIPT_DIR — version tracking uses serial numbers only."
 fi
+
+# Stamp core/BUILD so the deployed core-mgr can report exactly what it runs.
+{
+    echo "commit: $(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)$(git -C "$SCRIPT_DIR" diff --quiet HEAD 2>/dev/null || echo '-dirty')"
+    echo "built:  $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+} > "$SCRIPT_DIR/core/BUILD"
 
 # -----------------------------------------------------------------------
 # shared helper: run_playbook
@@ -387,7 +394,7 @@ set -euo pipefail
 TARGET_BASE="${TARGET_BASE}"
 
 echo "[*] Stopping and removing systemd services..."
-for svc in nginx bind9 ldap stepca keycloak postgres; do
+for svc in coreweb nginx bind9 ldap stepca keycloak postgres; do
     systemctl stop \$svc 2>/dev/null || true
     systemctl disable \$svc 2>/dev/null || true
     rm -f /etc/systemd/system/\$svc.service
@@ -459,7 +466,7 @@ REMOTE
         fi
     else
         info "Stopping and removing systemd services..."
-        for svc in nginx bind9 ldap stepca keycloak postgres; do
+        for svc in coreweb nginx bind9 ldap stepca keycloak postgres; do
             systemctl stop $svc 2>/dev/null || true
             systemctl disable $svc 2>/dev/null || true
             rm -f /etc/systemd/system/$svc.service

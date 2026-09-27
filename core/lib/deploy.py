@@ -6,6 +6,9 @@ import shutil
 import subprocess
 import jinja2
 import base64
+import filecmp
+import json
+import re
 from pathlib import Path
 from datetime import datetime
 
@@ -111,6 +114,63 @@ def get_service_user(vars_dict, service_name):
     svc = users.get(service_name, {})
     return int(svc.get('uid', 0)), int(svc.get('gid', 0))
 
+# -----------------------------------------------------------------------
+# BIND9 zone deployment
+# Forward zones carry an update-policy, which makes them dynamic: BIND
+# ignores `rndc reload` for them and keeps its own journal (.jnl). To
+# replace one safely we freeze it (flushes the journal into the file and
+# blocks updates), swap the file, drop the stale journal and thaw it.
+# -----------------------------------------------------------------------
+SERIAL_RE = re.compile(r"^\s*\d+\s*;\s*Serial.*$", re.MULTILINE)
+
+def rndc(args, timeout=15):
+    try:
+        return subprocess.run(f"docker exec -u bind bind9 rndc {args}", shell=True,
+                              capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"rndc {args} timed out")
+        return None
+
+def zone_content_changed(src, dst):
+    """Compare zone files ignoring the SOA serial, which changes on every render."""
+    if not os.path.exists(dst):
+        return True
+    with open(src) as a, open(dst) as b:
+        return SERIAL_RE.sub("", a.read()) != SERIAL_RE.sub("", b.read())
+
+def install_zone_file(src, dst, uid, gid):
+    shutil.copy2(src, dst)
+    os.chown(dst, uid, gid)
+    os.chmod(dst, 0o640)
+
+def deploy_zone_files(src_dir, dst_dir, uid, gid):
+    """Return [(zone, src, dst)] for zone files whose records actually changed."""
+    changed = []
+    if not os.path.isdir(src_dir):
+        return changed
+    for fname in sorted(os.listdir(src_dir)):
+        if not fname.startswith("db."):
+            continue
+        src, dst = os.path.join(src_dir, fname), os.path.join(dst_dir, fname)
+        if zone_content_changed(src, dst):
+            changed.append((fname[3:], src, dst))
+    return changed
+
+def reload_zone(zone, src, dst, uid, gid):
+    print(f"Updating zone {zone}...")
+    frozen = rndc(f"freeze {zone}")
+    install_zone_file(src, dst, uid, gid)
+    jnl = dst + ".jnl"
+    if os.path.exists(jnl):
+        os.remove(jnl)
+    if frozen is not None and frozen.returncode == 0:
+        res = rndc(f"thaw {zone}")
+    else:
+        # Static zone (no update-policy): a plain reload is enough.
+        res = rndc(f"reload {zone}")
+    if res is None or res.returncode != 0:
+        print(f"  Warning: BIND9 did not accept zone {zone}: {(res.stderr or res.stdout).strip() if res else 'timeout'}")
+
 def apply_deployment():
     print("Starting native Python deployment...")
     
@@ -151,6 +211,14 @@ def apply_deployment():
         secrets['keycloak_db_password'] = generate_secret_b64(32)
         changed_secrets = True
         
+    for name in ('ldap_super_admin_password', 'ldap_group_admin_password',
+                 'ldap_user_creator_password', 'ldap_user_modifier_password',
+                 'coreweb_oidc_secret'):
+        if name not in secrets:
+            # Alphanumeric: safe inside LDIF and JSON without quoting.
+            secrets[name] = run_cmd("openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32").stdout.strip()
+            changed_secrets = True
+
     if 'tsig_secrets' not in secrets:
         secrets['tsig_secrets'] = {}
         changed_secrets = True
@@ -179,6 +247,7 @@ def apply_deployment():
     jinja_env.globals['lookup'] = lookup_func
     jinja_env.tests['match'] = match_test
     jinja_env.filters['basename'] = basename_filter
+    jinja_env.filters['to_json'] = json.dumps
     
     merged_context = {**secrets, **custom_vars}
     merged_context['playbook_dir'] = os.path.join(CORE_DIR, 'playbooks')
@@ -285,7 +354,7 @@ def apply_deployment():
         {'service': 'nginx', 'compose': 'nginx', 'folder': 'nginx', 'requires': []},
         {'service': 'bind9', 'compose': 'bind9', 'folder': 'bind9', 'requires': []},
         {'service': 'stepca', 'compose': 'step-ca', 'folder': 'stepca', 'requires': []},
-        {'service': 'ldap', 'compose': 'openldap', 'folder': 'openldap', 'requires': []},
+        {'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []},
         {'service': 'postgres', 'compose': 'postgres', 'folder': 'postgres', 'requires': []},
         {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']}
     ]
@@ -296,7 +365,7 @@ def apply_deployment():
         
         if svc_folder in ['keycloak', 'postgres'] and not final_vars.get('install_keycloak'):
             continue
-        if svc_folder == 'openldap' and not final_vars.get('install_ldap'):
+        if svc_folder == 'dirsrv' and not final_vars.get('install_ldap'):
             continue
             
         render_file(f'{svc_folder}/docker-compose.yml.j2', f'{svc_folder}/docker-compose.yml')
@@ -333,10 +402,16 @@ def apply_deployment():
         with open(dest_path, 'w') as f:
             f.write(tpl.render(**merged_context, reverse_zone_name=rz))
 
-    # OpenLDAP
+    # 389 Directory Server seed data
     if final_vars.get('install_ldap'):
-        for ldif in ['02-ous.ldif.j2', '03-groups.ldif.j2', '05-admins.ldif.j2', '06-acl.ldif.j2']:
-            render_file(f'openldap/{ldif}', f"openldap/{ldif.replace('.j2', '')}")
+        for ldif in ['00-config.ldif.j2', '10-tree.ldif.j2', '20-accounts.ldif.j2', '30-aci.ldif.j2']:
+            render_file(f'dirsrv/seed/{ldif}', f"dirsrv/seed/{ldif.replace('.j2', '')}")
+        shutil.copy(os.path.join(jinja_dir, 'dirsrv/seed.py'), os.path.join(render_tmp, 'dirsrv/seed/seed.py'))
+
+    # core-web management UI
+    if final_vars.get('install_coreweb'):
+        render_file('coreweb/coreweb.json.j2', 'coreweb/coreweb.json')
+        render_file('systemd/coreweb.service.j2', 'systemd/coreweb.service')
 
     # Step-CA
     render_file('stepca/leaf.tpl.j2', 'stepca/templates/certs/leaf.tpl')
@@ -423,7 +498,6 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         copy_tree_with_perms(os.path.join(REPO_DIR, "docs"), os.path.join(DEPLOY_BASE_DIR, "nginx/www/manual/docs"), nginx_uid, nginx_gid, 0o644, 0o755)
         
     # Service Directories, Config Files & Systemd Wrappers
-    import filecmp
     services_to_restart = set()
     daemon_reload_needed = False
 
@@ -432,9 +506,9 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         svc_name = svc_info['service']
         
         if svc_folder in ['keycloak', 'postgres'] and not final_vars.get('install_keycloak'): continue
-        if svc_folder == 'openldap' and not final_vars.get('install_ldap'): continue
+        if svc_folder == 'dirsrv' and not final_vars.get('install_ldap'): continue
         
-        uid, gid = get_service_user(final_vars, 'bind' if svc_folder == 'bind9' else ('step' if svc_folder == 'stepca' else ('ldap' if svc_folder == 'openldap' else svc_folder)))
+        uid, gid = get_service_user(final_vars, 'bind' if svc_folder == 'bind9' else ('step' if svc_folder == 'stepca' else ('ldap' if svc_folder == 'dirsrv' else svc_folder)))
         
         svc_dir = os.path.join(DEPLOY_BASE_DIR, svc_folder)
         ensure_dir(svc_dir, 0o750, uid, gid)
@@ -480,18 +554,38 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         ensure_dir(os.path.join(DEPLOY_BASE_DIR, f"bind9/{d}"), 0o750, bind_uid, bind_gid)
     
     bind9_config_changed = copy_tree_with_perms(os.path.join(render_tmp, "bind9/config"), os.path.join(DEPLOY_BASE_DIR, "bind9/config"), bind_uid, bind_gid, 0o640, 0o750)
-    bind9_data_changed = copy_tree_with_perms(os.path.join(render_tmp, "bind9/data"), os.path.join(DEPLOY_BASE_DIR, "bind9/data"), bind_uid, bind_gid, 0o640, 0o750)
+    changed_zones = deploy_zone_files(os.path.join(render_tmp, "bind9/data"), os.path.join(DEPLOY_BASE_DIR, "bind9/data"), bind_uid, bind_gid)
     
     os.chmod(os.path.join(DEPLOY_BASE_DIR, "bind9/config/named.conf.keys"), 0o600)
     os.chmod(os.path.join(DEPLOY_BASE_DIR, "bind9/config/rndc.key"), 0o600)
 
-    # OpenLDAP Files
+    # 389 Directory Server seed files (group-readable by the container user only:
+    # 20-accounts.ldif holds role-account passwords)
+    ldap_seed_changed = False
     if final_vars.get('install_ldap'):
         ldap_uid, ldap_gid = get_service_user(final_vars, 'ldap')
-        ensure_dir(os.path.join(DEPLOY_BASE_DIR, "openldap/data"), 0o750, ldap_uid, ldap_gid)
-        if os.path.exists(os.path.join(render_tmp, "openldap")):
-            if copy_tree_with_perms(os.path.join(render_tmp, "openldap"), os.path.join(DEPLOY_BASE_DIR, "openldap"), ldap_uid, ldap_gid, 0o640, 0o750):
-                services_to_restart.add('ldap')
+        ensure_dir(os.path.join(DEPLOY_BASE_DIR, "dirsrv/data"), 0o750, ldap_uid, ldap_gid)
+        copy_tree_with_perms(os.path.join(jinja_dir, "dirsrv/build"), os.path.join(DEPLOY_BASE_DIR, "dirsrv/build"),
+                             0, 0, 0o644, 0o755)
+        ldap_seed_changed = copy_tree_with_perms(os.path.join(render_tmp, "dirsrv/seed"),
+                                                 os.path.join(DEPLOY_BASE_DIR, "dirsrv/seed"),
+                                                 0, ldap_gid, 0o640, 0o750)
+
+    # core-web config + unit
+    coreweb_changed = False
+    if final_vars.get('install_coreweb'):
+        ensure_dir(os.path.join(DEPLOY_BASE_DIR, "coreweb"), 0o755)
+        ensure_dir(os.path.join(DEPLOY_BASE_DIR, "coreweb/run"), 0o750, 0, get_service_user(final_vars, 'nginx')[1])
+        for src_rel, dst, mode in [("coreweb/coreweb.json", os.path.join(DEPLOY_BASE_DIR, "coreweb/coreweb.json"), 0o600),
+                                   ("systemd/coreweb.service", "/etc/systemd/system/coreweb.service", 0o644)]:
+            src = os.path.join(render_tmp, src_rel)
+            if not os.path.exists(dst) or not filecmp.cmp(src, dst, shallow=False):
+                shutil.copy2(src, dst)
+                os.chown(dst, 0, 0)
+                os.chmod(dst, mode)
+                coreweb_changed = True
+                if dst.endswith(".service"):
+                    daemon_reload_needed = True
 
     # Step-CA Files
     step_uid, step_gid = get_service_user(final_vars, 'step')
@@ -513,6 +607,20 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         except subprocess.TimeoutExpired:
             print("systemctl daemon-reload timed out")
         
+    try:
+        res = subprocess.run("docker ps --format '{{.Names}}'", shell=True, capture_output=True, text=True, timeout=15)
+        running = res.stdout.split('\n')
+    except subprocess.TimeoutExpired:
+        print("docker ps timed out")
+        running = []
+
+    # If BIND9 is down or about to restart it reads zone files on start, so
+    # they must be in place before the restart below.
+    bind9_live_reload = "bind9" in running and "bind9" not in services_to_restart
+    if not bind9_live_reload:
+        for zone, src, dst in changed_zones:
+            install_zone_file(src, dst, bind_uid, bind_gid)
+
     for svc in services_to_restart:
         print(f"Restarting {svc} due to configuration changes...")
         try:
@@ -521,20 +629,12 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
             print(f"Restart of {svc} timed out")
 
     print("Reloading active services...")
-    try:
-        res = subprocess.run("docker ps --format '{{.Names}}'", shell=True, capture_output=True, text=True, timeout=15)
-        running = res.stdout.split('\n')
-    except subprocess.TimeoutExpired:
-        print("docker ps timed out")
-        running = []
-    
-    if "bind9" in running and "bind9" not in services_to_restart:
-        if bind9_config_changed or bind9_data_changed:
-            print("Reloading BIND9...")
-            try:
-                subprocess.run("docker exec -u bind bind9 rndc reload", shell=True, timeout=15)
-            except subprocess.TimeoutExpired:
-                print("Reloading BIND9 timed out")
+    if bind9_live_reload:
+        if bind9_config_changed:
+            print("Reloading BIND9 configuration...")
+            rndc("reconfig")
+        for zone, src, dst in changed_zones:
+            reload_zone(zone, src, dst, bind_uid, bind_gid)
         
     if "nginx" in running and "nginx" not in services_to_restart:
         if nginx_config_changed:
@@ -543,6 +643,15 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
                 subprocess.run("docker exec nginx nginx -s reload", shell=True, timeout=15)
             except subprocess.TimeoutExpired:
                 print("Reloading NGINX timed out")
+
+    if ldap_seed_changed and ("dirsrv" in running or "ldap" in services_to_restart):
+        print("Applying 389-DS seed data...")
+        subprocess.run(["bash", os.path.join(TARGET_CORE, "lib", "dirsrv.sh"), "seed"], timeout=600)
+
+    if coreweb_changed and subprocess.run(["systemctl", "is-enabled", "--quiet", "coreweb"]).returncode == 0:
+        # --no-block: this apply may itself be running inside core-web.
+        print("Restarting core-web (queued)...")
+        subprocess.run(["systemctl", "restart", "--no-block", "coreweb"], timeout=15)
 
     print("Deployment complete.")
     return services_to_restart

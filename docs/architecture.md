@@ -23,17 +23,24 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 ├── core
 │   ├── jinja
 │   │   ├── bind9
+│   │   ├── coreweb         # coreweb.json.j2
+│   │   ├── dirsrv          # docker-compose.yml.j2, seed.py, seed/*.ldif.j2
 │   │   ├── docker-compose.yml.j2
 │   │   ├── nginx
-│   │   ├── openldap
 │   │   ├── stepca
+│   │   ├── systemd         # wrapper.service.j2, coreweb.service.j2
 │   │   └── vars.yaml.j2
 │   ├── lib
 │   │   ├── archive.sh
 │   │   ├── certs.sh
+│   │   ├── coreweb/        # core-web package (server, oidc, tlsclient, actions, views)
 │   │   ├── deploy.py
+│   │   ├── dirsrv.sh
 │   │   ├── dns.sh
 │   │   ├── interactive.py
+│   │   ├── keycloak_bootstrap.py
+│   │   ├── ldap_migrate.py
+│   │   ├── ldap_migrate.sh
 │   │   ├── manage.sh
 │   │   ├── output.sh
 │   │   ├── package.sh
@@ -42,28 +49,33 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 │   │   ├── ssh.sh
 │   │   ├── tsig.sh
 │   │   └── vars.sh
-│   └── playbooks
-│       ├── 00-controller-check.yml
-│       ├── 01-gen-vars-and-render-jinja.yml
-│       ├── 02-target-system-conditioning.yml
-│       ├── 03-target-service-accounts.yml
-│       ├── 04-target-file-structure.yml
-│       ├── 05-target-network.yml
-│       ├── 06-configure-stepca.yml
-│       ├── 07-bootstrap-containers.yml
-│       ├── 08-mint-service-certs.yml
-│       ├── 09-start-and-configure.yml
-│       ├── 10-deploy-checks-and-cleanup.yml
-│       ├── ansible.cfg
-│       ├── core-config.yml
+│   ├── playbooks
+│   │   ├── 00-controller-check.yml
+│   │   ├── 01-gen-vars-and-render-jinja.yml
+│   │   ├── 02-target-system-conditioning.yml
+│   │   ├── 03-target-service-accounts.yml
+│   │   ├── 04-target-file-structure.yml
+│   │   ├── 05-target-network.yml
+│   │   ├── 06-configure-stepca.yml
+│   │   ├── 07-bootstrap-containers.yml
+│   │   ├── 08-mint-service-certs.yml
+│   │   ├── 09-start-and-configure.yml
+│   │   ├── 10-deploy-checks-and-cleanup.yml
+│   │   ├── ansible.cfg
+│   │   └── core-config.yml
+│   └── VERSION             # core-mgr version (BUILD is stamped by setup.sh, git-ignored)
 ├── custom-vars.yaml
 ├── docs
 │   ├── ansible-doc.md
 │   ├── architecture.md
+│   ├── coreweb.md
 │   ├── install.md
+│   ├── keycloak.md
 │   ├── lib-doc.md
 │   ├── operations.md
-│   └── subordinate.md
+│   ├── subordinate.md
+│   ├── testplan.md
+│   └── vars.md
 ├── setup.sh
 └── tests
 ```
@@ -89,8 +101,17 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 │   │   └── manage.sh   # Managed: Legacy shell function wrapper
 │   ├── src/            # Managed: A full mirror of the deployment repository
 │   └── vars.yaml       # User-managed: Safely merged and preserved
+├── coreweb             # Managed (only when install_coreweb)
+│   ├── coreweb.json    # Managed: core-web config incl. OIDC client secret (root, 0600)
+│   └── run/web.sock    # Runtime: unix socket (dir root:nginx 0750), mounted into nginx at /srv/coreweb
+├── dirsrv              # Managed/Persistent mix
+│   ├── data            # Persistent: 389-DS /data (config, db, logs)
+│   │   └── tls         # Managed: server.crt, server.key, ca/*.crt (imported into NSS on start)
+│   ├── seed            # Managed: seed.py + 00-config/10-tree/20-accounts/30-aci .ldif (root:ldap 0640)
+│   └── docker-compose.yml # Managed
 ├── nginx               # Managed: config updated by installer
 │   ├── docker-compose.yml # Managed: Re-rendered and managed by idempotent deploy
+│   ├── certs           # Managed: service certs; client-ca/ca-bundle.pem (core-web mTLS trust)
 │   ├── config          # Managed: Nginx main and stream configurations
 │   │   ├── nginx.conf  # Managed: Main config managed by idempotent deploy
 │   │   ├── dns.conf    # Managed: DNS stream routing
@@ -101,11 +122,6 @@ This document provides an in-depth breakdown of the `core-template` infrastructu
 │       ├── ldap        # Managed: LDAP Client guides
 │       ├── manual      # Managed: Core infrastructure manual
 │       └── shared      # Managed: Shared CSS/assets
-├── openldap            # Managed/Persistent mix
-│   ├── config          # Persistent: slapd.d config database
-│   ├── data            # Persistent: main LDAP database
-│   ├── docker-compose.yml # Managed
-│   └── ...ldif         # Managed: Schema templates managed by idempotent deploy
 └── stepca              # Persistent: Internally manages certs, keys, and DB
     ├── docker-compose.yml # Managed
     └── data            # Persistent: PKI database, certs, and configurations
@@ -130,14 +146,20 @@ graph TB
         NGINX["nginx :10.255.0.10\nports 53 · 80 · 389 · 443 · 636 · 853"]
         BIND9["bind9 :10.255.0.30\nhost port bind_dns_port → :53"]
         STEPCA["step-ca :10.255.0.40"]
-        LDAP["openldap :10.255.0.50"]
+        LDAP["dirsrv (389-DS) :10.255.0.50\n:3389 StartTLS · :3636 LDAPS"]
+        KC["keycloak :10.255.0.60"]
     end
+
+    WEB["coreweb (host systemd)\nunix socket"]
 
     CLIENT -->|"DNS · HTTPS · LDAPS"| HOST
     HOST --> NGINX
     NGINX -->|"DNS + DoT → :53"| BIND9
     NGINX -->|"DoH /dns-query → :8053"| BIND9
-    NGINX -->|"LDAP passthru"| LDAP
+    NGINX -->|"389 → :3389 · 636 → :3636 (TCP passthrough)"| LDAP
+    NGINX -->|"mgr.<domain> (mTLS) → unix socket"| WEB
+    WEB -->|"OIDC · admin REST"| KC
+    KC -->|"LDAPS :3636"| LDAP
     NGINX -->|"HTTPS :443 → :9000"| STEPCA
     BIND9 -.->|"internal DNS"| STEPCA
 ```
@@ -158,7 +180,7 @@ When `host_ram_capacity` is enabled, Jinja2 automatically injects memory constra
 The services are strictly clamped to their minimal footprint, leaving sufficient overhead for the host OS.
 - Keycloak: `800M`
 - Postgres: `100M`
-- OpenLDAP: `30M`
+- 389-DS: `256M` (plus `DS_MEMORY_PERCENTAGE=10`)
 - BIND9: `40M`
 - Nginx: `15M`
 - Step-CA: `30M`
@@ -167,7 +189,7 @@ The services are strictly clamped to their minimal footprint, leaving sufficient
 - Keycloak and Postgres proportionally expand to utilize available memory:
   - Keycloak: `1200M * (host_ram_capacity / 4)`
   - Postgres: `200M * (host_ram_capacity / 4)`
-- Nginx, BIND9, OpenLDAP, and Step-CA limits remain capped at their peak efficient usage (`40M`, `80M`, `50M`, `50M` respectively) if `host_ram_capacity == 4`. If the host RAM is 5GB or higher, these lightweight services are fully uncapped as they pose zero threat to system stability.
+- Nginx, BIND9, and Step-CA limits remain capped at their peak efficient usage (`40M`, `80M`, `50M` respectively) and 389-DS at `384M` if `host_ram_capacity == 4`. If the host RAM is 5GB or higher, these lightweight services are fully uncapped as they pose zero threat to system stability.
 
 > [!WARNING]
 > **JVM Memory Scaling (Keycloak)**
@@ -179,7 +201,7 @@ If the server cold-boots with a low capacity (`3 <= host_ram_capacity <= 4`), pa
 To mitigate this, artificial boot delays (`ExecStartPre=/bin/sleep N`) are automatically injected into the `systemd` wrapper templates, forcing the following strict sequence:
 1. **Postgres**: Boots immediately (`0s`).
 2. **Keycloak**: Waits `15s` for Postgres to stabilize.
-3. **Rest of Stack**: Nginx, BIND9, OpenLDAP, and Step-CA wait `30s` (15s after Keycloak).
+3. **Rest of Stack**: Nginx, BIND9, 389-DS, and Step-CA wait `30s` (15s after Keycloak).
 
 ---
 
@@ -225,8 +247,10 @@ Root CA  (offline — manually generated, key never deployed to target)
             ├── BIND9 static TLS cert   (offline via step-ca, ~15 years)
             ├── Offline leaf certs      (issued at install time via step-ca)
             │       ├── dns.<domain>    → nginx DoT / DoH
-            │       ├── ldap.<domain>   → nginx LDAPS
+            │       ├── ldap.<domain>   → 389-DS (StartTLS + LDAPS, served by dirsrv itself)
+            │       ├── mgr.<domain>    → nginx → core-web (only when install_coreweb)
             │       └── ca.<domain>     → nginx → Step-CA
+            ├── core-web admin client certs  (core-mgr --client-cert <user>; CN = Keycloak username)
             └── extra_certs  (offline or ACME, per-entry config)
 ```
 
@@ -243,7 +267,7 @@ Internal CA files are distributed to services as `root_ca.crt` volume mounts. Th
 
 ## Certificate Relay
 
-Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `landing_page_cname.<domain>`) are offline Step-CA leaf certs with a 10-year lifetime, issued at install time via `step certificate create`. There is no certbot container or cert-relay service. nginx reads the issued certs directly from the volume paths set during install.
+Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `landing_page_cname.<domain>`, and `mgr.<domain>` when core-web is enabled) are offline Step-CA leaf certs with a 10-year lifetime, issued at install time via `step certificate create`. There is no certbot container or cert-relay service. nginx reads the issued certs directly from the volume paths set during install. The LDAP cert is copied to `/opt/dirsrv/data/tls/` (`server.crt`, `server.key`, `ca/root_ca.crt`, `ca/intermediate_ca.crt`), which 389-DS imports on start. For core-web client-certificate verification nginx trusts `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root).
 
 ---
 
@@ -275,6 +299,9 @@ All `.j2` files in this repo are rendered by the Ansible playbook or the `core-m
 | `core/jinja/bind9/config/named.conf*.j2` | `/opt/bind9/config/named.conf*` |
 | `core/jinja/bind9/data/zone.j2` | `/opt/bind9/data/db.<zone>` (forward zones) |
 | `core/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<octet3>.<octet2>.<octet1>.in-addr.arpa` (PTR — auto-generated) |
-| `core/jinja/openldap/*.ldif.j2` | `/opt/openldap/*.ldif` |
+| `core/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
+| `core/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
+| `core/jinja/coreweb/coreweb.json.j2` | `/opt/coreweb/coreweb.json` |
+| `core/jinja/systemd/coreweb.service.j2` | `/etc/systemd/system/coreweb.service` |
 | `core/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
 | `core/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |

@@ -1,0 +1,17 @@
+{% set admins = 'ou=admins,ou=accounts,' ~ ldap_base_dn %}
+{% set kc = 'ldap:///cn=keycloak_admin,' ~ admins %}
+# Access control for the whole suffix. `replace` makes this list the single
+# source of truth: ACIs added by hand on the base entry are removed on deploy.
+# Anything not granted here is denied (389-DS is default-deny).
+dn: {{ ldap_base_dn }}
+changetype: modify
+replace: aci
+aci: (targetattr="objectClass || cn || ou || uid || uidNumber || gidNumber || homeDirectory || loginShell || gecos || memberUid || member || memberOf || description || entryUUID || nsUniqueId")(version 3.0; acl "Anonymous POSIX name service read (sssd)"; allow (read, search, compare) userdn="ldap:///anyone";)
+aci: (targetattr!="userPassword || aci")(version 3.0; acl "Authenticated users read directory"; allow (read, search, compare) userdn="ldap:///all";)
+aci: (targetattr="userPassword")(version 3.0; acl "Users change own password"; allow (write) userdn="ldap:///self";)
+aci: (targetattr="*")(version 3.0; acl "Super admin full control"; allow (all) userdn="ldap:///cn=super_admin,{{ admins }}";)
+aci: (target="ldap:///ou=groups,{{ ldap_base_dn }}")(targetattr="*")(version 3.0; acl "Group admins manage groups"; allow (all) userdn="ldap:///cn=group_admin,{{ admins }} || {{ kc }}";)
+aci: (target="ldap:///ou=groups,{{ ldap_base_dn }}")(targetattr="member || memberUid")(version 3.0; acl "Group owners manage membership"; allow (write) userattr="owner#USERDN";)
+aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(version 3.0; acl "User creators add users"; allow (add) userdn="ldap:///cn=user_creator_admin,{{ admins }} || {{ kc }}";)
+aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(targetattr="*")(version 3.0; acl "User modifiers edit users"; allow (write, read, search, compare) userdn="ldap:///cn=user_modifier_admin,{{ admins }} || {{ kc }}";)
+aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(version 3.0; acl "Keycloak removes users"; allow (delete) userdn="{{ kc }}";)

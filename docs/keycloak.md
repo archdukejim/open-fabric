@@ -1,6 +1,6 @@
 # Keycloak Deployment Documentation
 
-This document tracks connections, variables, configuration nuances, and gotchas discovered during the Keycloak OpenLDAP integration deployment.
+This document tracks connections, variables, configuration nuances, and gotchas for the Keycloak ↔ LDAP (389 Directory Server) integration. The core-web management UI that authenticates through this realm is covered in [coreweb.md](coreweb.md).
 
 ## Phase 1: Infrastructure and Bootstrapping
 
@@ -10,7 +10,8 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 
 ### Secrets and Credentials
 *   **Locating Passwords**: All generated credentials are safely stored on the target machine in `/opt/core/config/core-secrets.yml`. You can view them by running `cat /opt/core/config/core-secrets.yml`.
-*   **LDAP Service Account**: Keycloak uses a dedicated, isolated service account password (`ldap_keycloak_password`) generated automatically by the installer.
+*   **LDAP Service Account**: Keycloak uses a dedicated, isolated service account password (`ldap_keycloak_password`) generated automatically by the installer. Every other LDAP role account also has its own generated password (`ldap_super_admin_password`, `ldap_group_admin_password`, `ldap_user_creator_password`, `ldap_user_modifier_password`); there is no shared default password.
+*   **core-web Client Secret**: `coreweb_oidc_secret` is the client secret of the `core-mgr` OIDC client.
 *   **Keycloak Admin**: The admin credentials (`keycloak_admin_user`, `keycloak_admin_password`) and the PostgreSQL database password (`keycloak_db_password`) are also generated automatically by the installer.
 
 ### Identity Preconditioning & Gotchas
@@ -20,7 +21,7 @@ This document tracks connections, variables, configuration nuances, and gotchas 
     *   **Solution**: Run Keycloak with `user: "900:0"`. By running with GID `0` (the root group), Keycloak gains group-write permissions to the internal directories while still maintaining UID `900` isolation on the host.
     *   **Gotcha (PostgreSQL)**: PostgreSQL 16+ introduces strict mount point boundaries. If you map `/opt/postgres/data` directly to `/var/lib/postgresql/data`, PostgreSQL will refuse to initialize, citing that the directory is an `(unused mount/volume)`.
     *   **Solution**: Set the `PGDATA` environment variable to a subdirectory, e.g., `/var/lib/postgresql/data/pgdata`. PostgreSQL will successfully create and manage this subdirectory.
-*   **kcadm.sh Configuration**:
+*   **kcadm.sh Configuration** (manual use only — the installer no longer calls `kcadm.sh`, see Phase 3):
     *   **Gotcha**: When Keycloak runs as a non-root user (e.g. UID 900), its home directory evaluates to `/`, which it cannot write to. Running `kcadm.sh` commands will fail with `Failed to create config file: /.keycloak/kcadm.config`.
     *   **Solution**: Append `--config /tmp/kcadm.config` immediately after the `kcadm.sh` command (e.g., `kcadm.sh config credentials --config /tmp/kcadm.config ...`) to write the configuration to a writable temporary directory.
 *   **Healthchecks and Systemd**: 
@@ -33,7 +34,24 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 
 ## Phase 3: LDAP Federation Configuration
 
-### Keycloak Provider Configuration (kcadm.sh)
+### Automated Configuration (`keycloak_bootstrap.py`)
+Playbook 09 runs `core/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from `core-secrets.yml` — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
+
+```bash
+sudo core-mgr --keycloak-sync
+```
+
+| Object | Configuration |
+|--------|---------------|
+| Realm | `coreweb_realm` (default: `domain`); brute-force protection on (5 failures, temporary lockout) |
+| User federation | LDAP provider `389-DS`: vendor `rhds`, `ldaps://<hostname_ldap>:3636`, UUID attribute `entryUUID`, username/RDN `uid`, edit mode `WRITABLE`, sync registrations on. An existing provider named `OpenLDAP` is **updated in place** so federated user links survive the migration. |
+| Group mapper | `LDAP Groups` (`group-ldap-mapper`) on `ou=groups,<base_dn>`, synced into Keycloak |
+| Realm role | `coreweb_admin_role` (default `core-admin`), granted to group `coreweb_admin_group` (default `admins`) |
+| OIDC client | `core-mgr` — confidential, code flow + PKCE `S256`, exact redirect `https://<hostname_mgr>/oidc/callback`, `fullScopeAllowed: false`, realm roles in the ID token `roles` claim |
+| Auth flow | `core-mgr-browser-mfa` — browser flow with TOTP **REQUIRED**, bound to the `core-mgr` client only (other clients keep the realm default flow) |
+
+### Manual kcadm.sh Notes
+These still apply if you drive `kcadm.sh` by hand inside the container.
 *   **kcadm.sh Connection**: When running `kcadm.sh config credentials` inside the Keycloak container, using `--server https://localhost:8443` will fail with a `SunCertPathBuilderException` because the internal Java truststore does not automatically trust the generated certificates without explicit Java keystore configuration. 
     *   **Gotcha**: Using `--insecure` does not bypass this specific PKIX path building failure in Keycloak 24.
     *   **Solution**: Connect to the local HTTP port instead: `--server http://localhost:8080`.
@@ -44,27 +62,36 @@ This document tracks connections, variables, configuration nuances, and gotchas 
     *   **Solution**: You must quote the keys: `-s 'config."groups.dn"=["ou=groups,{{ ldap_base_dn }}"]'`.
 
 ### LDAP Service Account Bind
-*   Keycloak is now bound to OpenLDAP using the dedicated `cn=keycloak_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}` service account, utilizing the isolated `ldap_keycloak_password`.
+*   Keycloak is bound to 389-DS using the dedicated `cn=keycloak_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}` service account, utilizing the isolated `ldap_keycloak_password`.
 *   Users are searched in `ou=users,ou=accounts,{{ ldap_base_dn }}`.
 *   Groups are searched in `ou=groups,{{ ldap_base_dn }}`.
-*   **Gotcha**: Keycloak connection URL must use the exact LDAP hostname (`ldaps://{{ hostname_ldap }}:636`) instead of just `ldaps://ldap:636`. Using the bare `ldap` name fails resolution (`UnknownHostException`) because it's not a valid Docker alias on the network, only `hostname_ldap` is.
+*   **Gotcha**: Keycloak connects to the `dirsrv` container directly on `core_net` (not through nginx), so the URL must use the container-side port **3636** and the exact LDAP hostname: `ldaps://{{ hostname_ldap }}:3636`. The bare `ldap` name fails resolution (`UnknownHostException`) — only `hostname_ldap` is a Docker alias — and the hostname must match the certificate SAN.
+*   **UUID attribute**: `entryUUID` (provided by the 389-DS `entryuuid` plugin, enabled by the seed). Keycloak links federated users by this value, which is why the OpenLDAP migration preserves it.
 
 ---
 *End of Phase 3 Notes*
 
 ## Phase 4: Security & ACLs
 
-### OpenLDAP Configuration Database (cn=config)
-*   **Gotcha**: The default `osixia/openldap` image processes files in `/container/environment/custom/` during startup. However, if a file ends in `.ldif`, it runs it against the main database using a simple bind (`ldapadd -x`). 
-*   **Solution**: To modify the `cn=config` database, you MUST execute `ldapmodify -Y EXTERNAL -H ldapi:///`. We achieved this by writing `06-acl.sh` instead of an `.ldif` file, allowing the shell script to execute the proper `ldapmodify` command.
+### 389-DS Seeding (cn=config and the tree)
+*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`dirsrv.sh seed`, run by playbook 09 and by `core-mgr --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
+*   `00-config.ldif` hardens the server: `nsslapd-require-secure-binds: on`, `nsslapd-minssf: 56` (rootDSE excluded), TLS 1.2 minimum, `PBKDF2-SHA512` password storage, password syntax checks (min length 12, 3 categories), lockout after 5 failures for 900 s, and enables the `memberOf` and `entryUUID` plugins.
+*   `10-tree.ldif` creates the suffix, OUs and groups (`groupOfNames` + `posixGroup`, so both `member` and `gidNumber` work). `20-accounts.ldif` creates the role accounts. `30-aci.ldif` holds the ACIs.
 
 ### TLS Enforcement and Simple Binds
-*   **Gotcha**: OpenLDAP is configured to strictly enforce TLS (`LDAP_TLS_ENFORCE: "true"`). Running simple binds (`ldapadd -x` or `ldapsearch -x`) against `localhost` or `ldapi:///` will fail with `Confidentiality required (13)`.
-*   **Solution**: Any local testing or script execution against the OpenLDAP container must use `-H ldaps://localhost:636` and override TLS verification with `LDAPTLS_REQCERT=never` if querying internally.
+*   **Gotcha**: 389-DS terminates TLS itself; nginx only passes TCP through (389 → `dirsrv:3389`, 636 → `dirsrv:3636`). On port 389 everything except StartTLS and the rootDSE is refused until the connection is encrypted, so a plain `ldapsearch -x -H ldap://…` bind fails with `Confidentiality required` / `Minimum SSF not met`.
+*   **Solution**: Use `-ZZ` (StartTLS) on 389 or `ldaps://` on 636, with the core root CA trusted (`LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt`). Inside the container, LDAPI (`ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket`) counts as a secure channel.
 
-### Isolated Permissions Testing
-*   Keycloak's ability to create, read, and write users and groups was successfully validated using the isolated `cn=keycloak_admin` service account.
-*   The `cn=config` Access Control Lists ensure that the Keycloak service account has write access *only* to `ou=users` and `ou=groups`, preventing it from recursively modifying core infrastructure accounts like `cn=super_admin`.
+```bash
+LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt \
+  ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,ou=accounts,<base_dn>" -W
+```
+
+### Access Control (ACIs)
+*   **Anonymous**: may read/search only POSIX name-service attributes (`uid`, `uidNumber`, `gidNumber`, `memberUid`, `member`, `memberOf`, `homeDirectory`, `loginShell`, …) — enough for sssd — and only over TLS (minssf). Never `userPassword`.
+*   **Authenticated users**: read everything except `userPassword` and `aci`; may change their own password.
+*   **`super_admin`**: full control. **`group_admin`**: manages `ou=groups`. **`user_creator_admin`** / **`user_modifier_admin`**: add / edit entries in `ou=users,ou=accounts`. Group `owner`s may edit membership.
+*   **`keycloak_admin`**: add, edit and delete users in `ou=users` and manage `ou=groups` — nothing else, so it cannot modify role accounts like `cn=super_admin`.
 
 ---
 *End of Phase 4 Notes*

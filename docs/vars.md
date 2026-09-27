@@ -20,7 +20,6 @@ These variables define top-level identity and basic settings.
 - `docs/testplan.md.j2`
 - `nginx/www/certificates/index.html.j2`
 - `nginx/www/certificates/install-certs.sh.j2`
-- `openldap/docker-compose.yml.j2`
 - `vars.yaml.j2`
 
 ### `domain_file`
@@ -115,12 +114,14 @@ These variables define top-level identity and basic settings.
 
 **Effected Jinja Templates:**
 - `bind9/docker-compose.yml.j2`
+- `coreweb/coreweb.json.j2`
+- `dirsrv/docker-compose.yml.j2`
 - `docs/testplan.md.j2`
 - `keycloak/docker-compose.yml.j2`
 - `nginx/docker-compose.yml.j2`
-- `openldap/docker-compose.yml.j2`
 - `postgres/docker-compose.yml.j2`
 - `stepca/docker-compose.yml.j2`
+- `systemd/coreweb.service.j2`
 - `systemd/wrapper.service.j2`
 - `vars.yaml.j2`
 
@@ -305,7 +306,6 @@ These variables define how the internal Certificate Authority generates and sign
 
 **Effected Jinja Templates:**
 - `nginx/www/certificates/index.html.j2`
-- `openldap/docker-compose.yml.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -525,15 +525,24 @@ Allows deep customization of the container orchestration, including overriding i
 ### `project_containers`
 **Description:** List of containers to include in deployment.
 
-**Default Value:** `['nginx', 'step-ca', 'bind9']` (plus conditionally enabled services)
+**Default Value:** `['nginx', 'step-ca', 'bind9']` plus `dirsrv` (if `install_ldap`) and `keycloak`, `postgres` (if `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render; stale `openldap` entries are dropped.
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
 
 ### `nginx_backend_ldap`
-**Description:** Upstream target for Nginx LDAP proxy.
+**Description:** Upstream for the nginx stream listener on port 389 (plain TCP passthrough; 389-DS requires StartTLS). A legacy `openldap:*` value is rewritten to the default automatically.
 
-**Default Value:** `"openldap:389"`
+**Default Value:** `"dirsrv:3389"`
+
+**Effected Jinja Templates:**
+- `nginx/nginx.conf.j2`
+- `vars.yaml.j2`
+
+### `nginx_backend_ldaps`
+**Description:** Upstream for the nginx stream listener on port 636 (plain TCP passthrough; 389-DS terminates LDAPS itself).
+
+**Default Value:** `"dirsrv:3636"`
 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
@@ -567,7 +576,7 @@ Allows deep customization of the container orchestration, including overriding i
 - `vars.yaml.j2`
 
 ### `host_ram_capacity`
-**Description:** Host RAM limit in GB (min 3) to enforce memory ceilings and staggered boots. `0` disables limits.
+**Description:** Host RAM limit in GB (min 3) to enforce memory ceilings and staggered boots. `0` disables limits. At 3/4 GB the 389-DS container is limited to `256M`/`384M` (with `DS_MEMORY_PERCENTAGE=10`).
 
 **Default Value:** `0`
 
@@ -588,7 +597,7 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_nginx` | `"nginx:latest"` |
 | `image_bind9` | `"ubuntu/bind9:latest"` |
 | `image_stepca` | `"smallstep/step-ca:latest"` |
-| `image_openldap`| `"osixia/openldap:latest"` |
+| `image_dirsrv`| `"core-template/dirsrv:local"` (built locally from `core/jinja/dirsrv/build`, Debian stable + `389-ds-base`) |
 | `image_keycloak`| `"keycloak/keycloak:latest"` |
 | `image_postgres`| `"postgres:latest"` |
 
@@ -601,6 +610,7 @@ Allows overriding the default short hostnames (CNAMEs) automatically assigned to
 | `cname_dns` | `"dns"` |
 | `cname_ldap` | `"ldap"` |
 | `cname_sso` | `"sso"` |
+| `cname_mgr` | `"mgr"` (DNS CNAME added only when core-web is enabled) |
 
 ### Internal Subdomain Routing (Nginx)
 By default, the fully qualified hostnames are constructed using the CNAMEs above appended with the base `domain`.
@@ -612,16 +622,18 @@ By default, the fully qualified hostnames are constructed using the CNAMEs above
 | `hostname_landing` | `landing_page_cname + "." + domain` (or `domain` if empty) |
 | `hostname_ldap` | `cname_ldap + "." + domain` |
 | `hostname_keycloak`| `cname_sso + "." + domain` |
+| `hostname_mgr`| `cname_mgr + "." + domain` (core-web vhost; `redirect_uri` is `https://<hostname_mgr>/oidc/callback`) |
 
 ## 5. Security Contexts & Features
 Toggle features and control system-level UNIX isolation mapping.
 
 ### `install_ldap`
-**Description:** Toggles whether the OpenLDAP container is deployed.
+**Description:** Toggles whether the 389 Directory Server (`dirsrv`) container and the nginx LDAP/LDAPS stream listeners are deployed.
 
-**Default Value:** `false`
+**Default Value:** `true`
 
 **Effected Jinja Templates:**
+- `nginx/nginx.conf.j2`
 - `vars.yaml.j2`
 
 ### `install_keycloak`
@@ -633,6 +645,27 @@ Toggle features and control system-level UNIX isolation mapping.
 - `nginx/nginx.conf.j2`
 - `nginx/www/landing/index.html.j2`
 - `vars.yaml.j2`
+
+### `install_coreweb`
+**Description:** Deploys the core-web management UI (systemd `coreweb`, nginx vhost `hostname_mgr`, `mgr` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [coreweb.md](coreweb.md).
+
+**Default Value:** `true` (effective only with Keycloak)
+
+**Effected Jinja Templates:**
+- `nginx/docker-compose.yml.j2`
+- `nginx/nginx.conf.j2`
+- `vars.yaml.j2`
+
+### core-web Settings
+| Variable | Default Value | Description |
+|----------|---------------|-------------|
+| `coreweb_realm` | `domain` | Keycloak realm used for login and created/configured by `keycloak_bootstrap.py` |
+| `coreweb_admin_role` | `"core-admin"` | Realm role required to use core-web |
+| `coreweb_admin_group` | `"admins"` | LDAP/Keycloak group granted `coreweb_admin_role` |
+| `coreweb_session_idle` | `900` | Session idle timeout (seconds) |
+| `coreweb_session_max` | `28800` | Absolute session lifetime (seconds) |
+
+`coreweb_realm`, `coreweb_admin_role` and `coreweb_admin_group` are rendered into `vars.yaml`; the session timeouts are read only by `coreweb/coreweb.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `coreweb_oidc_secret` is generated into `core-secrets.yml`.
 
 ### `service_users`
 **Description:** Dictionary mapping container names to UID/GID objects for setting permissions.
@@ -663,7 +696,7 @@ Toggle features and control system-level UNIX isolation mapping.
 ```yaml
 service_users:
   bind:     { uid: 53,  gid: 53 }
-  ldap:     { uid: 389, gid: 389 }
+  ldap:     { uid: 911, gid: 911 }
   nginx:    { uid: 443, gid: 443 }
   step:     { uid: 135, gid: 135 }
   keycloak: { uid: 900, gid: 0 }
@@ -676,34 +709,34 @@ service_dirs:
   - { folder: nginx,    owner: nginx }
   - { folder: bind9,    owner: bind }
   - { folder: stepca,   owner: step }
-  - { folder: openldap, owner: ldap }
+  - { folder: dirsrv,   owner: ldap }
   - { folder: keycloak, owner: keycloak }
   - { folder: postgres, owner: postgres }
+  - { folder: coreweb,  owner: root }
 ```
+Built-in folders always come from these defaults (a legacy `openldap` entry is dropped); user-added folders are kept.
 
-## 6. OpenLDAP Specifics
-If `install_ldap` is enabled, these settings govern the directory structure.
+## 6. 389 Directory Server (LDAP) Specifics
+If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `core/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 
 ### `ldap_base_dn`
-**Description:** Base distinguished name, automatically computed from `domain`.
+**Description:** Base distinguished name (389-DS suffix), automatically computed from `domain`.
 
 **Default Value:** `dc=lan,dc=example,dc=com`
 
 **Effected Jinja Templates:**
-- `openldap/02-ous.ldif.j2`
-- `openldap/03-groups.ldif.j2`
-- `openldap/05-admins.ldif.j2`
-- `openldap/06-acl.ldif.j2`
-- `openldap/base.ldif.j2`
-- `openldap/docker-compose.yml.j2`
+- `dirsrv/docker-compose.yml.j2`
+- `dirsrv/seed/10-tree.ldif.j2`
+- `dirsrv/seed/20-accounts.ldif.j2`
+- `dirsrv/seed/30-aci.ldif.j2`
 
 ### `ldap_groups`
-**Description:** Defines the security groups to pre-provision in LDAP.
+**Description:** Defines the security groups to pre-provision in LDAP (created as `groupOfNames` + `posixGroup` under `ou=groups`).
 
 **Default Value:** `[{name: admins, gidNumber: 1100, permissions: [read, write, modify]}, ...]`
 
 **Effected Jinja Templates:**
-- `openldap/03-groups.ldif.j2`
+- `dirsrv/seed/10-tree.ldif.j2`
 - `vars.yaml.j2`
 
 ### `ldap_organizational_units`
@@ -712,8 +745,29 @@ If `install_ldap` is enabled, these settings govern the directory structure.
 **Default Value:** `[{name: accounts, description: User Accounts}, ...]`
 
 **Effected Jinja Templates:**
-- `openldap/02-ous.ldif.j2`
+- `dirsrv/seed/10-tree.ldif.j2`
 - `vars.yaml.j2`
+
+### Directory Policy
+| Variable | Default Value | Template |
+|----------|---------------|----------|
+| `ldap_password_min_length` | `12` | `dirsrv/seed/00-config.ldif.j2` |
+| `ldap_lockout_max_failures` | `5` | `dirsrv/seed/00-config.ldif.j2` |
+| `ldap_lockout_duration` | `900` (seconds) | `dirsrv/seed/00-config.ldif.j2` |
+| `dirsrv_errorlog_level` | `8192` | `dirsrv/docker-compose.yml.j2` |
+
+### Role Accounts
+Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated into `core-secrets.yml` (there is no shared default password):
+
+| Account | Secret |
+|---------|--------|
+| `cn=super_admin` | `ldap_super_admin_password` |
+| `cn=group_admin` | `ldap_group_admin_password` |
+| `cn=user_creator_admin` | `ldap_user_creator_password` |
+| `cn=user_modifier_admin` | `ldap_user_modifier_password` |
+| `cn=keycloak_admin` | `ldap_keycloak_password` |
+
+`cn=Directory Manager` uses `ldap_admin_password`.
 
 
 **Example LDAP Configuration (`custom-vars.yaml`):**

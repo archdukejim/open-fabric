@@ -214,12 +214,13 @@ run_service_certs() {
     [ -f "$vars_file" ] || { err "Live vars not found: ${vars_file}. Is core-template deployed?"; exit 1; }
 
     # Read runtime config from live vars.yaml (all values already resolved)
-    local deploy_base image_stepca step_uid step_gid nginx_uid nginx_gid bind_uid bind_gid
+    local deploy_base image_stepca step_uid step_gid nginx_uid nginx_gid bind_uid bind_gid ldap_uid ldap_gid install_ldap
     local domain hostname_bind9 hostname_ldap hostname_stepca hostname_landing cert_service_days
     IFS=' ' read -r deploy_base image_stepca \
                     step_uid  step_gid \
                     nginx_uid nginx_gid \
                     bind_uid  bind_gid \
+                    ldap_uid  ldap_gid install_ldap \
                     domain \
                     hostname_bind9 hostname_ldap hostname_stepca hostname_landing \
                     cert_service_days \
@@ -234,6 +235,7 @@ print(
     su['step']['uid'],  su['step']['gid'],
     su['nginx']['uid'], su['nginx']['gid'],
     su['bind']['uid'],  su['bind']['gid'],
+    su['ldap']['uid'],  su['ldap']['gid'], str(bool(v.get('install_ldap', True))).lower(),
     v['domain'],
     v['hostname_bind9'],
     v['hostname_ldap'],
@@ -310,7 +312,20 @@ PYEOF
     }
 
     # ---- Mint + install each service cert ----
-    _mint_svc "$hostname_ldap";   _install_nginx_cert "$hostname_ldap"
+    if [ "$install_ldap" = "true" ]; then
+        # 389-DS imports /data/tls on start; restart it to pick up the new cert.
+        local ldap_safe; ldap_safe=$(echo "$hostname_ldap" | tr './ ' '---')
+        local ldap_tls="${deploy_base}/dirsrv/data/tls"
+        _mint_svc "$hostname_ldap"
+        install -d -m 0750 -o "$ldap_uid" -g "$ldap_gid" "$ldap_tls" "$ldap_tls/ca"
+        install -m 0644 -o "$ldap_uid" -g "$ldap_gid" "${artifacts}/${ldap_safe}.crt" "${ldap_tls}/server.crt"
+        install -m 0600 -o "$ldap_uid" -g "$ldap_gid" "${artifacts}/${ldap_safe}.key" "${ldap_tls}/server.key"
+        install -m 0644 -o "$ldap_uid" -g "$ldap_gid" "${stepca_data}/certs/root_ca.crt" "${ldap_tls}/ca/root_ca.crt"
+        install -m 0644 -o "$ldap_uid" -g "$ldap_gid" "${stepca_data}/certs/intermediate_ca.crt" "${ldap_tls}/ca/intermediate_ca.crt"
+        rm -f "${artifacts}/${ldap_safe}.crt" "${artifacts}/${ldap_safe}.key"
+        ok "  Installed ${hostname_ldap} → ${ldap_tls}"
+        if systemctl is-active --quiet ldap; then systemctl restart ldap; fi
+    fi
     _mint_svc "$hostname_stepca"; _install_nginx_cert "$hostname_stepca"
     _mint_svc "$hostname_landing";  _install_nginx_cert "$hostname_landing"
 

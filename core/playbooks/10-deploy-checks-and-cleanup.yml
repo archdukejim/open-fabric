@@ -133,41 +133,88 @@
             msg: "Service logs exported to /tmp/core-deploy-logs/"
 
         # ----------------------------------------------------------------
-        # 10f — Validate LDAP Deployment
+        # 10f — Validate 389 Directory Server
         # ----------------------------------------------------------------
-        - name: Wait for OpenLDAP container to be healthy
-          when: install_ldap | default(false) | bool
+        - name: Wait for 389-DS container to be healthy
+          when: install_ldap | default(true) | bool
           ansible.builtin.command:
-            cmd: "docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' openldap"
+            cmd: "docker inspect --format='{{ '{{' }}.State.Health.Status{{ '}}' }}' dirsrv"
           register: ldap_health
           until: ldap_health.stdout == 'healthy'
-          retries: 12
+          retries: 24
           delay: 5
           changed_when: false
 
-        - name: Query LDAP as super_admin to verify privileges and existence
-          when: install_ldap | default(false) | bool
+        # Passwords travel via environment variables, never argv.
+        - name: Verify LDAP role accounts authenticate with their generated secrets
+          when: install_ldap | default(true) | bool
           ansible.builtin.command:
             cmd: >
-              docker exec openldap ldapwhoami -x
-              -D "cn=super_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}"
-              -w "initialpassword123"
-              -H ldapi:///
-          register: ldap_query_super_admin
+              docker exec -e CHECK_DN -e CHECK_PW dirsrv python3 -c
+              "import ldap, os; c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket');
+              c.simple_bind_s(os.environ['CHECK_DN'], os.environ['CHECK_PW']); print(c.whoami_s())"
+          environment:
+            CHECK_DN: "cn={{ item.name }},ou=admins,ou=accounts,{{ ldap_base_dn }}"
+            CHECK_PW: "{{ item.pw }}"
+          loop:
+            - { name: super_admin, pw: "{{ ldap_super_admin_password }}" }
+            - { name: group_admin, pw: "{{ ldap_group_admin_password }}" }
+            - { name: keycloak_admin, pw: "{{ ldap_keycloak_password }}" }
+          loop_control:
+            label: "{{ item.name }}"
+          no_log: true
+          register: ldap_whoami
           changed_when: false
-          failed_when: "'dn:cn=super_admin' not in ldap_query_super_admin.stdout"
+          failed_when: "('dn: cn=' ~ item.name) not in ldap_whoami.stdout"
 
-        - name: Query LDAP as group_admin to verify privileges and existence
-          when: install_ldap | default(false) | bool
+        - name: Verify 389-DS refuses simple binds without TLS
+          when: install_ldap | default(true) | bool
           ansible.builtin.command:
             cmd: >
-              docker exec openldap ldapwhoami -x
-              -D "cn=group_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}"
-              -w "initialpassword123"
-              -H ldapi:///
-          register: ldap_query_group_admin
+              docker exec -e CHECK_DN -e CHECK_PW dirsrv python3 -c
+              "import ldap, os, sys; c = ldap.initialize('ldap://127.0.0.1:3389');
+              c.simple_bind_s(os.environ['CHECK_DN'], os.environ['CHECK_PW']); sys.exit('plaintext bind accepted')"
+          environment:
+            CHECK_DN: "cn=super_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}"
+            CHECK_PW: "{{ ldap_super_admin_password }}"
+          no_log: true
+          register: ldap_plain
           changed_when: false
-          failed_when: "'dn:cn=group_admin' not in ldap_query_group_admin.stdout"
+          failed_when: "'plaintext bind accepted' in ldap_plain.stderr or ldap_plain.rc == 0"
+
+        - name: Verify 389-DS serves the Step-CA certificate on LDAPS
+          when: install_ldap | default(true) | bool
+          ansible.builtin.shell:
+            cmd: >
+              echo | openssl s_client -connect {{ ip_ldap }}:3636 -servername {{ hostname_ldap }}
+              -verify_hostname {{ hostname_ldap }} -CAfile {{ deploy_base_dir }}/stepca/data/certs/root_ca.crt 2>/dev/null
+              | grep -q 'Verify return code: 0 (ok)'
+          changed_when: false
+
+        # ----------------------------------------------------------------
+        # 10f2 — Validate core-web is up and refuses requests without a
+        #        client certificate
+        # ----------------------------------------------------------------
+        - name: Verify core-web socket exists
+          when: install_coreweb | default(false) | bool
+          ansible.builtin.stat:
+            path: "{{ deploy_base_dir }}/coreweb/run/web.sock"
+          register: coreweb_sock
+          until: coreweb_sock.stat.exists | default(false)
+          retries: 12
+          delay: 5
+          failed_when: not (coreweb_sock.stat.exists | default(false))
+
+        - name: Verify core-web rejects connections without a client certificate
+          when: install_coreweb | default(false) | bool
+          ansible.builtin.command:
+            cmd: >
+              curl -s -o /dev/null -w '%{http_code}'
+              --cacert {{ deploy_base_dir }}/stepca/data/certs/root_ca.crt
+              --resolve {{ hostname_mgr }}:443:{{ host_ip }} https://{{ hostname_mgr }}/
+          register: coreweb_nocert
+          changed_when: false
+          failed_when: coreweb_nocert.stdout != '400'
 
         # ----------------------------------------------------------------
         # 10g — Cleanup and Teardown
@@ -182,6 +229,7 @@
             state: stopped
           loop:
             - nginx
+            - coreweb
             - keycloak
             - postgres
             - ldap

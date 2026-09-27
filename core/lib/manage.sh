@@ -17,6 +17,9 @@ set -euo pipefail
 #   --dns-record         Add a DNS record to vars.yaml and reload BIND9.
 #   --remove-dns-record  Remove a DNS record from vars.yaml and reload BIND9.
 #   --render-jinja <j2>  Render a Jinja2 template using core-template vars.
+#   --client-cert <user> Mint a core-web client certificate (.p12) for a Keycloak user.
+#   --keycloak-sync      Re-run the idempotent Keycloak configuration (federation, core-web client, MFA).
+#   --migrate-ldap [dir] One-time import of users/groups from the old OpenLDAP data dir into 389-DS.
 #
 # Common flags:
 #   --apply            Apply without interactive prompting (uses existing vars.yaml)
@@ -68,6 +71,8 @@ CERT_SIZE="4096"
 RENDER_TEMPLATE=""
 RENDER_VARS=""
 RENDER_OUTPUT=""
+CLIENT_CERT_USER=""
+MIGRATE_DIR=""
 
 ARCHIVE_DIR="$TARGET_BASE/core/archive"
 
@@ -89,6 +94,9 @@ for arg in "${ARGS[@]}"; do
         --interactive)  MODE="interactive" ;;
         --version)      MODE="version" ;;
         --update-containers) MODE="update-containers" ;;
+        --client-cert)  MODE="client-cert" ;;
+        --keycloak-sync) MODE="keycloak-sync" ;;
+        --migrate-ldap) MODE="migrate-ldap" ;;
         --apply)        [ -z "$MODE" ] && MODE="apply" ;;
     esac
 done
@@ -106,6 +114,9 @@ while [[ $# -gt 0 ]]; do
         --help|-h)    usage ;;
         --version)    shift ;;
         --tsig-keys|--list-tsig|--mint-certs|--service-cert|--dns-record|--remove-dns-record|--print|--interactive|--update-containers)  shift ;;
+        --client-cert)  CLIENT_CERT_USER="${2:-}"; shift; [ -n "$CLIENT_CERT_USER" ] && shift || true ;;
+        --migrate-ldap) MIGRATE_DIR="${2:-}"; shift; [ -n "$MIGRATE_DIR" ] && shift || true ;;
+        --keycloak-sync) shift ;;
         --remove-tsig)  REMOVE_TSIG_KEY="${2:-}"; shift; [ -n "$REMOVE_TSIG_KEY" ] && shift || true ;;
         --render-jinja) RENDER_TEMPLATE="${2:-}"; shift; [ -n "$RENDER_TEMPLATE" ] && shift || true ;;
         --vars)         RENDER_VARS="${2:-}"; shift; [ -n "$RENDER_VARS" ] && shift || true ;;
@@ -257,6 +268,9 @@ case "$MODE" in
     interactive)  python3 "${CORE_DIR}/lib/interactive.py" --interactive ;;
     apply)        python3 "${CORE_DIR}/lib/interactive.py" --apply ;;
     update-containers) python3 "${CORE_DIR}/lib/interactive.py" --update-containers ;;
-    version)      echo "core-mgr version 1.4.0"
-                  echo "Last Modified: 2026-05-01T03:06:00Z" ;;
+    client-cert)  do_client_cert ;;
+    keycloak-sync) python3 "${CORE_DIR}/lib/keycloak_bootstrap.py" --vars "$VARS_FILE" --secrets "${CORE_DIR}/config/core-secrets.yml" ;;
+    migrate-ldap) bash "${CORE_DIR}/lib/ldap_migrate.sh" ${MIGRATE_DIR:+"$MIGRATE_DIR"} ;;
+    version)      echo "core-mgr version $(cat "$CORE_DIR/VERSION" 2>/dev/null || echo unknown)"
+                  cat "$CORE_DIR/BUILD" 2>/dev/null || true ;;
 esac

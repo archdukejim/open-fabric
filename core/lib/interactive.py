@@ -10,6 +10,8 @@ CORE_DIR = os.path.dirname(SCRIPT_DIR)
 PLAYBOOKS_DIR = os.path.join(CORE_DIR, "playbooks")
 CUSTOM_VARS_FILE = os.path.abspath(os.path.join(CORE_DIR, "config/vars.yaml"))
 DEPLOYED_VARS_FILE = "/opt/core/config/vars.yaml"
+DEPLOY_BASE_DIR = os.path.dirname(CORE_DIR)
+BIND_DATA_DIR = os.path.join(DEPLOY_BASE_DIR, "bind9", "data")
 LINK_VARS_FILE = os.environ.get("LINK_VARS_PATH", os.path.abspath(os.path.join(CORE_DIR, "config/link-vars.yaml")))
 if not os.path.exists(LINK_VARS_FILE) and os.path.exists(os.path.join(os.path.dirname(CORE_DIR), "link-vars.yaml")):
     LINK_VARS_FILE = os.path.join(os.path.dirname(CORE_DIR), "link-vars.yaml")
@@ -37,7 +39,7 @@ WARNED_KEYS = {
 }
 
 CATEGORIES = [
-    ("Docker & Services", ["host_ram_capacity", "compose_file", "project_containers", "nginx_backend_ldap", "nginx_backend_stepca", "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_ldap", "ip_keycloak", "ip_postgres", "image_nginx", "image_bind9", "image_stepca", "image_openldap", "image_keycloak", "image_postgres", "cname_ca", "landing_page_cname", "cname_dns", "cname_ldap", "cname_sso", "hostname_nginx", "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_ldap", "hostname_keycloak"])
+    ("Docker & Services", ["host_ram_capacity", "compose_file", "project_containers", "nginx_backend_ldap", "nginx_backend_stepca", "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_ldap", "ip_keycloak", "ip_postgres", "image_nginx", "image_bind9", "image_stepca", "image_dirsrv", "image_keycloak", "image_postgres", "cname_ca", "landing_page_cname", "cname_dns", "cname_ldap", "cname_sso", "cname_mgr", "hostname_nginx", "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_ldap", "hostname_keycloak", "hostname_mgr"])
 ]
 
 IMPACT_MAP = {
@@ -49,6 +51,7 @@ IMPACT_MAP = {
     "cert_service_days": ["nginx", "bind9", "stepca"],
     "install_ldap": ["ldap", "nginx"],
     "install_keycloak": ["keycloak", "postgres", "nginx"],
+    "install_coreweb": ["coreweb", "nginx"],
     "dns_server": ["bind9"],
     "use_host_dns": ["nginx"],
     "bind_dns_port": ["bind9"],
@@ -68,7 +71,7 @@ def map_service(key):
         return IMPACT_MAP[key]
     if key.startswith("image_"):
         img = key.replace("image_", "")
-        if img == "openldap": return ["ldap"]
+        if img == "dirsrv": return ["ldap"]
         if img == "stepca": return ["stepca"]
         return [img]
     if key.startswith("cname_") or key.startswith("hostname_"):
@@ -129,6 +132,42 @@ def print_vars():
     print("")
 
 
+def format_record_value(rtype, record):
+    """Human-readable right-hand side of a DNS record, matching zone.j2."""
+    if rtype in ('A', 'AAAA'):
+        return str(record.get('ip', ''))
+    if rtype == 'CNAME':
+        return str(record.get('canonical', ''))
+    if rtype == 'TXT':
+        return f'"{record.get("text", "")}"'
+    if rtype == 'MX':
+        return f"{record.get('priority', '')} {record.get('exchange', '')}"
+    if rtype == 'SRV':
+        return f"{record.get('priority', '')} {record.get('weight', '')} {record.get('port', '')} {record.get('target', '')}"
+    return str(record.get('value', record.get('target', '')))
+
+def zone_sync_status(zone):
+    """Compare the serial BIND is serving with the serial in the deployed zone file."""
+    import re
+    file_serial = None
+    zone_file = os.path.join(BIND_DATA_DIR, f"db.{zone}")
+    if os.path.exists(zone_file):
+        with open(zone_file) as f:
+            m = re.search(r"^\s*(\d+)\s*;\s*Serial", f.read(), re.MULTILINE)
+            file_serial = m.group(1) if m else None
+    try:
+        res = subprocess.run(["docker", "exec", "-u", "bind", "bind9", "rndc", "zonestatus", zone],
+                             capture_output=True, text=True, timeout=10)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return f"{YELLOW}? BIND9 not reachable{NC}"
+    m = re.search(r"^serial:\s*(\d+)", res.stdout, re.MULTILINE)
+    if res.returncode != 0 or not m:
+        return f"{RED}NOT LOADED in BIND9{NC}"
+    live = m.group(1)
+    if file_serial and int(live) < int(file_serial):
+        return f"{YELLOW}OUT OF SYNC (serving serial {live}, file has {file_serial}; run 'l'){NC}"
+    return f"{GREEN}IN SYNC (serial {live}){NC}"
+
 def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
     if zone_key not in dns_data:
         dns_data[zone_key] = {}
@@ -139,11 +178,7 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
         os.system('clear')
         print(f"{BOLD}--- DNS Zone: {disp_zone} ---{NC}\n")
         
-        jnl_path = f"/opt/core/bind9/data/db.{disp_zone}.jnl"
-        if os.path.exists(jnl_path):
-            print(f"  {YELLOW}🟡 OUT OF SYNC (Journal exists - updates pending){NC}")
-        else:
-            print(f"  {GREEN}🟢 IN SYNC (No active journal){NC}")
+        print(f"  {zone_sync_status(disp_zone)}")
         print()
         
         record_types = [k for k in zone_data.keys() if k != 'zone_authority' and isinstance(zone_data[k], list)]
@@ -152,9 +187,8 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
         record_map = {}
         for rtype in record_types:
             for ridx, record in enumerate(zone_data[rtype]):
-                name = record.get('name', '')
-                val = record.get('ip', record.get('value', record.get('target', '')))
-                print(f"  {idx}) [{rtype}] {name} -> {val}")
+                name = record.get('name') or f"{RED}(missing name){NC}"
+                print(f"  {idx}) [{rtype}] {name} -> {format_record_value(rtype, record)}")
                 record_map[idx] = (rtype, ridx, record)
                 idx += 1
                 
@@ -181,6 +215,10 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
             rtype = input("Record type (A, CNAME, TXT, MX, etc): ").strip().upper()
             if rtype:
                 name = input("Record name (e.g. '@', 'www'): ").strip()
+                if not name:
+                    print(f"{RED}Record name is required.{NC}")
+                    input("Press Enter to continue...")
+                    continue
                 if rtype == 'A' or rtype == 'AAAA':
                     val = input("IP Address: ").strip()
                     new_rec = {'name': name, 'ip': val}
@@ -210,32 +248,27 @@ def edit_dns_zone(full_data, dns_data, zone_key, domain_var):
                 save_yaml(CUSTOM_VARS_FILE, full_data)
                 audit_log("dns", "None", f"Added {rtype} {name}", "MODIFIED")
         elif choice == 'l':
-            print(f"\n{BLUE}Freezing zone {disp_zone}...{NC}")
-            subprocess.run(f"docker exec -u bind bind9 rndc freeze {disp_zone}", shell=True)
-            print(f"{BLUE}Applying deployment to render zone...{NC}")
-            import deploy
+            # deploy.py freezes/thaws each changed zone itself.
             try:
-                deploy.apply_deployment()
-            except Exception as e:
-                print(f"{RED}Render failed: {e}{NC}")
-            print(f"{BLUE}Thawing zone {disp_zone}...{NC}")
-            subprocess.run(f"docker exec -u bind bind9 rndc thaw {disp_zone}", shell=True)
-            print(f"{GREEN}Live update complete.{NC}")
+                apply_mode()
+            except SystemExit:
+                pass
             input("Press Enter to continue...")
         elif choice == 'f':
             print(f"\n{YELLOW}WARNING: This will delete the journal file, overwrite the zone data, and restart the BIND9 container.{NC}")
             confirm = input("Type 'force' to confirm: ").strip().lower()
             if confirm == 'force':
-                jnl = f"/opt/core/bind9/data/db.{disp_zone}.jnl"
-                if os.path.exists(jnl):
-                    os.remove(jnl)
-                    print(f"Removed {jnl}")
+                subprocess.run("systemctl stop bind9", shell=True)
+                for suffix in ('', '.jnl'):
+                    path = os.path.join(BIND_DATA_DIR, f"db.{disp_zone}{suffix}")
+                    if os.path.exists(path):
+                        os.remove(path)
+                        print(f"Removed {path}")
                 print(f"{BLUE}Applying deployment to recreate zone...{NC}")
-                import deploy
                 try:
-                    deploy.apply_deployment()
-                except Exception as e:
-                    print(f"{RED}Render failed: {e}{NC}")
+                    apply_mode()
+                except SystemExit:
+                    pass
                 print(f"{BLUE}Restarting BIND9 container...{NC}")
                 subprocess.run("systemctl restart bind9", shell=True)
                 print(f"{GREEN}Force update complete.{NC}")
@@ -714,7 +747,7 @@ def apply_mode():
     
     os.environ["CUSTOM_VARS_PATH"] = CUSTOM_VARS_FILE
     os.environ["SECRETS_FILE_OVERRIDE"] = os.path.join(CORE_DIR, 'config', 'core-secrets.yml')
-    os.environ["DEPLOY_BASE_DIR"] = os.path.dirname(CORE_DIR)
+    os.environ["DEPLOY_BASE_DIR"] = DEPLOY_BASE_DIR
     
     try:
         restarted_services = apply_deployment()
@@ -772,7 +805,7 @@ def update_containers_mode():
         {'service': 'nginx', 'folder': 'nginx'},
         {'service': 'bind9', 'folder': 'bind9'},
         {'service': 'stepca', 'folder': 'stepca'},
-        {'service': 'ldap', 'folder': 'openldap'},
+        {'service': 'ldap', 'folder': 'dirsrv'},
         {'service': 'postgres', 'folder': 'postgres'},
         {'service': 'keycloak', 'folder': 'keycloak'}
     ]
@@ -785,9 +818,11 @@ def update_containers_mode():
     for svc in sys_svcs:
         dc_path = f"/opt/core/{svc['folder']}/docker-compose.yml"
         if os.path.exists(dc_path):
-            print(f"\n{BLUE}Pulling latest images for {svc['service']}...{NC}")
+            # dirsrv is built locally: rebuild on a fresh Debian base instead of pulling.
+            action = ["build", "--pull"] if svc['folder'] == 'dirsrv' else ["pull"]
+            print(f"\n{BLUE}Updating images for {svc['service']} ({' '.join(action)})...{NC}")
             try:
-                res = subprocess.run(["docker", "compose", "-f", dc_path, "pull"], timeout=300)
+                res = subprocess.run(["docker", "compose", "-f", dc_path] + action, timeout=900)
                 if res.returncode == 0:
                     print(f"{GREEN}Restarting {svc['service']} to apply updates...{NC}")
                     subprocess.run(["systemctl", "restart", svc['service']], timeout=get_svc_timeout(svc['service']))

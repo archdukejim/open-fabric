@@ -300,3 +300,51 @@ do_service_cert() {
     ok "Service certificates re-issued."
     info "Reload nginx to apply: docker exec nginx nginx -s reload"
 }
+
+# -----------------------------------------------------------------------
+# do_client_cert <username>
+# Mint a core-web client certificate. The CN must equal the user's Keycloak
+# username — core-web rejects a login whose certificate CN differs.
+# Produces <username>-core-mgr.p12 (password-protected) for browser import.
+# -----------------------------------------------------------------------
+do_client_cert() {
+    local user="$CLIENT_CERT_USER"
+    echo -e "${BOLD}core-template client-cert${NC}"
+    echo ""
+    [[ "$user" =~ ^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$ ]] || {
+        err "Usage: core-mgr --client-cert <keycloak-username>"; exit 1; }
+
+    local deploy_base target_dir
+    deploy_base=$(python3 -c "import yaml; print(yaml.safe_load(open('$VARS_FILE'))['deploy_base_dir'])")
+    if [ -n "${SUDO_USER:-}" ]; then
+        target_dir=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    else
+        target_dir="$HOME"
+    fi
+
+    _mint_extra_cert "{\"cn\": \"${user}\", \"days\": ${CERT_DAYS:-365}, \"kty\": \"RSA\", \"size\": 3072}"
+
+    local safe; safe=$(echo "$user" | tr './ ' '---')
+    local key="${target_dir}/${safe}.key" crt="${target_dir}/${safe}.crt"
+    local p12="${target_dir}/${safe}-core-mgr.p12"
+    local chain; chain=$(mktemp)
+    cat "${deploy_base}/stepca/data/certs/intermediate_ca.crt" "${deploy_base}/stepca/data/certs/root_ca.crt" > "$chain"
+
+    echo ""
+    info "Choose a password to protect the .p12 bundle (asked for on browser import):"
+    openssl pkcs12 -export -in "$crt" -inkey "$key" -certfile "$chain" \
+        -name "${user} (core-mgr)" -keypbe AES-256-CBC -certpbe AES-256-CBC -macalg sha256 \
+        -out "$p12"
+    rm -f "$chain"
+    # The .p12 is now the only copy of the private key.
+    shred -u "$key" 2>/dev/null || rm -f "$key"
+
+    if [ -n "${SUDO_USER:-}" ]; then
+        chown "${SUDO_USER}:$(id -g "$SUDO_USER")" "$p12"
+    fi
+    chmod 0600 "$p12"
+    echo ""
+    ok "Client certificate for '${user}': ${p12}"
+    info "Import it into your browser, then open https://$(python3 -c "import yaml; print(yaml.safe_load(open('$VARS_FILE')).get('hostname_mgr',''))")/"
+    info "The Keycloak user '${user}' must hold the core-admin role (members of the LDAP 'admins' group do)."
+}

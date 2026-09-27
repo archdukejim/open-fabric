@@ -25,6 +25,10 @@ services:
       - {{ deploy_base_dir }}/nginx/config/conf.d:/etc/nginx/conf.d:ro
       - {{ deploy_base_dir }}/nginx/certs:/etc/nginx/certs:ro
       - {{ deploy_base_dir }}/nginx/www:/srv/www:ro
+{% if install_coreweb | default(false) | bool %}
+      # core-web's unix socket (dir is root:nginx 0750, socket 0660)
+      - {{ deploy_base_dir }}/coreweb/run:/srv/coreweb:ro
+{% endif %}
     networks:
       core_net:
         ipv4_address: "{{ ip_nginx }}"

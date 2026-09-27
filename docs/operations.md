@@ -2,7 +2,7 @@
 
 ## Live Configuration Changes (`core-mgr`)
 
-Use `core-mgr` (the global wrapper powered by the interactive Python engine) for post-install changes to DNS records, TSIG keys, certificates, and infrastructure variables — no full redeploy needed. Run it **on the target machine** (requires root / sudo).
+Use `core-mgr` (the global wrapper powered by the interactive Python engine) for post-install changes to DNS records, TSIG keys, certificates, and infrastructure variables — no full redeploy needed. Run it **on the target machine** (requires root / sudo). The same DNS and apply operations are also available in the browser through core-web — see [coreweb.md](coreweb.md).
 
 ### Table of Contents
 - [Live Configuration Management (`core-mgr`)](#live-configuration-management-core-mgr)
@@ -10,11 +10,16 @@ Use `core-mgr` (the global wrapper powered by the interactive Python engine) for
   - [`--print`](#--print)
   - [`--apply`](#--apply)
   - [`--update-containers`](#--update-containers)
+  - [`--version`](#--version)
+  - [`--client-cert <user>`](#--client-cert-user)
+  - [`--keycloak-sync`](#--keycloak-sync)
+  - [`--migrate-ldap [old_dir]`](#--migrate-ldap-old_dir)
 - [Interactive Menu Categories](#interactive-menu-categories)
   - [DNS Configuration](#dns-configuration)
   - [Mint Certificates](#mint-certificates)
   - [TSIG Keys](#tsig-keys)
   - [Landing Page Links](#landing-page-links)
+- [Migrating from OpenLDAP](#migrating-from-openldap)
 - [Ansible Tags Reference (Initial Install Only)](#ansible-tags-reference-initial-install-only)
 - [Service Ports](#service-ports)
 
@@ -43,18 +48,49 @@ Apply any manual changes made directly to `vars.yaml`. `core-mgr` leverages the 
 
 **Intelligent Restarts:** `deploy.py` tracks exact file modifications.
 - If only `nginx/www/...` templates change, Nginx natively live-reads the files. No restart or reload is performed.
-- If `bind9` or `nginx` configurations change, they are issued a seamless `rndc reload` or `nginx -s reload`.
-- A full container restart (`docker compose down/up` via systemctl) is ONLY triggered if immutable service definitions (like `docker-compose.yml` or the systemd `.service` wrapper) or service-specific config files (like OpenLDAP `.ldif` seeds or StepCA templates) actually change their rendered contents.
+- If `bind9` configuration changes, BIND9 gets `rndc reconfig`; if `nginx` configuration changes, `nginx -s reload`.
+- **DNS zones** are compared ignoring the SOA serial, so only zones whose records actually changed are touched. Forward zones are dynamic (they carry an `update-policy`), so each changed zone is updated with `rndc freeze` → swap the zone file → delete the stale `.jnl` → `rndc thaw` (static zones get `rndc reload <zone>`). Non-disruptive; dynamic updates made since the last apply (e.g. ACME TXT records) are discarded for that zone.
+- If a **389-DS seed file** (`/opt/dirsrv/seed/*.ldif`) changes, it is applied live with `dirsrv.sh seed`; the `ldap` service is restarted only if `cn=config` changed.
+- If the **core-web** config or unit changes, `coreweb` is restarted (queued, so an apply started from core-web completes).
+- A full container restart (`docker compose down/up` via systemctl) is ONLY triggered if immutable service definitions (like `docker-compose.yml` or the systemd `.service` wrapper) or service-specific config files (like StepCA templates) actually change their rendered contents.
 
 ```bash
 sudo core-mgr --apply
 ```
 
 #### `--update-containers`
-Pulls the latest images for all deployed containers and recreates them. This operation is protected by a 300-second timeout to prevent indefinite hangs if the upstream registries are slow or unreachable.
+Pulls the latest images for all deployed containers and recreates them. The 389-DS image is built locally, so for `dirsrv` this runs `docker compose build --pull` instead — a fresh `debian:trixie-slim` base plus the current Debian `389-ds-base` packages, which is how its security updates arrive. Each step is protected by a timeout (pull 300 s, build 900 s) to prevent indefinite hangs if registries or mirrors are slow.
 
 ```bash
 sudo core-mgr --update-containers
+```
+
+#### `--version`
+Print the version from `core/VERSION` plus the build stamp in `core/BUILD` (git commit, `-dirty` if the tree had local changes, and UTC build time — written by `setup.sh` on each run).
+
+```bash
+sudo core-mgr --version
+```
+
+#### `--client-cert <user>`
+Mint a core-web admin client certificate. The CN is `<user>` and **must equal the Keycloak username**. Issued offline by the Step-CA intermediate (RSA 3072, 365 days), bundled with the chain into a password-protected `~/<user>-core-mgr.p12` (home of `SUDO_USER`, mode `0600`). The private key exists only inside the `.p12`. See [coreweb.md](coreweb.md).
+
+```bash
+sudo core-mgr --client-cert jdoe
+```
+
+#### `--keycloak-sync`
+Re-run `keycloak_bootstrap.py`: realm, LDAP federation to 389-DS, group mapper and sync, `core-admin` role → `admins` group, the `core-mgr` OIDC client and its TOTP flow. Idempotent — use after changing `coreweb_*` vars, after an LDAP migration, or to repair drift made in the admin console.
+
+```bash
+sudo core-mgr --keycloak-sync
+```
+
+#### `--migrate-ldap [old_dir]`
+One-time import of an old OpenLDAP deployment into 389-DS (default `old_dir`: `/opt/openldap`). See [Migrating from OpenLDAP](#migrating-from-openldap).
+
+```bash
+sudo core-mgr --migrate-ldap
 ```
 
 ---
@@ -68,13 +104,16 @@ All granular modifications are now managed within the unified `--interactive` me
 Add, modify, or remove records in BIND9 zones without a full redeploy via the interactive menu. Supported record types include `A`, `AAAA`, `CNAME`, `MX`, `TXT`, and `SRV`.
 
 **DNS Sync Status & Actions:**
-When entering a specific zone, the menu will display its current journal status:
-- `🟢 IN SYNC (No active journal)`: Zone data file matches live state.
-- `🟡 OUT OF SYNC (Journal exists - updates pending)`: Dynamic updates have occurred and are stored in `db.<zone>.jnl`. Modifying the `db.<zone>` file directly in this state can cause conflicts.
+When entering a specific zone, the menu compares the serial BIND9 is serving (`rndc zonestatus`) with the serial in the deployed `db.<zone>` file:
+- `IN SYNC (serial N)`: BIND9 serves the deployed file (or newer, e.g. after dynamic updates).
+- `OUT OF SYNC (serving serial N, file has M; run 'l')`: the file on disk is newer than what BIND9 serves.
+- `NOT LOADED in BIND9` / `? BIND9 not reachable`: the zone failed to load or the container is down.
+
+Records are listed with their full value (`A`/`AAAA` ip, `CNAME` target, `MX` priority + exchange, `TXT` text, `SRV` priority/weight/port/target). Records without a name (or named `None`) are shown as `(missing name)`, rejected on entry, and filtered out at render time.
 
 You have two powerful options to apply your pending `vars.yaml` modifications directly from the menu:
-- **`l` (Live update):** Freezes the zone (flushes the journal and stops dynamic updates), re-renders the zone file from `vars.yaml`, thaws the zone (re-enabling dynamic updates), and issues an `rndc reload`. *This is completely non-disruptive to DNS resolution.*
-- **`f` (Force update):** Deletes the `.jnl` journal file completely, forcefully rewrites the zone data, and issues a full systemd restart of the BIND9 container. *Warning: Disruptive. Can drop inflight queries.*
+- **`l` (Live update):** Runs the same apply as `core-mgr --apply`: each changed zone is frozen, its file swapped, the `.jnl` removed and the zone thawed. *Non-disruptive to DNS resolution.*
+- **`f` (Force update):** Stops BIND9, deletes `db.<zone>` and its `.jnl`, then runs the apply, which rewrites the zone and starts BIND9 again. *Warning: Disruptive — DNS is down while it runs.*
 
 Changes edit `vars.yaml` and re-render forward and reverse zone files natively using Jinja2. Rendered files are written to `/opt/bind9/data/` with bind ownership. **Reverse zones are auto-generated** based on `/24` subnets found in `A` records.
 
@@ -156,17 +195,37 @@ links:
 
 ## Resource Utilization
 
-The following chart outlines the memory footprint and CPU impact of the deployed applications. When `host_ram_capacity` is set to a value between 3 and 4, the infrastructure automatically enforces Docker Compose memory constraints to prevent these services from exceeding the host's physical memory boundaries.
+The following chart outlines the memory footprint and CPU impact of the deployed applications. When `host_ram_capacity` is set to a value between 3 and 4, the infrastructure automatically enforces Docker Compose memory constraints (389-DS: `256M` at 3 GB, `384M` at 4 GB) to prevent these services from exceeding the host's physical memory boundaries.
 
 | Service | Startup (Peak RAM) | Idle (RAM) | Typical Usage | CPU Impact |
 |---------|--------------------|------------|---------------|------------|
 | Keycloak | 800MB – 1.2GB | 500MB – 700MB | 800MB – 1.2GB | High (during auth) |
 | Postgres | 150MB | 80MB | 100MB – 200MB | Low |
-| OpenLDAP | 50MB | 10MB – 20MB | 30MB – 50MB | Very Low |
+| 389-DS | 150MB – 250MB | 60MB – 120MB | 100MB – 250MB | Very Low |
+| core-web | 30MB | 20MB – 30MB | 20MB – 40MB | Minimal |
 | AdGuardHome | 100MB | 30MB – 50MB | 60MB – 120MB | Low (sustained) |
 | BIND9 | 60MB | 30MB – 40MB | 40MB – 80MB | Very Low |
 | Nginx | 20MB | 5MB – 10MB | 15MB – 40MB | Very Low |
 | Step-ca | 50MB | 15MB – 25MB | 30MB – 50MB | Minimal |
+
+---
+
+## Migrating from OpenLDAP
+
+Deployments before 1.5.0 ran `osixia/openldap` from `/opt/openldap`. The upgrade deploys 389-DS in `/opt/dirsrv` with a fresh tree and fresh role-account passwords; user and group data is moved with `--migrate-ldap`.
+
+1. **Back up** `/opt/openldap` (and `/opt/core/config/core-secrets.yml`), e.g. `sudo tar -czf ~/openldap-backup.tgz -C /opt openldap`.
+2. **Deploy** the new version: `sudo ./setup.sh`. `/opt/openldap` is left untouched by the upgrade (snapshots and uninstall still include it). If a stopped `openldap` container still exists, it can be removed with `docker rm openldap`.
+3. **Migrate**: `sudo core-mgr --migrate-ldap [old_dir]`.
+   - Runs `slapcat` against a *copy* of the old `data/` and `config/` using the `osixia/openldap:1.5.0` image (must be pullable or already loaded).
+   - Exports the current 389-DS database to `/opt/dirsrv/data/ldif/pre-migrate-<timestamp>.ldif` (your rollback point), merges the OpenLDAP entries into it and **imports** the result with `dsconf backend import`. An import is used rather than LDAP adds because 389-DS always generates a new `entryUUID` on add (and refuses to modify it), but keeps it on import.
+   - Merge rules: entries already in 389-DS (suffix, OUs, seeded role accounts) win; `entryUUID` and password hashes are preserved (389-DS re-hashes to PBKDF2-SHA512 on next bind); missing group `member` values are merged; osixia's `cn=admin` is dropped, including from group membership; `memberOf` is rebuilt afterwards.
+   - Re-runs the Keycloak bootstrap (if `keycloak` is running), which repoints the existing `OpenLDAP` federation provider to 389-DS in place, so federated users keep their Keycloak links.
+   - Safe to re-run.
+4. **Verify**: log in to Keycloak (and core-web) as a migrated user; check group membership in the Keycloak admin console. To roll back the directory, import the `pre-migrate-*.ldif` backup: `docker exec dirsrv dsconf localhost backend import userroot /data/ldif/pre-migrate-<timestamp>.ldif`.
+5. **Remove** the old data once satisfied: `sudo rm -rf /opt/openldap`.
+
+> Role accounts (`super_admin`, `group_admin`, `user_creator_admin`, `user_modifier_admin`, `keycloak_admin`) are **not** migrated — they now have per-account generated passwords in `core-secrets.yml`. Update any client that used the old shared password.
 
 ---
 
@@ -190,13 +249,13 @@ ansible-playbook core/playbooks/09-start-and-configure.yml -e target_host=core
 | `prereqs`,`validation` | 00 | `00-controller-check.yml` | Validate controller environment |
 | *(always)* `handle-vars`, `render-jinja` | 01 | `01-gen-vars-and-render-jinja.yml` | Generate CA password + TSIG secrets into `core-secrets.yml` (idempotent); Merge all vars + secrets; render every template to `/tmp/core-template-render` |
 | `users` | 03 | `03-target-service-accounts.yml` | Create service accounts (nginx, bind, step, ldap) |
-| `file-structure`, `bind9`, `stepca`, `nginx`, `openldap` | 04 | `04-target-file-structure.yml` | Create directory tree; deploy configs, stepca dirs, bind9 runtime dirs; create `core-mgr` global wrapper |
+| `file-structure`, `bind9`, `stepca`, `nginx`, `add-ldap`, `dirsrv`, `coreweb`, `systemd` | 04 | `04-target-file-structure.yml` | Create directory tree; deploy configs, stepca dirs, bind9 runtime dirs, 389-DS seed files, core-web config + unit; create `core-mgr` global wrapper |
 | `network`, `firewall` | 05 | `05-target-network.yml` | Harden systemd-resolved; configure UFW (LAN allow-list) |
 | `pki`, `stepca` | 06 | `06-configure-stepca.yml` | Sign intermediate CA CSR (if deployed); initialize and configure step-ca |
 | `pki`, `bootstrap` | 07 | `07-bootstrap-containers.yml` | Bootstrap bind9+step-ca containers safely |
-| `pki`, `mint-certs` | 08 | `08-mint-service-certs.yml` | Mint BIND9 TLS, service certs, and `extra_certs` |
-| `verify`, `deploy-checks` | 09 | `09-start-and-configure.yml` | Start full stack and bring up services |
-| `cleanup-temp`, `teardown`, `validation` | 10 | `10-deploy-checks-and-cleanup.yml` | dig DNS; check nginx/HTTPS; export 30s logs; drop stack if `no_start` |
+| `pki`, `mint-certs` | 08 | `08-mint-service-certs.yml` | Mint BIND9 TLS, service certs (incl. `mgr.<domain>`), and `extra_certs`; install 389-DS TLS files and the core-web client-CA bundle |
+| `start`, `configure`, `keycloak` | 09 | `09-start-and-configure.yml` | Start full stack; seed 389-DS; run `keycloak_bootstrap.py`; start `coreweb` |
+| `verify`, `deploy-checks`, `cleanup` | 10 | `10-deploy-checks-and-cleanup.yml` | dig DNS; check nginx/HTTPS; LDAP role-account binds, plaintext-bind refusal, LDAPS cert; core-web socket + `400` without client cert; export 30s logs; drop stack if `no_start` |
 
 ---
 
@@ -206,9 +265,9 @@ ansible-playbook core/playbooks/09-start-and-configure.yml -e target_host=core
 |------|-------|---------|---------|
 | 53 | TCP + UDP | nginx | `bind9:53` (container-to-container) |
 | 80 | TCP | nginx | health check · ACME passthrough · HTTPS redirect |
-| 389 | TCP | nginx | `openldap:389` (plain LDAP passthrough) |
-| 443 | TCP | nginx | `step-ca:9000` · `bind9:8053` (`/dns-query`) |
-| 636 | TCP | nginx | `openldap:389` (LDAPS — nginx terminates TLS) |
+| 389 | TCP | nginx | `dirsrv:3389` (TCP passthrough; 389-DS requires StartTLS before bind) |
+| 443 | TCP | nginx | `step-ca:9000` · `bind9:8053` (`/dns-query`) · Keycloak · core-web (`mgr.<domain>`, mTLS → `/opt/coreweb/run/web.sock`) |
+| 636 | TCP | nginx | `dirsrv:3636` (TCP passthrough; LDAPS terminated by 389-DS) |
 | `bind_dns_port` | TCP + UDP | bind9 | host-facing (mapped `bind_dns_port:53`); default `53` |
 | `bind9_doh_port` | TCP | bind9 | plain-HTTP DoH; default `8053` |
 | `stepca_port` | TCP | step-ca | internal HTTPS; default `9000` |

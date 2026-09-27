@@ -10,7 +10,7 @@
 #   bind9          — BIND9 directories and runtime dirs (data, log, cache).
 #   stepca         — Step-CA directory structure.
 #   nginx          — nginx directories.
-#   openldap       — OpenLDAP directories.
+#   dirsrv         — 389 Directory Server data, TLS and seed directories.
 #
 # Copies pre-rendered files from /tmp/core-template-render (localhost) to target.
 # /tmp/core-template-render is populated by 02-render-jinja.yml before this runs.
@@ -216,7 +216,8 @@
         - { dir: "bind9/data", user: "bind" }
         - { dir: "bind9/log", user: "bind" }
         - { dir: "bind9/cache", user: "bind" }
-        - { dir: "openldap/data", user: "ldap" }
+        - { dir: "dirsrv/data", user: "ldap" }
+        - { dir: "dirsrv/data/tls", user: "ldap" }
         - { dir: "stepca/data", user: "step" }
         - { dir: "postgres/data", path: "{{ postgres_data_dir }}", user: "postgres" }
         - { dir: "keycloak/data", path: "{{ keycloak_data_dir }}", user: "keycloak" }
@@ -461,7 +462,7 @@
     # ----------------------------------------------------------------
     # 4g — LDAP and Docker Compose explicit deployment
     # ----------------------------------------------------------------
-    - name: Section 4g - Deploy OpenLDAP and docker-compose
+    - name: Section 4g - Deploy 389-DS seed data and docker-compose
       tags: [file-structure, add-ldap]
       block:
         - name: Deploy separate docker-compose.yml files
@@ -475,35 +476,87 @@
             - nginx
             - bind9
             - stepca
-            - openldap
+            - dirsrv
             - postgres
             - keycloak
           ignore_errors: true
 
-        - name: Ensure OpenLDAP custom_ldif directory exists
-          tags: [openldap]
+        - name: Ensure 389-DS seed directory exists
+          tags: [dirsrv]
           ansible.builtin.file:
-            path: "{{ deploy_base_dir }}/openldap/custom_ldif"
+            path: "{{ deploy_base_dir }}/dirsrv/seed"
             state: directory
-            owner: "{{ service_users.ldap.uid }}"
+            owner: root
             group: "{{ service_users.ldap.gid }}"
             mode: '0750'
-          when: install_ldap | default(false) | bool
+          when: install_ldap | default(true) | bool
 
-        - name: Deploy rendered OpenLDAP files
-          tags: [openldap]
+        - name: Deploy 389-DS image build context
+          tags: [dirsrv]
           ansible.builtin.copy:
-            src: "/tmp/core-template-render/openldap/{{ item }}"
-            dest: "{{ deploy_base_dir }}/openldap/custom_ldif/{{ item }}"
-            owner: "{{ service_users.ldap.uid }}"
+            src: "{{ playbook_dir }}/../jinja/dirsrv/build/"
+            dest: "{{ deploy_base_dir }}/dirsrv/build/"
+            owner: root
+            group: root
+            mode: '0644'
+            directory_mode: '0755'
+          when: install_ldap | default(true) | bool
+
+        # Readable by the dirsrv container user only: 20-accounts.ldif holds
+        # the role-account passwords.
+        - name: Deploy 389-DS seed files
+          tags: [dirsrv]
+          ansible.builtin.copy:
+            src: "/tmp/core-template-render/dirsrv/seed/{{ item }}"
+            dest: "{{ deploy_base_dir }}/dirsrv/seed/{{ item }}"
+            owner: root
             group: "{{ service_users.ldap.gid }}"
             mode: '0640'
           loop:
-            - 02-ous.ldif
-            - 03-groups.ldif
-            - 05-admins.ldif
-            - 06-acl.ldif
-          when: install_ldap | default(false) | bool
+            - seed.py
+            - 00-config.ldif
+            - 10-tree.ldif
+            - 20-accounts.ldif
+            - 30-aci.ldif
+          when: install_ldap | default(true) | bool
+
+    # ----------------------------------------------------------------
+    # 4h — core-web management UI (runs on the host as root, reachable
+    #      only through nginx over a unix socket)
+    # ----------------------------------------------------------------
+    - name: Section 4h - Deploy core-web
+      tags: [file-structure, coreweb]
+      when: install_coreweb | default(false) | bool
+      block:
+        - name: Ensure core-web directories exist
+          ansible.builtin.file:
+            path: "{{ item.path }}"
+            state: directory
+            owner: root
+            group: "{{ item.group }}"
+            mode: "{{ item.mode }}"
+          loop:
+            - { path: "{{ deploy_base_dir }}/coreweb", group: "root", mode: "0755" }
+            # nginx (container gid) may traverse and connect to the socket; nobody else.
+            - { path: "{{ deploy_base_dir }}/coreweb/run", group: "{{ service_users.nginx.gid }}", mode: "0750" }
+
+        - name: Deploy core-web config
+          ansible.builtin.copy:
+            src: "/tmp/core-template-render/coreweb/coreweb.json"
+            dest: "{{ deploy_base_dir }}/coreweb/coreweb.json"
+            owner: root
+            group: root
+            mode: '0600'
+          register: coreweb_config
+
+        - name: Deploy core-web systemd unit
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/../jinja/systemd/coreweb.service.j2"
+            dest: "/etc/systemd/system/coreweb.service"
+            owner: root
+            group: root
+            mode: '0644'
+          register: coreweb_unit
 
     - name: Section 4a - Deploy Systemd wrappers
       tags: [file-structure, update, systemd]
@@ -527,8 +580,8 @@
           folder: stepca
           requires: []
         - service: ldap
-          compose: openldap
-          folder: openldap
+          compose: dirsrv
+          folder: dirsrv
           requires: []
         - service: postgres
           compose: postgres
@@ -540,14 +593,14 @@
           requires: ["postgres"]
       when: >
         (item.service not in ['postgres', 'keycloak'] or (install_keycloak | default(false) | bool)) and
-        (item.service != 'ldap' or (install_ldap | default(false) | bool))
+        (item.service != 'ldap' or (install_ldap | default(true) | bool))
       register: systemd_wrappers
 
     - name: Reload systemd daemon
       tags: [file-structure, update, systemd]
       ansible.builtin.systemd:
         daemon_reload: true
-      when: systemd_wrappers.changed
+      when: systemd_wrappers.changed or (coreweb_unit.changed | default(false))
 
     - name: Section 4c - Global Executable
       tags: [file-structure]
@@ -561,9 +614,7 @@
               # core-mgr - Global wrapper for Antigravity Core interactive manager
               # -------------------------------------------------------------------------
               if [[ " $* " == *" --version "* ]]; then
-                echo "core-mgr version 1.2.2"
-                echo "Last Modified: 2026-04-30"
-                exit 0
+                exec bash "{{ deploy_base_dir }}/core/lib/manage.sh" --version
               fi
               if [[ "$EUID" -ne 0 ]]; then
                 echo "Please run as root (sudo core-mgr)"

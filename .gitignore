@@ -9,3 +9,4 @@ become_pass
 test/
 custom-vars-test.yaml
 link-vars.yaml
+core/BUILD

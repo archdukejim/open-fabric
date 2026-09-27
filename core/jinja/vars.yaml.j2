@@ -50,17 +50,19 @@ ip_postgres: {{ ip_postgres | default('10.255.0.70') }}
 # SERVICE HOSTNAMES
 # ============================================================
 cname_ca: {{ cname_ca | default('ca') }}
-landing_page_cname: {{ landing_page_cname | default('') }}
+landing_page_cname: {{ landing_page_cname | default('', true) }}
 cname_dns: {{ cname_dns | default('dns') }}
 cname_ldap: {{ cname_ldap | default('ldap') }}
 cname_sso: {{ cname_sso | default('sso') }}
+cname_mgr: {{ cname_mgr | default('mgr') }}
 
 hostname_nginx: {{ hostname_nginx | default('nginx.' ~ domain) }}
 hostname_bind9: {{ hostname_bind9 | default((cname_dns | default('dns')) ~ '.' ~ domain) }}
 hostname_stepca: {{ hostname_stepca | default((cname_ca | default('ca')) ~ '.' ~ domain) }}
-hostname_landing: {{ hostname_landing | default((landing_page_cname ~ '.' ~ domain) if landing_page_cname | default('') else domain) }}
+hostname_landing: {{ hostname_landing | default((landing_page_cname ~ '.' ~ domain) if landing_page_cname | default('', true) else domain) }}
 hostname_ldap: {{ hostname_ldap | default((cname_ldap | default('ldap')) ~ '.' ~ domain) }}
 hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~ '.' ~ domain) }}
+hostname_mgr: {{ hostname_mgr | default((cname_mgr | default('mgr')) ~ '.' ~ domain) }}
 
 # ============================================================
 # DOCKER IMAGES
@@ -68,12 +70,18 @@ hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~
 image_nginx: {{ image_nginx | default('nginx:latest') }}
 image_bind9: {{ image_bind9 | default('ubuntu/bind9:latest') }}
 image_stepca: {{ image_stepca | default('smallstep/step-ca:latest') }}
-image_openldap: {{ image_openldap | default('osixia/openldap:latest') }}
+{# Built locally from Debian packages (core/jinja/dirsrv/build); `core-mgr --update-containers` rebuilds it. #}
+image_dirsrv: {{ image_dirsrv | default('core-template/dirsrv:local') }}
 image_keycloak: {{ image_keycloak | default('keycloak/keycloak:latest') }}
 image_postgres: {{ image_postgres | default('postgres:latest') }}
 
 install_ldap: {{ install_ldap | default(true) | bool }}
 install_keycloak: {{ install_keycloak | default(false) | bool }}
+# Web management UI (mTLS + Keycloak OIDC). Requires Keycloak.
+install_coreweb: {{ (install_coreweb | default(true) | bool) and (install_keycloak | default(false) | bool) }}
+coreweb_realm: {{ coreweb_realm | default(domain) }}
+coreweb_admin_role: {{ coreweb_admin_role | default('core-admin') }}
+coreweb_admin_group: {{ coreweb_admin_group | default('admins') }}
 enforce_ldaps: {{ enforce_ldaps | default(true) | bool }}
 
 # ============================================================
@@ -83,23 +91,27 @@ host_ram_capacity: {{ host_ram_capacity | default(0) }}
 compose_file: {{ compose_file | default((deploy_base_dir | default('/opt')) ~ '/core/docker-compose.yml') }}
 keycloak_data_dir: {{ keycloak_data_dir | default((deploy_base_dir | default('/opt')) ~ '/keycloak/data') }}
 postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/opt')) ~ '/postgres/data') }}
+{# Optional containers are derived from the install_* flags on every render, so
+   strip them from any value read back from a previously rendered vars.yaml. #}
+{% set _optional_containers = ['openldap', 'dirsrv', 'keycloak', 'postgres'] %}
+{% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9'])) | reject('in', _optional_containers) | list %}
+{% if install_ldap | default(true) | bool %}{% set _ = _containers.append('dirsrv') %}{% endif %}
+{% if install_keycloak | default(false) | bool %}{% set _ = _containers.extend(['keycloak', 'postgres']) %}{% endif %}
 project_containers:
-{{ project_containers | default(['nginx', 'step-ca', 'bind9']) | to_nice_yaml(indent=2) | indent(2, first=True) }}{% if install_ldap | default(false) | bool %}
-  - openldap
-{% endif %}{% if install_keycloak | default(false) | bool %}
-  - keycloak
-  - postgres
-{% endif %}
+{{ _containers | unique | list | to_nice_yaml(indent=2) | indent(2, first=True) }}
 {% set default_service_dirs = [
   { 'folder': 'nginx', 'owner': 'nginx' },
   { 'folder': 'bind9', 'owner': 'bind' },
   { 'folder': 'stepca', 'owner': 'step' },
-  { 'folder': 'openldap', 'owner': 'ldap' },
+  { 'folder': 'dirsrv', 'owner': 'ldap' },
   { 'folder': 'keycloak', 'owner': 'keycloak' },
-  { 'folder': 'postgres', 'owner': 'postgres' }
+  { 'folder': 'postgres', 'owner': 'postgres' },
+  { 'folder': 'coreweb', 'owner': 'root' }
 ] %}
+{# Built-in folders always come from the defaults above; user-added folders are kept. #}
+{% set _default_folders = default_service_dirs | map(attribute='folder') | list + ['openldap'] %}
 service_dirs:
-{{ service_dirs | default(default_service_dirs) | to_nice_yaml(indent=2) | indent(2, first=True) }}
+{{ (default_service_dirs + ((service_dirs | default([])) | rejectattr('folder', 'in', _default_folders) | list)) | to_nice_yaml(indent=2) | indent(2, first=True) }}
 {% set default_service_users = {
   'bind': {'uid': 53, 'gid': 53},
   'ldap': {'uid': 911, 'gid': 911},
@@ -181,19 +193,22 @@ bind_acls:
   { 'canonical': hostname, 'name': cname_ldap | default('ldap') },
   { 'canonical': hostname, 'name': cname_sso | default('sso') }
 ] %}
-{% if landing_page_cname | default('') %}
+{% if (install_coreweb | default(true) | bool) and (install_keycloak | default(false) | bool) %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_mgr | default('mgr') }) %}
+{% endif %}
+{% if landing_page_cname | default('', true) %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname }) %}
 {% endif %}
 {% set default_a = [
   { 'ip': host_ip, 'name': hostname }
 ] %}
-{% if not landing_page_cname | default('') %}
+{% if not landing_page_cname | default('', true) %}
 {% set _ = default_a.append({ 'ip': host_ip, 'name': '@' }) %}
 {% endif %}
 {% set _user_dns = dns | default({'dynamic_zone_var': {'zone_authority': true}}) %}
 {% set _dynamic_zone = _user_dns.get('dynamic_zone_var', {}) %}
-{% set _merged_a = (_dynamic_zone.get('A', []) + default_a) | unique | list %}
-{% set _merged_cname = (_dynamic_zone.get('CNAME', []) + default_cnames) | unique | list %}
+{% set _merged_a = (_dynamic_zone.get('A', []) + default_a) | selectattr('name') | rejectattr('name', 'equalto', 'None') | unique | list %}
+{% set _merged_cname = (_dynamic_zone.get('CNAME', []) + default_cnames) | selectattr('name') | rejectattr('name', 'equalto', 'None') | unique | list %}
 {% set _ = _dynamic_zone.update({'A': _merged_a, 'CNAME': _merged_cname}) %}
 {% set _ = _user_dns.update({'dynamic_zone_var': _dynamic_zone}) %}
 dns:
@@ -222,7 +237,9 @@ reverse_zone_names:
 # ============================================================
 # NGINX BACKENDS
 # ============================================================
-nginx_backend_ldap: {{ nginx_backend_ldap | default('openldap:389') }}
+{# 389-DS terminates TLS itself; nginx only passes TCP through. #}
+nginx_backend_ldap: {{ 'dirsrv:3389' if (nginx_backend_ldap | default('', true)).startswith('openldap') or not nginx_backend_ldap | default('', true) else nginx_backend_ldap }}
+nginx_backend_ldaps: {{ nginx_backend_ldaps | default('dirsrv:3636') }}
 nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (stepca_port | default(9000))) }}
 
 # ============================================================

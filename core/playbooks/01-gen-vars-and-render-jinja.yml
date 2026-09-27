@@ -212,6 +212,22 @@
           when: keycloak_db_password is not defined
 
         # ----------------------------------------------------------------
+        # LDAP role accounts + core-web OIDC client — alphanumeric so they
+        # are safe inside LDIF and JSON without quoting.
+        # ----------------------------------------------------------------
+        - name: Generate remaining service secrets if missing
+          ansible.builtin.set_fact:
+            "{{ item }}": "{{ lookup('vars', item, default='') or lookup('ansible.builtin.password', '/dev/null', chars=['ascii_letters', 'digits'], length=32) }}"
+          loop: "{{ core_generated_secrets }}"
+          vars:
+            core_generated_secrets:
+              - ldap_super_admin_password
+              - ldap_group_admin_password
+              - ldap_user_creator_password
+              - ldap_user_modifier_password
+              - coreweb_oidc_secret
+
+        # ----------------------------------------------------------------
         # TSIG secrets — one per key in tsig_keys[]
         # ----------------------------------------------------------------
         - name: Initialise tsig_secrets dict if absent
@@ -258,6 +274,11 @@
               keycloak_admin_user: "{{ keycloak_admin_user }}"
               keycloak_admin_password: "{{ keycloak_admin_password }}"
               keycloak_db_password: "{{ keycloak_db_password }}"
+              ldap_super_admin_password: "{{ ldap_super_admin_password }}"
+              ldap_group_admin_password: "{{ ldap_group_admin_password }}"
+              ldap_user_creator_password: "{{ ldap_user_creator_password }}"
+              ldap_user_modifier_password: "{{ ldap_user_modifier_password }}"
+              coreweb_oidc_secret: "{{ coreweb_oidc_secret }}"
               tsig_secrets:
               {% for k, v in (tsig_secrets | default({}, true)).items() %}
                 {{ k }}: "{{ v }}"
@@ -406,7 +427,8 @@
             - "/tmp/core-template-render/bind9"
             - "/tmp/core-template-render/bind9/config"
             - "/tmp/core-template-render/bind9/data"
-            - "/tmp/core-template-render/openldap"
+            - "/tmp/core-template-render/dirsrv/seed"
+            - "/tmp/core-template-render/coreweb"
             - "/tmp/core-template-render/stepca"
             - "/tmp/core-template-render/stepca/templates/certs"
             - "/tmp/core-template-render/keycloak"
@@ -546,12 +568,12 @@
             - nginx
             - bind9
             - stepca
-            - openldap
+            - dirsrv
             - keycloak
             - postgres
           when: >
             (item not in ['postgres', 'keycloak'] or (install_keycloak | default(false) | bool)) and
-            (item != 'openldap' or (install_ldap | default(false) | bool))
+            (item != 'dirsrv' or (install_ldap | default(true) | bool))
           delegate_to: localhost
 
 
@@ -613,21 +635,41 @@
           delegate_to: localhost
 
         # ----------------------------------------------------------------
-        # 2g — OpenLDAP
+        # 2g — 389 Directory Server seed data (applied by dirsrv/seed.py)
         # ----------------------------------------------------------------
-        - name: Render OpenLDAP templates
+        - name: Render 389-DS seed LDIF
           tags: [add-ldap]
           ansible.builtin.template:
-            src: "{{ playbook_dir }}/../jinja/openldap/{{ item }}"
-            dest: "/tmp/core-template-render/openldap/{{ item | regex_replace('\\.j2$', '') }}"
+            src: "{{ playbook_dir }}/../jinja/dirsrv/seed/{{ item }}"
+            dest: "/tmp/core-template-render/dirsrv/seed/{{ item | regex_replace('\\.j2$', '') }}"
             mode: '0640'
           loop:
-            - 02-ous.ldif.j2
-            - 03-groups.ldif.j2
-            - 05-admins.ldif.j2
-            - 06-acl.ldif.j2
+            - 00-config.ldif.j2
+            - 10-tree.ldif.j2
+            - 20-accounts.ldif.j2
+            - 30-aci.ldif.j2
           delegate_to: localhost
-          when: install_ldap | default(false) | bool
+          when: install_ldap | default(true) | bool
+
+        - name: Copy 389-DS seeder
+          tags: [add-ldap]
+          ansible.builtin.copy:
+            src: "{{ playbook_dir }}/../jinja/dirsrv/seed.py"
+            dest: "/tmp/core-template-render/dirsrv/seed/seed.py"
+            mode: '0644'
+          delegate_to: localhost
+          when: install_ldap | default(true) | bool
+
+        # ----------------------------------------------------------------
+        # 2g2 — core-web management UI config (contains the OIDC secret)
+        # ----------------------------------------------------------------
+        - name: Render core-web config
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/../jinja/coreweb/coreweb.json.j2"
+            dest: "/tmp/core-template-render/coreweb/coreweb.json"
+            mode: '0600'
+          delegate_to: localhost
+          when: install_coreweb | default(false) | bool
 
         # ----------------------------------------------------------------
         # 2h — Step-CA certificate templates
