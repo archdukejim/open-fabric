@@ -11,3 +11,5 @@ test/
 custom-vars-test.yaml
 link-vars.yaml
 fabric/BUILD
+__pycache__/
+*.pyc
