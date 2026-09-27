@@ -125,17 +125,6 @@ These variables define top-level identity and basic settings.
 - `systemd/wrapper.service.j2`
 - `vars.yaml.j2`
 
-### `repo_source`
-**Description:** Absolute path to the template repository source directory.
-
-**Default Value:** *(Ansible Playbook Parent Directory)*
-
-**Immutable:** Yes 🔒
-
-**Effected Jinja Templates:**
-- `vars.yaml.j2`
-
-
 ## 2. Networking & DNS
 > [!WARNING]
 > Editing core networking configurations post-deployment can impact routing and require widespread service restarts. Proceed with caution.

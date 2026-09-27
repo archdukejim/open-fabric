@@ -24,7 +24,6 @@ address_line1: {{ address_line1 | default('null', true) }}
 address_line2: {{ address_line2 | default('null', true) }}
 system_timezone: {{ system_timezone | default('America/New_York') }}
 deploy_base_dir: {{ deploy_base_dir | default('/opt') }}
-repo_source: {{ repo_source | default(playbook_dir | dirname | dirname) }}
 
 # ============================================================
 # NETWORK
@@ -86,6 +85,14 @@ install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak |
 webui_realm: {{ webui_realm | default(domain) }}
 webui_admin_role: {{ webui_admin_role | default('fabric-admin') }}
 webui_admin_group: {{ webui_admin_group | default('admins') }}
+
+# ============================================================
+# SECURITY (fabricctl setup; relaxations are shown by fabricctl status)
+# ============================================================
+{% set _security = {'firewall': true, 'firewall_allow': [], 'docker_daemon_hardening': true} %}
+{% set _ = _security.update(security | default({}, true)) %}
+security:
+{{ _security | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
 # ============================================================
 # DOCKER / SERVICE INFRASTRUCTURE

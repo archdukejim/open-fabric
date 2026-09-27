@@ -31,7 +31,9 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   │   ├── systemd         # wrapper.service.j2, fabric-agent.service.j2
 │   │   └── vars.yaml.j2
 │   ├── lib
-│   │   ├── fabriclib/    # domain code, one operation per file (common/, dns/, system/)
+│   │   ├── fabriclib/    # domain code, one operation per file (common/, dns/, system/, pki/, security/)
+│   │   │   ├── setup/    # fabricctl setup/doctor/certs/reinstall/uninstall: one step per file
+│   │   │   └── cli.py    # lifecycle command router
 │   │   ├── agent/        # fabric-agent: privileged host API for webui (routes to fabriclib)
 │   │   ├── webui/        # webui container app (server, oidc, tlsclient, agentclient, views)
 │   │   ├── certs.sh
@@ -43,30 +45,11 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   │   ├── ldap_migrate.sh
 │   │   ├── manage.sh
 │   │   ├── output.sh
-│   │   ├── reinstall_backup.sh
-│   │   ├── reinstall_restore.sh
-│   │   ├── services.sh
-│   │   ├── ssh.sh
 │   │   ├── tsig.sh
 │   │   └── vars.sh
-│   ├── playbooks
-│   │   ├── 00-controller-check.yml
-│   │   ├── 01-gen-vars-and-render-jinja.yml
-│   │   ├── 02-target-system-conditioning.yml
-│   │   ├── 03-target-service-accounts.yml
-│   │   ├── 04-target-file-structure.yml
-│   │   ├── 05-target-network.yml
-│   │   ├── 06-configure-stepca.yml
-│   │   ├── 07-bootstrap-containers.yml
-│   │   ├── 08-mint-service-certs.yml
-│   │   ├── 09-start-and-configure.yml
-│   │   ├── 10-deploy-checks-and-cleanup.yml
-│   │   ├── ansible.cfg
-│   │   └── fabric-config.yml
 │   └── VERSION             # fabricctl version (BUILD is stamped by setup.sh, git-ignored)
 ├── custom-vars.yaml
 ├── docs
-│   ├── ansible-doc.md
 │   ├── architecture.md
 │   ├── webui.md
 │   ├── install.md
@@ -303,19 +286,20 @@ Core service certificates (`dns.<domain>`, `ldap.<domain>`, `ca.<domain>`, `land
 
 ```mermaid
 sequenceDiagram
-    participant A as admin (install time)
+    participant F as fabricctl (setup / certs)
     participant S as step-ca
-    participant N as nginx/certs
-    A->>S: step certificate create (offline)
-    S-->>A: signed leaf cert (10 years)
-    A->>N: deploy cert → nginx reload
+    participant N as service (nginx, bind9, dirsrv, keycloak, postgres)
+    F->>F: missing, expiring < 30 days, or a name missing?
+    F->>S: step ca certificate (RSA 4096, via the running CA)
+    S-->>F: signed leaf + intermediate
+    F->>N: install (service uid, key 0600) → restart only that service
 ```
 
 ---
 
 ## Jinja2 Templates
 
-All `.j2` files in this repo are rendered by the Ansible playbook or the `fabricctl` deployment engine into `/opt/<service>/`. The `.j2` source files are removed from `/opt` after rendering — only rendered outputs remain on the host.
+All `.j2` files in this repo are rendered by the `fabricctl` deployment engine (`fabric/lib/deploy.py`, shared Jinja environment `fabriclib/common/jinja_env.py`) into `/opt/<service>/`. The `.j2` source files are removed from `/opt` after rendering — only rendered outputs remain on the host.
 
 | Template | Rendered to |
 |----------|------------|

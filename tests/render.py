@@ -5,29 +5,19 @@ import os
 import sys
 import glob
 import yaml
-import jinja2
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, 'fabric', 'lib'))
-import deploy  # noqa: E402
+from fabriclib.common.jinja_env import jinja_env  # noqa: E402  (the same env deploy.py uses)
 
-env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.join(REPO, 'fabric', 'jinja')),
-                         keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True,
-                         undefined=jinja2.StrictUndefined if '--strict' in sys.argv else jinja2.Undefined)
-for n, f in [('to_nice_yaml', deploy.to_nice_yaml_filter), ('unique', deploy.unique_filter),
-             ('regex_replace', deploy.regex_replace_filter), ('flatten', deploy.flatten_filter),
-             ('bool', deploy.bool_filter), ('dirname', deploy.dirname_filter),
-             ('basename', deploy.basename_filter), ('b64encode', deploy.b64encode_filter), ('to_json', __import__('json').dumps), ('combine', lambda b, *o: {k: v for d in (b, *o) for k, v in (d or {}).items()})]:
-    env.filters[n] = f
-env.tests['match'] = deploy.match_test
-env.globals['lookup'] = deploy.lookup_func
+env = jinja_env(os.path.join(REPO, 'fabric', 'jinja'))
 
 secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
                ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
                ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1',
                webui_oidc_secret='OidcSecret1', tsig_secrets={})
-user = dict(playbook_dir='/opt/core/playbooks', deploy_base_dir='/opt', domain='lan.j-j.family', hostname='pi-core',
+user = dict(deploy_base_dir='/opt', domain='lan.j-j.family', hostname='pi-core',
             host_ip='192.168.7.53', lan_cidr='192.168.7.0/24', lan_gateway='192.168.7.1',
             core_subnet='10.255.0.0/24', landing_page_cname=None, install_keycloak=True,
             cert_country='US', cert_province='S', cert_city='C', cert_org='O', cert_ou='IT', ca_name='CA',
@@ -42,7 +32,7 @@ user = dict(playbook_dir='/opt/core/playbooks', deploy_base_dir='/opt', domain='
 # (deploy path, host IP, ports) with a JSON object in FABRIC_TEST_VARS.
 user.update(json.loads(os.environ.get("FABRIC_TEST_VARS", "{}")))
 
-ctx = {**secrets, **user}
+ctx = {**secrets, **user, 'render_date': '2026-01-01'}
 v1 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**ctx))
 v2 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1}))
 import re as _re
@@ -64,7 +54,7 @@ if out:
     with open(os.path.join(out, 'vars.yaml'), 'w') as f:
         yaml.safe_dump(v2, f)
 for tpl in sorted(env.list_templates()):
-    if not tpl.endswith('.j2') or tpl.startswith(('nginx/www/', 'openldap/')) or tpl == 'vars.yaml.j2':
+    if not tpl.endswith('.j2') or tpl.startswith('openldap/') or tpl == 'vars.yaml.j2':
         continue
     extra = {}
     if tpl.startswith('bind9/data/zone'):

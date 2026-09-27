@@ -4,12 +4,12 @@ import sys
 import yaml
 import shutil
 import subprocess
-import jinja2
-import base64
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 import filecmp
 import json
 import re
-from pathlib import Path
 from datetime import datetime
 
 FABRIC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,67 +40,6 @@ def save_yaml(data, path):
 
 def generate_secret_b64(length=32):
     return run_cmd(f"openssl rand -base64 {length} | tr -d '\\n'").stdout.strip()
-
-def unique_filter(x, attribute=None):
-    import json
-    if not x: return []
-    seen = set()
-    res = []
-    for item in x:
-        val = item.get(attribute, item) if isinstance(item, dict) and attribute else item
-        try:
-            hash_val = val
-            if isinstance(val, (dict, list)):
-                hash_val = json.dumps(val, sort_keys=True)
-        except Exception:
-            hash_val = str(val)
-        if hash_val not in seen:
-            seen.add(hash_val)
-            res.append(item)
-    return res
-
-def regex_replace_filter(s, pattern, repl):
-    import re
-    return re.sub(pattern, repl, s)
-
-def b64encode_filter(s):
-    return base64.b64encode(s.encode()).decode()
-
-def to_nice_yaml_filter(value, indent=4):
-    return yaml.safe_dump(value, default_flow_style=False, indent=indent).strip()
-
-def flatten_filter(value):
-    import collections.abc
-    result = []
-    for item in value:
-        if isinstance(item, collections.abc.Iterable) and not isinstance(item, (str, bytes, dict)):
-            result.extend(flatten_filter(item))
-        else:
-            result.append(item)
-    return result
-
-def bool_filter(value):
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.lower() in ['true', 'yes', '1', 'on', 't', 'y']
-    return bool(value)
-
-def match_test(value, pattern):
-    import re
-    return bool(re.search(pattern, str(value)))
-
-def lookup_func(lookup_type, command):
-    if lookup_type == 'pipe' and command == 'date +%s':
-        import time
-        return str(int(time.time()))
-    return ""
-
-def dirname_filter(path):
-    return os.path.dirname(path)
-
-def basename_filter(path):
-    return os.path.basename(path)
 
 def ensure_dir(path, mode=0o750, uid=0, gid=0):
     if not os.path.exists(path):
@@ -170,7 +109,10 @@ def reload_zone(zone, src, dst, uid, gid):
     if res is None or res.returncode != 0:
         print(f"  Warning: BIND9 did not accept zone {zone}: {(res.stderr or res.stdout).strip() if res else 'timeout'}")
 
-def apply_deployment():
+def apply_deployment(start_services=True):
+    """Render and deploy all configuration. With start_services=False (first
+    install, used by `fabricctl setup`) files are deployed but nothing is
+    started, restarted or reloaded: certificates do not exist yet."""
     print("Starting native Python deployment...")
     
     custom_vars_path = os.environ.get("CUSTOM_VARS_PATH", os.path.join(TARGET_FABRIC, "config/custom-vars.yaml"))
@@ -235,29 +177,10 @@ def apply_deployment():
         
     # 3. Render vars.yaml.j2
     jinja_dir = os.path.join(FABRIC_DIR, 'jinja')
-    jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(jinja_dir), keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
-    jinja_env.filters['to_nice_yaml'] = to_nice_yaml_filter
-    jinja_env.filters['unique'] = unique_filter
-    jinja_env.filters['regex_replace'] = regex_replace_filter
-    jinja_env.filters['b64encode'] = b64encode_filter
-    jinja_env.filters['flatten'] = flatten_filter
-    jinja_env.filters['bool'] = bool_filter
-    jinja_env.filters['dirname'] = dirname_filter
-    jinja_env.globals['lookup'] = lookup_func
-    jinja_env.tests['match'] = match_test
-    jinja_env.filters['basename'] = basename_filter
-    jinja_env.filters['to_json'] = json.dumps
-    jinja_env.filters['combine'] = lambda base, *others: {k: v for d in (base, *others) for k, v in (d or {}).items()}
+    jinja_env = jinja_env_for(jinja_dir)   # fabriclib/common/jinja_env.py
     
     merged_context = {**secrets, **custom_vars}
-    merged_context['playbook_dir'] = os.path.join(FABRIC_DIR, 'playbooks')
-    
-    now = datetime.utcnow()
-    merged_context['ansible_date_time'] = {
-        'iso8601': now.isoformat() + 'Z',
-        'date': now.strftime('%Y-%m-%d'),
-        'time': now.strftime('%H:%M:%S')
-    }
+    merged_context['render_date'] = datetime.utcnow().strftime('%Y-%m-%d')
     
     try:
         vars_template = jinja_env.get_template('vars.yaml.j2')
@@ -468,7 +391,6 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         return changed
 
     # Sync repo fabric directory (safely)
-    # Exclude jinja, playbooks if we want, but copying full is fine.
     if os.path.realpath(FABRIC_DIR) != os.path.realpath(TARGET_FABRIC):
         copy_tree_with_perms(FABRIC_DIR, TARGET_FABRIC, 0, 0, 0o640, 0o750)
     
@@ -492,14 +414,20 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         os.chmod(os.path.join(TARGET_FABRIC, "config/link-vars.yaml"), 0o644)
     
     # Nginx Web Assets
-    for folder in ['certificates', 'shared', 'landing', 'manual']:
+    for folder in ['certificates', 'shared', 'landing', 'manual', 'ldap']:
         src_dir = os.path.join(render_tmp, f"nginx/www/{folder}")
         dest_dir = os.path.join(DEPLOY_BASE_DIR, f"nginx/www/{folder}")
         if os.path.exists(src_dir):
             copy_tree_with_perms(src_dir, dest_dir, nginx_uid, nginx_gid, 0o644, 0o755)
             
-    if os.path.exists(os.path.join(REPO_DIR, "docs")):
-        copy_tree_with_perms(os.path.join(REPO_DIR, "docs"), os.path.join(DEPLOY_BASE_DIR, "nginx/www/manual/docs"), nginx_uid, nginx_gid, 0o644, 0o755)
+    # Docs: from a checkout (<repo>/docs), kept in the installed tree
+    # (<fabric>/docs) so setup/reinstall run from /opt/fabric still has them.
+    docs_src = next((d for d in (os.path.join(REPO_DIR, "docs"), os.path.join(FABRIC_DIR, "docs"))
+                     if os.path.isdir(d)), None)
+    if docs_src:
+        if os.path.realpath(docs_src) != os.path.realpath(os.path.join(TARGET_FABRIC, "docs")):
+            copy_tree_with_perms(docs_src, os.path.join(TARGET_FABRIC, "docs"), 0, 0, 0o644, 0o755)
+        copy_tree_with_perms(docs_src, os.path.join(DEPLOY_BASE_DIR, "nginx/www/manual/docs"), nginx_uid, nginx_gid, 0o644, 0o755)
         
     # Service Directories, Config Files & Systemd Wrappers
     services_to_restart = set()
@@ -616,8 +544,41 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
     step_uid, step_gid = get_service_user(final_vars, 'step')
     ensure_dir(os.path.join(DEPLOY_BASE_DIR, "stepca/data"), 0o750, step_uid, step_gid)
     if os.path.exists(os.path.join(render_tmp, "stepca/templates/certs")):
-        if copy_tree_with_perms(os.path.join(render_tmp, "stepca/templates"), os.path.join(DEPLOY_BASE_DIR, "stepca/templates"), step_uid, step_gid, 0o640, 0o750):
+        if copy_tree_with_perms(os.path.join(render_tmp, "stepca/templates"), os.path.join(DEPLOY_BASE_DIR, "stepca/data/templates"), step_uid, step_gid, 0o640, 0o750):
             services_to_restart.add('stepca')
+
+    # Runtime data directories (owned by the service that writes them)
+    for rel, user, wanted in [("bind9/data", "bind", True), ("bind9/log", "bind", True), ("bind9/cache", "bind", True),
+                              ("dirsrv/data", "ldap", final_vars.get('install_ldap')),
+                              ("dirsrv/data/tls", "ldap", final_vars.get('install_ldap'))]:
+        if wanted:
+            ensure_dir(os.path.join(DEPLOY_BASE_DIR, rel), 0o750, *get_service_user(final_vars, user))
+    if final_vars.get('install_keycloak'):
+        ensure_dir(final_vars.get('postgres_data_dir', os.path.join(DEPLOY_BASE_DIR, "postgres/data")), 0o750,
+                   *get_service_user(final_vars, 'postgres'))
+        ensure_dir(final_vars.get('keycloak_data_dir', os.path.join(DEPLOY_BASE_DIR, "keycloak/data")), 0o750,
+                   *get_service_user(final_vars, 'keycloak'))
+
+    # RFC2136 credentials for non-primary TSIG keys (certbot-style DNS-01 clients)
+    for key in tsig_keys:
+        if 'primary' in key:
+            continue
+        src = os.path.join(render_tmp, f"rfc2136/{key['name']}/rfc2136.ini")
+        dst = key.get('out') or os.path.join(DEPLOY_BASE_DIR, key['name'], "rfc2136.ini")
+        if os.path.exists(src):
+            os.makedirs(os.path.dirname(dst), mode=0o700, exist_ok=True)
+            shutil.copy2(src, dst)
+            os.chown(dst, 0, 0)
+            os.chmod(dst, 0o600)
+
+    if not start_services:
+        # Nothing is running yet: zone files are simply put in place.
+        for zone, src, dst in changed_zones:
+            install_zone_file(src, dst, bind_uid, bind_gid)
+        if daemon_reload_needed:
+            subprocess.run(["systemctl", "daemon-reload"], timeout=30)
+        print("Configuration deployed (services not started).")
+        return services_to_restart
 
     # Reloading services
     def get_svc_timeout(s):

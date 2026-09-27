@@ -3,6 +3,7 @@
 # Run fabric's test suites against real containers.
 #
 #   sudo tests/run-all.sh [suite ...]      suites: render nginx zone webui dirsrv keycloak hardening
+#   sudo tests/run-all.sh sandbox          opt-in: full install in a systemd + Docker sandbox (~10 min)
 #
 # Needs: Linux (amd64 or arm64), Docker with buildx, python3 with yaml +
 # jinja2, openssl, curl, setpriv. Runs as root (chown to service uids,
@@ -38,6 +39,7 @@ for s in "${SUITES[@]}"; do
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
         keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
         hardening) run hardening bash "$HERE/hardening/run.sh" ;;
+        sandbox)  run sandbox  bash "$HERE/sandbox/run.sh" ;;
         *) echo "unknown suite: $s" >&2; exit 2 ;;
     esac
 done

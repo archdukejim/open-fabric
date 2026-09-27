@@ -9,3 +9,8 @@ and import as `fabriclib.<domain>.<file>`.
 | [common/](common/) | Shared helpers: paths, vars file, locking, audit log, errors |
 | [dns/](dns/) | DNS zones and records in `vars.yaml` (validated), zone sync status |
 | [system/](system/) | Version, service status, apply |
+| [setup/](setup/) | `fabricctl setup`, `doctor`, `uninstall`, `reinstall` — the installer |
+| [pki/](pki/) | Issue, check and install certificates from Step-CA |
+| [security/](security/) | Firewall for Docker-published ports |
+
+`cli.py` routes the lifecycle commands (`fabricctl setup|doctor|uninstall|reinstall`).

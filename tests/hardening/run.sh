@@ -12,6 +12,8 @@
 # that runs a live fabric stack.
 # -----------------------------------------------------------------------
 set -uo pipefail
+exec 9>/tmp/fabric-hardening-suite.lock
+flock -n 9 || { echo "another hardening run is active; refusing to start" >&2; exit 2; }
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"

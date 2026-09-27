@@ -48,7 +48,7 @@
     {% endblock %}
 
     <footer>
-      &#10227; Last Updated: {{ ansible_date_time.date | default('2026-04-29', true) }}.<br>
+      &#10227; Last Updated: {{ render_date | default('', true) }}.<br>
       {% if copyright | default('', true) %}&#169; {{ copyright }} {% endif %}{{ friendly_name | default(ca_name, true) }}{% if service_mark | default('', true) %} &#8480; {{ service_mark }}{% endif %}{% if trademark | default('', true) %} &#8482; {{ trademark }}{% endif %}
       {% if address_line1 | default('', true) or address_line2 | default('', true) %}
       <br>{{ address_line1 | default('', true) }}{% if address_line1 | default('', true) and address_line2 | default('', true) %}, {% endif %}{{ address_line2 | default('', true) }}

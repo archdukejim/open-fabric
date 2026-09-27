@@ -16,7 +16,6 @@ from fabriclib.dns.remove_record import remove_record  # noqa: E402
 from fabriclib.dns.sync_status import sync_status  # noqa: E402
 from fabriclib.dns.validate_record import HOST_RE  # noqa: E402
 FABRIC_DIR = os.path.dirname(SCRIPT_DIR)
-PLAYBOOKS_DIR = os.path.join(FABRIC_DIR, "playbooks")
 CUSTOM_VARS_FILE = os.path.abspath(os.path.join(FABRIC_DIR, "config/vars.yaml"))
 DEPLOYED_VARS_FILE = "/opt/fabric/config/vars.yaml"
 DEPLOY_BASE_DIR = os.path.dirname(FABRIC_DIR)
@@ -40,7 +39,7 @@ IMMUTABLE_KEYS = {
     "cert_intermediate_key_param", "cert_service_days", "cert_acme_lifetime_hours",
     "stepca_port", "stepca_cert_allow_subordinate_ca", "stepca_cert_max_lifetime_hours",
     "byoc", "root_cert_name", "ca_crt_path", "ica_crt_path", "ica_key_path", "extra_certs",
-    "deploy_base_dir", "repo_source", "domain"
+    "deploy_base_dir", "domain"
 }
 
 WARNED_KEYS = {

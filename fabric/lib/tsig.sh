@@ -73,7 +73,7 @@ do_tsig_keys() {
 
     # Append ACME challenge grants to named.conf.zones
     for record in "${records[@]}"; do
-        sed -i "/managed outside of Ansible/a\\        grant \"${key_name}\" name _acme-challenge.${record}.${key_domain}. TXT;" "$zones_file"
+        sed -i "/managed outside of \(Ansible\|the templates\)/a\\        grant \"${key_name}\" name _acme-challenge.${record}.${key_domain}. TXT;" "$zones_file"
     done
     chown "$(stat -c '%u:%g' "$zones_file")" "$zones_file"
     ok "ACME grants added to ${zones_file}"

@@ -1,21 +1,22 @@
-# Design: `fabricctl` as an apt package (replacing Ansible), Kea DHCP, 802.1X
+# Design: `fabricctl` as an apt package, Kea DHCP, 802.1X
 
-Status: **proposal — for decision**. Nothing here is implemented yet.
+Status: **in progress.** Done: phase 0 (rename), container hardening, and phase 1 — the native installer (`fabricctl setup`, §4); Ansible and the playbooks are removed. The rest is proposal.
 
 ## 1. Goal
 
-Installing fabric today means cloning the repo on a controller, installing
+Installing fabric used to mean cloning the repo on a controller, installing
 Ansible and running 12 playbooks (~3,000 lines) against the target over SSH.
-The goal:
+Today it is `git clone` + `sudo ./setup.sh` on the host itself (native
+Python, §4). The goal:
 
 ```bash
 sudo apt install fabricctl        # one package, one command
-sudo fabricctl init               # interactive, or: fabricctl init --config fabric.yaml
+sudo fabricctl setup               # interactive, or: fabricctl setup --file vars.yaml
 ```
 
-Everything `setup.sh` + Ansible does today (preconditioning, rendering,
-PKI bootstrap, containers, checks) happens locally on the host, driven by
-`fabricctl`. Day-2 operations stay the same command (`fabricctl apply`,
+Everything setup does (preconditioning, rendering, PKI bootstrap,
+containers, checks) already happens locally on the host, driven by
+`fabricctl`; the package only changes how the code arrives. Day-2 operations stay the same command (`fabricctl apply`,
 `fabricctl dns ...`) and the web UI.
 
 The package and the command share one name. Plain `fabric` is taken
@@ -91,14 +92,13 @@ Every setting can be changed later (`fabricctl security …`,
 
 | Today | Reuse |
 |---|---|
-| `fabric/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | Becomes the core of the installer; already replaces playbooks 01 and 04 for day-2 changes |
+| `fabric/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
 | `fabric/lib/webui/` (container app), `fabric/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh`, `ldap_migrate.*` | Ship as-is inside the package |
 | `fabric/jinja/**` templates | Ship as-is (package data) |
-| Playbooks 02, 03, 05–10 | **Port** to Python modules (see §4) |
+| `fabriclib/setup/` — the native installer (§4) | Ships as-is |
 | `fabriclib/` (one operation per file) | The package's library layout from day one |
 
-Only the "first install" half of the Ansible code needs porting; the
-day-2 half is already native.
+Both the first-install and day-2 halves are native Python.
 
 ## 3. Package design
 
@@ -118,21 +118,21 @@ fabricctl_<ver>_<arch>.deb
   `docker.io | docker-ce`, `docker-compose-v2 | docker-compose-plugin`,
   `openssl`, `curl`. All from the distro — no pip, no venv.
 - **Architectures:** `all` (pure Python) — one package for amd64 and arm64
-  (Raspberry Pi). Images are per-arch and pulled/built at `init`.
+  (Raspberry Pi). Images are per-arch and pulled/built at `setup`.
 - **Maintainer scripts** stay minimal (create `fabric` system group,
   directories). `postinst` never starts services or touches the network —
-  `fabricctl init` does the real work, so `apt install` is always safe and
+  `fabricctl setup` does the real work, so `apt install` is always safe and
   reversible.
 - **Config location:** move from `/opt/fabric/config` to `/etc/fabric`
   (config) and `/var/lib/fabric` (state) per FHS; service data stays in
   `/opt/<service>` (or becomes `/var/lib/fabric/<service>`, decision D3).
-  `fabricctl` migrates `/opt/fabric` on first run (like `00b-migrate-from-core`).
+  `fabricctl` migrates `/opt/fabric` on first run (like the `migrate` step does for core-template).
 - **Distribution:** a signed apt repository published from GitHub Actions to
   GitHub Pages (`aptly`/`reprepro`, GPG key in repo secrets). Users add one
   `sources.list.d` entry + keyring. Releases also attach the `.deb` for
   manual `apt install ./fabricctl_*.deb`.
 - **Offline installs:** `fabricctl-images_<ver>_<arch>.deb` (or a tarball)
-  carries `docker save` output; `fabricctl init --offline` loads it.
+  carries `docker save` output; `fabricctl setup --offline` loads it.
 
 ### Language
 
@@ -141,34 +141,35 @@ fabricctl_<ver>_<arch>.deb
 | **Python in the .deb (recommended)** | Reuses deploy.py, webui, bootstrap, seeders (~70% of the code); Debian-native deps; `Architecture: all` | Python startup (~150 ms); distro Python version floor |
 | Go static binary | Single file, no runtime deps | Full rewrite incl. web UI and Keycloak/LDAP logic; templates must move to Go `text/template` or keep a Jinja dependency |
 
-## 4. Porting the playbooks
+## 4. Porting the playbooks ✅
 
-Each playbook becomes an idempotent, individually re-runnable step
-(`fabricctl init --step pki`), with the same checks as today:
+Done: each playbook became an idempotent, individually re-runnable step in
+`fabric/lib/fabriclib/setup/` (`fabricctl setup --step pki`), and the
+playbooks were deleted. Mapping:
 
 | Playbook | `fabricctl` step | Notes |
 |---|---|---|
 | 00 controller check | *(gone)* | No controller any more |
-| 00b migrate-from-core | `migrate` | Also migrates `/opt/fabric` → `/etc` + `/var/lib` |
-| 01 gen vars + render | `render` | Already in deploy.py |
-| 02 system conditioning | `precondition` | Packages come from `Depends:`; sysctl, free port 53 from systemd-resolved, time sync check |
-| 03 service accounts | `accounts` | `systemd-sysusers` snippet shipped in the package |
-| 04 file structure | `render` / `deploy` | Already in deploy.py |
-| 05 network | `network` | Resolver drop-in, `fabric_net` |
-| 06 configure Step-CA | `pki` | Largest port: CA init, BYOC import |
-| 07 bootstrap containers | `pki` | |
-| 08 mint service certs | `certs` | Logic already duplicated in services.sh; consolidate |
+| 00b migrate-from-core | `migrate` | Later (phase 2) also `/opt/fabric` → `/etc` + `/var/lib` |
+| 01 gen vars + render | `deploy` | deploy.py; settings from `collect_vars` + `choose_plan` |
+| 02 system conditioning | `preflight`, `host`, `docker` | Checks, packages + Docker Engine, daemon hardening; later packages come from `Depends:` |
+| 03 service accounts | `accounts` | Later a `systemd-sysusers` snippet in the package |
+| 04 file structure | `deploy` | deploy.py |
+| 05 network | `network`, `firewall` | Resolver drop-in, `fabric_net`; UFW + `DOCKER-USER` |
+| 06 configure Step-CA | `pki` | CA init, BYOC import |
+| 07 bootstrap containers | `bootstrap` | |
+| 08 mint service certs | `certs` | One implementation (`fabriclib/pki/`); also `fabricctl certs` |
 | 09 start + configure | `start` | dirsrv seed + keycloak_bootstrap already native |
-| 10 checks | `check` | Also exposed as `fabricctl doctor` and in the web UI |
+| 10 checks | `verify` | Also `fabricctl doctor`; web UI later |
 
-**Remote install without Ansible:**
+**Remote install** (after the `.deb`, phase 2):
 
 ```bash
-ssh admin@pi 'sudo apt install -y fabricctl && sudo fabricctl init --config -' < fabric.yaml
+ssh admin@pi 'sudo apt install -y fabricctl && sudo fabricctl setup --file /dev/stdin --non-interactive --yes' < fabric.yaml
 ```
 
-`setup.sh` stays for one release as a thin wrapper that does exactly that,
-then is removed along with `fabric/playbooks/`.
+Until then: clone the repo on the host and run `sudo ./setup.sh`; it is a
+thin bootstrap into `fabricctl setup`.
 
 ## 5. Kea DHCP
 
@@ -424,11 +425,11 @@ the webui container still holds no secrets itself.
 | 0.6 | Signed image channels on GitHub Pages, local registry, `fabric-update` timer with rollback, offline export/import | 0.5 |
 | 0.7 | OpenBao: container, auto-unseal from key file, OIDC login via Keycloak, KV for fabric (import `fabric-secrets.yml`) and apps | 0.5 |
 | 0.8 | OpenBao: rotated DB/LDAP credentials, SSH certificate CA, web UI Secrets section | 0.7 |
-| 1 | `fabricctl init` natively (port 02, 03, 05–10); Ansible kept as fallback | — |
+| 1 ✅ | Native installer `fabricctl setup` (all playbooks ported); Ansible removed | — |
 | 2 | `.deb` build + signed apt repo in CI (amd64 + arm64 test runs); `setup.sh` becomes a wrapper | 1 |
 | 3 | Kea DHCP + DDNS + reservations (CLI + UI) | 2 |
 | 4 | FreeRADIUS 802.1X: EAP-TLS, SCEP, MAB, dynamic VLANs | 3 (MAB uses reservations) |
-| 5 | Web UI: PKI, directory, roles, health; remove Ansible | 3, 4 |
+| 5 | Web UI: PKI, directory, roles, health | 3, 4 |
 
 Each phase ships on its own and is tested the same way as 1.5.0: real
 containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
@@ -444,7 +445,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D5 | Lease backend: memfile or Postgres | memfile; Postgres only if HA or large lease counts |
 | D6 | Which switches/APs must 802.1X support (vendor affects VLAN attributes, CoA, RadSec) | Needs your inventory |
 | D7 | Apt repo hosting: GitHub Pages vs Cloudsmith/packagecloud | GitHub Pages (no third party, free, signed) |
-| D8 | Keep `setup.sh`/Ansible for remote install after phase 2? | One release as a wrapper, then remove |
+| D8 ✅ | Keep Ansible for remote install? | No: removed. `setup.sh` is a local bootstrap; remote = ssh + apt (phase 2) |
 | D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b) |
 | D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b) |
 | D11 ✅ | Docker privilege | Harden all containers + daemon; userns-remap on by default; rootless opt-in with stated limits (§1b, §7a) |

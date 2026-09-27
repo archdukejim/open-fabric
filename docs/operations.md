@@ -20,7 +20,8 @@ Use `fabricctl` (the global wrapper powered by the interactive Python engine) fo
   - [TSIG Keys](#tsig-keys)
   - [Landing Page Links](#landing-page-links)
 - [Migrating from OpenLDAP](#migrating-from-openldap)
-- [Ansible Tags Reference (Initial Install Only)](#ansible-tags-reference-initial-install-only)
+- [Lifecycle Commands](#lifecycle-commands)
+- [Upgrading from core-template](#upgrading-from-core-template)
 - [Service Ports](#service-ports)
 
 ---
@@ -212,7 +213,7 @@ The following chart outlines the memory footprint and CPU impact of the deployed
 
 ## Upgrading from core-template
 
-fabric was previously named core-template. Re-running `sudo ./setup.sh` from a fabric checkout migrates an existing install in place (playbook `00b-migrate-from-core.yml`, a no-op on fresh or already-migrated hosts):
+fabric was previously named core-template. Re-running `sudo ./setup.sh` from a fabric checkout migrates an existing install in place (the `migrate` setup step, a no-op on fresh or already-migrated hosts):
 
 | Before | After |
 |---|---|
@@ -244,33 +245,18 @@ Deployments before 1.5.0 ran `osixia/openldap` from `/opt/openldap`. The upgrade
 
 ---
 
-## Ansible Tags Reference (Initial Install Only)
+## Lifecycle Commands
 
-> [!NOTE]
-> Ansible is now strictly used for the **initial deployment and bootstrapping** of the infrastructure. For any day-2 operations (e.g. changing configurations, minting certificates, updating DNS), use the Python-based `fabricctl` interactive CLI instead.
+Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fabriclib/setup/`). All are idempotent. See [install.md](install.md#run-the-installer) for options and the step list.
 
-The full playbook (`fabric/playbooks/fabric-config.yml`) is an `import_playbook` entry point composed of individual playbooks in `fabric/playbooks/`. During an initial install, each section can be run directly:
-
-```bash
-# Via setup.sh (recommended — handles SSH key setup and sudo)
-sudo ./setup.sh --custom --tags <tag>
-
-# Or directly with ansible-playbook
-ansible-playbook fabric/playbooks/09-start-and-configure.yml -e target_host=fabric
-```
-
-| Tag | Section | Playbook | What it does |
-|-----|---------|----------|-------------|
-| `prereqs`,`validation` | 00 | `00-controller-check.yml` | Validate controller environment |
-| *(always)* `handle-vars`, `render-jinja` | 01 | `01-gen-vars-and-render-jinja.yml` | Generate CA password + TSIG secrets into `fabric-secrets.yml` (idempotent); Merge all vars + secrets; render every template to `/tmp/fabric-render` |
-| `users` | 03 | `03-target-service-accounts.yml` | Create service accounts (nginx, bind, step, ldap) |
-| `file-structure`, `bind9`, `stepca`, `nginx`, `add-ldap`, `dirsrv`, `webui`, `systemd` | 04 | `04-target-file-structure.yml` | Create directory tree; deploy configs, stepca dirs, bind9 runtime dirs, 389-DS seed files, webui config + image build context, `fabric-agent` unit, `webui` compose wrapper; create `fabricctl` global wrapper |
-| `network`, `firewall` | 05 | `05-target-network.yml` | Harden systemd-resolved; configure UFW (LAN allow-list) |
-| `pki`, `stepca` | 06 | `06-configure-stepca.yml` | Sign intermediate CA CSR (if deployed); initialize and configure step-ca |
-| `pki`, `bootstrap` | 07 | `07-bootstrap-containers.yml` | Bootstrap bind9+step-ca containers safely |
-| `pki`, `mint-certs` | 08 | `08-mint-service-certs.yml` | Mint BIND9 TLS, service certs (incl. `mgr.<domain>`), and `extra_certs`; install 389-DS TLS files and the webui client-CA bundle |
-| `start`, `configure`, `keycloak` | 09 | `09-start-and-configure.yml` | Start full stack; seed 389-DS; run `keycloak_bootstrap.py`; start `fabric-agent`, build (`--pull`, online only) and start `webui` |
-| `verify`, `deploy-checks`, `cleanup` | 10 | `10-deploy-checks-and-cleanup.yml` | dig DNS; check nginx/HTTPS; LDAP role-account binds, plaintext-bind refusal, LDAPS cert; webui socket, `fabric-agent` socket (`0660`, webui gid) + `400` without client cert; export 30s logs; drop stack if `no_start` |
+| Command | What it does |
+|---|---|
+| `sudo fabricctl setup [--file vars.yaml]` | Install or re-converge. Re-run after changing settings. |
+| `sudo fabricctl setup --step <name>` | Run one step, e.g. `--step firewall` after editing `security.firewall_allow` |
+| `sudo fabricctl doctor` | End-to-end checks of the running install (the `verify` step) |
+| `sudo fabricctl certs [--force]` | Renew service certificates that are missing, expiring within 30 days or missing a name (`--force`: all of them); restarts only the services whose certificates changed |
+| `sudo fabricctl reinstall` | Uninstall + setup, keeping config, secrets, the CA and certificates |
+| `sudo fabricctl uninstall` | Remove fabric's containers, images, network, units, accounts and `/opt` directories (nothing else) |
 
 ---
 

@@ -14,12 +14,12 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] Variables in `custom-vars.yaml` have been correctly rendered.
 
 ## 2. Full Installation Test
-- [ ] **Action**: Run `sudo ./setup.sh`.
+- [ ] **Action**: Run `sudo ./setup.sh --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox).
 - [ ] **Expected**:
-  - Playbooks 00-10 complete successfully without failure.
+  - Every setup step completes and setup prints `fabric is ready`; `sudo fabricctl doctor` passes; a second `sudo fabricctl setup` converges without re-issuing certificates; no secret appears in any process's argv.
   - Docker containers `nginx`, `bind9`, `step-ca` (and optionally `dirsrv`, `keycloak`, `postgres`, `webui`) are healthy.
   - If Keycloak is enabled, `systemctl is-active webui fabric-agent` reports `active` for both.
-  - Playbook 10 LDAP/webui checks pass (role-account binds, plaintext bind refused, LDAPS cert verifies, agent socket `0660` with webui gid, webui returns `400` without a client cert).
+  - The `verify` step's LDAP/webui checks pass (role-account binds, plaintext bind refused, LDAPS cert verifies, agent socket `0660` with webui gid, webui returns `400` without a client cert).
 - [ ] **Validation**: 
   - `docker ps` shows all containers running.
   - `nslookup dns.<domain> localhost -port=<bind_dns_port>` returns the host IP.
@@ -37,7 +37,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 ### 3.2 PKI / Bring Your Own Certs (BYOC)
 - [ ] **Action**: Conduct a teardown (`sudo ./setup.sh --uninstall --force`) to prepare a clean environment.
 - [ ] **Action**: Generate an offline Root CA, set `byoc: true` and specify paths in `custom-vars.yaml`.
-- [ ] **Action**: Run `sudo ./setup.sh`.
+- [ ] **Action**: Run `sudo ./setup.sh --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox).
 - [ ] **Expected**: Step-CA imports the offline CA and starts successfully.
 - [ ] **Validation**: Inspect `/opt/stepca/data/certs/` to confirm the BYOC intermediate cert is present.
 

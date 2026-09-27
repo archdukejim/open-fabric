@@ -55,7 +55,7 @@ The repo must stay easy to navigate. For all of our own code:
   what it is, why it is stale, its possible value and a recommendation. The
   owner decides later.
 - Verify before calling code stale: search for callers across the repo
-  (including playbooks, templates, systemd units and docs), not only the
+  (including templates, systemd units, tests and docs), not only the
   file's own language.
 - Docs that describe things that no longer exist are stale too: fix them,
   or register them if the fix depends on a pending decision.

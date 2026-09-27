@@ -35,7 +35,7 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 ## Phase 3: LDAP Federation Configuration
 
 ### Automated Configuration (`keycloak_bootstrap.py`)
-Playbook 09 runs `fabric/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from `fabric-secrets.yml` — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
+The `start` setup step (and `fabricctl --keycloak-sync`) runs `fabric/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from `fabric-secrets.yml` — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
 
 ```bash
 sudo fabricctl --keycloak-sync
@@ -74,7 +74,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 ## Phase 4: Security & ACLs
 
 ### 389-DS Seeding (cn=config and the tree)
-*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`dirsrv.sh seed`, run by playbook 09 and by `fabricctl --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
+*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`dirsrv.sh seed`, run by the `start` setup step and by `fabricctl --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
 *   `00-config.ldif` hardens the server: `nsslapd-require-secure-binds: on`, `nsslapd-minssf: 56` (rootDSE excluded), TLS 1.2 minimum, `PBKDF2-SHA512` password storage, password syntax checks (min length 12, 3 categories), lockout after 5 failures for 900 s, and enables the `memberOf` and `entryUUID` plugins.
 *   `10-tree.ldif` creates the suffix, OUs and groups (`groupOfNames` + `posixGroup`, so both `member` and `gidNumber` work). `20-accounts.ldif` creates the role accounts. `30-aci.ldif` holds the ACIs.
 

@@ -264,10 +264,9 @@ do_service_cert() {
     if [ "$SUB_MODE" = "apply" ]; then
         info "Re-issuing all core service certificates..."
         echo ""
-        run_service_certs
+        python3 "$FABRIC_DIR/lib/fabriclib/cli.py" certs --force
         echo ""
-        ok "Service certificates re-issued."
-        info "Reload nginx to apply: docker exec nginx nginx -s reload"
+        ok "Service certificates re-issued (affected services restarted)."
         return
     fi
 
@@ -290,12 +289,12 @@ do_service_cert() {
     done
 
     echo ""
-    warn "Re-issuing will replace all four certificates. nginx must be reloaded after."
+    warn "Re-issuing replaces every service certificate and restarts the affected services."
     local confirm; read -rp "  Re-issue all service certificates? [y/N] " confirm
     [[ "$confirm" =~ ^[yY] ]] || { info "Cancelled."; exit 0; }
 
     echo ""
-    run_service_certs
+    python3 "$FABRIC_DIR/lib/fabriclib/cli.py" certs --force
     echo ""
     ok "Service certificates re-issued."
     info "Reload nginx to apply: docker exec nginx nginx -s reload"

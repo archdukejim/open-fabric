@@ -43,12 +43,15 @@ set -euo pipefail
 actual_script=$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || realpath "${BASH_SOURCE[0]}")
 SCRIPT_DIR="$(cd "$(dirname "$actual_script")" && pwd)"
 FABRIC_DIR="$(dirname "$SCRIPT_DIR")"
-PLAYBOOKS_DIR="$FABRIC_DIR/playbooks"
+
+# Lifecycle commands are Python (fabric/lib/fabriclib/cli.py).
+case "${1:-}" in
+    setup|doctor|certs|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
+esac
 VARS_FILE="$FABRIC_DIR/config/vars.yaml"
 
 # Source shared library modules
 source "$FABRIC_DIR/lib/output.sh"
-source "$FABRIC_DIR/lib/services.sh"
 source "$FABRIC_DIR/lib/vars.sh"
 source "$FABRIC_DIR/lib/tsig.sh"
 source "$FABRIC_DIR/lib/certs.sh"
@@ -97,8 +100,6 @@ if [ -z "$MODE" ]; then
     MODE="interactive"
 fi
 
-export FABRIC_DEBUG=0
-
 # Pass 2: parse flags
 set -- "${ARGS[@]}"
 while [[ $# -gt 0 ]]; do
@@ -119,12 +120,6 @@ while [[ $# -gt 0 ]]; do
         --intermediate-ca)
             IS_CA=true
             if [[ "${2:-}" =~ ^[0-9]+$ ]]; then PATH_LEN="$2"; shift; fi
-            shift ;;
-        --debug)
-            export FABRIC_DEBUG=1
-            export ANSIBLE_LOG_PATH="/var/log/fabricctl-debug.log"
-            export ANSIBLE_VERBOSITY=4
-            echo -e "${BLUE}Debug mode enabled. Logging all ansible actions to: $ANSIBLE_LOG_PATH${NC}"
             shift ;;
         *)  err "Unknown flag: $1"; exit 1 ;;
     esac
@@ -185,47 +180,9 @@ except Exception as e:
     sys.exit(1)
 
 # Set up jinja environment with the same custom filters as fabricctl
-env = jinja2.Environment(loader=jinja2.FileSystemLoader(os.path.dirname(template_path) or '.'), keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
-env.filters['to_nice_yaml'] = lambda x, indent=4: yaml.safe_dump(x, default_flow_style=False, indent=indent).strip()
-def unique_filter_manage(x, attribute=None):
-    import json
-    if not x: return []
-    seen = set()
-    res = []
-    for item in x:
-        val = item.get(attribute, item) if isinstance(item, dict) and attribute else getattr(item, attribute, item) if attribute else item
-        try:
-            hash_val = val
-            if isinstance(val, (dict, list)):
-                hash_val = json.dumps(val, sort_keys=True)
-        except Exception:
-            hash_val = str(val)
-        if hash_val not in seen:
-            seen.add(hash_val)
-            res.append(item)
-    return res
-env.filters['unique'] = unique_filter_manage
-
-def flatten_filter(value):
-    import collections.abc
-    result = []
-    for item in value:
-        if isinstance(item, collections.abc.Iterable) and not isinstance(item, (str, bytes, dict)):
-            result.extend(flatten_filter(item))
-        else:
-            result.append(item)
-    return result
-env.filters['flatten'] = flatten_filter
-
-def match_test(value, pattern):
-    import re
-    return bool(re.search(pattern, str(value)))
-env.tests['match'] = match_test
-env.filters['bool'] = lambda x: str(x).lower() in ['true', 'yes', '1', 'on', 't', 'y']
-env.filters['dirname'] = os.path.dirname
-env.filters['basename'] = os.path.basename
-env.filters['to_json'] = __import__('json').dumps
-env.filters['combine'] = lambda base, *others: {k: v for d in (base, *others) for k, v in (d or {}).items()}
+sys.path.insert(0, '$FABRIC_DIR/lib')
+from fabriclib.common.jinja_env import jinja_env
+env = jinja_env(os.path.dirname(template_path) or '.')
 
 try:
     template = env.get_template(os.path.basename(template_path))

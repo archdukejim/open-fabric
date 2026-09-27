@@ -9,3 +9,7 @@
 | `vars_lock.py` | Exclusive lock around read-modify-write of `vars.yaml` |
 | `write_audit.py` | Append one line to the audit log with the acting user and source |
 | `read_audit.py` | Last N audit lines, newest first |
+| `run.py` | Run a command as an argument list (never a shell); raise `CommandError` with stderr on failure |
+| `console.py` | `heading` / `info` / `ok` / `warn` / `err` output (colour only on a terminal) |
+| `wait_healthy.py` | Wait for a container's Docker healthcheck |
+| `dns_query.py` | A-record lookup against one DNS server (stdlib; no `dig` needed) |

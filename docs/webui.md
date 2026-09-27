@@ -52,7 +52,7 @@ The web app (TLS header checks, OIDC, sessions, HTML) holds no privilege: no Doc
 | fabric-agent | `/opt/fabric/lib/agent/server.py` (routes to `fabric/lib/fabriclib/`); unit `/etc/systemd/system/fabric-agent.service` from `fabric/jinja/systemd/fabric-agent.service.j2` (root, sandboxed, no network listener) |
 | Agent socket | `/opt/webui/agent/agent.sock` (`root:<webui gid> 0660`; dir `root:<webui gid> 0750`) |
 | nginx vhost | `server_name hostname_mgr`; `ssl_verify_client on`, `ssl_verify_depth 2`, trust `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root) |
-| Server cert | `mgr.<domain>` offline Step-CA leaf, minted by playbook 08 |
+| Server cert | `mgr.<domain>` offline Step-CA leaf, issued by the `certs` setup step (renew: `fabricctl certs`) |
 | Keycloak | realm `webui_realm`, client `fabric-webui`, role `fabric-admin`, flow `fabric-webui-mfa` — created by `keycloak_bootstrap.py` |
 
 ---
