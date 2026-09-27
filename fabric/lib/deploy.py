@@ -175,6 +175,17 @@ def apply_deployment(start_services=True):
         print(f"Error: {e}")
         sys.exit(1)
     custom_vars['tsig_keys'] = tsig_keys
+    # A key's `acls` puts it in those BIND ACLs (same entries `fabricctl tsig
+    # --acl` writes), so a vars file can assign keys to ACLs directly.
+    acl_map = custom_vars.get('bind_acls') or {}
+    for key in tsig_keys:
+        for acl in key.get('acls') or []:
+            entries = acl_map.setdefault(acl, []) or []
+            if f'key "{key["name"]}"' not in entries:
+                entries.append(f'key "{key["name"]}"')
+            acl_map[acl] = entries
+    if acl_map:
+        custom_vars['bind_acls'] = acl_map
     for kname, secret in embedded.items():
         if secrets['tsig_secrets'].get(kname) != secret:
             secrets['tsig_secrets'][kname] = secret

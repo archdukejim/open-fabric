@@ -60,7 +60,7 @@ install_keycloak: true
 install_ldap: true
 install_webui: true
 tsig_keys:
-- { name: npm, records: [npm], secret: "$TSIG_SECRET" }
+- { name: npm, records: [npm], secret: "$TSIG_SECRET", acls: [npm-updaters] }
 EOF
 docker cp "$OUT/vars.yaml" "$NAME:/root/vars.yaml"
 
@@ -117,19 +117,49 @@ check "new record served by the running bind9" \
 : > "$OUT/rfc2136.log"; rfc2136 > /dev/null
 check "RFC2136 key still works after the re-runs (secret unchanged)" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
 
-echo "--- fabricctl tsig add/remove on the running install"
+echo "--- fabricctl tsig / acl on the running install"
+ACLF=/opt/bind9/config/named.conf.acl
+t2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test $1 '$2' $3" 2>&1 | tail -1; }   # key secret host
+secret_of() { in_box "python3 -c \"import yaml;print(yaml.safe_load(open('/opt/fabric/config/fabric-secrets.yml'))['tsig_secrets']['$1'])\""; }
+check "vars file: npm key is in ACL npm-updaters" \
+    "in_box \"sed -n '/acl \\\"npm-updaters\\\"/,/};/p' $ACLF\" | grep -q 'key \"npm\"'"
+
 S2=$(openssl rand -base64 32)
 in_box "umask 077; printf '%s' '$S2' > /root/nas.secret"
-in_box 'fabricctl tsig add nas --record nas --secret-file /root/nas.secret' > "$OUT/tsig.log" 2>&1
-check "tsig add with an existing secret applies" "grep -q \"TSIG key 'nas' active (existing secret kept)\" '$OUT/tsig.log'"
-check "the added key works over RFC2136" \
-    "in_box \"bash /root/rfc2136_test.sh $IP lan.test nas '$S2' nas\" | grep -q '4 passed, 0 failed'"
+in_box 'fabricctl tsig add nas --record nas --secret-file /root/nas.secret --acl nas-updaters' > "$OUT/tsig.log" 2>&1
+check "tsig add: existing secret kept, key in ACL nas-updaters" \
+    "grep -q \"TSIG key 'nas' added (existing secret kept), in ACL nas-updaters.\" '$OUT/tsig.log'"
+check "tsig add: key works over RFC2136" "[ \"\$(t2136 nas '$S2' nas)\" = '4 passed, 0 failed' ]"
+check "tsig add: ACL rendered with the key" "in_box \"sed -n '/acl \\\"nas-updaters\\\"/,/};/p' $ACLF\" | grep -q 'key \"nas\"'"
+
+in_box 'fabricctl tsig rotate nas' >> "$OUT/tsig.log" 2>&1
+S3=$(secret_of nas)
+check "tsig rotate: old secret refused" "[ \"\$(t2136 nas '$S2' nas | cut -d' ' -f1)\" != 4 ]"
+check "tsig rotate: new secret works" "[ -n '$S3' ] && [ '$S3' != '$S2' ] && [ \"\$(t2136 nas '$S3' nas)\" = '4 passed, 0 failed' ]"
+check "tsig rotate: rfc2136.ini carries the new secret" "in_box \"grep -qxF 'dns_rfc2136_secret = $S3' /opt/nas/rfc2136.ini\""
+
+in_box 'fabricctl tsig set-secret nas --secret-file /root/nas.secret' >> "$OUT/tsig.log" 2>&1
+check "tsig set-secret: the given secret works again" "[ \"\$(t2136 nas '$S2' nas)\" = '4 passed, 0 failed' ]"
+
+in_box 'fabricctl tsig update nas --record web' >> "$OUT/tsig.log" 2>&1
+check "tsig update: new record allowed" "[ \"\$(t2136 nas '$S2' web)\" = '4 passed, 0 failed' ]"
+check "tsig update: old record no longer allowed" "[ \"\$(t2136 nas '$S2' nas | cut -d' ' -f1)\" != 4 ]"
+
+in_box "fabricctl acl add lab 192.168.50.0/24 10.9.9.9 'key nas'" >> "$OUT/tsig.log" 2>&1
+check "acl add: rendered with CIDR, IP and key" \
+    "in_box \"sed -n '/acl \\\"lab\\\"/,/};/p' $ACLF\" | tr -d ' ' | grep -c -e '192.168.50.0/24;' -e '10.9.9.9;' -e 'key\"nas\";' | grep -qx 3"
+check "acl add: rejects nonsense" "! in_box \"fabricctl acl add lab 'not-an-ip'\" >/dev/null 2>&1"
+check "acl remove: built-in ACL protected" "! in_box 'fabricctl acl remove dns-resolvers' >/dev/null 2>&1"
+in_box 'fabricctl acl remove lab 10.9.9.9' >> "$OUT/tsig.log" 2>&1
+check "acl remove: one entry" "! in_box \"grep -q '10.9.9.9' $ACLF\""
+
 in_box 'fabricctl tsig remove nas' >> "$OUT/tsig.log" 2>&1
-in_box "bash /root/rfc2136_test.sh $IP lan.test nas '$S2' nas" > "$OUT/tsig-removed.log" 2>&1
-check "removed key is refused by BIND" "grep -q '^FAIL RFC2136 update with the embedded key accepted' '$OUT/tsig-removed.log'"
-check "removed key's rfc2136.ini deleted" "! in_box 'test -e /opt/nas/rfc2136.ini'"
-check "the npm key is unaffected" \
-    "in_box \"bash /root/rfc2136_test.sh $IP lan.test npm '$TSIG_SECRET' npm\" | grep -q '4 passed, 0 failed'"
+in_box "bash /root/rfc2136_test.sh $IP lan.test nas '$S2' web" > "$OUT/tsig-removed.log" 2>&1
+check "tsig remove: key refused by BIND" "grep -q '^FAIL RFC2136 update with the embedded key accepted' '$OUT/tsig-removed.log'"
+check "tsig remove: key gone from every ACL" "! in_box \"grep -q 'key \\\"nas\\\"' $ACLF\""
+check "tsig remove: rfc2136.ini deleted" "! in_box 'test -e /opt/nas/rfc2136.ini'"
+check "BIND still serves after all changes" "in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP"
+check "the npm key is unaffected" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
 
 cat > "$OUT/argv_check.py" <<'PY'
 import glob, yaml

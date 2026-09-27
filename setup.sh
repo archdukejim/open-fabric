@@ -32,7 +32,7 @@ if ! python3 -c 'import yaml, jinja2' 2>/dev/null; then
 fi
 
 case "${1:-}" in
-    setup|doctor|certs|client-cert|tsig|uninstall|reinstall)
+    setup|doctor|certs|client-cert|tsig|acl|uninstall|reinstall)
         exec python3 "$HERE/fabric/lib/fabriclib/cli.py" "$@" ;;
 esac
 exec python3 "$HERE/fabric/lib/fabriclib/cli.py" setup "$@"

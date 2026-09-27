@@ -8,6 +8,7 @@ ALGORITHMS = ("hmac-sha256", "hmac-sha512", "hmac-sha384", "hmac-sha224", "hmac-
 NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")
 LABEL_RE = re.compile(r"^(?!-)[A-Za-z0-9*_-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9_-]{1,63}(?<!-))*$")
 RTYPE_RE = re.compile(r"^[A-Z0-9]{1,10}$")
+ACL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$")
 
 
 def normalize_tsig_keys(keys, domain, secrets=None):
@@ -15,7 +16,8 @@ def normalize_tsig_keys(keys, domain, secrets=None):
 
     Entry: {name, algorithm=hmac-sha256, domain=<domain>, record_types=[TXT],
     records=[host, ...] (optional: only _acme-challenge.<host>.<domain>),
-    primary (optional), out (optional rfc2136.ini path),
+    primary (optional), out (optional rfc2136.ini path), acls (optional:
+    BIND ACLs to put the key in),
     secret (optional: an existing key's base64 secret, e.g. from another
     DNS server whose clients must keep working)}.
 
@@ -49,6 +51,12 @@ def normalize_tsig_keys(keys, domain, secrets=None):
             bad = [r for r in key["records"] if not LABEL_RE.match(r)]
             if bad:
                 raise ValidationError(f"TSIG key {name}: invalid record names {bad!r}")
+        if key.get("acls"):
+            key["acls"] = [str(a) for a in key["acls"]]
+            bad = [a for a in key["acls"] if not ACL_RE.match(a) or a in ("any", "none", "localhost", "localnets",
+                                                                             "tsig-updaters")]
+            if bad:
+                raise ValidationError(f"TSIG key {name}: invalid ACL names {bad!r}")
         if "secret" in key:
             embedded[name] = str(key.pop("secret"))
         out.append(key)

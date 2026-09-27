@@ -7,12 +7,13 @@ from fabriclib.common.save_vars import save_vars
 from fabriclib.common.set_tsig_secrets import set_tsig_secrets
 from fabriclib.common.vars_lock import vars_lock
 from fabriclib.common.write_audit import write_audit
+from fabriclib.dns.set_key_acls import set_key_acls
 
 
 def remove_tsig_key(actor, name, source="cli"):
-    """Remove a TSIG key from vars.yaml, its secret from fabric-secrets.yml and
-    the rfc2136.ini fabric wrote for it. Run apply afterwards; BIND then
-    refuses updates signed with it."""
+    """Remove a TSIG key from vars.yaml and from every ACL, its secret from
+    fabric-secrets.yml and the rfc2136.ini fabric wrote for it. Run apply
+    afterwards; BIND then refuses updates signed with it."""
     with vars_lock():
         data = load_vars()
         keys = list(data.get("tsig_keys") or [])
@@ -22,6 +23,7 @@ def remove_tsig_key(actor, name, source="cli"):
         data["tsig_keys"] = [k for k in keys if k.get("name") != name]
         save_vars(data)
         set_tsig_secrets({name: None})
+    set_key_acls(actor, name, drop_all=True, source=source)
     ini = key.get("out") or os.path.join(DEPLOY_BASE_DIR, name, "rfc2136.ini")
     if os.path.basename(ini) == "rfc2136.ini" and os.path.isfile(ini):
         os.remove(ini)

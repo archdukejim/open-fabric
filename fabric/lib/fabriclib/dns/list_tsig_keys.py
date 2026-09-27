@@ -1,9 +1,13 @@
+import re
+
 from fabriclib.common.load_vars import load_vars
 
 
 def list_tsig_keys():
-    """TSIG keys from vars.yaml with what each may update (no secrets)."""
+    """TSIG keys from vars.yaml with what each may update and the ACLs it is
+    in (no secrets)."""
     data = load_vars()
+    acls = data.get("bind_acls") or {}
     out = []
     for k in data.get("tsig_keys") or []:
         dom = k.get("domain") or data.get("domain")
@@ -15,5 +19,8 @@ def list_tsig_keys():
             scope = f"any name in {dom}"
         out.append({"name": k.get("name"), "algorithm": k.get("algorithm", "hmac-sha256"),
                     "types": " ".join(k.get("record_types") or ["TXT"]), "scope": scope,
-                    "ini": k.get("out") or f"/opt/{k.get('name')}/rfc2136.ini"})
+                    "ini": k.get("out") or f"/opt/{k.get('name')}/rfc2136.ini",
+                    "acls": sorted(a for a, entries in acls.items()
+                                   if any(re.fullmatch(rf'key\s+"?{re.escape(k.get("name", ""))}"?', str(e).strip())
+                                          for e in entries or []))})
     return out

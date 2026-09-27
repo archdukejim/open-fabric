@@ -4,7 +4,9 @@
   fabricctl setup [options]      install or re-converge (fabricctl setup --help)
   fabricctl doctor               end-to-end checks of the running install
   fabricctl certs [--force]      renew service certificates that need it (--force: all)
-  fabricctl tsig list|add|remove  TSIG keys for RFC2136 updates (fabricctl tsig add --help)
+  fabricctl tsig list|add|update|set-secret|rotate|remove
+                                 TSIG keys for RFC2136 updates (fabricctl tsig --help)
+  fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
   fabricctl client-cert <user> [--days N]
                                  web UI client certificate (.p12) into ~/fabric-admin
   fabricctl uninstall [--yes]    remove fabric from this host
@@ -17,6 +19,7 @@ import sys
 # Run as a script, Python puts fabriclib/ itself first on sys.path, where its
 # folders (dns/, ldap/, keycloak/) would shadow real packages. Use fabric/lib.
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
 from fabriclib.pki.mint_extra_cert import mint_extra_cert  # noqa: E402
@@ -58,6 +61,8 @@ def main(argv):
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)
+    if cmd == "acl":
+        return run_acl_command(args)
     if cmd == "extra-cert" and args:        # internal: fabricctl --mint-certs (certs.sh) -> one JSON entry
         print(mint_extra_cert(SetupContext(deploy_base=_base(args)).load_state().vars, json.loads(args[0])))
         return 0

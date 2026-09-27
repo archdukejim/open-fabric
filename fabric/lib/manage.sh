@@ -7,7 +7,8 @@ set -euo pipefail
 # Run this script ON the target machine (must be root / sudo).
 #
 # Modes:
-#   tsig list|add|remove  TSIG keys for RFC2136 updates (fabricctl tsig add --help).
+#   tsig list|add|update|set-secret|rotate|remove  TSIG keys for RFC2136 updates.
+#   acl list|add|remove   BIND ACLs (who may query the zones).
 #   --mint-certs    Mint an offline certificate and save to vars.yaml.
 #                   --intermediate-ca [N]  Issue as a subordinate CA cert (pathLen=N, default 0).
 #                                          pathLen=0: can sign leaf certs, cannot issue further CAs.
@@ -42,7 +43,7 @@ FABRIC_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Lifecycle commands are Python (fabric/lib/fabriclib/cli.py).
 case "${1:-}" in
-    setup|doctor|certs|client-cert|tsig|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
+    setup|doctor|certs|client-cert|tsig|acl|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
 esac
 VARS_FILE="$FABRIC_DIR/config/vars.yaml"
 

@@ -6,68 +6,143 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.dns.add_tsig_key import add_tsig_key
 from fabriclib.dns.list_tsig_keys import list_tsig_keys
 from fabriclib.dns.remove_tsig_key import remove_tsig_key
+from fabriclib.dns.replace_tsig_secret import replace_tsig_secret
+from fabriclib.dns.set_key_acls import set_key_acls
+from fabriclib.dns.update_tsig_key import update_tsig_key
 from fabriclib.system.apply_changes import apply_changes
 
 
-def _apply():
-    ok, output = apply_changes("root", "cli")
-    if not ok:
-        print(output[-2000:], file=sys.stderr)
-        raise ValidationError("apply failed; BIND was not updated (see above)")
+def _secret(args):
+    """An existing secret from --secret-file or a hidden prompt; None otherwise."""
+    if getattr(args, "secret_file", None):
+        with open(args.secret_file) as f:
+            return f.read().strip()
+    if getattr(args, "secret_prompt", False):
+        return getpass.getpass("TSIG secret (base64): ").strip()
+    return None
+
+
+def _stored_key(name):
+    from fabriclib.common.load_vars import load_vars
+    return next((k for k in load_vars().get("tsig_keys") or [] if k.get("name") == name), None)
+
+
+def _ini(key):
+    return key.get("out") or f"/opt/{key['name']}/rfc2136.ini"
 
 
 def run_tsig_command(argv):
-    """`fabricctl tsig list | add <name> | remove <name>` — TSIG keys for
-    RFC2136 dynamic updates (e.g. certbot's rfc2136 plugin in
+    """`fabricctl tsig list | add | set-secret | rotate | update | remove` —
+    TSIG keys for RFC2136 dynamic updates (e.g. certbot's rfc2136 plugin in
     nginx-proxy-manager). Secrets never appear in argv: an existing secret
-    is read from --secret-file or a hidden prompt (--secret-prompt)."""
+    comes from --secret-file or a hidden prompt (--secret-prompt)."""
     ap = argparse.ArgumentParser(prog="fabricctl tsig")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")
-    add = sub.add_parser("add", help="add a key and apply")
-    add.add_argument("name")
-    add.add_argument("--domain", help="zone (default: the fabric domain)")
-    add.add_argument("--record", action="append", default=[],
-                     help="host allowed a DNS-01 challenge (_acme-challenge.<host>.<zone>); repeatable. "
-                          "Without --record the key may update any name in the zone")
-    add.add_argument("--types", default="TXT", help="record types it may change (default TXT)")
-    add.add_argument("--algorithm", default="hmac-sha256")
-    add.add_argument("--out", help="where to write its rfc2136.ini (default /opt/<name>/rfc2136.ini)")
-    add.add_argument("--secret-file", help="keep an existing key: file holding its base64 secret")
-    add.add_argument("--secret-prompt", action="store_true", help="keep an existing key: type its secret")
-    rm = sub.add_parser("remove", help="remove a key and apply")
+
+    def scope(p):
+        p.add_argument("name")
+        p.add_argument("--domain", help="zone (default: the fabric domain)")
+        p.add_argument("--record", action="append", default=None,
+                       help="host allowed a DNS-01 challenge (_acme-challenge.<host>.<zone>); repeatable")
+        p.add_argument("--types", help="record types it may change, comma-separated (default TXT)")
+        p.add_argument("--algorithm", help="default hmac-sha256")
+        p.add_argument("--out", help="where to write its rfc2136.ini (default /opt/<name>/rfc2136.ini)")
+        p.add_argument("--acl", action="append", default=[],
+                       help="put the key in this BIND ACL (created if missing); repeatable")
+
+    def secret_opts(p):
+        g = p.add_mutually_exclusive_group()
+        g.add_argument("--secret-file", help="file holding an existing base64 secret")
+        g.add_argument("--secret-prompt", action="store_true", help="type/paste an existing secret (hidden)")
+
+    add = sub.add_parser("add", help="add a key (new secret, or keep an existing one)")
+    scope(add)
+    secret_opts(add)
+    upd = sub.add_parser("update", help="change what a key may update (secret untouched)")
+    scope(upd)
+    upd.add_argument("--any-name", action="store_true", help="drop --record limits: any name in the zone")
+    upd.add_argument("--drop-acl", action="append", default=[], help="take the key out of this ACL; repeatable")
+    setp = sub.add_parser("set-secret", help="replace a key's secret with one you give")
+    setp.add_argument("name")
+    secret_opts(setp)
+    rot = sub.add_parser("rotate", help="give a key a newly generated secret")
+    rot.add_argument("name")
+    rm = sub.add_parser("remove", help="remove a key")
     rm.add_argument("name")
+    for p in (add, upd, setp, rot, rm):
+        p.add_argument("--no-apply", action="store_true", help="only record the change; apply later")
     args = ap.parse_args(argv)
 
     try:
         if args.cmd == "list":
             keys = list_tsig_keys()
             for k in keys:
-                print(f"{k['name']:<24} {k['algorithm']:<12} {k['types']:<8} {k['scope']}\n{'':<24} credentials: {k['ini']}")
+                print(f"{k['name']:<24} {k['algorithm']:<12} {k['types']:<8} {k['scope']}\n"
+                      f"{'':<24} ACLs: {', '.join(k['acls']) or '-'}   credentials: {k['ini']}")
             if not keys:
                 print("no TSIG keys")
             return 0
+
         if args.cmd == "add":
-            secret = None
-            if args.secret_file:
-                with open(args.secret_file) as f:
-                    secret = f.read().strip()
-            elif args.secret_prompt:
-                secret = getpass.getpass("TSIG secret (base64): ").strip()
-            entry = {"name": args.name, "record_types": [t.strip() for t in args.types.split(",") if t.strip()],
-                     "algorithm": args.algorithm}
-            for k, val in (("domain", args.domain), ("records", args.record), ("out", args.out)):
+            secret = _secret(args)
+            entry = {"name": args.name}
+            for field, val in (("domain", args.domain), ("records", args.record), ("algorithm", args.algorithm),
+                               ("out", args.out)):
                 if val:
-                    entry[k] = val
-            added, _ = add_tsig_key("root", entry, secret)
-            _apply()
-            print(f"TSIG key '{added['name']}' active ({'existing secret kept' if secret else 'new secret'}).")
-            print(f"RFC2136 credentials (server, port, key, secret, algorithm): "
-                  f"{added.get('out') or '/opt/' + added['name'] + '/rfc2136.ini'} (0600)")
+                    entry[field] = val
+            if args.types:
+                entry["record_types"] = [t.strip() for t in args.types.split(",") if t.strip()]
+            key, _ = add_tsig_key("root", entry, secret)
+            acls = set_key_acls("root", key["name"], add=args.acl) if args.acl else []
+            msg = (f"TSIG key '{key['name']}' added ({'existing secret kept' if secret else 'new secret'})"
+                   + (f", in ACL {', '.join(acls)}." if acls else "."))
+        elif args.cmd == "update":
+            changes = {}
+            if args.any_name:
+                changes["records"] = []
+            elif args.record:
+                changes["records"] = args.record
+            if args.types:
+                changes["record_types"] = [t.strip() for t in args.types.split(",") if t.strip()]
+            for field in ("domain", "algorithm", "out"):
+                if getattr(args, field):
+                    changes[field] = getattr(args, field)
+            if not changes and not args.acl and not args.drop_acl:
+                raise ValidationError("nothing to change (--record, --any-name, --types, --domain, --algorithm, "
+                                      "--out, --acl, --drop-acl)")
+            key = update_tsig_key("root", args.name, changes) if changes else _stored_key(args.name)
+            if key is None:
+                raise ValidationError(f"no TSIG key named {args.name!r}")
+            acls = set_key_acls("root", args.name, add=args.acl, drop=args.drop_acl)
+            msg = f"TSIG key '{args.name}' (ACLs: {', '.join(acls) or '-'}) may update: " + (
+                ", ".join(f"_acme-challenge.{r}.{key['domain']}" for r in key["records"])
+                if key.get("records") else f"any name in {key['domain']}") + f" ({' '.join(key['record_types'])})."
+        elif args.cmd in ("set-secret", "rotate"):
+            given = _secret(args) if args.cmd == "set-secret" else None
+            if args.cmd == "set-secret" and not given:
+                raise ValidationError("give the secret with --secret-prompt or --secret-file")
+            replace_tsig_secret("root", args.name, given)
+            key = {"name": args.name}
+            msg = (f"TSIG key '{args.name}': secret replaced." if given else
+                   f"TSIG key '{args.name}': new secret generated; update its clients.")
+        else:
+            remove_tsig_key("root", args.name)
+            key, msg = None, f"TSIG key '{args.name}' removed."
+
+        print(msg)
+        if args.no_apply:
+            print("not applied yet: sudo fabricctl --apply")
             return 0
-        remove_tsig_key("root", args.name)
-        _apply()
-        print(f"TSIG key '{args.name}' removed.")
+        ok, output = apply_changes("root", "cli")
+        if not ok:
+            print(output[-2000:], file=sys.stderr)
+            raise ValidationError("apply failed; BIND was not updated (see above)")
+        if key:
+            ini = next((k["ini"] for k in list_tsig_keys() if k["name"] == key["name"]), _ini(key))
+            print(f"applied. RFC2136 client settings (server, port, key, secret, algorithm): {ini} (0600)")
+        else:
+            print("applied.")
         return 0
     except (ValidationError, OSError) as e:
         print(f"error: {e}", file=sys.stderr)

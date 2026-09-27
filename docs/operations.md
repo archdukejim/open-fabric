@@ -17,6 +17,7 @@ Use `fabricctl` (the global wrapper powered by the interactive Python engine) fo
   - [DNS Configuration](#dns-configuration)
   - [Mint Certificates](#mint-certificates)
   - [TSIG Keys (RFC2136)](#tsig-keys-rfc2136-dynamic-updates)
+  - [ACLs](#acls)
   - [Landing Page Links](#landing-page-links)
 - [Lifecycle Commands](#lifecycle-commands)
 - [Service Ports](#service-ports)
@@ -150,6 +151,7 @@ tsig_keys:
 - name: npm                   # nginx-proxy-manager
   records: [npm, shelfmark]   # may only set _acme-challenge.npm.<domain> and _acme-challenge.shelfmark.<domain>
   secret: "base64..."         # OPTIONAL: keep an existing key (its clients keep working unchanged)
+  acls: [npm-updaters]        # OPTIONAL: BIND ACLs the key belongs to (created if missing)
 - name: acme_nas-proxy
   record_types: [TXT, A]      # no records: may update these types anywhere in the zone (zonesub)
 ```
@@ -164,17 +166,37 @@ tsig_keys:
 | `record_types` | `[TXT]` | Record types it may change |
 | `primary` | — | The zone's own ACME key: `grant <key> subdomain _acme-challenge <types>` |
 | `out` | `/opt/<name>/rfc2136.ini` | Credentials file for the client (`0600`): server = `host_ip`, port = `bind_dns_port`, key, secret, algorithm |
+| `acls` | — | BIND ACLs holding `key "<name>"` (see [ACLs](#acls)) |
 
 Without `records` or `primary`, the key gets `zonesub` for its `record_types`.
 
 ```bash
-sudo fabricctl tsig list
-sudo fabricctl tsig add npm --record npm --record shelfmark              # new secret -> /opt/npm/rfc2136.ini
-sudo fabricctl tsig add npm --record npm --secret-file /root/npm.secret   # keep an existing key's secret
-sudo fabricctl tsig remove npm
+sudo fabricctl tsig list                                     # keys, what each may update, ACLs, credentials file
+# add: a new secret, or keep an existing one (pasted, hidden), optionally into ACLs
+sudo fabricctl tsig add npm --record npm --acl npm-updaters --secret-prompt
+sudo fabricctl tsig add nas --record nas                     # new secret -> /opt/nas/rfc2136.ini
+sudo fabricctl tsig set-secret npm --secret-prompt           # replace the secret with one you give
+sudo fabricctl tsig rotate npm                               # generate a new secret (update its clients)
+sudo fabricctl tsig update npm --record npm --record web     # change what it may update (secret untouched)
+sudo fabricctl tsig update npm --any-name --types TXT,A      # any name in the zone, TXT and A
+sudo fabricctl tsig update npm --acl lab --drop-acl npm-updaters
+sudo fabricctl tsig remove npm                               # also leaves every ACL; its rfc2136.ini is deleted
 ```
 
-`add` and `remove` update the vars and secrets and apply at once (BIND reloads its configuration). A secret is never taken on the command line: `--secret-file` or `--secret-prompt`.
+Every change updates the vars and secrets and applies at once: BIND reloads its configuration, and apply fails loudly if BIND rejects it. `--no-apply` records a change without applying (batch several, then `fabricctl --apply`). A secret is never taken on the command line: `--secret-file` or `--secret-prompt`.
+
+#### ACLs
+
+`bind_acls` are named BIND address match lists; each may query fabric's zones (`allow-query`). `dns-resolvers` (loopback, the LAN, fabric's Docker subnet) and `acme-updaters` are built in and cannot be removed; `tsig-updaters` always lists every TSIG key.
+
+```bash
+sudo fabricctl acl list
+sudo fabricctl acl add lab 192.168.50.0/24 10.9.9.9 'key npm' '!192.168.50.7'
+sudo fabricctl acl remove lab 10.9.9.9       # one entry
+sudo fabricctl acl remove lab                # the whole ACL
+```
+
+Entries: an IP or CIDR, `key <tsig-key>` (must exist), another ACL, `any`/`none`/`localhost`/`localnets`; a leading `!` excludes. Assigning keys to ACLs is also `tsig add/update --acl`. Update rights come from each key's grants (above); ACL membership decides what the key's holder may query.
 
 **Keeping an existing key (rebuilding a host):** put its `name`, `records` and `secret` in the vars file you give `fabricctl setup --file`, with the same `domain`. BIND on the new host then accepts the same client configuration unchanged (server = `host_ip`, port 53).
 
@@ -220,7 +242,8 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 | `sudo fabricctl setup [--file vars.yaml]` | Install or re-converge. Re-run after changing settings. |
 | `sudo fabricctl setup --step <name>` | Run one step, e.g. `--step firewall` after editing `security.firewall_allow` |
 | `sudo fabricctl doctor` | End-to-end checks of the running install (the `verify` step) |
-| `sudo fabricctl tsig list/add/remove` | TSIG keys for RFC2136 clients — see [TSIG Keys](#tsig-keys-rfc2136-dynamic-updates) |
+| `sudo fabricctl tsig list/add/update/set-secret/rotate/remove` | TSIG keys for RFC2136 clients — see [TSIG Keys](#tsig-keys-rfc2136-dynamic-updates) |
+| `sudo fabricctl acl list/add/remove` | BIND ACLs — see [ACLs](#acls) |
 | `sudo fabricctl client-cert <user>` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`) |
 | `sudo fabricctl certs [--force]` | Renew service certificates that are missing, expiring within 30 days or missing a name (`--force`: all of them); restarts only the services whose certificates changed |
 | `sudo fabricctl reinstall` | Uninstall + setup, keeping config, secrets, the CA and certificates. Directory users/groups and Keycloak's database are **not** kept; the first admin is re-created with a new login kit |
