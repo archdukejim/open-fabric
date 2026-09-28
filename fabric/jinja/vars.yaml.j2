@@ -255,21 +255,6 @@ tsig_keys:
 {{ tsig_keys | default([]) | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
 # ============================================================
-# REVERSE DNS — auto-computed from A records in the dns: block
-# ============================================================
-reverse_zone_names:
-{{ _user_dns.values() |
-   selectattr('A', 'defined') |
-   map(attribute='A') |
-   flatten |
-   map(attribute='ip') |
-   select('match', '^\d+\.\d+\.\d+\.\d+$') |
-   map('regex_replace', '^(\\d+)\\.(\\d+)\\.(\\d+)\\.\\d+$', '\\3.\\2.\\1.in-addr.arpa') |
-   unique |
-   list |
-   to_nice_yaml(indent=2) |
-   indent(2, first=True) }}
-# ============================================================
 # NGINX BACKENDS
 # ============================================================
 {# 389-DS terminates TLS itself; nginx only passes TCP through. #}

@@ -287,7 +287,7 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
       and hd.get("X-Frame-Options") == "DENY" and hd.get("Cache-Control") == "no-store", hd)
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
-check("overview tab renders service health", st == 200 and "Overview" in body and "services running" in body, st)
+check("overview tab renders service health", st == 200 and "Overview" in body and "services healthy" in body, st)
 for tab in ("kea", "dirsrv", "freeradius", "openbao"):
     st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
     check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
@@ -296,6 +296,10 @@ check("footer shows real version", "fabricctl 9.9.9" in body, body[-300:])
 st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
 check("BIND9 tab shows the zone's records and CNAME targets", st == 200 and "nas25-apps" in body and "192.168.7.53" in body, body[:500])
 csrf = body.split('name="csrf" value="')[1].split('"')[0]
+check("A record shows its automatic PTR", "53.7.168.192.in-addr.arpa" in body, body[:300])
+st, hd, sc, body = req("GET", "/bind9?view=reverse", ALICE, cookie=session)
+check("reverse zones section lists generated PTRs", st == 200 and "7.168.192.in-addr.arpa" in body
+      and "pi-core.lan.test." in body, body[:300])
 
 st, hd, sc, body = req("GET", "/", BOB_CERT, cookie=session)
 check("session cookie replayed with another cert -> redirect to login", st == 303, st)

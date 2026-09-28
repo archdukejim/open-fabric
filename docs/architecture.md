@@ -219,7 +219,7 @@ To mitigate this, artificial boot delays (`ExecStartPre=/bin/sleep N`) are autom
 BIND9 runs as an **authoritative-only** server (recursion disabled). It serves:
 - Internal forward zones defined in the `dns:` block of `custom-vars.yaml` (`dynamic_zone_var` key resolved to `domain` at render time)
 - Each zone with `zone_authority: true` gets an NS A record pointing to `host_ip`
-- Reverse zones (PTR) auto-generated from A records — one `/24` `in-addr.arpa` zone per unique subnet; `reverse_zone_names` computed in `vars.yaml.j2`
+- Reverse zones (PTR) generated at apply from A and AAAA records by `fabriclib/dns/reverse_zones.py`. There is one `/24` `in-addr.arpa` zone per IPv4 subnet and one `/64` `ip6.arpa` zone per ULA prefix, with one PTR per address. Only private addresses (RFC 1918, 100.64/10, ULA) get one; zones written by hand in `dns:` are left alone. See [operations.md](operations.md#reverse-dns)
 - RFC2136 updates, deny-by-default: per key `records` → only `_acme-challenge.<record>.<zone>`; `primary` → `subdomain _acme-challenge`; explicit `any_name` → `zonesub`; plus the grants of any ACL policy (`bind_acl_policies`) the key is a member of. Keys and secrets live in vars + `fabric-secrets.yml` (managed with `fabricctl tsig`)
 
 nginx fronts BIND9 on all public DNS ports:

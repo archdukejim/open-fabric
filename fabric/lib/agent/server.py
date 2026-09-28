@@ -16,7 +16,7 @@ top of the socket's 0660 root:<webui gid> permissions.
   POST /v1/zones/<key>/records/delete   {actor, type, index, name}
   POST /v1/apply                        {actor}
   POST /v1/events                       {actor, action, detail}  (login audit)
-  GET  /v1/pki/ca | /v1/pki/issued | /v1/tsig
+  GET  /v1/pki/ca | /v1/pki/issued | /v1/tsig | /v1/reverse-zones
   POST /v1/pki/describe-csr             {actor, csr}
   POST /v1/pki/sign                     {actor, csr, days}
   POST /v1/pki/issue                    {actor, cn, sans, key_type, days}
@@ -49,6 +49,7 @@ from fabriclib.dns.list_tsig_keys import list_tsig_keys  # noqa: E402
 from fabriclib.dns.list_zones import list_zones  # noqa: E402
 from fabriclib.dns.remove_record import remove_record  # noqa: E402
 from fabriclib.dns.remove_tsig_key import remove_tsig_key  # noqa: E402
+from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 from fabriclib.dns.rotate_tsig_key import rotate_tsig_key  # noqa: E402
 from fabriclib.dns.zone_detail import zone_detail  # noqa: E402
 from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
@@ -138,6 +139,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, list_issued())
                 if route == ["tsig"]:
                     return self.reply(200, list_tsig_keys())
+                if route == ["reverse-zones"]:
+                    return self.reply(200, reverse_zones(load_vars()))
                 return self.reply(404, {"error": "not found"})
 
             data = self.body()

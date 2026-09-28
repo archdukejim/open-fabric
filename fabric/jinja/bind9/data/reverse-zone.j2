@@ -18,17 +18,9 @@ $ORIGIN {{ reverse_zone_name }}.
 @       IN      NS      ns.{{ domain }}.
 
 ;-----------------------------------------------------------------
-; PTR Records  (auto-generated from forward zone A records)
+; PTR Records — generated from the forward zones' A/AAAA records
+; (fabriclib/dns/reverse_zones.py): one per address, private ranges only
 ;-----------------------------------------------------------------
-{% for zone_key, zone_records in dns.items() %}
-{% set fwd_zone = domain if zone_key == 'dynamic_zone_var' else zone_key %}
-{% if zone_records.A is defined %}
-{% for rec in zone_records.A %}
-{% set ip_parts = rec.ip.split('.') %}
-{% set rec_rev_zone = ip_parts[2] + '.' + ip_parts[1] + '.' + ip_parts[0] + '.in-addr.arpa' %}
-{% if rec_rev_zone == reverse_zone_name %}
-{{ "%-24s" | format(ip_parts[3]) }}PTR     {{ rec.name }}.{{ fwd_zone }}.
-{% endif %}
-{% endfor %}
-{% endif %}
+{% for rec in ptr_records %}
+{{ "%-24s" | format(rec.label) }}PTR     {{ rec.target }}
 {% endfor %}

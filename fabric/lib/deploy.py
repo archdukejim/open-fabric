@@ -10,6 +10,7 @@ from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
+from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 from fabriclib.dns.rfc2136_settings import rfc2136_settings  # noqa: E402
 import filecmp
 import json
@@ -343,6 +344,9 @@ def apply_deployment(start_services=True):
         
     
     # Bind9 Config
+    # Reverse zones and their PTRs come from the forward A/AAAA records.
+    reverse = reverse_zones(final_vars)
+    merged_context['reverse_zone_names'] = list(reverse['zones'])
     for f in ['named.conf', 'named.conf.acl', 'named.conf.logs', 'named.conf.options', 'named.conf.tls', 'named.conf.zones', 'named.conf.keys', 'rndc.key']:
         render_file(f'bind9/config/{f}.j2', f'bind9/config/{f}')
         
@@ -356,11 +360,11 @@ def apply_deployment(start_services=True):
         with open(dest_path, 'w') as f:
             f.write(tpl.render(**merged_context, zone_name=zone_name, zone_records=v))
             
-    for rz in final_vars.get('reverse_zone_names', []):
+    for rz, ptrs in reverse['zones'].items():
         dest_path = os.path.join(render_tmp, f"bind9/data/db.{rz}")
         tpl = jinja_env.get_template('bind9/data/reverse-zone.j2')
         with open(dest_path, 'w') as f:
-            f.write(tpl.render(**merged_context, reverse_zone_name=rz))
+            f.write(tpl.render(**merged_context, reverse_zone_name=rz, ptr_records=ptrs))
 
     # 389 Directory Server seed data
     if final_vars.get('install_ldap'):

@@ -208,7 +208,7 @@ check("Keycloak required a new password and TOTP enrolment",
 check("admin: callback accepted (cert CN = user, fabric-admin role)",
       st == 200 and "__Host-webui" in b.cookies.get(MGR, {}), (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/")
-check("admin: overview renders", st == 200 and "services running" in page and ADMIN in page, (st, page[:300]))
+check("admin: overview renders", st == 200 and "services healthy" in page and ADMIN in page, (st, page[:300]))
 
 # -- everyone else is refused -----------------------------------------------------------
 st, page, seen = login(Browser(other_pem), OTHER, OTHER_PW)

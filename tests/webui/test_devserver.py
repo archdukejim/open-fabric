@@ -43,7 +43,7 @@ try:
         except OSError:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
-    check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services running" in page, st)
+    check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services healthy" in page, st)
     tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "dirsrv", "freeradius", "openbao"))
     check("every service tab renders (placeholders)", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
@@ -66,6 +66,15 @@ try:
     st, _, _, page = req("POST", "/stepca/issue", {"csrf": "dev", "cn": "x"})
     check("generate shows sample downloads and the one-time key warning",
           st == 200 and 'download="device.home.arpa.key"' in page and "only copy of the private key" in page)
+    page = req("GET", "/")[3]
+    check("overview shows one status light per service", page.count('class="light ok"') == 9 and "pill" not in page.split("<section class=\"tiles\">")[1])
+    st, _, _, page = req("GET", "/bind9?view=reverse")
+    check("reverse zones generated from forward A/AAAA records",
+          st == 200 and "1.168.192.in-addr.arpa" in page and "20.168.192.in-addr.arpa" in page
+          and "cam-front.iot.home.arpa." in page and ".ip6.arpa" in page, page[:300])
+    check("public address listed without a reverse record", "203.0.113.7" in page and "public address" in page)
+    st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")
+    check("forward records show their automatic PTR", "40.1.168.192.in-addr.arpa" in page)
     st, _, _, page = req("GET", "/bind9?view=tsig")
     check("TSIG view lists sample keys", st == 200 and "npm-certbot" in page and "New TSIG key for a zone" in page)
     st, _, _, page = req("POST", "/bind9/tsig/create", {"csrf": "dev", "name": "preview-key", "zone": "home.arpa"})

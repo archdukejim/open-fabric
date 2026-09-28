@@ -24,6 +24,8 @@ PLACEHOLDERS = {
     "openbao": ("OpenBao", "Seal status and unseal methods (key file, USB key, KMIP, PKCS#11), secrets engines, "
                            "fabric's own secrets, dynamic credentials and the SSH certificate authority."),
 }
+# BIND9 tab sections: (view, label)
+BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
 # Step-CA tab sub-menu: (view, label)
 STEPCA_MENU = [("ca", "Certificate authority"), ("sign", "Sign a CSR"), ("issue", "New key + certificate"),
                ("inspect", "Inspect"), ("convert", "Convert"), ("issued", "Issued")]
@@ -82,19 +84,21 @@ _TEMPLATES = {
 <section class="card narrow"><p>Signed in. <a href="{{ target }}">Continue</a></p></section>{% endblock %}""",
 
     "overview": """{% extends "base" %}{% block body %}
-{% set healthy = services | selectattr(1, 'equalto', 'active') | list | length %}
+{% set ok = services | selectattr(1, 'equalto', 'active') | rejectattr(2, 'in', ['unhealthy', 'starting']) | list | length %}
 <h1>Overview</h1>
-<p class="muted">{{ healthy }} of {{ services | length }} services running.</p>
+<p class="muted">{{ ok }} of {{ services | length }} services healthy.</p>
 <section class="tiles">
 {% for name, state, health in services %}
 {% set info = service_info.get(name, (name, None)) %}
-<div class="tile">
+{% if state != 'active' or health == 'unhealthy' %}{% set light, why = 'bad', (state if state != 'active' else 'running, health check failing') %}
+{% elif health == 'starting' %}{% set light, why = 'warn', 'starting' %}
+{% else %}{% set light, why = 'ok', 'running' ~ (', healthy' if health == 'healthy' else '') %}{% endif %}
+<div class="tile" title="{{ name }}: {{ why }}">
   <div class="tile-head">
+    <span class="light {{ light }}" role="img" aria-label="{{ why }}"></span>
     {% if info[1] %}<a href="/{{ info[1] }}"><strong>{{ name }}</strong></a>{% else %}<strong>{{ name }}</strong>{% endif %}
-    <span class="pill {{ 'ok' if state == 'active' else 'bad' }}">{{ state }}</span>
   </div>
-  <div class="muted">{{ info[0] }}</div>
-  {% if health %}<div><span class="pill {{ 'ok' if health == 'healthy' else ('warn' if health == 'starting' else 'bad') }}">{{ health }}</span></div>{% endif %}
+  <div class="muted">{{ info[0] }}{% if light != 'ok' %} · <span class="{{ light }}-text">{{ why }}</span>{% endif %}</div>
 </div>
 {% endfor %}
 </section>
@@ -104,45 +108,23 @@ _TEMPLATES = {
 <h1>BIND9 · DNS</h1>
 {% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
-<nav class="subtabs">
-{% for z in zones %}<a href="/bind9?zone={{ z.key | urlencode }}" class="subtab{{ ' active' if zone and z.key == zone.key }}">{{ z.name }} <span class="muted">{{ z.records }}</span></a>{% endfor %}
-<a href="/bind9?view=tsig" class="subtab{{ ' active' if tsig_keys is not none }}">TSIG keys</a>
+<nav class="sections">
+{% for id, label in bind9_sections %}<a href="/bind9{{ '' if id == 'forward' else '?view=' ~ id }}" class="section{{ ' active' if id == section }}">{{ label }}</a>{% endfor %}
 </nav>
-{% if tsig_keys is not none %}
-<section class="card"><h2>TSIG keys</h2>
-<p class="muted">RFC2136 keys for dynamic updates (certbot DNS-01, nginx-proxy-manager). Update rights are deny-by-default; secrets are never shown again after creation or rotation.</p>
-{% if tsig_keys %}
-<table><thead><tr><th>Key</th><th>May update</th><th>Types</th><th>ACLs</th><th></th></tr></thead><tbody>
-{% for k in tsig_keys %}
-<tr><td><strong>{{ k.name }}</strong><div class="muted">{{ k.algorithm }}</div></td><td>{{ k.scope }}</td>
-<td>{{ k.types }}</td><td>{{ k.acls | join(', ') or '—' }}</td>
-<td class="num actions">
-<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/rotate"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">New secret</button></form>
-<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete</button></form>
-</td></tr>
-{% endfor %}</tbody></table>
-{% else %}<p class="blank">No TSIG keys yet.</p>{% endif %}
-</section>
-<section class="card"><h2>New TSIG key for a zone</h2>
-<form method="post" action="/bind9/tsig/create" class="grid">
-<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
-<label>Key name<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,62}" placeholder="npm-certbot"></label>
-<label>Zone<select name="zone">{% for z in zones if not (z.name.endswith('.in-addr.arpa') or z.name.endswith('.ip6.arpa')) %}<option>{{ z.name }}</option>{% endfor %}</select></label>
-<label class="wide">May update<select name="scope">{% for v, l in tsig_scopes %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
-<label class="wide">Hosts (listed-hosts scope) <input name="hosts" placeholder="npm, nas, printer"></label>
-<fieldset class="wide"><legend>Record types (any-name scope)</legend>
-{% for t in tsig_any_types %}<label class="check"><input type="checkbox" name="type_{{ t }}" value="1"{{ ' checked' if t == 'TXT' }}> {{ t }}</label>{% endfor %}
-</fieldset>
-<label class="wide">Existing secret (optional — keep a current client working)<input name="secret" type="password" autocomplete="off" placeholder="base64; leave empty to generate"></label>
-<div><button>Create key</button></div>
-</form>
-</section>
-{% elif zone %}
+
+{% if section == 'forward' %}
+{% if forward_zones | length > 1 %}
+<div class="picker"><span class="muted">Zone</span>
+{% for z in forward_zones %}<a href="/bind9?zone={{ z.key | urlencode }}" class="subtab{{ ' active' if zone and z.key == zone.key }}">{{ z.name }} <span class="muted">{{ z.records }}</span></a>{% endfor %}
+</div>
+{% endif %}
+{% if zone %}
+<section class="card"><h2>{{ zone.name }}</h2>
 <p class="muted">{{ zone.status }}</p>
-<section class="card"><h2>Records — {{ zone.name }}</h2>
-<table><thead><tr><th>Type</th><th>Name</th><th>Value</th><th></th></tr></thead><tbody>
+<table><thead><tr><th>Type</th><th>Name</th><th>Value</th><th>Reverse (PTR)</th><th></th></tr></thead><tbody>
 {% for r in zone.records %}
 <tr><td><span class="pill">{{ r.type }}</span></td><td>{{ r.name or '(missing)' }}</td><td><code>{{ r.value }}</code></td>
+<td>{% if r.ptr %}<span class="muted small">auto</span> <code class="small">{{ r.ptr }}</code>{% elif r.ptr_note %}<span class="muted small">none — {{ r.ptr_note }}</span>{% endif %}</td>
 <td class="num"><form method="post" action="/bind9/zone/{{ zone.key | urlencode }}/delete">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="type" value="{{ r.type }}">
 <input type="hidden" name="index" value="{{ r.index }}"><input type="hidden" name="name" value="{{ r.name }}">
@@ -160,15 +142,65 @@ _TEMPLATES = {
 <label>Weight (SRV)<input name="weight" inputmode="numeric"></label>
 <label>Port (SRV)<input name="port" inputmode="numeric"></label>
 <div><button>Add record</button></div>
+</form>
+<p class="muted">A and AAAA records with a private address get their PTR record automatically — see Reverse zones.</p></section>
+{% else %}<section class="card"><p class="blank">No forward zones.</p></section>{% endif %}
+
+{% elif section == 'reverse' %}
+<section class="card"><h2>Reverse zones</h2>
+<p class="muted">Generated from the forward zones: every A and AAAA record with a private address (RFC 1918, 100.64/10, IPv6 ULA) gets a PTR record — one per address, a named host before the zone apex. IPv4 zones are /24, IPv6 zones /64. To change a PTR, change the forward record; Apply publishes both.</p></section>
+{% for name, ptrs in reverse.zones.items() %}
+<section class="card"><h2>{{ name }} <span class="muted">{{ ptrs | length }}</span></h2>
+<table><thead><tr><th>Address</th><th>PTR</th><th>Points to</th><th>From</th></tr></thead><tbody>
+{% for r in ptrs %}<tr><td><code>{{ r.ip }}</code></td><td><code class="small">{{ r.label }}</code></td><td>{{ r.target }}</td><td class="muted">{{ r.source }}</td></tr>{% endfor %}
+</tbody></table></section>
+{% else %}<section class="card"><p class="blank">No reverse zones yet: add an A or AAAA record with a private address.</p></section>
+{% endfor %}
+{% if manual_reverse %}<section class="card"><h2>Written by hand</h2>
+<p class="muted">Defined directly in <code>vars.yaml</code> (<code>dns:</code>); not generated: {{ manual_reverse | map(attribute='name') | join(', ') }}.</p></section>{% endif %}
+{% if reverse.skipped %}
+<section class="card"><h2>No reverse record</h2>
+<table><thead><tr><th>Name</th><th>Address</th><th>Why</th></tr></thead><tbody>
+{% for r in reverse.skipped %}<tr><td>{{ r.name }}</td><td><code>{{ r.ip }}</code></td><td class="muted">{{ r.reason }}</td></tr>{% endfor %}
+</tbody></table></section>
+{% endif %}
+
+{% else %}
+<section class="card"><h2>TSIG keys</h2>
+<p class="muted">RFC2136 keys for dynamic updates (certbot DNS-01, nginx-proxy-manager). Update rights are deny-by-default; a secret is shown only once, when it is created or replaced.</p>
+{% if tsig_keys %}
+<table><thead><tr><th>Key</th><th>May update</th><th>Types</th><th>ACLs</th><th></th></tr></thead><tbody>
+{% for k in tsig_keys %}
+<tr><td><strong>{{ k.name }}</strong><div class="muted small">{{ k.algorithm }}</div></td><td>{{ k.scope }}</td>
+<td>{{ k.types }}</td><td>{{ k.acls | join(', ') or '—' }}</td>
+<td class="num"><div class="row-actions">
+<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/rotate"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">New secret</button></form>
+<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete</button></form>
+</div></td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="blank">No TSIG keys yet.</p>{% endif %}
+</section>
+<section class="card"><h2>New TSIG key for a zone</h2>
+<form method="post" action="/bind9/tsig/create" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Key name<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,62}" placeholder="npm-certbot"></label>
+<label>Zone<select name="zone">{% for z in forward_zones %}<option>{{ z.name }}</option>{% endfor %}</select></label>
+<label class="wide">May update<select name="scope">{% for v, l in tsig_scopes %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+<label class="wide">Hosts (listed-hosts scope)<input name="hosts" placeholder="npm, nas, printer"></label>
+<fieldset class="wide"><legend>Record types (any-name scope)</legend>
+{% for t in tsig_any_types %}<label class="check"><input type="checkbox" name="type_{{ t }}" value="1"{{ ' checked' if t == 'TXT' }}> {{ t }}</label>{% endfor %}
+</fieldset>
+<label class="wide">Existing secret (optional — keep a current client working)<input name="secret" type="password" autocomplete="off" placeholder="base64; leave empty to generate"></label>
+<div><button>Create key</button></div>
 </form></section>
+<section class="card"><h2>ACLs and update policies</h2><p class="blank">Left intentionally blank.</p>
+<p class="muted">Who may query the zones, and which certbot devices may prove which names (today: <code>fabricctl acl</code>).</p></section>
 {% endif %}
 <form method="post" action="/apply" class="apply card">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <button>Apply changes</button>
-<span class="muted">Publishes record changes: renders configuration and reloads only what changed — same as <code>fabricctl --apply</code>.</span>
+<span class="muted">Publishes zone, reverse-zone and key changes to BIND9 — reloads only what changed (same as <code>fabricctl --apply</code>).</span>
 </form>
-<section class="card"><h2>ACLs and update policies</h2><p class="blank">Left intentionally blank.</p>
-<p class="muted">Who may query the zones, and which certbot devices may prove which names (today: <code>fabricctl acl</code>).</p></section>
 {% endblock %}""",
 
     "stepca": """{% extends "base" %}{% block body %}
@@ -359,10 +391,13 @@ def overview(ctx, services):
     return _render("overview", ctx=ctx, tab="overview", services=services, service_info=SERVICES)
 
 
-def bind9(ctx, zones, zone, types, msg, err, tsig_keys=None):
-    """tsig_keys: None for a zone view, else the TSIG key list (TSIG view)."""
-    return _render("bind9", ctx=ctx, tab="bind9", zones=zones, zone=zone, types=types, msg=msg, err=err,
-                   tsig_keys=tsig_keys, tsig_scopes=TSIG_SCOPES, tsig_any_types=TSIG_ANY_TYPES)
+def bind9(ctx, section, zones, zone=None, types=(), msg="", err="", tsig_keys=None, reverse=None):
+    """section: forward (zone records) | reverse (generated PTRs) | tsig."""
+    return _render("bind9", ctx=ctx, tab="bind9", section=section, bind9_sections=BIND9_SECTIONS,
+                   forward_zones=[z for z in zones if not z.get("reverse")],
+                   manual_reverse=[z for z in zones if z.get("reverse")], zone=zone, types=types, msg=msg,
+                   err=err, tsig_keys=tsig_keys, reverse=reverse or {"zones": {}, "skipped": []},
+                   tsig_scopes=TSIG_SCOPES, tsig_any_types=TSIG_ANY_TYPES)
 
 
 def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err=""):
@@ -438,7 +473,11 @@ a{color:var(--accent)}
 .narrow{max-width:520px;margin:48px auto}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
-.tile-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.tile-head{display:flex;align-items:center;gap:10px}
+.light{flex:none;width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.light.ok{background:var(--ok);box-shadow:0 0 6px var(--ok)}.light.warn{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+.light.bad{background:var(--bad);box-shadow:0 0 6px var(--bad)}
+.bad-text{color:var(--bad)}.warn-text{color:var(--warn)}
 .blank{font-style:italic;color:var(--muted);margin:0 0 8px}
 .blank-card{min-height:320px}
 table{width:100%;border-collapse:collapse}
@@ -476,6 +515,11 @@ details{margin-top:8px}summary{cursor:pointer;color:var(--accent)}
 .downloads{list-style:none;padding:0;margin:0 0 8px;display:flex;flex-direction:column;gap:8px}
 .btn{display:inline-block;padding:4px 12px;border:1px solid var(--accent);border-radius:6px;text-decoration:none}
 button.ghost{background:transparent;color:var(--accent);padding:2px 10px}
-td.actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.sections{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 0 16px;overflow-x:auto}
+.section{flex:none;padding:8px 12px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.section:hover{color:var(--text)}.section.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
+.picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
+.small{font-size:12px}
 .devbanner{margin:0;padding:8px 16px;text-align:center;font-weight:600;background:#b45309;color:#fff}
 """

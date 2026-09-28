@@ -22,6 +22,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from webui import views  # noqa: E402
+try:        # the real PTR rules when run from a checkout; the webui image carries only webui/
+    from fabriclib.dns.ptr_for_ip import ptr_for_ip  # noqa: E402
+    from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
+except ImportError:
+    ptr_for_ip = reverse_zones = None
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE = {
@@ -32,9 +37,11 @@ SAMPLE = {
         "dynamic_zone_var": {"name": "home.arpa", "records": [
             ("A", "fabric", "192.168.1.53"), ("A", "@", "192.168.1.53"), ("A", "nas", "192.168.1.10"),
             ("CNAME", "ca", "fabric"), ("CNAME", "certs", "fabric"), ("CNAME", "dns", "fabric"),
+            ("A", "printer", "192.168.1.40"), ("AAAA", "nas", "fd00:1:2:3::10"), ("A", "vpn", "203.0.113.7"),
+            ("CNAME", "ca", "fabric"), ("CNAME", "certs", "fabric"), ("CNAME", "dns", "fabric"),
             ("CNAME", "sso", "fabric"), ("MX", "@", "10 mail"), ("TXT", "@", '"v=spf1 -all"')]},
-        "1.168.192.in-addr.arpa": {"name": "1.168.192.in-addr.arpa", "records": [
-            ("PTR", "53", "fabric.home.arpa.")]},
+        "iot.home.arpa": {"name": "iot.home.arpa", "records": [
+            ("A", "cam-front", "192.168.20.11"), ("A", "cam-back", "192.168.20.12"), ("A", "thermostat", "192.168.20.30")]},
     },
     "audit": ["[dev] User: dev (web) | Action: LOGIN | dev preview — no certificate, no Keycloak\n"],
     "tsig": [{"name": "npm-certbot", "algorithm": "hmac-sha256", "types": "TXT",
@@ -80,12 +87,32 @@ class DevState:
         self.lock = threading.Lock()
 
     def zones(self):
-        return [{"key": k, "name": z["name"], "records": len(z["records"])} for k, z in self.data["zones"].items()]
+        return [{"key": k, "name": z["name"], "records": len(z["records"]), "reverse": False}
+                for k, z in self.data["zones"].items()]
+
+    def reverse(self):
+        """The same PTR generation apply uses, over the sample records."""
+        if not reverse_zones:
+            return {"zones": {}, "skipped": []}
+        dns = {}
+        for k, z in self.data["zones"].items():
+            for t, n, v in z["records"]:
+                if t in ("A", "AAAA"):
+                    dns.setdefault(k, {}).setdefault(t, []).append({"name": n, "ip": v})
+        return reverse_zones({"domain": self.data["zones"]["dynamic_zone_var"]["name"], "dns": dns})
 
     def zone(self, key):
         z = self.data["zones"][key]
         return {"key": key, "name": z["name"], "status": "dev preview — sample data, not served by BIND",
-                "records": [{"type": t, "index": i, "name": n, "value": v} for i, (t, n, v) in enumerate(z["records"])]}
+                "records": [dict({"type": t, "index": i, "name": n, "value": v}, **self._ptr(t, v))
+                            for i, (t, n, v) in enumerate(z["records"])]}
+
+    @staticmethod
+    def _ptr(rtype, value):
+        if rtype not in ("A", "AAAA") or not ptr_for_ip:
+            return {}
+        zone, label = ptr_for_ip(value)
+        return {"ptr": f"{label}.{zone}" if zone else "", "ptr_note": "" if zone else label}
 
     def log(self, action, detail):
         self.data["audit"].insert(0, f"[dev] User: dev (web) | Action: {action} | {detail}\n")
@@ -120,12 +147,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/":
                 return self.send(200, views.overview(self.ctx, self.state.data["services"]))
             if path == "/bind9":
-                tsig = query.get("view") == "tsig"
-                key = "" if tsig else query.get("zone") or next(iter(self.state.data["zones"]))
-                zone = self.state.zone(key) if key in self.state.data["zones"] else None
-                return self.send(200, views.bind9(self.ctx, self.state.zones(), zone, RECORD_TYPES,
-                                                  query.get("msg", ""), query.get("err", ""),
-                                                  tsig_keys=self.state.data["tsig"] if tsig else None))
+                section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"
+                key = query.get("zone") or next(iter(self.state.data["zones"]))
+                zone = self.state.zone(key) if section == "forward" and key in self.state.data["zones"] else None
+                return self.send(200, views.bind9(self.ctx, section, self.state.zones(), zone=zone,
+                                                  types=RECORD_TYPES, msg=query.get("msg", ""),
+                                                  err=query.get("err", ""),
+                                                  tsig_keys=self.state.data["tsig"] if section == "tsig" else None,
+                                                  reverse=self.state.reverse() if section == "reverse" else None))
             if path == "/stepca":
                 view = query.get("view", "ca")
                 view = view if view in views.STEPCA_VIEWS else "ca"

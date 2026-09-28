@@ -19,7 +19,7 @@ def create_zone_tsig_key(actor, name, zone, scope, hosts=(), types=("TXT",), sec
     `secret` keeps an existing client's key working; else one is generated.
     The rfc2136.ini path is always fabric's default (never caller-chosen).
     Run apply afterwards. Returns (entry, secret, rfc2136_ini_text)."""
-    forward = {z["name"] for z in list_zones() if not z["name"].endswith((".in-addr.arpa", ".ip6.arpa"))}
+    forward = {z["name"] for z in list_zones() if not z["reverse"]}
     if zone not in forward:
         raise ValidationError(f"{zone!r} is not one of this fabric's forward zones")
     entry = {"name": str(name).strip(), "domain": zone, "record_types": ["TXT"]}

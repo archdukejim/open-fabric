@@ -21,8 +21,9 @@ everything else is core.
 
 | Tab | What it does |
 |-----|--------------|
-| Overview (`/`) | Health of every service: systemd state plus the container's Docker health check (`nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `openbao`, `kea`, `freeradius`, `webui`, `fabric-agent`); "N of M running"; version/build |
-| BIND9 · DNS (`/bind9?zone=<key>`) | One sub-tab per zone; view records (A, AAAA, CNAME, MX, TXT, SRV); add or delete a record in `vars.yaml`; Apply |
+| Overview (`/`) | One status light per service (`nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `openbao`, `kea`, `freeradius`, `webui`, `fabric-agent`). Green: running (and its Docker health check passes). Amber: starting. Red: stopped or health check failing, with the reason beside it. Also "N of M services healthy" and the version/build |
+| BIND9 · Forward zones (`/bind9?zone=<key>`) | Zone picker; records (A, AAAA, CNAME, MX, TXT, SRV) with each A/AAAA record's automatic PTR (or why it has none); add or delete a record in `vars.yaml`; Apply |
+| BIND9 · Reverse zones (`/bind9?view=reverse`) | Read-only: the reverse zones and PTR records generated from the forward A/AAAA records (see [Reverse DNS](operations.md#reverse-dns)), hand-written reverse zones, and addresses that get no PTR, with the reason |
 | BIND9 · TSIG keys (`/bind9?view=tsig`) | Keys with their effective update rights and ACLs (never secrets). **New TSIG key for a zone**: a forward zone and one scope — certbot DNS-01 for listed hosts, certbot DNS-01 for any host in the zone, or any name with chosen record types; generated secret or an existing one kept. The secret and the `rfc2136.ini` (download) are shown once. **New secret** (rotate) and **Delete**. Apply publishes. ACLs and update policies: placeholder (`fabricctl acl`) |
 | Kea · DHCP (`/kea`) *optional* | Placeholder — left intentionally blank |
 | Step-CA · PKI (`/stepca?view=…`) | Sub-menu: **Certificate authority** (root + intermediate subject, expiry, SHA-256; link to `certs.<domain>`), **Sign a CSR** (upload or paste PEM/DER → review names, key, policy → sign), **New key + certificate** (for devices that cannot make a CSR: RSA-2048/3072/4096 or EC P-256/P-384), **Inspect** (decode a certificate, chain or CSR; says whether this fabric issued it), **Convert** (PEM `.crt`, DER `.cer`, full chain `.pem`/`.p7b`, and with its key a `.p12`), **Issued** (every certificate issued by hand, with expiry status). See [Manual certificates](#manual-certificates) |
@@ -120,7 +121,7 @@ A compromise of the web app yields only the webui container: uid 912, no capabil
 |---------|--------|
 | Socket access | `agent.sock` is `0660 root:<webui gid>` in a `0750` dir; other host users cannot reach it |
 | Peer check | `SO_PEERCRED` on every connection: only the webui uid and root are accepted (right group, wrong uid → `403`) |
-| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`, `/v1/pki/ca`, `/v1/pki/issued`, `/v1/tsig`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only), `/v1/pki/{describe-csr,sign,issue,inspect,convert}`, `/v1/tsig`, `/v1/tsig/<name>/{rotate,delete}`. Anything else → `404` |
+| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`, `/v1/pki/ca`, `/v1/pki/issued`, `/v1/tsig`, `/v1/reverse-zones`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only), `/v1/pki/{describe-csr,sign,issue,inspect,convert}`, `/v1/tsig`, `/v1/tsig/<name>/{rotate,delete}`. Anything else → `404` |
 | Validation | Record input validated in `fabriclib/dns/validate_record.py`; actor must match `^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$`; body ≤ 64 KiB |
 | Audit | Every change is written to `/opt/fabric/archive/audit.log` with the acting user |
 | Sandbox | systemd hardening (`NoNewPrivileges`, `ProtectHome`, `ProtectKernel*`, `RestrictNamespaces`, ...); no network listener; IP access limited to localhost + `fabric_subnet` |

@@ -122,6 +122,10 @@ def convert_cert(actor, cert, key):
     return _call("POST", "/v1/pki/convert", {"actor": actor, "cert": cert, "key": key})
 
 
+def reverse_zones():
+    return _call("GET", "/v1/reverse-zones")
+
+
 def list_tsig_keys():
     return _call("GET", "/v1/tsig")
 

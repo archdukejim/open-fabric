@@ -321,14 +321,16 @@ class Handler(BaseHTTPRequestHandler):
     def ctx(sess):
         return {"user": sess["user"], "csrf": sess["csrf"], "version": actions.version_info()}
 
-    def bind9_page(self, ctx, query, status=200, **extra):
+    def bind9_page(self, ctx, query, status=200):
+        section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"
         zones = actions.list_zones()
-        tsig = query.get("view") == "tsig"
-        key = "" if tsig else query.get("zone") or (zones[0]["key"] if zones else "")
-        zone = actions.zone_detail(key) if key else None
-        return self.send(status, views.bind9(ctx, zones, zone, actions.RECORD_TYPES, query.get("msg", ""),
-                                             query.get("err", ""), tsig_keys=actions.list_tsig_keys() if tsig else None,
-                                             **extra))
+        forward = [z for z in zones if not z.get("reverse")]
+        key = query.get("zone") or (forward[0]["key"] if forward else "")
+        return self.send(status, views.bind9(
+            ctx, section, zones, zone=actions.zone_detail(key) if section == "forward" and key else None,
+            types=actions.RECORD_TYPES, msg=query.get("msg", ""), err=query.get("err", ""),
+            tsig_keys=actions.list_tsig_keys() if section == "tsig" else None,
+            reverse=actions.reverse_zones() if section == "reverse" else None))
 
     def stepca_page(self, ctx, view, status=200, **extra):
         if view not in views.STEPCA_VIEWS:

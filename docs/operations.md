@@ -243,6 +243,27 @@ links:
 
 ---
 
+## Reverse DNS
+
+PTR records are not edited by hand. Every forward-zone A and AAAA record
+gets its reverse record at apply, in a zone fabric creates:
+
+| Address | Reverse zone | PTR name |
+|---|---|---|
+| `192.168.1.40` | `1.168.192.in-addr.arpa` (/24) | `40` |
+| `fd00:1:2:3::10` | `3.0.0.0.2.0.0.0.1.0.0.0.0.0.d.f.ip6.arpa` (/64) | `0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0` |
+
+- **One PTR per address.** If several names share an address, the first
+  named record wins, then the zone apex (`@` → the zone itself), then the
+  zone's `ns` host.
+- **Private addresses only**: RFC 1918, 100.64.0.0/10, IPv6 ULA (`fc00::/7`).
+  A public address gets no PTR. Serving its reverse zone here would
+  answer for someone else's network. The web UI lists these under
+  *Reverse zones → No reverse record*.
+- A reverse zone you define yourself under `dns:` (a key ending in
+  `.in-addr.arpa` / `.ip6.arpa`) replaces the generated one for that range.
+- Change or delete the forward record and apply: the PTR follows.
+
 ## Resource Utilization
 
 The following chart outlines the memory footprint and CPU impact of the deployed applications. When `host_ram_capacity` is set to a value between 3 and 4, the infrastructure automatically enforces Docker Compose memory constraints (389-DS: `256M` at 3 GB, `384M` at 4 GB; webui: `96M`) to prevent these services from exceeding the host's physical memory boundaries.

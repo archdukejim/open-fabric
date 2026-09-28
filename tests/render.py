@@ -10,6 +10,7 @@ import yaml
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(REPO, 'fabric', 'lib'))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402  (the same env deploy.py uses)
+from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 
 env = jinja_env(os.path.join(REPO, 'fabric', 'jinja'))
 
@@ -49,10 +50,30 @@ ctx = {**secrets, **user, 'render_date': '2026-01-01'}
 PRISTINE = copy.deepcopy(ctx)      # vars.yaml.j2 updates the dns dict it is given in place
 v1 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**ctx))
 v2 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1}))
-import re as _re
-bad_rev = [z for z in v1.get('reverse_zone_names') or [] if not _re.fullmatch(r'\d+\.\d+\.\d+\.in-addr\.arpa', z)]
-assert not bad_rev, f'reverse zone names are malformed (Jinja escape bug?): {bad_rev!r}'
-print('reverse zones', v1.get('reverse_zone_names'))
+
+# Reverse zones: generated from forward A/AAAA records (deploy.py does the same).
+rv = reverse_zones({'domain': 'lan.test', 'host_ip': '192.168.7.53', 'dns': {
+    'dynamic_zone_var': {'zone_authority': True,
+                         'A': [{'name': '@', 'ip': '192.168.7.53'}, {'name': 'fabric', 'ip': '192.168.7.53'},
+                               {'name': 'nas', 'ip': '192.168.7.10'}, {'name': 'lab', 'ip': '10.1.2.3'},
+                               {'name': 'cloud', 'ip': '8.8.8.8'}],
+                         'AAAA': [{'name': 'nas', 'ip': 'fd12:3456:789a:1::10'}, {'name': 'pub', 'ip': '2001:db8::1'}]},
+    'iot.lan.test': {'A': [{'name': 'cam', 'ip': '192.168.7.99'}]},
+    '5.168.192.in-addr.arpa': {'A': []},
+}})
+z = rv['zones']
+assert list(z) == ['1.0.0.0.a.9.8.7.6.5.4.3.2.1.d.f.ip6.arpa', '2.1.10.in-addr.arpa', '7.168.192.in-addr.arpa'], list(z)
+ptr7 = {r['label']: r['target'] for r in z['7.168.192.in-addr.arpa']}
+assert ptr7 == {'10': 'nas.lan.test.', '53': 'fabric.lan.test.', '99': 'cam.iot.lan.test.'}, ptr7
+assert [r['label'] for r in z['7.168.192.in-addr.arpa']] == ['10', '53', '99'], 'PTRs sorted numerically'
+assert z['1.0.0.0.a.9.8.7.6.5.4.3.2.1.d.f.ip6.arpa'][0] == {
+    'label': '0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0', 'target': 'nas.lan.test.', 'ip': 'fd12:3456:789a:1::10',
+    'source': 'AAAA nas in lan.test'}, z
+assert {s['ip'] for s in rv['skipped']} == {'8.8.8.8', '2001:db8::1'}, 'public addresses get no local reverse zone'
+apex = reverse_zones({'domain': 'lan.test', 'dns': {'dynamic_zone_var': {'A': [{'name': '@', 'ip': '192.168.9.1'}]}}})
+assert apex['zones']['9.168.192.in-addr.arpa'][0]['target'] == 'lan.test.', 'apex record -> PTR to the zone, not "@."'
+full_rev = reverse_zones(v1)
+print('reverse zones', list(full_rev['zones']))
 diff = {k: (v1.get(k), v2.get(k)) for k in set(v1) | set(v2) if v1.get(k) != v2.get(k)}
 assert not diff, diff
 print('project_containers', v2['project_containers'])
@@ -61,7 +82,7 @@ print('ldap backends', v2['nginx_backend_ldap'], v2['nginx_backend_ldaps'])
 print('install_webui', v2['install_webui'], v2['hostname_mgr'])
 print('CNAMEs', [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']])
 
-full = {**secrets, **v2}
+full = {**secrets, **v2, 'reverse_zone_names': list(full_rev['zones'])}
 out = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith('--') else None
 if out:
     os.makedirs(out, exist_ok=True)
@@ -74,7 +95,7 @@ for tpl in sorted(env.list_templates()):
     if tpl.startswith('bind9/data/zone'):
         extra = dict(zone_name='lan.j-j.family', zone_records=v2['dns']['dynamic_zone_var'])
     if tpl.startswith('bind9/data/reverse'):
-        extra = dict(reverse_zone_name='7.168.192.in-addr.arpa')
+        extra = dict(reverse_zone_name='7.168.192.in-addr.arpa', ptr_records=rv['zones']['7.168.192.in-addr.arpa'])
     if tpl.startswith('systemd/'):
         extra = dict(item={'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []})
     if tpl.endswith('.json.j2'):
