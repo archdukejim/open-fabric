@@ -23,8 +23,9 @@ from webui import views  # noqa: E402
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE = {
-    "services": [("nginx", "active"), ("bind9", "active"), ("stepca", "active"), ("ldap", "active"),
-                 ("postgres", "active"), ("keycloak", "active"), ("webui", "active"), ("fabric-agent", "active")],
+    "services": [("nginx", "active", "healthy"), ("bind9", "active", "healthy"), ("stepca", "active", "healthy"),
+                 ("ldap", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),
+                 ("openbao", "active", "healthy"), ("webui", "active", "healthy"), ("fabric-agent", "active", "")],
     "zones": {
         "dynamic_zone_var": {"name": "home.arpa", "records": [
             ("A", "fabric", "192.168.1.53"), ("A", "@", "192.168.1.53"), ("A", "nas", "192.168.1.10"),
@@ -83,10 +84,14 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/static/app.css":
                 return self.send(200, views.css(), "text/css; charset=utf-8")
             if path == "/":
-                return self.send(200, views.dashboard(self.ctx, self.state.data["services"], self.state.zones()))
-            if path.startswith("/zone/") and path[6:] in self.state.data["zones"]:
-                return self.send(200, views.zone(self.ctx, self.state.zone(path[6:]), RECORD_TYPES,
-                                                 query.get("msg", ""), query.get("err", "")))
+                return self.send(200, views.overview(self.ctx, self.state.data["services"]))
+            if path == "/bind9":
+                key = query.get("zone") or next(iter(self.state.data["zones"]))
+                zone = self.state.zone(key) if key in self.state.data["zones"] else None
+                return self.send(200, views.bind9(self.ctx, self.state.zones(), zone, RECORD_TYPES,
+                                                  query.get("msg", ""), query.get("err", "")))
+            if path.lstrip("/") in views.PLACEHOLDERS:
+                return self.send(200, views.placeholder(self.ctx, path.lstrip("/")))
             if path == "/audit":
                 return self.send(200, views.audit(self.ctx, self.state.data["audit"]))
             if path == "/preview/denied":       # what a refused sign-in looks like
@@ -106,14 +111,14 @@ class Handler(BaseHTTPRequestHandler):
                                                          "DEV PREVIEW — nothing was rendered or reloaded.\n"
                                                          "On a real install this runs `fabricctl --apply`."))
             parts = path.strip("/").split("/")
-            if len(parts) == 3 and parts[0] == "zone" and parts[1] in self.state.data["zones"]:
-                key, op = parts[1], parts[2]
+            if len(parts) == 4 and parts[:2] == ["bind9", "zone"] and parts[2] in self.state.data["zones"]:
+                key, op = parts[2], parts[3]
                 records = self.state.data["zones"][key]["records"]
                 if op == "add":
                     rtype, name = form.get("type", ""), form.get("name", "").strip()
                     value = next((form.get(f, "").strip() for f in ("ip", "target", "text") if form.get(f, "").strip()), "")
                     if rtype not in RECORD_TYPES or not name or not value:
-                        return self.send(303, b"", location=f"/zone/{urllib.parse.quote(key)}?err=" +
+                        return self.send(303, b"", location=f"/bind9?zone={urllib.parse.quote(key)}&err=" +
                                          urllib.parse.quote("type, name and a value are required"))
                     records.append((rtype, name, value))
                     self.state.log("DNS_ADD", f"zone={key} {rtype} {name} {value} (in memory)")
@@ -126,7 +131,7 @@ class Handler(BaseHTTPRequestHandler):
                     msg = "Record deleted (dev preview: in memory only)."
                 else:
                     return self.send(404, views.error_page(404, "Not found."))
-                return self.send(303, b"", location=f"/zone/{urllib.parse.quote(key)}?msg=" + urllib.parse.quote(msg))
+                return self.send(303, b"", location=f"/bind9?zone={urllib.parse.quote(key)}&msg=" + urllib.parse.quote(msg))
             return self.send(404, views.error_page(404, "Not found."))
 
 

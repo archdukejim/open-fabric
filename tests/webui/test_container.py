@@ -268,10 +268,14 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
       and hd.get("X-Frame-Options") == "DENY" and hd.get("Cache-Control") == "no-store", hd)
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
-check("dashboard renders", st == 200 and "DNS zones" in body and "lan.test" in body, st)
+check("overview tab renders service health", st == 200 and "Overview" in body and "services running" in body, st)
+for tab in ("kea", "stepca", "dirsrv", "freeradius", "openbao"):
+    st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
+    check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
+st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("footer shows real version", "fabricctl 9.9.9" in body, body[-300:])
-st, hd, sc, body = req("GET", "/zone/dynamic_zone_var", ALICE, cookie=session)
-check("zone page shows CNAME targets", st == 200 and "nas25-apps" in body and "192.168.7.53" in body, body[:500])
+st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
+check("BIND9 tab shows the zone's records and CNAME targets", st == 200 and "nas25-apps" in body and "192.168.7.53" in body, body[:500])
 csrf = body.split('name="csrf" value="')[1].split('"')[0]
 
 st, hd, sc, body = req("GET", "/", BOB_CERT, cookie=session)
@@ -281,31 +285,31 @@ check("...and that session is now destroyed", st == 303, st)
 
 (st, hd, sc, body), _, _ = login()
 session = cookie_val(sc, "__Host-webui")
-st, hd, sc, body = req("GET", "/zone/dynamic_zone_var", ALICE, cookie=session)
+st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
 csrf = body.split('name="csrf" value="')[1].split('"')[0]
 POSTH = {**ALICE, "Origin": "https://mgr.test"}
 add = {"csrf": csrf, "type": "CNAME", "name": "shelfmark", "target": "nas25-apps"}
-st, *_ = req("POST", "/zone/dynamic_zone_var/add", ALICE, dict(add), cookie=session)
+st, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", ALICE, dict(add), cookie=session)
 check("POST without Origin -> 403", st == 403, st)
-st, *_ = req("POST", "/zone/dynamic_zone_var/add", POSTH, {**add, "csrf": "nope"}, cookie=session)
+st, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH, {**add, "csrf": "nope"}, cookie=session)
 check("POST with bad CSRF -> 403", st == 403, st)
-st, *_ = req("POST", "/zone/dynamic_zone_var/add", {**POSTH, "Origin": "https://evil.test"}, dict(add), cookie=session)
+st, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", {**POSTH, "Origin": "https://evil.test"}, dict(add), cookie=session)
 check("POST from foreign origin -> 403", st == 403, st)
-st, hd, *_ = req("POST", "/zone/dynamic_zone_var/add", POSTH, dict(add), cookie=session)
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH, dict(add), cookie=session)
 vars_text = open(f"{W}/fabric/config/vars.yaml").read()
 check("add CNAME -> saved to vars.yaml", st == 303 and "shelfmark" in vars_text and "msg=" in hd["Location"], (st, hd))
-st, hd, *_ = req("POST", "/zone/dynamic_zone_var/add", POSTH,
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                  {"csrf": csrf, "type": "A", "name": "bad name;rm", "ip": "1.2.3.4"}, cookie=session)
 check("invalid record name rejected", st == 303 and "err=" in hd["Location"], hd)
-st, hd, *_ = req("POST", "/zone/dynamic_zone_var/add", POSTH,
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                  {"csrf": csrf, "type": "TXT", "name": "x", "text": 'a"\n$INCLUDE /etc/shadow'}, cookie=session)
 check("zone-file injection via TXT rejected", st == 303 and "err=" in hd["Location"], hd)
-st, hd, sc, body = req("GET", "/zone/dynamic_zone_var", ALICE, cookie=session)
+st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
 idx = [l for l in body.split("<tr>") if "shelfmark" in l][0].split('name="index" value="')[1].split('"')[0]
-st, hd, *_ = req("POST", "/zone/dynamic_zone_var/delete", POSTH,
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
                  {"csrf": csrf, "type": "CNAME", "index": idx, "name": "wrong-name"}, cookie=session)
 check("stale delete (name mismatch) refused", "err=" in hd.get("Location", ""), hd)
-st, hd, *_ = req("POST", "/zone/dynamic_zone_var/delete", POSTH,
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
                  {"csrf": csrf, "type": "CNAME", "index": idx, "name": "shelfmark"}, cookie=session)
 check("delete CNAME -> removed from vars.yaml", "shelfmark" not in open(f"{W}/fabric/config/vars.yaml").read(), hd)
 st, hd, sc, body = req("GET", "/audit", ALICE, cookie=session)

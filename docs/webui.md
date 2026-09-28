@@ -15,10 +15,19 @@ webui is a browser front end for `fabricctl`. It runs as an unprivileged contain
 
 ## Features
 
-| Page | What it does |
-|------|--------------|
-| Dashboard (`/`) | `systemctl is-active` status of `nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `webui`, `fabric-agent`; zone list; version/build |
-| Zone (`/zone/<zone>`) | View records (A, AAAA, CNAME, MX, TXT, SRV); add or delete a record in `vars.yaml` |
+One tab per service, plus an overview. Tabs marked *optional* are the
+services that can be added or removed on a running install (DHCP, 802.1X);
+everything else is core.
+
+| Tab | What it does |
+|-----|--------------|
+| Overview (`/`) | Health of every service: systemd state plus the container's Docker health check (`nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `openbao`, `kea`, `freeradius`, `webui`, `fabric-agent`); "N of M running"; version/build |
+| BIND9 · DNS (`/bind9?zone=<key>`) | One sub-tab per zone; view records (A, AAAA, CNAME, MX, TXT, SRV); add or delete a record in `vars.yaml`; Apply. TSIG keys and ACL/update policies: placeholder (use `fabricctl tsig` / `fabricctl acl`) |
+| Kea · DHCP (`/kea`) *optional* | Placeholder — left intentionally blank |
+| Step-CA · PKI (`/stepca`) | Placeholder — left intentionally blank |
+| 389-DS · Directory (`/dirsrv`) | Placeholder — left intentionally blank |
+| FreeRADIUS · 802.1X (`/freeradius`) *optional* | Placeholder — left intentionally blank |
+| OpenBao · Secrets (`/openbao`) | Placeholder — left intentionally blank |
 | Apply | fabric-agent runs the same apply as `sudo fabricctl --apply` (`interactive.py --apply`); the output is shown |
 | Audit (`/audit`) | Last 200 lines of `/opt/fabric/archive/audit.log` (logins, denials, record edits, applies) |
 

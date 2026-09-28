@@ -288,11 +288,15 @@ class Handler(BaseHTTPRequestHandler):
     def get(self, sess, path, query):
         ctx = {"user": sess["user"], "csrf": sess["csrf"], "version": actions.version_info()}
         if path == "/":
-            return self.send(200, views.dashboard(ctx, actions.service_status(), actions.list_zones()))
-        if path.startswith("/zone/"):
-            key = urllib.parse.unquote(path[len("/zone/"):])
-            return self.send(200, views.zone(ctx, actions.zone_detail(key), actions.RECORD_TYPES,
-                                             query.get("msg", ""), query.get("err", "")))
+            return self.send(200, views.overview(ctx, actions.service_status()))
+        if path == "/bind9":
+            zones = actions.list_zones()
+            key = query.get("zone") or (zones[0]["key"] if zones else "")
+            zone = actions.zone_detail(key) if key else None
+            return self.send(200, views.bind9(ctx, zones, zone, actions.RECORD_TYPES,
+                                              query.get("msg", ""), query.get("err", "")))
+        if path.lstrip("/") in views.PLACEHOLDERS:
+            return self.send(200, views.placeholder(ctx, path.lstrip("/")))
         if path == "/audit":
             return self.send(200, views.audit(ctx, actions.read_audit()))
         return self.deny(404, "Not found.")
@@ -305,10 +309,10 @@ class Handler(BaseHTTPRequestHandler):
             actions.audit(user, "LOGOUT", "")
             return self.redirect(self.app.oidc.logout_url(sess["id_token"], self.app.public_url + "/"),
                                  [self.set_cookie(SESSION_COOKIE, "", 0)])
-        if path.startswith("/zone/"):
-            rest = urllib.parse.unquote(path[len("/zone/"):])
+        if path.startswith("/bind9/zone/"):
+            rest = urllib.parse.unquote(path[len("/bind9/zone/"):])
             key, _, op = rest.rpartition("/")
-            back = "/zone/" + urllib.parse.quote(key)
+            back = "/bind9?zone=" + urllib.parse.quote(key)
             try:
                 if op == "add":
                     rtype = form.get("type", "")
@@ -322,9 +326,9 @@ class Handler(BaseHTTPRequestHandler):
                     msg = "Record deleted. Apply to publish."
                 else:
                     return self.deny(404, "Not found.")
-                return self.redirect(back + "?" + urllib.parse.urlencode({"msg": msg}))
+                return self.redirect(back + "&" + urllib.parse.urlencode({"msg": msg}))
             except actions.ValidationError as exc:
-                return self.redirect(back + "?" + urllib.parse.urlencode({"err": str(exc)}))
+                return self.redirect(back + "&" + urllib.parse.urlencode({"err": str(exc)}))
         if path == "/apply":
             ok, output = actions.apply_changes(user)
             ctx = {"user": user, "csrf": sess["csrf"], "version": actions.version_info()}
