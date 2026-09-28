@@ -21,6 +21,9 @@ through apply (`deploy.py`), which reloads only changed zones.
 | `list_tsig_keys.py` | TSIG keys with their effective update rights (own + ACL policies) and ACLs |
 | `replace_tsig_secret.py` | Give a key a secret you supply, or a newly generated one (locked, audited) |
 | `update_tsig_key.py` | Change what a key may update: records, types, zone, algorithm (locked, audited) |
+| `rfc2136_settings.py` | The `rfc2136.ini` text a certbot-style client needs for one key (used by apply and the web UI) |
+| `create_zone_tsig_key.py` | Web UI: a new key limited to one forward zone and one scope (listed hosts' ACME, zone ACME, any name + types) |
+| `rotate_tsig_key.py` | New generated secret for a key, returned with its `rfc2136.ini` |
 | `run_tsig_command.py` | `fabricctl tsig list/add/update/set-secret/rotate/remove` (applies after a change) |
 | `set_key_acls.py` | Put a TSIG key in ACLs or take it out (of all, when the key is removed) |
 | `builtin_acls.py` | The ACLs fabric always renders (protected from removal) |

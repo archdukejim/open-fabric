@@ -44,7 +44,7 @@ try:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
     check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services running" in page, st)
-    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "stepca", "dirsrv", "freeradius", "openbao"))
+    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "dirsrv", "freeradius", "openbao"))
     check("every service tab renders (placeholders)", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
     st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")
@@ -60,6 +60,17 @@ try:
     check("apply is a no-op that says so", st == 200 and "nothing was rendered or reloaded" in page)
     st, _, _, page = req("GET", "/audit")
     check("audit log shows the preview's actions", "DNS_ADD" in page and "in memory" in page)
+    pages = [req("GET", f"/stepca?view={v}") for v in ("ca", "sign", "issue", "inspect", "convert", "issued")]
+    check("every Step-CA menu page renders", all(p[0] == 200 for p in pages) and "Fabric Root CA" in pages[0][3]
+          and "switch-core.home.arpa" in pages[5][3])
+    st, _, _, page = req("POST", "/stepca/issue", {"csrf": "dev", "cn": "x"})
+    check("generate shows sample downloads and the one-time key warning",
+          st == 200 and 'download="device.home.arpa.key"' in page and "only copy of the private key" in page)
+    st, _, _, page = req("GET", "/bind9?view=tsig")
+    check("TSIG view lists sample keys", st == 200 and "npm-certbot" in page and "New TSIG key for a zone" in page)
+    st, _, _, page = req("POST", "/bind9/tsig/create", {"csrf": "dev", "name": "preview-key", "zone": "home.arpa"})
+    check("creating a TSIG key shows its secret and rfc2136.ini once",
+          st == 200 and "dns_rfc2136_name = preview-key" in page and 'class="secret"' in page)
     st, _, _, page = req("GET", "/preview/denied")
     check("preview of a refused sign-in", st == 403 and "fabric-admin" in page)
 finally:

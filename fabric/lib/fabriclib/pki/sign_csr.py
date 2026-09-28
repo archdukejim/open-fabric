@@ -1,0 +1,54 @@
+import base64
+import os
+import secrets
+
+from fabriclib.common.errors import ValidationError
+from fabriclib.common.write_audit import write_audit
+from fabriclib.pki.common.artifacts_dir import artifacts_dir
+from fabriclib.pki.common.ca_chain_pem import ca_chain_pem
+from fabriclib.pki.common.describe_cert import describe_cert
+from fabriclib.pki.common.openssl import openssl
+from fabriclib.pki.common.record_issued import record_issued
+from fabriclib.pki.common.run_step import run_step
+from fabriclib.pki.common.safe_name import safe_name
+from fabriclib.pki.common.to_pem import to_pem
+from fabriclib.pki.common.valid_days import valid_days
+from fabriclib.pki.describe_csr import describe_csr
+
+
+def sign_csr(v, actor, csr, days, source="web"):
+    """Sign a device's certificate signing request with the Step-CA
+    intermediate: a leaf certificate (serverAuth + clientAuth, the CSR's
+    names, the fabric subject defaults) valid for `days`. The private key
+    never leaves the device. Refuses requests that fail describe_csr's
+    policy. Returns {name, cert, chain, fullchain, der_b64, info}."""
+    req = describe_csr(csr)
+    if req["problems"]:
+        raise ValidationError("cannot sign: " + "; ".join(req["problems"]))
+    days = valid_days(v, days)
+    uid, gid = (int(v["service_users"]["step"][k]) for k in ("uid", "gid"))
+    name = f"csr-{secrets.token_hex(8)}.csr"
+    path = os.path.join(artifacts_dir(v), name)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+    with os.fdopen(fd, "w") as f:
+        f.write(req["pem"])
+    os.chown(path, uid, gid)
+    try:
+        out = run_step(v, ["certificate", "sign", f"/home/step/artifacts/{name}",
+                           "/home/step/certs/intermediate_ca.crt", "/home/step/secrets/intermediate_ca_key",
+                           "--password-file", "/home/step/secrets/password",
+                           "--template", "/home/step/templates/certs/leaf.tpl",
+                           "--not-after", f"{days * 24}h"])
+    finally:
+        os.remove(path)
+    cert = to_pem(out, "cert")[0]
+    info = describe_cert(cert)
+    if info["is_ca"]:                       # the leaf template never sets CA:TRUE; belt and braces
+        raise ValidationError("refusing: the signed certificate would be a CA")
+    chain = ca_chain_pem(v)
+    record_issued(actor, "csr", info, source)
+    write_audit(actor, "PKI_SIGN_CSR", f"subject={info['subject']} sans={','.join(info['sans'])} "
+                                       f"serial={info['serial']} days={days}", source)
+    return {"name": safe_name(req["cn"] or req["sans"][0]), "cert": cert, "chain": chain, "fullchain": cert + chain,
+            "der_b64": base64.b64encode(openssl("x509", "-outform", "DER", data=cert.encode())).decode(),
+            "info": info}

@@ -21,7 +21,11 @@ Security model (every request must pass all of these):
      and a same-origin Origin header.
 """
 import argparse
+import base64
+import email.parser
+import email.policy
 import grp
+import re
 import hmac
 import json
 import os
@@ -158,11 +162,37 @@ class Handler(BaseHTTPRequestHandler):
         return ("Set-Cookie", f"{name}={value}; Path=/; Secure; HttpOnly; SameSite={samesite}; Max-Age={max_age}")
 
     def read_form(self):
+        """Form fields as {name: str}; file uploads (multipart) as {name: bytes}."""
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY:
             raise ValueError("request too large")
-        raw = self.rfile.read(length).decode("utf-8", "replace")
+        body = self.rfile.read(length)
+        ctype = self.headers.get("Content-Type", "")
+        if ctype.startswith("multipart/form-data"):
+            msg = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(
+                f"Content-Type: {ctype}\r\n\r\n".encode() + body)
+            form = {}
+            for part in msg.iter_parts() if msg.is_multipart() else []:
+                name = part.get_param("name", header="content-disposition")
+                if not name:
+                    continue
+                data = part.get_payload(decode=True) or b""
+                form[name] = data if part.get_filename() is not None else data.decode("utf-8", "replace")
+            return form
+        raw = body.decode("utf-8", "replace")
         return {k: v[0] for k, v in urllib.parse.parse_qs(raw, keep_blank_values=True).items()}
+
+    @staticmethod
+    def upload(form, file_field, text_field):
+        """A pasted value, or an uploaded file (binary DER goes to the agent as base64)."""
+        data = form.get(file_field)
+        if isinstance(data, bytes) and data:
+            try:
+                return data.decode("ascii")
+            except UnicodeDecodeError:
+                return base64.b64encode(data).decode()
+        text = form.get(text_field, "")
+        return text if isinstance(text, str) else ""
 
     # -- gate 1+2: client certificate ------------------------------------
     def client_cert(self):
@@ -229,7 +259,9 @@ class Handler(BaseHTTPRequestHandler):
             if method == "POST":
                 origin = self.headers.get("Origin", "")
                 form = self.read_form()
-                if origin != self.app.public_url or not hmac.compare_digest(form.get("csrf", ""), sess["csrf"]):
+                csrf = form.get("csrf", "")
+                if (origin != self.app.public_url or not isinstance(csrf, str)
+                        or not hmac.compare_digest(csrf, sess["csrf"])):
                     return self.deny(403, "Request rejected (CSRF check failed). Reload the page and try again.")
                 return self.post(sess, path, form)
             return self.get(sess, path, query)
@@ -285,16 +317,37 @@ class Handler(BaseHTTPRequestHandler):
             self.set_cookie(LOGIN_COOKIE, "", 0, "Lax")])
 
     # -- pages --------------------------------------------------------------
+    @staticmethod
+    def ctx(sess):
+        return {"user": sess["user"], "csrf": sess["csrf"], "version": actions.version_info()}
+
+    def bind9_page(self, ctx, query, status=200, **extra):
+        zones = actions.list_zones()
+        tsig = query.get("view") == "tsig"
+        key = "" if tsig else query.get("zone") or (zones[0]["key"] if zones else "")
+        zone = actions.zone_detail(key) if key else None
+        return self.send(status, views.bind9(ctx, zones, zone, actions.RECORD_TYPES, query.get("msg", ""),
+                                             query.get("err", ""), tsig_keys=actions.list_tsig_keys() if tsig else None,
+                                             **extra))
+
+    def stepca_page(self, ctx, view, status=200, **extra):
+        if view not in views.STEPCA_VIEWS:
+            view = "ca"
+        try:
+            ca = actions.ca_summary()
+        except (actions.AgentError, actions.ValidationError):
+            ca = None
+        issued = actions.list_issued() if view == "issued" else None
+        return self.send(status, views.stepca(ctx, view, ca, issued=issued, **extra))
+
     def get(self, sess, path, query):
-        ctx = {"user": sess["user"], "csrf": sess["csrf"], "version": actions.version_info()}
+        ctx = self.ctx(sess)
         if path == "/":
             return self.send(200, views.overview(ctx, actions.service_status()))
         if path == "/bind9":
-            zones = actions.list_zones()
-            key = query.get("zone") or (zones[0]["key"] if zones else "")
-            zone = actions.zone_detail(key) if key else None
-            return self.send(200, views.bind9(ctx, zones, zone, actions.RECORD_TYPES,
-                                              query.get("msg", ""), query.get("err", "")))
+            return self.bind9_page(ctx, query)
+        if path == "/stepca":
+            return self.stepca_page(ctx, query.get("view", "ca"))
         if path.lstrip("/") in views.PLACEHOLDERS:
             return self.send(200, views.placeholder(ctx, path.lstrip("/")))
         if path == "/audit":
@@ -331,9 +384,63 @@ class Handler(BaseHTTPRequestHandler):
                 return self.redirect(back + "&" + urllib.parse.urlencode({"err": str(exc)}))
         if path == "/apply":
             ok, output = actions.apply_changes(user)
-            ctx = {"user": user, "csrf": sess["csrf"], "version": actions.version_info()}
-            return self.send(200, views.apply_result(ctx, ok, output))
+            return self.send(200, views.apply_result(self.ctx(sess), ok, output))
+        if path.startswith("/stepca/"):
+            return self.stepca_post(sess, path[len("/stepca/"):], form)
+        if path.startswith("/bind9/tsig/"):
+            return self.tsig_post(sess, urllib.parse.unquote(path[len("/bind9/tsig/"):]), form)
         return self.deny(404, "Not found.")
+
+    def stepca_post(self, sess, op, form):
+        """Manual PKI: each form maps to one fabric-agent operation."""
+        ctx, user = self.ctx(sess), sess["user"]
+        back = {"sign/review": "sign", "sign": "sign", "issue": "issue", "inspect": "inspect",
+                "convert": "convert"}.get(op)
+        if not back:
+            return self.deny(404, "Not found.")
+        try:
+            if op == "sign/review":
+                req = actions.describe_csr(user, self.upload(form, "csr_file", "csr"))
+                return self.stepca_page(ctx, "sign", review=req)
+            if op == "sign":
+                result = actions.sign_csr(user, form.get("csr", ""), form.get("days", ""))
+                return self.send(200, views.pki_result(ctx, "sign", result))
+            if op == "issue":
+                sans = [n for n in re.split(r"[\s,]+", form.get("sans", "")) if n]
+                result = actions.issue_key_pair(user, form.get("cn", ""), sans, form.get("key_type", ""),
+                                                form.get("days", ""))
+                return self.send(200, views.pki_result(ctx, "issue", result))
+            if op == "inspect":
+                return self.stepca_page(ctx, "inspect",
+                                        inspected=actions.inspect_pem(user, self.upload(form, "file", "data")))
+            result = actions.convert_cert(user, self.upload(form, "cert_file", "cert"),
+                                          self.upload(form, "key_file", "key"))
+            return self.send(200, views.pki_result(ctx, "convert", result))
+        except actions.ValidationError as exc:
+            return self.stepca_page(ctx, back, status=400, err=str(exc))
+
+    def tsig_post(self, sess, rest, form):
+        """TSIG keys for a zone: create, rotate, delete (apply publishes them)."""
+        ctx, user = self.ctx(sess), sess["user"]
+        name, _, op = rest.rpartition("/")
+        back = {"view": "tsig"}
+        try:
+            if rest == "create":
+                hosts = [h for h in re.split(r"[\s,]+", form.get("hosts", "")) if h]
+                types = [t for t in actions.RECORD_TYPES if form.get(f"type_{t}")]
+                r = actions.create_tsig_key(user, form.get("name", ""), form.get("zone", ""), form.get("scope", ""),
+                                            hosts, types, form.get("secret", ""))
+                return self.send(200, views.tsig_result(ctx, r["key"]["name"], r["secret"], r["ini"], "created"))
+            if op == "rotate":
+                r = actions.rotate_tsig_key(user, name)
+                return self.send(200, views.tsig_result(ctx, name, r["secret"], r["ini"], "rotated"))
+            if op == "delete":
+                actions.delete_tsig_key(user, name)
+                return self.redirect("/bind9?" + urllib.parse.urlencode(
+                    {**back, "msg": f"TSIG key {name} removed. Apply to publish."}))
+            return self.deny(404, "Not found.")
+        except actions.ValidationError as exc:
+            return self.bind9_page(ctx, {**back, "err": str(exc)}, status=400)
 
 
 class UnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):

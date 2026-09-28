@@ -407,6 +407,14 @@ These variables define how the internal Certificate Authority generates and sign
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
 
+### `pki_manual_max_days`
+**Description:** The longest validity (in days) of a certificate issued by hand from the web UI's Step-CA tab — a signed CSR or a generated key pair. Requests above it are refused.
+
+**Default Value:** `1825` (5 years)
+
+**Effected Jinja Templates:**
+- `vars.yaml.j2`
+
 ### `cert_acme_lifetime_hours`
 **Description:** The default validity of certificates requested via ACME.
 

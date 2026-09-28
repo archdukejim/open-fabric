@@ -140,6 +140,7 @@ shutil.copytree(os.path.join(REPO, "fabric", "lib"), f"{W}/fabric/lib")
 os.makedirs(f"{W}/fabric/config")
 open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
 open(f"{W}/fabric/config/vars.yaml", "w").write(
+    f"deploy_base_dir: {W}\nhost_ip: 192.168.7.53\nhostname_certs: certs.lan.test\n"
     "domain: lan.test\ndns:\n  dynamic_zone_var:\n    zone_authority: true\n    A:\n    - {name: pi-core, ip: 192.168.7.53}\n"
     "    CNAME:\n    - {name: calibre, canonical: nas25-apps}\n")
 UID = 912
@@ -150,6 +151,7 @@ for d, owner, group, mode in [("agent", 0, UID, 0o750), ("run", UID, 0, 0o750), 
     os.chmod(f"{W}/{d}", mode)
 shutil.copy(f"{W}/root.crt", f"{W}/certs/root_ca.crt")
 shutil.copy(f"{W}/int.crt", f"{W}/certs/intermediate_ca.crt")
+shutil.copytree(f"{W}/certs", f"{W}/stepca/data/certs")      # what the agent's PKI pages read
 agent = subprocess.Popen([sys.executable, f"{W}/fabric/lib/agent/server.py", "--socket", f"{W}/agent/agent.sock",
                           "--socket-gid", str(UID), "--allow-uid", str(UID)],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -201,6 +203,23 @@ def req(method, path, headers=None, body=None, cookie=None):
     r = c.getresponse()
     data = r.read().decode()
     return r.status, dict(r.getheaders()), r.getheader("Set-Cookie") or "", data
+
+
+def req_upload(path, headers, fields, files, cookie):
+    """multipart/form-data POST, as a browser sends a form with a file input."""
+    boundary = "----fabrictest" + os.urandom(8).hex()
+    out = b""
+    for k, v in fields.items():
+        out += f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+    for k, (fname, data) in files.items():
+        out += (f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"; filename="{fname}"\r\n'
+                f"Content-Type: application/octet-stream\r\n\r\n").encode() + data + b"\r\n"
+    out += f"--{boundary}--\r\n".encode()
+    c = UConn("x")
+    c.request("POST", path, body=out, headers={**headers, "Cookie": cookie,
+                                               "Content-Type": f"multipart/form-data; boundary={boundary}"})
+    r = c.getresponse()
+    return r.status, dict(r.getheaders()), r.read().decode()
 
 
 def cookie_val(set_cookie, name):
@@ -269,7 +288,7 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("overview tab renders service health", st == 200 and "Overview" in body and "services running" in body, st)
-for tab in ("kea", "stepca", "dirsrv", "freeradius", "openbao"):
+for tab in ("kea", "dirsrv", "freeradius", "openbao"):
     st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
     check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
@@ -315,6 +334,64 @@ check("delete CNAME -> removed from vars.yaml", "shelfmark" not in open(f"{W}/fa
 st, hd, sc, body = req("GET", "/audit", ALICE, cookie=session)
 check("audit log records web actions with user", "User: alice (web) | Action: DNS_ADD" in body
       and "LOGIN_DENIED" in body, body[:400])
+
+# ---- Step-CA tab: manual PKI through the agent
+st, hd, sc, body = req("GET", "/stepca", ALICE, cookie=session)
+check("Step-CA tab shows the CA certificates", st == 200 and "Test Root CA" in body and "Test Intermediate CA" in body
+      and "http://certs.lan.test/" in body, body[:400])
+views_ok = all(req("GET", f"/stepca?view={v}", ALICE, cookie=session)[0] == 200
+               for v in ("sign", "issue", "inspect", "convert", "issued"))
+check("every Step-CA menu page renders", views_ok)
+sso_pem, sso_key = open(f"{W}/sso.crt").read(), open(f"{W}/sso.key").read()
+sso_der = subprocess.run(["openssl", "x509", "-in", f"{W}/sso.crt", "-outform", "DER"], capture_output=True).stdout
+st, hd, body = req_upload("/stepca/inspect", POSTH, {"csrf": csrf}, {"file": ("sso.cer", sso_der)}, session)
+check("inspect a DER upload -> decoded, marked as issued by this fabric",
+      st == 200 and "sso.test" in body and "issued by this fabric" in body, (st, body[:300]))
+st, hd, body = req_upload("/stepca/inspect", POSTH, {"csrf": csrf, "data": sso_key}, {}, session)
+check("inspect refuses a pasted private key (400, not echoed)",
+      st == 400 and "private key" in body and "BEGIN" not in body.split("<textarea")[0], st)
+st, hd, body = req_upload("/stepca/inspect", POSTH, {"csrf": "nope"}, {"file": ("x.crt", sso_pem.encode())}, session)
+check("upload with bad CSRF -> 403", st == 403, st)
+subprocess.run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{W}/dev.key", "-out",
+                f"{W}/dev.csr", "-subj", "/CN=dev.lan.test", "-addext", "subjectAltName=DNS:dev.lan.test,IP:192.168.7.9"],
+               check=True, capture_output=True)
+st, hd, body = req_upload("/stepca/sign/review", POSTH, {"csrf": csrf}, {"csr_file": ("dev.csr", open(f"{W}/dev.csr", "rb").read())}, session)
+check("CSR upload -> review with names and a Sign button",
+      st == 200 and "dev.lan.test, 192.168.7.9" in body and "Sign certificate" in body, body[:400])
+st, hd, body = req_upload("/stepca/convert", POSTH, {"csrf": csrf, "key": sso_key}, {"cert_file": ("sso.crt", sso_pem.encode())}, session)
+check("convert cert + key -> downloads incl. .p12 and a one-time password",
+      st == 200 and 'download="sso.test.p12"' in body and 'download="sso.test.cer"' in body and "shown once" in body,
+      body[:400])
+st, hd, sc, body = req("POST", "/stepca/issue", POSTH, {"csrf": csrf, "cn": "bad name!", "key_type": "RSA-2048",
+                                                        "days": "30"}, cookie=session)
+check("invalid request -> form again with the reason (400)", st == 400 and "not a host name" in body, (st, body[:300]))
+
+# ---- BIND9 tab: TSIG keys for a zone
+st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)
+check("TSIG view renders the create form", st == 200 and "New TSIG key for a zone" in body, st)
+st, hd, sc, body = req("POST", "/bind9/tsig/create", POSTH, {"csrf": csrf, "name": "npm-certbot", "zone": "lan.test",
+                                                              "scope": "acme-hosts", "hosts": "npm, nas"}, cookie=session)
+secret = body.split('<code class="secret">')[1].split("<")[0] if '<code class="secret">' in body else ""
+check("create TSIG key -> secret and rfc2136.ini shown once", st == 200 and secret
+      and "dns_rfc2136_name = npm-certbot" in body, body[:300])
+vt = open(f"{W}/fabric/config/vars.yaml").read()
+check("...key saved, secret kept out of vars.yaml", "npm-certbot" in vt and secret not in vt
+      and secret in open(f"{W}/fabric/config/fabric-secrets.yml").read())
+st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)
+check("TSIG list shows the key's rights, never its secret",
+      "_acme-challenge.npm.lan.test" in body and secret not in body, body[:300])
+st, hd, sc, body = req("POST", "/bind9/tsig/create", POSTH, {"csrf": csrf, "name": "x", "zone": "evil.test",
+                                                              "scope": "acme-zone"}, cookie=session)
+check("TSIG key for a zone fabric does not serve -> refused", st == 400 and "forward zones" in body, st)
+st, hd, sc, body = req("POST", "/bind9/tsig/npm-certbot/rotate", POSTH, {"csrf": csrf}, cookie=session)
+new = body.split('<code class="secret">')[1].split("<")[0] if '<code class="secret">' in body else ""
+check("rotate -> a new secret", st == 200 and new and new != secret, st)
+st, hd, *_ = req("POST", "/bind9/tsig/npm-certbot/delete", POSTH, {"csrf": csrf}, cookie=session)
+check("delete TSIG key -> removed", st == 303 and "npm-certbot" not in open(f"{W}/fabric/config/vars.yaml").read(), st)
+st, hd, sc, body = req("GET", "/audit", ALICE, cookie=session)
+check("audit log records TSIG and PKI actions", "TSIG_ADD" in body and "TSIG_SECRET" in body
+      and "PKI_CONVERT" in body, body[:300])
+
 st, hd, sc, body = req("POST", "/logout", POSTH, {"csrf": csrf}, cookie=session)
 check("logout -> Keycloak end-session with id_token_hint",
       st == 303 and "/protocol/openid-connect/logout?id_token_hint=" in hd.get("Location", ""), hd)

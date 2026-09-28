@@ -11,8 +11,10 @@ dev switch, so this can never be turned on in a real install.
       fabric/webui:local /app/webui/devserver.py --bind 0.0.0.0   # from the image
 """
 import argparse
+import base64
 import copy
 import os
+import secrets
 import sys
 import threading
 import urllib.parse
@@ -35,7 +37,39 @@ SAMPLE = {
             ("PTR", "53", "fabric.home.arpa.")]},
     },
     "audit": ["[dev] User: dev (web) | Action: LOGIN | dev preview — no certificate, no Keycloak\n"],
+    "tsig": [{"name": "npm-certbot", "algorithm": "hmac-sha256", "types": "TXT",
+              "scope": "_acme-challenge.npm.home.arpa, _acme-challenge.nas.home.arpa", "acls": ["certbot-devices"]},
+             {"name": "home.arpa-acme", "algorithm": "hmac-sha256", "types": "TXT",
+              "scope": "_acme-challenge (zone home.arpa)", "acls": []}],
+    "issued": [{"when": "2026-09-20T10:12:00", "actor": "dev", "kind": "csr", "subject": "CN=switch-core.home.arpa",
+                "sans": ["switch-core.home.arpa", "192.168.1.2"], "not_after": "Sep 20 10:12:00 2027 GMT",
+                "status": "valid"},
+               {"when": "2025-10-01T08:00:00", "actor": "dev", "kind": "keypair", "subject": "CN=printer.home.arpa",
+                "sans": ["printer.home.arpa"], "not_after": "Oct 15 08:00:00 2026 GMT", "status": "expires soon"}],
 }
+_FP = ":".join(["AB", "12", "CD", "34"] * 8)
+SAMPLE_CA = {"certs_url": "http://certs.home.arpa/", "max_days": 1825,
+             "root": {"subject": "CN=Fabric Root CA,O=Fabric", "not_after": "Sep  1 00:00:00 2046 GMT",
+                      "key": "EC prime256v1", "sha256": _FP},
+             "intermediate": {"subject": "CN=Fabric Intermediate CA,O=Fabric", "not_after": "Sep  1 00:00:00 2036 GMT",
+                              "key": "EC prime256v1", "sha256": _FP}}
+SAMPLE_PEM = "-----BEGIN CERTIFICATE-----\nDEV PREVIEW — sample, not a real certificate\n-----END CERTIFICATE-----\n"
+SAMPLE_KEY = "-----BEGIN PRIVATE KEY-----\nDEV PREVIEW — sample, not a real key\n-----END PRIVATE KEY-----\n"
+SAMPLE_INFO = {"subject": "CN=device.home.arpa,OU=IT,O=Fabric", "issuer": "CN=Fabric Intermediate CA,O=Fabric",
+               "sans": ["device.home.arpa", "192.168.1.50"], "key": "RSA 2048", "serial": "0x1A2B3C4D5E",
+               "not_before": "Sep 28 00:00:00 2026 GMT", "not_after": "Sep 28 00:00:00 2027 GMT", "sha256": _FP,
+               "usage": "TLS Web Server Authentication, TLS Web Client Authentication", "is_ca": False}
+
+
+def sample_result(kind):
+    b64 = base64.b64encode(SAMPLE_PEM.encode()).decode()
+    r = {"name": "device.home.arpa", "cert": SAMPLE_PEM, "fullchain": SAMPLE_PEM * 3, "der_b64": b64,
+         "info": SAMPLE_INFO}
+    if kind == "issue":
+        r.update(key=SAMPLE_KEY, p12_b64=b64, p12_password=secrets.token_urlsafe(15))
+    if kind == "convert":
+        r.update(p7b_b64=b64, p12_b64=b64, p12_password=secrets.token_urlsafe(15))
+    return r
 
 
 class DevState:
@@ -86,10 +120,16 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/":
                 return self.send(200, views.overview(self.ctx, self.state.data["services"]))
             if path == "/bind9":
-                key = query.get("zone") or next(iter(self.state.data["zones"]))
+                tsig = query.get("view") == "tsig"
+                key = "" if tsig else query.get("zone") or next(iter(self.state.data["zones"]))
                 zone = self.state.zone(key) if key in self.state.data["zones"] else None
                 return self.send(200, views.bind9(self.ctx, self.state.zones(), zone, RECORD_TYPES,
-                                                  query.get("msg", ""), query.get("err", "")))
+                                                  query.get("msg", ""), query.get("err", ""),
+                                                  tsig_keys=self.state.data["tsig"] if tsig else None))
+            if path == "/stepca":
+                view = query.get("view", "ca")
+                view = view if view in views.STEPCA_VIEWS else "ca"
+                return self.send(200, views.stepca(self.ctx, view, SAMPLE_CA, issued=self.state.data["issued"]))
             if path.lstrip("/") in views.PLACEHOLDERS:
                 return self.send(200, views.placeholder(self.ctx, path.lstrip("/")))
             if path == "/audit":
@@ -110,6 +150,37 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, views.apply_result(self.ctx, True,
                                                          "DEV PREVIEW — nothing was rendered or reloaded.\n"
                                                          "On a real install this runs `fabricctl --apply`."))
+            if path == "/stepca/sign/review":
+                review = {"pem": SAMPLE_PEM, "subject": SAMPLE_INFO["subject"], "cn": "device.home.arpa",
+                          "sans": SAMPLE_INFO["sans"], "key": "RSA 2048", "ca_requested": False, "problems": [],
+                          "text": "DEV PREVIEW — a real install shows the decoded request here."}
+                return self.send(200, views.stepca(self.ctx, "sign", SAMPLE_CA, review=review))
+            if path == "/stepca/inspect":
+                item = {"info": SAMPLE_INFO, "trusted": True,
+                        "text": "DEV PREVIEW — a real install shows `openssl x509 -text` here."}
+                return self.send(200, views.stepca(self.ctx, "inspect", SAMPLE_CA,
+                                                   inspected={"kind": "cert", "items": [item]}))
+            if path in ("/stepca/sign", "/stepca/issue", "/stepca/convert"):
+                kind = path.rsplit("/", 1)[1]
+                self.state.log(f"PKI_{kind.upper()}", "dev preview: sample only, nothing signed")
+                return self.send(200, views.pki_result(self.ctx, kind, sample_result(kind)))
+            if path == "/bind9/tsig/create" or path.endswith("/rotate"):
+                name = form.get("name", "") if path.endswith("create") else path.split("/")[3]
+                secret = base64.b64encode(os.urandom(32)).decode()
+                ini = (f"# RFC2136 credentials for TSIG key: {name}\ndns_rfc2136_server = 192.168.1.53\n"
+                       f"dns_rfc2136_port = 53\ndns_rfc2136_name = {name}\ndns_rfc2136_secret = {secret}\n"
+                       f"dns_rfc2136_algorithm = HMAC-SHA256\ndns_rfc2136_base_domain = {form.get('zone') or 'home.arpa'}\n")
+                if path.endswith("create") and name:
+                    self.state.data["tsig"].append({"name": name, "algorithm": "hmac-sha256", "types": "TXT",
+                                                    "scope": f"(dev preview) {form.get('scope', '')}", "acls": []})
+                self.state.log("TSIG_ADD" if path.endswith("create") else "TSIG_SECRET", f"key={name} (in memory)")
+                return self.send(200, views.tsig_result(self.ctx, name or "preview", secret, ini,
+                                                        "created" if path.endswith("create") else "rotated"))
+            if path.startswith("/bind9/tsig/") and path.endswith("/delete"):
+                name = path.split("/")[3]
+                self.state.data["tsig"] = [k for k in self.state.data["tsig"] if k["name"] != name]
+                return self.send(303, b"", location="/bind9?view=tsig&msg=" +
+                                 urllib.parse.quote(f"TSIG key {name} removed (dev preview: in memory)."))
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[:2] == ["bind9", "zone"] and parts[2] in self.state.data["zones"]:
                 key, op = parts[2], parts[3]

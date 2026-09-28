@@ -93,6 +93,52 @@ def apply_changes(actor):
     return result["ok"], result["output"]
 
 
+def ca_summary():
+    return _call("GET", "/v1/pki/ca")
+
+
+def list_issued():
+    return _call("GET", "/v1/pki/issued")
+
+
+def describe_csr(actor, csr):
+    return _call("POST", "/v1/pki/describe-csr", {"actor": actor, "csr": csr})
+
+
+def sign_csr(actor, csr, days):
+    return _call("POST", "/v1/pki/sign", {"actor": actor, "csr": csr, "days": days}, timeout=120)
+
+
+def issue_key_pair(actor, cn, sans, key_type, days):
+    return _call("POST", "/v1/pki/issue", {"actor": actor, "cn": cn, "sans": sans, "key_type": key_type,
+                                           "days": days}, timeout=180)
+
+
+def inspect_pem(actor, data):
+    return _call("POST", "/v1/pki/inspect", {"actor": actor, "data": data})
+
+
+def convert_cert(actor, cert, key):
+    return _call("POST", "/v1/pki/convert", {"actor": actor, "cert": cert, "key": key})
+
+
+def list_tsig_keys():
+    return _call("GET", "/v1/tsig")
+
+
+def create_tsig_key(actor, name, zone, scope, hosts, types, secret):
+    return _call("POST", "/v1/tsig", {"actor": actor, "name": name, "zone": zone, "scope": scope,
+                                      "hosts": hosts, "types": types, "secret": secret})
+
+
+def rotate_tsig_key(actor, name):
+    return _call("POST", f"/v1/tsig/{_q(name)}/rotate", {"actor": actor})
+
+
+def delete_tsig_key(actor, name):
+    return _call("POST", f"/v1/tsig/{_q(name)}/delete", {"actor": actor})
+
+
 def audit(actor, action, detail):
     """Login events; best effort so an agent outage never blocks a denial."""
     try:

@@ -1,5 +1,7 @@
 """HTML rendering for webui. Jinja2 with autoescape; no inline scripts
 or styles, so the page works under a strict Content-Security-Policy."""
+import base64
+
 import jinja2
 
 _env = jinja2.Environment(autoescape=True, trim_blocks=True, lstrip_blocks=True)
@@ -16,14 +18,22 @@ TABS = [
 ]
 PLACEHOLDERS = {
     "kea": ("Kea DHCP", "Subnets and pools, reservations, active leases, and DHCP-driven DNS updates into BIND9."),
-    "stepca": ("Step-CA", "Root and intermediate CA, issued certificates and renewals, client certificates for "
-                          "admins, ACME provisioner."),
     "dirsrv": ("389 Directory Server", "Users, groups and organisational units; role accounts; password policy."),
     "freeradius": ("FreeRADIUS 802.1X", "Network access: EAP-TLS device certificates, MAC authentication, "
                                        "VLAN assignment, switches and access points (NAS clients)."),
     "openbao": ("OpenBao", "Seal status and unseal methods (key file, USB key, KMIP, PKCS#11), secrets engines, "
                            "fabric's own secrets, dynamic credentials and the SSH certificate authority."),
 }
+# Step-CA tab sub-menu: (view, label)
+STEPCA_MENU = [("ca", "Certificate authority"), ("sign", "Sign a CSR"), ("issue", "New key + certificate"),
+               ("inspect", "Inspect"), ("convert", "Convert"), ("issued", "Issued")]
+STEPCA_VIEWS = {v for v, _ in STEPCA_MENU}
+KEY_TYPES = ["RSA-2048", "RSA-3072", "RSA-4096", "EC-P256", "EC-P384"]
+TSIG_SCOPES = [("acme-hosts", "Certbot DNS-01 for listed hosts only (TXT)"),
+               ("acme-zone", "Certbot DNS-01 for any host in the zone (TXT)"),
+               ("any-name", "Any name in the zone, chosen record types")]
+TSIG_ANY_TYPES = ["A", "AAAA", "CNAME", "TXT", "SRV", "MX"]
+
 # service -> (what it is, tab)
 SERVICES = {
     "nginx": ("Reverse proxy", None), "bind9": ("DNS", "bind9"), "stepca": ("Certificate authority", "stepca"),
@@ -96,8 +106,38 @@ _TEMPLATES = {
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 <nav class="subtabs">
 {% for z in zones %}<a href="/bind9?zone={{ z.key | urlencode }}" class="subtab{{ ' active' if zone and z.key == zone.key }}">{{ z.name }} <span class="muted">{{ z.records }}</span></a>{% endfor %}
+<a href="/bind9?view=tsig" class="subtab{{ ' active' if tsig_keys is not none }}">TSIG keys</a>
 </nav>
-{% if zone %}
+{% if tsig_keys is not none %}
+<section class="card"><h2>TSIG keys</h2>
+<p class="muted">RFC2136 keys for dynamic updates (certbot DNS-01, nginx-proxy-manager). Update rights are deny-by-default; secrets are never shown again after creation or rotation.</p>
+{% if tsig_keys %}
+<table><thead><tr><th>Key</th><th>May update</th><th>Types</th><th>ACLs</th><th></th></tr></thead><tbody>
+{% for k in tsig_keys %}
+<tr><td><strong>{{ k.name }}</strong><div class="muted">{{ k.algorithm }}</div></td><td>{{ k.scope }}</td>
+<td>{{ k.types }}</td><td>{{ k.acls | join(', ') or '—' }}</td>
+<td class="num actions">
+<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/rotate"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">New secret</button></form>
+<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete</button></form>
+</td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="blank">No TSIG keys yet.</p>{% endif %}
+</section>
+<section class="card"><h2>New TSIG key for a zone</h2>
+<form method="post" action="/bind9/tsig/create" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Key name<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,62}" placeholder="npm-certbot"></label>
+<label>Zone<select name="zone">{% for z in zones if not (z.name.endswith('.in-addr.arpa') or z.name.endswith('.ip6.arpa')) %}<option>{{ z.name }}</option>{% endfor %}</select></label>
+<label class="wide">May update<select name="scope">{% for v, l in tsig_scopes %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select></label>
+<label class="wide">Hosts (listed-hosts scope) <input name="hosts" placeholder="npm, nas, printer"></label>
+<fieldset class="wide"><legend>Record types (any-name scope)</legend>
+{% for t in tsig_any_types %}<label class="check"><input type="checkbox" name="type_{{ t }}" value="1"{{ ' checked' if t == 'TXT' }}> {{ t }}</label>{% endfor %}
+</fieldset>
+<label class="wide">Existing secret (optional — keep a current client working)<input name="secret" type="password" autocomplete="off" placeholder="base64; leave empty to generate"></label>
+<div><button>Create key</button></div>
+</form>
+</section>
+{% elif zone %}
 <p class="muted">{{ zone.status }}</p>
 <section class="card"><h2>Records — {{ zone.name }}</h2>
 <table><thead><tr><th>Type</th><th>Name</th><th>Value</th><th></th></tr></thead><tbody>
@@ -127,10 +167,155 @@ _TEMPLATES = {
 <button>Apply changes</button>
 <span class="muted">Publishes record changes: renders configuration and reloads only what changed — same as <code>fabricctl --apply</code>.</span>
 </form>
-<section class="card"><h2>TSIG keys</h2><p class="blank">Left intentionally blank.</p>
-<p class="muted">RFC2136 keys, their secrets and update rights (today: <code>fabricctl tsig</code>).</p></section>
 <section class="card"><h2>ACLs and update policies</h2><p class="blank">Left intentionally blank.</p>
 <p class="muted">Who may query the zones, and which certbot devices may prove which names (today: <code>fabricctl acl</code>).</p></section>
+{% endblock %}""",
+
+    "stepca": """{% extends "base" %}{% block body %}
+<h1>Step-CA · PKI</h1>
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+<nav class="subtabs">
+{% for v, label in menu %}<a href="/stepca?view={{ v }}" class="subtab{{ ' active' if v == view }}">{{ label }}</a>{% endfor %}
+</nav>
+{% if view == 'ca' %}
+{% if ca %}
+{% for label, c in (('Root CA', ca.root), ('Intermediate CA', ca.intermediate)) %}
+<section class="card"><h2>{{ label }}</h2>
+<dl class="kv"><dt>Subject</dt><dd>{{ c.subject }}</dd><dt>Valid until</dt><dd>{{ c.not_after }}</dd>
+<dt>Key</dt><dd>{{ c.key }}</dd><dt>SHA-256</dt><dd><code class="fp">{{ c.sha256 }}</code></dd></dl></section>
+{% endfor %}
+<section class="card"><h2>Trust this CA on a device</h2>
+<p>Every format (Windows .cer, Linux .crt, PEM text, DER, .p7b chain) is published over plain HTTP at <a href="{{ ca.certs_url }}">{{ ca.certs_url }}</a>.</p>
+<p class="muted">Manually issued certificates: at most {{ ca.max_days }} days (<code>pki_manual_max_days</code>).</p></section>
+{% else %}<section class="card"><p class="flash bad">The CA certificates could not be read.</p></section>{% endif %}
+
+{% elif view == 'sign' %}
+{% if review %}
+<section class="card"><h2>Review the request</h2>
+<dl class="kv"><dt>Subject</dt><dd>{{ review.subject or '—' }}</dd>
+<dt>Names</dt><dd>{{ review.sans | join(', ') or review.cn }}</dd><dt>Key</dt><dd>{{ review.key }}</dd></dl>
+{% if review.ca_requested %}<p class="flash warn">The request asks to be a CA. That is ignored: fabric only issues leaf certificates here.</p>{% endif %}
+{% if review.problems %}
+<p class="flash bad">This request cannot be signed:</p><ul>{% for p in review.problems %}<li>{{ p }}</li>{% endfor %}</ul>
+{% else %}
+<form method="post" action="/stepca/sign" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="csr" value="{{ review.pem }}">
+<label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
+<div><button>Sign certificate</button></div>
+</form>
+<p class="muted">Issued as a leaf certificate for server and client authentication, from the fabric intermediate CA.</p>
+{% endif %}
+<details><summary>Decoded request</summary><pre>{{ review.text }}</pre></details>
+</section>
+{% endif %}
+<section class="card"><h2>Sign a certificate signing request</h2>
+<p class="muted">For devices that make their own key (switches, printers, appliances, Windows <code>certreq</code>, <code>openssl req</code>). The private key never leaves the device.</p>
+<form method="post" action="/stepca/sign/review" enctype="multipart/form-data" class="stack">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Upload a CSR (.csr, .req, .pem or DER)<input type="file" name="csr_file" accept=".csr,.req,.pem,.der,.txt"></label>
+<label>…or paste it<textarea name="csr" rows="8" placeholder="-----BEGIN CERTIFICATE REQUEST-----"></textarea></label>
+<div><button>Review</button></div>
+</form></section>
+
+{% elif view == 'issue' %}
+<section class="card"><h2>New private key and certificate</h2>
+<p class="muted">For devices that cannot make a CSR. The key is generated here, shown once for download (PEM and a password-protected .p12) and not kept.</p>
+<form method="post" action="/stepca/issue" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Name (CN)<input name="cn" required placeholder="printer.home.arpa"></label>
+<label class="wide">Other names (DNS, IP, e-mail; comma or space separated)<input name="sans" placeholder="printer, 192.168.1.40"></label>
+<label>Key type<select name="key_type">{% for k in key_types %}<option{{ ' selected' if k == 'RSA-2048' }}>{{ k }}</option>{% endfor %}</select></label>
+<label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
+<div><button>Generate</button></div>
+</form>
+<p class="muted">RSA-2048 is the most widely accepted by older devices; EC keys are smaller and faster where supported.</p></section>
+
+{% elif view == 'inspect' %}
+{% if inspected %}
+{% for item in inspected['items'] %}
+<section class="card"><h2>{{ 'Certificate' if inspected.kind == 'cert' else 'Certificate signing request' }}{% if inspected['items'] | length > 1 %} {{ loop.index }}{% endif %}</h2>
+{% if item.trusted is not none %}<p><span class="pill {{ 'ok' if item.trusted else 'warn' }}">{{ 'issued by this fabric' if item.trusted else 'not issued by this fabric (or incomplete chain)' }}</span></p>{% endif %}
+<dl class="kv"><dt>Subject</dt><dd>{{ item.info.subject or '—' }}</dd>
+{% if item.info.issuer %}<dt>Issuer</dt><dd>{{ item.info.issuer }}</dd>{% endif %}
+<dt>Names</dt><dd>{{ item.info.sans | join(', ') or '—' }}</dd><dt>Key</dt><dd>{{ item.info.key }}</dd>
+{% if item.info.not_after %}<dt>Valid</dt><dd>{{ item.info.not_before }} → {{ item.info.not_after }}</dd>
+<dt>Usage</dt><dd>{{ item.info.usage or '—' }}{{ ' · CA' if item.info.is_ca }}</dd>
+<dt>Serial</dt><dd><code class="fp">{{ item.info.serial }}</code></dd><dt>SHA-256</dt><dd><code class="fp">{{ item.info.sha256 }}</code></dd>{% endif %}
+</dl>
+{% if item.info.problems %}<p class="flash bad">Would be refused for signing: {{ item.info.problems | join('; ') }}</p>{% endif %}
+<details><summary>Full decode</summary><pre>{{ item.text }}</pre></details></section>
+{% endfor %}
+{% endif %}
+<section class="card"><h2>Inspect a certificate or CSR</h2>
+<p class="muted">Decodes PEM, DER or base64: subject, names, validity, usages, fingerprints, and whether this fabric issued it. Private keys are refused unread.</p>
+<form method="post" action="/stepca/inspect" enctype="multipart/form-data" class="stack">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Upload (.crt, .cer, .pem, .der, .csr)<input type="file" name="file"></label>
+<label>…or paste<textarea name="data" rows="8" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
+<div><button>Inspect</button></div>
+</form></section>
+
+{% elif view == 'convert' %}
+<section class="card"><h2>Convert a certificate</h2>
+<p class="muted">Get a certificate as PEM (.crt), DER (.cer), full chain (.pem / .p7b) — and, with its private key, a password-protected .p12 for Windows, macOS and phones. The key is not kept.</p>
+<form method="post" action="/stepca/convert" enctype="multipart/form-data" class="stack">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Certificate (upload)<input type="file" name="cert_file"></label>
+<label>…or paste<textarea name="cert" rows="6" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
+<label>Private key for a .p12 (optional, unencrypted PEM; upload)<input type="file" name="key_file"></label>
+<label>…or paste<textarea name="key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" autocomplete="off"></textarea></label>
+<div><button>Convert</button></div>
+</form></section>
+
+{% elif view == 'issued' %}
+<section class="card"><h2>Issued by hand</h2>
+<p class="muted">Certificates signed from a CSR or generated here (newest first). Service certificates are managed by setup and not listed.</p>
+{% if issued %}
+<table><thead><tr><th>Subject</th><th>Names</th><th>How</th><th>Expires</th><th>By</th></tr></thead><tbody>
+{% for c in issued %}
+<tr><td>{{ c.subject }}</td><td>{{ (c.sans or []) | join(', ') }}</td><td>{{ 'CSR' if c.kind == 'csr' else 'key + cert' }}</td>
+<td><span class="pill {{ 'ok' if c.status == 'valid' else ('warn' if c.status == 'expires soon' else 'bad') }}">{{ c.status }}</span> <span class="muted">{{ c.not_after }}</span></td>
+<td>{{ c.actor }} <span class="muted">{{ c.when }}</span></td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="blank">Nothing issued by hand yet.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}""",
+
+    "pki_result": """{% extends "base" %}{% block body %}
+<h1>{{ title }}</h1>
+{% if r.key %}<p class="flash warn">This page is the only copy of the private key. It is not stored anywhere — download it now.</p>{% endif %}
+<section class="card"><h2>{{ r.info.subject }}</h2>
+<dl class="kv"><dt>Names</dt><dd>{{ r.info.sans | join(', ') or '—' }}</dd><dt>Key</dt><dd>{{ r.info.key }}</dd>
+<dt>Valid</dt><dd>{{ r.info.not_before }} → {{ r.info.not_after }}</dd>
+<dt>Serial</dt><dd><code class="fp">{{ r.info.serial }}</code></dd><dt>SHA-256</dt><dd><code class="fp">{{ r.info.sha256 }}</code></dd></dl>
+</section>
+<section class="card"><h2>Download</h2>
+<ul class="downloads">
+{% for fname, mime, data, what in files %}
+<li><a class="btn" href="data:{{ mime }};base64,{{ data }}" download="{{ fname }}">{{ fname }}</a> <span class="muted">{{ what }}</span></li>
+{% endfor %}
+</ul>
+{% if r.p12_password %}<p>.p12 password: <code class="secret">{{ r.p12_password }}</code> <span class="muted">(shown once)</span></p>{% endif %}
+</section>
+<section class="card"><h2>Certificate (PEM)</h2><textarea readonly rows="10">{{ r.cert }}</textarea></section>
+{% if r.fullchain %}<section class="card"><h2>Full chain (PEM)</h2><textarea readonly rows="10">{{ r.fullchain }}</textarea></section>{% endif %}
+{% if r.key %}<section class="card"><h2>Private key (PEM)</h2><textarea readonly rows="8">{{ r.key }}</textarea></section>{% endif %}
+<p><a href="/stepca?view={{ back }}">Back</a></p>
+{% endblock %}""",
+
+    "tsig_result": """{% extends "base" %}{% block body %}
+<h1>TSIG key {{ key_name }} {{ action }}</h1>
+<p class="flash warn">The secret is shown only now. Put it in the client, then Apply to publish the key to BIND9.</p>
+<section class="card"><h2>Secret</h2><p><code class="secret">{{ secret }}</code></p></section>
+<section class="card"><h2>RFC2136 client settings (certbot / nginx-proxy-manager)</h2>
+<textarea readonly rows="9">{{ ini }}</textarea>
+<p><a class="btn" href="data:text/plain;base64,{{ ini_b64 }}" download="{{ key_name }}-rfc2136.ini">{{ key_name }}-rfc2136.ini</a></p>
+</section>
+<form method="post" action="/apply" class="apply card">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button>Apply changes</button>
+<span class="muted">Until applied, BIND9 does not know this {{ 'key' if action == 'created' else 'secret' }}.</span></form>
+<p><a href="/bind9?view=tsig">Back to TSIG keys</a></p>
 {% endblock %}""",
 
     "placeholder": """{% extends "base" %}{% block body %}
@@ -174,8 +359,43 @@ def overview(ctx, services):
     return _render("overview", ctx=ctx, tab="overview", services=services, service_info=SERVICES)
 
 
-def bind9(ctx, zones, zone, types, msg, err):
-    return _render("bind9", ctx=ctx, tab="bind9", zones=zones, zone=zone, types=types, msg=msg, err=err)
+def bind9(ctx, zones, zone, types, msg, err, tsig_keys=None):
+    """tsig_keys: None for a zone view, else the TSIG key list (TSIG view)."""
+    return _render("bind9", ctx=ctx, tab="bind9", zones=zones, zone=zone, types=types, msg=msg, err=err,
+                   tsig_keys=tsig_keys, tsig_scopes=TSIG_SCOPES, tsig_any_types=TSIG_ANY_TYPES)
+
+
+def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err=""):
+    return _render("stepca", ctx=ctx, tab="stepca", view=view, menu=STEPCA_MENU, ca=ca, issued=issued,
+                   review=review, inspected=inspected, err=err, key_types=KEY_TYPES)
+
+
+def _b64(text):
+    return base64.b64encode(text.encode()).decode()
+
+
+def pki_result(ctx, kind, r):
+    """kind: sign | issue | convert. Files are offered as data: downloads, so
+    nothing (least of all a private key) is kept server-side for a later GET."""
+    n = r["name"]
+    files = [(f"{n}.crt", "application/x-x509-ca-cert", _b64(r["cert"]), "certificate, PEM (Linux, most devices)"),
+             (f"{n}.cer", "application/pkix-cert", r["der_b64"], "certificate, DER (Windows)"),
+             (f"{n}-fullchain.pem", "application/x-pem-file", _b64(r["fullchain"]),
+              "certificate + CA chain, PEM (web servers)")]
+    if r.get("p7b_b64"):
+        files.append((f"{n}.p7b", "application/x-pkcs7-certificates", r["p7b_b64"], "certificate + chain, PKCS#7"))
+    if r.get("key"):
+        files.append((f"{n}.key", "application/x-pem-file", _b64(r["key"]), "private key, PEM (unencrypted)"))
+    if r.get("p12_b64"):
+        files.append((f"{n}.p12", "application/x-pkcs12", r["p12_b64"], "certificate + key + chain, PKCS#12"))
+    title = {"sign": "Certificate signed", "issue": "Key and certificate generated",
+             "convert": "Certificate converted"}[kind]
+    return _render("pki_result", ctx=ctx, tab="stepca", title=title, r=r, files=files, back=kind)
+
+
+def tsig_result(ctx, name, secret, ini, action):
+    return _render("tsig_result", ctx=ctx, tab="bind9", key_name=name, secret=secret, ini=ini, ini_b64=_b64(ini),
+                   action=action)
 
 
 def placeholder(ctx, tab):
@@ -241,5 +461,21 @@ button.link{background:none;border:none;color:var(--accent);padding:0}
 .apply{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
 pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px}
 code{font-size:13px}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0 0 8px}
+.kv dt{color:var(--muted);font-size:13px}.kv dd{margin:0;word-break:break-word}
+.fp{word-break:break-all}
+.secret{font-size:14px;padding:2px 6px;border:1px dashed var(--warn);border-radius:4px;word-break:break-all}
+.flash.warn{color:var(--warn)}
+.stack{display:flex;flex-direction:column;gap:12px}
+.wide{grid-column:1/-1}
+fieldset{border:1px solid var(--border);border-radius:6px;display:flex;flex-wrap:wrap;gap:12px;padding:8px 12px}
+legend{font-size:13px;color:var(--muted)}
+label.check{flex-direction:row;align-items:center;gap:6px;color:var(--text)}
+textarea{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)}
+details{margin-top:8px}summary{cursor:pointer;color:var(--accent)}
+.downloads{list-style:none;padding:0;margin:0 0 8px;display:flex;flex-direction:column;gap:8px}
+.btn{display:inline-block;padding:4px 12px;border:1px solid var(--accent);border-radius:6px;text-decoration:none}
+button.ghost{background:transparent;color:var(--accent);padding:2px 10px}
+td.actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .devbanner{margin:0;padding:8px 16px;text-align:center;font-weight:600;background:#b45309;color:#fff}
 """

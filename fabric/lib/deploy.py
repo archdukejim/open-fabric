@@ -10,6 +10,7 @@ from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
+from fabriclib.dns.rfc2136_settings import rfc2136_settings  # noqa: E402
 import filecmp
 import json
 import re
@@ -376,21 +377,12 @@ def apply_deployment(start_services=True):
     render_file('stepca/leaf.tpl.j2', 'stepca/templates/certs/leaf.tpl')
     render_file('stepca/subca.tpl.j2', 'stepca/templates/certs/subca.tpl')
     
-    # RFC2136
+    # RFC2136 client settings, one per TSIG key (the zone's own ACME key too)
     for key in tsig_keys:
-        if 'primary' not in key:
-            kname = key['name']
-            kdir = os.path.join(render_tmp, f"rfc2136/{kname}")
-            os.makedirs(kdir, exist_ok=True)
-            with open(os.path.join(kdir, "rfc2136.ini"), 'w') as f:
-                f.write(f"""# RFC2136 credentials for TSIG key: {kname}
-dns_rfc2136_server = {final_vars.get('host_ip')}
-dns_rfc2136_port = {final_vars.get('bind_dns_port', 53)}
-dns_rfc2136_name = {kname}
-dns_rfc2136_secret = {secrets['tsig_secrets'].get(kname)}
-dns_rfc2136_algorithm = {key.get('algorithm', 'hmac-sha256').upper()}
-dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
-""")
+        kdir = os.path.join(render_tmp, f"rfc2136/{key['name']}")
+        os.makedirs(kdir, exist_ok=True)
+        with open(os.path.join(kdir, "rfc2136.ini"), 'w') as f:
+            f.write(rfc2136_settings(final_vars, key, secrets['tsig_secrets'].get(key['name'])))
 
     print("Deploying configurations...")
     
@@ -600,10 +592,8 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         ensure_dir(final_vars.get('keycloak_data_dir', os.path.join(DEPLOY_BASE_DIR, "keycloak/data")), 0o750,
                    *get_service_user(final_vars, 'keycloak'))
 
-    # RFC2136 credentials for non-primary TSIG keys (certbot-style DNS-01 clients)
+    # RFC2136 credentials for every TSIG key (certbot-style DNS-01 clients)
     for key in tsig_keys:
-        if 'primary' in key:
-            continue
         src = os.path.join(render_tmp, f"rfc2136/{key['name']}/rfc2136.ini")
         dst = key.get('out') or os.path.join(DEPLOY_BASE_DIR, key['name'], "rfc2136.ini")
         if os.path.exists(src):

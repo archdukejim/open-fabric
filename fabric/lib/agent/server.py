@@ -16,6 +16,14 @@ top of the socket's 0660 root:<webui gid> permissions.
   POST /v1/zones/<key>/records/delete   {actor, type, index, name}
   POST /v1/apply                        {actor}
   POST /v1/events                       {actor, action, detail}  (login audit)
+  GET  /v1/pki/ca | /v1/pki/issued | /v1/tsig
+  POST /v1/pki/describe-csr             {actor, csr}
+  POST /v1/pki/sign                     {actor, csr, days}
+  POST /v1/pki/issue                    {actor, cn, sans, key_type, days}
+  POST /v1/pki/inspect                  {actor, data}
+  POST /v1/pki/convert                  {actor, cert, key}
+  POST /v1/tsig                         {actor, name, zone, scope, hosts, types, secret}
+  POST /v1/tsig/<name>/rotate | /v1/tsig/<name>/delete   {actor}
 """
 import argparse
 import json
@@ -31,13 +39,25 @@ from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.common.read_audit import read_audit  # noqa: E402
 from fabriclib.common.write_audit import write_audit  # noqa: E402
 from fabriclib.dns.add_record import add_record  # noqa: E402
+from fabriclib.dns.create_zone_tsig_key import create_zone_tsig_key  # noqa: E402
 from fabriclib.dns.constants import RECORD_TYPES  # noqa: E402
+from fabriclib.dns.list_tsig_keys import list_tsig_keys  # noqa: E402
 from fabriclib.dns.list_zones import list_zones  # noqa: E402
 from fabriclib.dns.remove_record import remove_record  # noqa: E402
+from fabriclib.dns.remove_tsig_key import remove_tsig_key  # noqa: E402
+from fabriclib.dns.rotate_tsig_key import rotate_tsig_key  # noqa: E402
 from fabriclib.dns.zone_detail import zone_detail  # noqa: E402
+from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
+from fabriclib.pki.convert_cert import convert_cert  # noqa: E402
+from fabriclib.pki.describe_csr import describe_csr  # noqa: E402
+from fabriclib.pki.inspect_pem import inspect_pem  # noqa: E402
+from fabriclib.pki.issue_key_pair import issue_key_pair  # noqa: E402
+from fabriclib.pki.list_issued import list_issued  # noqa: E402
+from fabriclib.pki.sign_csr import sign_csr  # noqa: E402
 from fabriclib.system.apply_changes import apply_changes  # noqa: E402
 from fabriclib.system.service_status import service_status  # noqa: E402
 from fabriclib.system.version_info import version_info  # noqa: E402
@@ -112,6 +132,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, zone_detail(route[1]))
                 if route == ["audit"]:
                     return self.reply(200, read_audit())
+                if route == ["pki", "ca"]:
+                    return self.reply(200, ca_summary(load_vars()))
+                if route == ["pki", "issued"]:
+                    return self.reply(200, list_issued())
+                if route == ["tsig"]:
+                    return self.reply(200, list_tsig_keys())
                 return self.reply(404, {"error": "not found"})
 
             data = self.body()
@@ -131,6 +157,19 @@ class Handler(BaseHTTPRequestHandler):
             if route == ["apply"]:
                 ok, output = apply_changes(actor, source="web")
                 return self.reply(200, {"ok": ok, "output": output})
+            if route[:1] == ["pki"] and len(route) == 2:
+                return self.reply(200, self.pki(route[1], actor, data))
+            if route == ["tsig"]:
+                key, secret, ini = create_zone_tsig_key(actor, text(data, "name"), text(data, "zone"),
+                                                        text(data, "scope"), strings(data, "hosts"),
+                                                        strings(data, "types"), text(data, "secret"), source="web")
+                return self.reply(200, {"key": key, "secret": secret, "ini": ini})
+            if len(route) == 3 and route[0] == "tsig" and route[2] == "rotate":
+                secret, ini = rotate_tsig_key(actor, route[1], source="web")
+                return self.reply(200, {"secret": secret, "ini": ini})
+            if len(route) == 3 and route[0] == "tsig" and route[2] == "delete":
+                remove_tsig_key(actor, route[1], source="web")
+                return self.reply(200, {})
             if route == ["events"]:
                 action = data.get("action")
                 if action not in EVENT_ACTIONS:
@@ -145,6 +184,37 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             traceback.print_exc()
             self.reply(500, {"error": "internal error"})
+
+
+    @staticmethod
+    def pki(op, actor, data):
+        """The manual PKI operations (one fabriclib.pki file each)."""
+        if op == "describe-csr":
+            return describe_csr(text(data, "csr"))
+        if op == "sign":
+            return sign_csr(load_vars(), actor, text(data, "csr"), data.get("days"))
+        if op == "issue":
+            return issue_key_pair(load_vars(), actor, text(data, "cn"), strings(data, "sans"),
+                                  text(data, "key_type"), data.get("days"))
+        if op == "inspect":
+            return inspect_pem(load_vars(), text(data, "data"))
+        if op == "convert":
+            return convert_cert(load_vars(), actor, text(data, "cert"), text(data, "key"))
+        raise ValidationError("unknown operation")
+
+
+def text(data, field):
+    value = data.get(field, "")
+    if not isinstance(value, str):
+        raise ValidationError(f"{field} must be text")
+    return value
+
+
+def strings(data, field):
+    value = data.get(field) or []
+    if not isinstance(value, list) or not all(isinstance(x, str) for x in value) or len(value) > 100:
+        raise ValidationError(f"{field} must be a list of text")
+    return value
 
 
 class UnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):

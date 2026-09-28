@@ -22,9 +22,10 @@ everything else is core.
 | Tab | What it does |
 |-----|--------------|
 | Overview (`/`) | Health of every service: systemd state plus the container's Docker health check (`nginx`, `bind9`, `stepca`, `ldap`, `postgres`, `keycloak`, `openbao`, `kea`, `freeradius`, `webui`, `fabric-agent`); "N of M running"; version/build |
-| BIND9 · DNS (`/bind9?zone=<key>`) | One sub-tab per zone; view records (A, AAAA, CNAME, MX, TXT, SRV); add or delete a record in `vars.yaml`; Apply. TSIG keys and ACL/update policies: placeholder (use `fabricctl tsig` / `fabricctl acl`) |
+| BIND9 · DNS (`/bind9?zone=<key>`) | One sub-tab per zone; view records (A, AAAA, CNAME, MX, TXT, SRV); add or delete a record in `vars.yaml`; Apply |
+| BIND9 · TSIG keys (`/bind9?view=tsig`) | Keys with their effective update rights and ACLs (never secrets). **New TSIG key for a zone**: a forward zone and one scope — certbot DNS-01 for listed hosts, certbot DNS-01 for any host in the zone, or any name with chosen record types; generated secret or an existing one kept. The secret and the `rfc2136.ini` (download) are shown once. **New secret** (rotate) and **Delete**. Apply publishes. ACLs and update policies: placeholder (`fabricctl acl`) |
 | Kea · DHCP (`/kea`) *optional* | Placeholder — left intentionally blank |
-| Step-CA · PKI (`/stepca`) | Placeholder — left intentionally blank |
+| Step-CA · PKI (`/stepca?view=…`) | Sub-menu: **Certificate authority** (root + intermediate subject, expiry, SHA-256; link to `certs.<domain>`), **Sign a CSR** (upload or paste PEM/DER → review names, key, policy → sign), **New key + certificate** (for devices that cannot make a CSR: RSA-2048/3072/4096 or EC P-256/P-384), **Inspect** (decode a certificate, chain or CSR; says whether this fabric issued it), **Convert** (PEM `.crt`, DER `.cer`, full chain `.pem`/`.p7b`, and with its key a `.p12`), **Issued** (every certificate issued by hand, with expiry status). See [Manual certificates](#manual-certificates) |
 | 389-DS · Directory (`/dirsrv`) | Placeholder — left intentionally blank |
 | FreeRADIUS · 802.1X (`/freeradius`) *optional* | Placeholder — left intentionally blank |
 | OpenBao · Secrets (`/openbao`) | Placeholder — left intentionally blank |
@@ -32,6 +33,34 @@ everything else is core.
 | Audit (`/audit`) | Last 200 lines of `/opt/fabric/archive/audit.log` (logins, denials, record edits, applies) |
 
 Record edits only change `vars.yaml`; nothing is published until **Apply**. Edits and applies take a lock file (`/opt/fabric/config/.webui.lock`) so concurrent web sessions do not interleave.
+
+### Manual certificates
+
+For the devices that cannot use ACME: switches, printers, appliances, VPN
+boxes, Windows machines with `certreq`.
+
+- **Signing policy.** The CSR's signature must verify. Its key must be RSA ≥ 2048,
+  EC P-256/384/521 or Ed25519. Its names must be DNS names, IP addresses or
+  e-mail addresses (URIs and other names are refused). Validity runs from 1 day
+  to [`pki_manual_max_days`](vars.md#pki_manual_max_days) (default 5 years).
+  Whatever the CSR asks for, the result is a **leaf** (serverAuth + clientAuth)
+  from fabric's template: a request for `CA:TRUE` is shown in the review and
+  ignored. If the CSR has no SANs, the CN becomes one.
+- **Generated keys are not kept.** A generated private key exists only in the
+  response. It is shown once as PEM and as a `.p12` with a generated
+  password. Downloads are `data:` links on the result page, so there is never
+  a URL to fetch the key again. Nothing is written to disk except a 0600
+  temp dir that is removed at once.
+- **Inspect refuses private keys** unread. **Convert** uses a supplied key
+  only to build the `.p12`, after checking it matches the certificate.
+- **Ledger.** Every hand-issued certificate is recorded in
+  `/opt/fabric/archive/issued-certs.jsonl` (0600): subject, names, serial,
+  expiry, fingerprint, who issued it and how. The ledger holds no keys. Each
+  issue is also written to the audit log (`PKI_SIGN_CSR`, `PKI_ISSUE`,
+  `PKI_CONVERT`).
+- Signing uses the Step-CA intermediate key through the pinned step image
+  (`docker run --network none`), as setup does. The CA key never enters the
+  web UI container.
 
 ---
 
@@ -91,7 +120,7 @@ A compromise of the web app yields only the webui container: uid 912, no capabil
 |---------|--------|
 | Socket access | `agent.sock` is `0660 root:<webui gid>` in a `0750` dir; other host users cannot reach it |
 | Peer check | `SO_PEERCRED` on every connection: only the webui uid and root are accepted (right group, wrong uid → `403`) |
-| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only). Anything else → `404` |
+| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`, `/v1/pki/ca`, `/v1/pki/issued`, `/v1/tsig`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only), `/v1/pki/{describe-csr,sign,issue,inspect,convert}`, `/v1/tsig`, `/v1/tsig/<name>/{rotate,delete}`. Anything else → `404` |
 | Validation | Record input validated in `fabriclib/dns/validate_record.py`; actor must match `^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$`; body ≤ 64 KiB |
 | Audit | Every change is written to `/opt/fabric/archive/audit.log` with the acting user |
 | Sandbox | systemd hardening (`NoNewPrivileges`, `ProtectHome`, `ProtectKernel*`, `RestrictNamespaces`, ...); no network listener; IP access limited to localhost + `fabric_subnet` |
