@@ -1,5 +1,8 @@
 [Unit]
 Description=Docker Compose service for {{ item.service }}
+PartOf=fabric.target
+# fabric.target is reached once this service is up (and healthy): `fabricctl start` waits for it.
+Before=fabric.target
 After=docker.service network-online.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
 
 Requires=docker.service network-online.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
@@ -34,4 +37,4 @@ done; exit 1'
 {% endif %}
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target fabric.target

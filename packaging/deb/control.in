@@ -1,0 +1,16 @@
+Package: fabricctl
+Version: @VERSION@
+Architecture: all
+Section: admin
+Priority: optional
+Maintainer: fabric <archdukejim@users.noreply.github.com>
+Homepage: https://github.com/archdukejim/fabric
+Depends: python3 (>= 3.10), python3-yaml, python3-jinja2, openssl, curl, ca-certificates, iptables, ufw, dnsutils
+Suggests: docker-ce
+Description: install, secure and run a small network fabric
+ fabricctl sets up and manages fabric on this host: authoritative DNS
+ (BIND9) with RFC2136/TSIG, an internal PKI (Step-CA), 389 Directory
+ Server, Keycloak SSO and a management web UI behind client certificates
+ and OIDC — every service in a hardened container under systemd
+ (fabric.target). Installing the package changes nothing; run
+ `sudo fabricctl setup` to install fabric.

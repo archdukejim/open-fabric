@@ -12,3 +12,6 @@ link-vars.yaml
 fabric/BUILD
 __pycache__/
 *.pyc
+
+# built packages (packaging/build-deb.sh)
+dist/

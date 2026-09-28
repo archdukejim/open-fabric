@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
-"""Real end-to-end web UI login, run inside the sandbox after setup.
+"""Real end-to-end web UI sign-in tests, run inside the sandbox after setup.
 
-Uses only what setup handed the admin (~/fabric-admin: the .p12, its
-password, the initial password, the root CA) and drives the real stack like
-a browser: nginx mTLS -> web UI -> Keycloak login -> forced password change
--> TOTP enrolment -> OIDC callback -> dashboard. Also checks the refusals.
+Drives the real stack like a browser — nginx (TLS + client certificate) ->
+web UI -> Keycloak (password, forced password change, TOTP) -> OIDC
+callback -> dashboard — using only what setup and `fabricctl client-cert`
+handed out. Proves the admin gets in and that everyone else is refused:
+
+  - plain HTTP is redirected to HTTPS
+  - no client certificate / a certificate from another CA  -> nginx 400
+  - a real directory user without the fabric-admin role   -> 403
+  - a valid certificate presented for another user        -> 403
+  - the initial password stops working after the first login
+
+  python3 login_test.py <vars.yaml> <other-user> <other-password> <other-p12-password>
 Prints PASS/FAIL lines.
-
-  python3 login_test.py <vars.yaml>
 """
-import base64
 import hashlib
 import hmac
 import html
 import http.client
 import os
 import re
+import secrets
+import socket
 import ssl
 import struct
 import subprocess
@@ -27,10 +34,12 @@ import urllib.parse
 import yaml
 
 V = yaml.safe_load(open(sys.argv[1]))
-USER = V["webui_admin_user"]
+OTHER, OTHER_PW, OTHER_P12_PW = sys.argv[2], sys.argv[3], sys.argv[4]
+ADMIN = V["webui_admin_user"]
 KIT = os.path.join(os.path.expanduser("~"), "fabric-admin")
 ROOT_CA = os.path.join(V["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
 MGR, SSO, NGINX = V["hostname_mgr"], V["hostname_keycloak"], V["ip_nginx"]
+TMP = tempfile.mkdtemp()
 FAILED = 0
 
 
@@ -45,17 +54,17 @@ def read(name):
     return open(os.path.join(KIT, name)).read().strip()
 
 
-# -- the admin's client certificate, out of the .p12 setup handed over ----
-tmp = tempfile.mkdtemp()
-cert_pem = os.path.join(tmp, "client.pem")
-subprocess.run(["openssl", "pkcs12", "-in", os.path.join(KIT, f"{USER}.p12"), "-nodes", "-passin", "stdin",
-                "-out", cert_pem], input=read("p12-password.txt"), text=True, check=True, capture_output=True)
-os.chmod(cert_pem, 0o600)
+def pem_from_p12(p12, password, name):
+    out = os.path.join(TMP, name)
+    subprocess.run(["openssl", "pkcs12", "-in", p12, "-nodes", "-passin", "stdin", "-out", out],
+                   input=password, text=True, check=True, capture_output=True)
+    os.chmod(out, 0o600)
+    return out
 
 
 class Browser:
-    """Just enough of a browser: per-host cookies, manual redirects, TLS
-    verified against the fabric root CA, optional client certificate."""
+    """Per-host cookies, manual redirects, TLS verified against the fabric
+    root CA, optional client certificate."""
 
     def __init__(self, client_cert=None):
         self.ctx = ssl.create_default_context(cafile=ROOT_CA)
@@ -65,9 +74,8 @@ class Browser:
 
     def request(self, method, url, form=None):
         u = urllib.parse.urlsplit(url)
-        conn = http.client.HTTPSConnection(NGINX, 443, context=self.ctx, timeout=30)
-        conn.sock = self.ctx.wrap_socket(__import__("socket").create_connection((NGINX, 443), 30),
-                                         server_hostname=u.hostname)
+        conn = http.client.HTTPSConnection(NGINX, 443, timeout=30)
+        conn.sock = self.ctx.wrap_socket(socket.create_connection((NGINX, 443), 30), server_hostname=u.hostname)
         jar = self.cookies.setdefault(u.hostname, {})
         headers = {"Host": u.hostname}
         if jar:
@@ -94,7 +102,6 @@ class Browser:
 
 
 def form_of(page):
-    """(action, {field: value}) of the first form on a Keycloak page."""
     m = re.search(r'<form[^>]*action="([^"]+)"', page)
     fields = {}
     for tag in re.findall(r"<input[^>]*>", page):
@@ -106,73 +113,119 @@ def form_of(page):
 
 
 def totp(secret, at=None):
-    """Keycloak's default policy: HmacSHA1, 6 digits, 30 s, key = raw secret bytes."""
+    """Keycloak default policy: HmacSHA1, 6 digits, 30 s, key = raw secret bytes."""
     counter = int((at or time.time()) // 30)
     mac = hmac.new(secret.encode(), struct.pack(">Q", counter), hashlib.sha1).digest()
     off = mac[-1] & 0x0F
     return f"{(struct.unpack('>I', mac[off:off + 4])[0] & 0x7FFFFFFF) % 1000000:06d}"
 
 
-# -- refusals -------------------------------------------------------------
+TOTP = {}                 # user -> enrolled TOTP secret (kept across logins)
+NEW_PW = {}               # user -> password after a forced change
+LAST_OTP = {}             # user -> last code sent: Keycloak refuses a code twice
+
+
+def fresh_totp(user):
+    """A code Keycloak has not seen yet: after a login in the same 30 s window,
+    wait for the next one (as a person with an authenticator app would)."""
+    code = totp(TOTP[user])
+    if LAST_OTP.get(user) == code:
+        time.sleep(31 - time.time() % 30)
+        code = totp(TOTP[user])
+    LAST_OTP[user] = code
+    return code
+
+
+def login(browser, user, password):
+    """Full browser login as `user`. Returns (status, page) of the web UI's
+    OIDC callback, and the Keycloak pages seen on the way."""
+    st, loc, _ = browser.request("GET", f"https://{MGR}/login")
+    if not (st == 303 and loc and loc.startswith(f"https://{SSO}/")):
+        return st, f"login did not redirect to Keycloak: {loc}", []
+    st, loc, page = browser.request("GET", loc)
+    seen = []
+    for _ in range(12):
+        while st in (301, 302, 303) and loc and not loc.startswith(f"https://{MGR}/"):
+            st, loc, page = browser.request("GET", loc)
+        if loc and loc.startswith(f"https://{MGR}/oidc/callback"):
+            st, _, page = browser.request("GET", loc)
+            return st, page, seen
+        action, fields = form_of(page)
+        if not action:
+            return st, page, seen
+        if "username" in fields and "password" in fields:
+            seen.append("login")
+            fields.update(username=user, password=password)
+        elif "password-new" in fields:
+            seen.append("update-password")
+            NEW_PW[user] = secrets.token_urlsafe(18)
+            fields.update({"password-new": NEW_PW[user], "password-confirm": NEW_PW[user]})
+        elif "totpSecret" in fields:
+            seen.append("configure-totp")
+            TOTP[user] = fields["totpSecret"]
+            fields.update(totp=fresh_totp(user), userLabel="fabric sandbox")
+        elif "otp" in fields and user in TOTP:
+            seen.append("otp")
+            fields.update(otp=fresh_totp(user))
+        elif {"firstName", "lastName", "email"} & set(fields):
+            seen.append("update-profile")
+        else:
+            return st, f"unknown Keycloak page {sorted(fields)}", seen
+        st, loc, page = browser.request("POST", action, {k: v for k, v in fields.items() if k != "cancel-aia"})
+    return st, page, seen
+
+
+admin_pem = pem_from_p12(os.path.join(KIT, f"{ADMIN}.p12"), read("p12-password.txt"), "admin.pem")
+other_pem = pem_from_p12(os.path.join(KIT, f"{OTHER}.p12"), OTHER_P12_PW, "other.pem")
+
+# -- transport: HTTPS only, client certificate from this CA only ------------------------
+conn = http.client.HTTPConnection(NGINX, 80, timeout=15)
+conn.request("GET", "/", headers={"Host": MGR})
+r = conn.getresponse()
+check("plain HTTP is redirected to HTTPS", r.status in (301, 308) and (r.getheader("Location") or "").startswith("https://"),
+      (r.status, r.getheader("Location")))
 st, _, _ = Browser().request("GET", f"https://{MGR}/")
 check("no client certificate -> refused by nginx (400)", st == 400, st)
+foreign = os.path.join(TMP, "foreign.pem")
+subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", f"/CN={ADMIN}",
+                "-keyout", foreign, "-out", foreign + ".crt"], check=True, capture_output=True)
+with open(foreign, "a") as f:
+    f.write(open(foreign + ".crt").read())
+try:
+    st, _, _ = Browser(foreign).request("GET", f"https://{MGR}/")
+except (ssl.SSLError, ConnectionError) as e:
+    st = f"TLS refused ({type(e).__name__})"
+check("certificate from another CA (even with the admin's name) -> refused", st == 400 or "refused" in str(st), st)
 
-# -- full login as the admin ------------------------------------------------
-b = Browser(cert_pem)
+# -- the admin gets in ------------------------------------------------------------------
+b = Browser(admin_pem)
 st, loc, _ = b.request("GET", f"https://{MGR}/")
-check("client cert, no session -> /login", st == 303 and loc.endswith("/login"), (st, loc))
-st, loc, _ = b.request("GET", loc)
-check("/login -> Keycloak authorization endpoint", st == 303 and loc.startswith(f"https://{SSO}/"), (st, loc))
-
-new_password = base64.urlsafe_b64encode(os.urandom(18)).decode()
-totp_secret = None
-st, loc, page = b.request("GET", loc)
-seen = []
-for _ in range(12):                      # follow Keycloak's pages until it sends us back
-    while st in (301, 302, 303) and loc and not loc.startswith(f"https://{MGR}/"):
-        st, loc, page = b.request("GET", loc)
-    if loc and loc.startswith(f"https://{MGR}/oidc/callback"):
-        break
-    action, fields = form_of(page)
-    if not action:
-        check("Keycloak page has a form", False, page[:600])
-        break
-    if "username" in fields and "password" in fields:
-        seen.append("login")
-        fields.update(username=USER, password=read("initial-password.txt"))
-    elif "password-new" in fields:
-        seen.append("update-password")
-        fields.update({"password-new": new_password, "password-confirm": new_password})
-    elif "totpSecret" in fields:
-        seen.append("configure-totp")
-        totp_secret = fields["totpSecret"]
-        fields.update(totp=totp(totp_secret), userLabel="fabric sandbox")
-    elif "otp" in fields and totp_secret:
-        seen.append("otp")
-        fields.update(otp=totp(totp_secret))
-    elif {"firstName", "lastName", "email"} & set(fields):
-        seen.append("update-profile")
-    else:
-        check("known Keycloak page", False, sorted(fields))
-        break
-    st, loc, page = b.request("POST", action, {k: v for k, v in fields.items() if k != "cancel-aia"})
-
-check("Keycloak asked for login, a new password and TOTP enrolment",
+check("admin cert, no session -> /login", st == 303 and loc.endswith("/login"), (st, loc))
+st, page, seen = login(b, ADMIN, read("initial-password.txt"))
+check("Keycloak required a new password and TOTP enrolment",
       seen[:1] == ["login"] and "update-password" in seen and "configure-totp" in seen, seen)
-check("Keycloak redirects back to the web UI callback",
-      bool(loc) and loc.startswith(f"https://{MGR}/oidc/callback"), (st, loc, page[:300]))
-st, _, page = b.request("GET", loc)
-check("callback accepted (cert CN = user, fabric-admin role)",
+check("admin: callback accepted (cert CN = user, fabric-admin role)",
       st == 200 and "__Host-webui" in b.cookies.get(MGR, {}), (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/")
-check("dashboard renders for the admin", st == 200 and "DNS zones" in page and USER in page, (st, page[:300]))
+check("admin: dashboard renders", st == 200 and "DNS zones" in page and ADMIN in page, (st, page[:300]))
 
-# -- the initial password is dead, the new one works -------------------------
-fresh = Browser(cert_pem)
+# -- everyone else is refused -----------------------------------------------------------
+st, page, seen = login(Browser(other_pem), OTHER, OTHER_PW)
+check(f"'{OTHER}' (directory user, not in admins) with own valid cert -> 403 missing role",
+      st == 403 and "role" in page, (st, page[:300], seen))
+st, page, _ = login(Browser(admin_pem), OTHER, OTHER_PW)
+check(f"admin's certificate used to sign in as '{OTHER}' -> 403 not your certificate",
+      st == 403 and "does not belong" in page, (st, page[:300]))
+st, page, _ = login(Browser(other_pem), ADMIN, NEW_PW.get(ADMIN, ""))
+check(f"'{OTHER}''s certificate used to sign in as the admin -> 403 not your certificate",
+      st == 403 and "does not belong" in page, (st, page[:300]))
+
+# -- the initial password is dead -------------------------------------------------------
+fresh = Browser(admin_pem)
 st, loc, _ = fresh.request("GET", f"https://{MGR}/login")
 st, loc, page = fresh.request("GET", loc)
 action, fields = form_of(page)
-fields.update(username=USER, password=read("initial-password.txt"))
+fields.update(username=ADMIN, password=read("initial-password.txt"))
 st, loc, page = fresh.request("POST", action, fields)
 check("initial password no longer accepted", st == 200 and "Invalid" in page, (st, loc))
 

@@ -3,6 +3,8 @@ Description=fabric-agent — privileged API for the webui container (unix socket
 After=network-online.target docker.service
 Wants=network-online.target
 Before=webui.service
+PartOf=fabric.target
+Before=fabric.target
 
 [Service]
 Type=simple
@@ -37,4 +39,4 @@ IPAddressDeny=any
 IPAddressAllow=localhost {{ fabric_subnet }}
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=multi-user.target fabric.target

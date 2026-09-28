@@ -20,6 +20,15 @@ exec bash "{target}/lib/manage.sh" "$@"
 """
 
 
+PACKAGED_CLI = "/usr/bin/fabricctl"
+LOCAL_CLI = "/usr/local/bin/fabricctl"
+
+
+def _packaged():
+    """True when fabricctl is installed from the .deb (it owns /usr/bin/fabricctl)."""
+    return os.path.exists(PACKAGED_CLI) and "installed by the fabricctl package" in open(PACKAGED_CLI).read()
+
+
 def _write_exec(path, text):
     with open(path, "w") as f:
         f.write(text)
@@ -29,7 +38,8 @@ def _write_exec(path, text):
 def run(ctx):
     """Render every template from <config>/fabric.yaml and deploy config,
     compose files, systemd units and web assets without starting anything
-    (deploy.py, start_services=False). Installs the fabricctl command."""
+    (deploy.py, start_services=False). From a checkout it installs the
+    fabricctl command; from the package, the package's command is used."""
     fabric_yaml = os.path.join(ctx.config_dir, "fabric.yaml")
     with open(fabric_yaml, "w") as f:           # persist plan choices made after collect_vars
         yaml.safe_dump(ctx.vars, f, sort_keys=False)
@@ -53,5 +63,12 @@ def run(ctx):
     ctx.load_state()
     ok(f"configuration deployed to {ctx.deploy_base}")
 
-    _write_exec("/usr/local/bin/fabricctl", CLI_WRAPPER.format(target=ctx.target_dir))
-    ok("installed /usr/local/bin/fabricctl")
+    if _packaged():
+        # The package's /usr/bin/fabricctl is the command; a checkout-era
+        # wrapper in /usr/local/bin would shadow it (it comes first in PATH).
+        if os.path.exists(LOCAL_CLI) and "installed by fabricctl setup" in open(LOCAL_CLI).read():
+            os.remove(LOCAL_CLI)
+        ok(f"fabricctl command: {PACKAGED_CLI} (package)")
+    else:
+        _write_exec(LOCAL_CLI, CLI_WRAPPER.format(target=ctx.target_dir))
+        ok(f"installed {LOCAL_CLI}")

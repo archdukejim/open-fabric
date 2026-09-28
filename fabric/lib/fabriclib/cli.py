@@ -3,6 +3,8 @@
 
   fabricctl setup [options]      install or re-converge (fabricctl setup --help)
   fabricctl doctor               end-to-end checks of the running install
+  fabricctl status|start|stop|restart
+                                 the whole stack (systemd fabric.target)
   fabricctl certs [--force]      renew service certificates that need it (--force: all)
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
@@ -29,6 +31,7 @@ from fabriclib.setup.context import SetupContext  # noqa: E402
 from fabriclib.setup.renew_service_certs import renew_service_certs  # noqa: E402
 from fabriclib.setup.restore_install import restore_install  # noqa: E402
 from fabriclib.setup.stage_source import stage_source  # noqa: E402
+from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
 
 
@@ -58,6 +61,17 @@ def main(argv):
         p12, password = hand_out_client_cert(SetupContext(deploy_base=_base(args)).load_state().vars, args[0], days)
         print(f"client certificate for '{args[0]}': {p12}")
         print(f".p12 password (shown once): {password}")
+        return 0
+    if cmd in ("start", "stop", "restart", "status"):
+        try:
+            rows = control_stack(cmd)
+        except Exception as e:           # ValidationError or a timeout: report, do not trace
+            print(f"error: {e}", file=sys.stderr)
+            return 1
+        for unit, state, health in rows:
+            print(f"{unit:<16} {state:<10} {health}")
+        if cmd != "status":
+            print(f"fabric: {cmd} done (systemctl {cmd} fabric.target)")
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)

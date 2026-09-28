@@ -268,6 +268,7 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 |---|---|
 | `sudo fabricctl setup [--file vars.yaml]` | Install or re-converge. Re-run after changing settings. |
 | `sudo fabricctl setup --step <name>` | Run one step, e.g. `--step firewall` after editing `security.firewall_allow` |
+| `sudo fabricctl status/start/stop/restart` | The whole stack through systemd `fabric.target` |
 | `sudo fabricctl doctor` | End-to-end checks of the running install (the `verify` step) |
 | `sudo fabricctl tsig list/add/update/set-secret/rotate/remove` | TSIG keys for RFC2136 clients — see [TSIG Keys](#tsig-keys-rfc2136-dynamic-updates) |
 | `sudo fabricctl acl list/add/remove` | BIND ACLs — see [ACLs](#acls) |

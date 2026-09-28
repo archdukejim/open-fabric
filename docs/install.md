@@ -1,6 +1,6 @@
 # Setup and Installation
 
-fabric installs on the host it runs on: clone the repo there and run `setup.sh`, which hands over to `fabricctl setup`. There is no controller machine and no Ansible.
+fabric is installed as a Debian package, `fabricctl`, on the host it runs on (amd64 or arm64), then set up with `sudo fabricctl setup`. There is no controller machine and no Ansible.
 
 ### Table of Contents
 - [Requirements](#requirements)
@@ -113,11 +113,17 @@ The `pki` step checks these files, installs them into Step-CA and verifies the c
 ## Run the Installer
 
 ```bash
-git clone https://github.com/archdukejim/fabric.git && cd fabric
-sudo ./setup.sh
+sudo apt install ./fabricctl_<version>_all.deb    # installs the tool; changes nothing else
+sudo fabricctl setup                              # installs fabric (or: --file vars.yaml)
 ```
 
-`setup.sh` only makes sure Python's YAML and Jinja2 are present, then runs `fabricctl setup`. Once installed, run `sudo fabricctl setup` from anywhere. Setup is idempotent: change a setting and run it again; finished steps are quick, and certificates are only re-issued when missing, expiring within 30 days, or missing a name.
+The package is built from the repository with `packaging/build-deb.sh` (one `_all.deb` for amd64 and arm64), until releases publish it. Installing it only adds `/usr/bin/fabricctl` and the code in `/usr/lib/fabricctl`; `fabricctl setup` does the rest. Example settings: `/usr/share/doc/fabricctl/examples/vars.yaml`.
+
+**Upgrade:** install the newer `.deb`, then `sudo fabricctl setup`; until you do, every other command reminds you. `apt remove fabricctl` removes the tool and leaves the running install alone.
+
+**From a git checkout (development):** `sudo ./setup.sh` does the same as `fabricctl setup` without the package.
+
+Setup is idempotent: change a setting and run it again; finished steps are quick, and certificates are only re-issued when missing, expiring within 30 days, or missing a name.
 
 ### The default plan
 
@@ -138,7 +144,7 @@ Any of these can be set in the vars file and changed later by re-running setup.
 ### Non-interactive install
 
 ```bash
-sudo ./setup.sh --file vars.yaml --non-interactive --yes
+sudo fabricctl setup --file vars.yaml --non-interactive --yes
 ```
 
 `--non-interactive` never prompts and fails if a required value is missing or invalid; `--yes` accepts the plan.
@@ -162,6 +168,18 @@ After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time.
 With the web UI enabled, setup finishes by creating your first admin and leaving everything your computer needs in `~/fabric-admin/` (of the account that ran `sudo`): the client certificate `<user>.p12` and its password, the initial Keycloak password (you choose a new one at first login), the fabric root CA (`.crt`, and `.cer` for Windows) and a README with the remaining steps: copy the folder to your computer, trust the CA, import the `.p12`, open `https://mgr.<domain>`. Details: [webui.md](webui.md#first-time-setup).
 
 On this host setup already trusts the fabric CA (`/usr/local/share/ca-certificates`), and every service has its certificate from it.
+
+### Running it: systemd
+
+Every service is its own systemd unit, all grouped under **`fabric.target`**, which is enabled at boot:
+
+```bash
+sudo fabricctl status            # the target, every unit and its container health
+sudo fabricctl stop              # = systemctl stop fabric.target (every fabric service)
+sudo fabricctl start             # returns once every service is up and healthy
+sudo fabricctl restart
+systemctl status webui           # one service (units: bind9 stepca nginx ldap postgres keycloak fabric-agent webui)
+```
 
 ### Steps
 
@@ -226,4 +244,4 @@ sudo fabricctl reinstall
 sudo fabricctl uninstall
 ```
 
-Both ask for confirmation; `--yes` skips it. From a checkout, `sudo ./setup.sh uninstall` works too. Uninstall only removes fabric's own objects: other containers, networks and Docker settings are left alone.
+Both ask for confirmation; `--yes` skips it. Uninstall only removes fabric's own objects: other containers, networks and Docker settings are left alone.

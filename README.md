@@ -47,8 +47,9 @@ Setup pulls or builds these images on the host:
 - `postgres:latest` (optional, if Keycloak is enabled)
 
 ### Deployment Modes
-- **Interactive:** `sudo ./setup.sh` — shows the hardened default plan; Proceed or Advanced (relax any item).
-- **Non-interactive:** `sudo ./setup.sh --file vars.yaml --non-interactive --yes`.
+- **Install:** `sudo apt install ./fabricctl_<version>_all.deb`, then `sudo fabricctl setup` — shows the hardened default plan; Proceed or Advanced (relax any item).
+- **Non-interactive:** `sudo fabricctl setup --file vars.yaml --non-interactive --yes`.
+- **Run:** every service under systemd `fabric.target` — `fabricctl status|start|stop|restart`.
 - **Offline (Air-gapped):** `--offline` never downloads; packages and images must already be present. Signed offline image bundles (`fabricctl images export/import`) are planned — see [the design](docs/design/fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases).
 
 ---

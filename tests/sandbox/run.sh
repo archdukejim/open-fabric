@@ -1,8 +1,10 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# End-to-end install test in a disposable systemd + Docker sandbox:
-#   fresh checkout -> sudo ./setup.sh --file vars.yaml --non-interactive --yes
-#   -> fabricctl doctor -> fabricctl setup again (idempotent re-run)
+# End-to-end test of the product as users get it, in a disposable
+# systemd + Docker sandbox (Ubuntu 24.04, no git checkout inside):
+#   apt install ./fabricctl_<v>_all.deb -> fabricctl setup --file vars.yaml
+#   -> doctor, systemd control (fabric.target), real sign-in incl. refusals,
+#   RFC2136/TSIG/ACLs, re-runs, package upgrade, apt remove
 #
 #   sudo tests/sandbox/run.sh            (KEEP=1 leaves the sandbox running)
 #
@@ -19,7 +21,9 @@ NET=fabric-sbx-net
 SUBNET=10.77.0.0/24
 IP=10.77.0.10
 PASS=0; FAIL=0
-check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
+# Checks run without pipefail: `cmd | grep -q x` must not fail when grep
+# finds x early and cmd then gets SIGPIPE writing the rest of its output.
+check() { if (set +o pipefail; eval "$2"); then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 in_box() { docker exec "$NAME" bash -lc "$*"; }
 
 docker rm -f "$NAME" >/dev/null 2>&1; docker network rm "$NET" >/dev/null 2>&1
@@ -41,11 +45,16 @@ for _ in $(seq 1 30); do in_box 'systemctl is-system-running 2>/dev/null' | grep
 # store. fabricctl merges its hardening into this file, so it survives.
 in_box 'mkdir -p /etc/docker && echo "{\"features\": {\"containerd-snapshotter\": false}, \"storage-driver\": \"overlay2\"}" > /etc/docker/daemon.json'
 
-# A clean checkout of the working tree (committed + uncommitted), like `git clone`.
-(cd "$REPO" && git ls-files -z --cached --others --exclude-standard | tar --null -T - -cf "$OUT/src.tar")
-docker exec "$NAME" mkdir -p /root/fabric
-docker cp "$OUT/src.tar" "$NAME:/root/src.tar"
-in_box 'tar -xf /root/src.tar -C /root/fabric && rm /root/src.tar'
+# The package, built from the working tree exactly as a release would be.
+DEB=$(OUT="$OUT/dist" bash "$REPO/packaging/build-deb.sh") || { echo "FAIL package build"; exit 1; }
+docker cp "$DEB" "$NAME:/root/fabricctl.deb"
+echo "--- apt install ./$(basename "$DEB")"
+in_box 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl.deb' > "$OUT/apt.log" 2>&1
+check "package installs with apt (dependencies resolved)" "in_box 'dpkg -s fabricctl' | grep -q '^Status: install ok installed'"
+check "fabricctl is the packaged command" "in_box 'command -v fabricctl' | grep -qx /usr/bin/fabricctl"
+check "installing the package started nothing" "! in_box 'test -e /etc/systemd/system/fabric.target'"
+# (the command exits 1 here by design; `; true` keeps pipefail from masking grep)
+check "before setup, day-2 commands say what to do" "in_box 'fabricctl status 2>&1; true' | grep -q 'not set up on this host yet'"
 # An existing TSIG key (as on a host being rebuilt) whose RFC2136 client —
 # nginx-proxy-manager's certbot plugin — must keep working unchanged.
 TSIG_SECRET=$(openssl rand -base64 32)
@@ -65,12 +74,35 @@ EOF
 docker cp "$OUT/vars.yaml" "$NAME:/root/vars.yaml"
 
 echo "--- setup (fresh install)"
-in_box 'cd /root/fabric && ./setup.sh --file /root/vars.yaml --non-interactive --yes' 2>&1 | tee "$OUT/setup.log"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes' 2>&1 | tee "$OUT/setup.log"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
+check "setup did not shadow the package command" "! in_box 'test -e /usr/local/bin/fabricctl'"
 
 echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
+
+echo "--- systemd control: fabric.target"
+check "fabric.target enabled and active" "in_box 'systemctl is-enabled fabric.target && systemctl is-active fabric.target' >/dev/null"
+check "every unit is part of fabric.target" \
+    "[ \"\$(in_box 'systemctl list-dependencies --plain fabric.target' | grep -cE '(bind9|stepca|nginx|ldap|postgres|keycloak|fabric-agent|webui)\\.service')\" -ge 8 ]"
+in_box 'fabricctl status' > "$OUT/status.log" 2>&1
+check "fabricctl status: target active, containers healthy" \
+    "grep -qE '^fabric.target +active' '$OUT/status.log' && [ \"\$(grep -c ' healthy' '$OUT/status.log')\" -ge 7 ]"
+in_box 'fabricctl stop' > "$OUT/stop.log" 2>&1
+check "fabricctl stop: every service stopped" \
+    "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak webui fabric-agent' | grep -qx active"
+check "fabricctl stop: DNS no longer answers" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
+in_box 'fabricctl start' > "$OUT/start.log" 2>&1
+sleep 20
+in_box 'fabricctl doctor' > "$OUT/doctor-after-start.log" 2>&1
+check "fabricctl start: everything back, doctor passes" \
+    "! grep -q '✗' '$OUT/doctor-after-start.log' && grep -q '✓' '$OUT/doctor-after-start.log'"
+in_box 'systemctl restart fabric.target' > /dev/null 2>&1
+sleep 20
+in_box 'fabricctl doctor' > "$OUT/doctor-after-restart.log" 2>&1
+check "systemctl restart fabric.target: doctor passes" \
+    "! grep -q '✗' '$OUT/doctor-after-restart.log' && grep -q '✓' '$OUT/doctor-after-restart.log'"
 
 echo "--- RFC2136 with the embedded TSIG key (what nginx-proxy-manager does)"
 docker cp "$REPO/tests/sandbox/rfc2136_test.sh" "$NAME:/root/rfc2136_test.sh"
@@ -89,10 +121,24 @@ check "kit: .p12, passwords and root CA in ~/fabric-admin" \
 check "kit: secrets are 0600" \
     "[ \"\$(in_box 'stat -c %a /root/fabric-admin/fabricadmin.p12 /root/fabric-admin/p12-password.txt /root/fabric-admin/initial-password.txt' | sort -u)\" = 600 ]"
 
-echo "--- real login: client cert -> web UI -> Keycloak (new password, TOTP) -> dashboard"
+echo "--- restricted sign-in: HTTPS + client cert from this CA + Keycloak OIDC/TOTP + fabric-admin role"
+# A real directory user who is NOT in admins, with their own valid client certificate.
+BOB_PW=$(openssl rand -base64 18)
+cat > "$OUT/bob.py" <<'PY'
+import os, sys, yaml
+sys.path.insert(0, "/opt/fabric/lib")
+from fabriclib.ldap.ensure_admin_user import ensure_admin_user
+v = yaml.safe_load(open("/opt/fabric/config/vars.yaml"))
+print(ensure_admin_user(dict(v, webui_admin_group="users"), "bob", os.environ["BOB_PW"], "bob@lan.test"))
+PY
+docker cp "$OUT/bob.py" "$NAME:/root/bob.py"
+in_box "BOB_PW='$BOB_PW' python3 /root/bob.py" > "$OUT/bob.log" 2>&1
+BOB_P12_PW=$(in_box 'fabricctl client-cert bob' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
+check "second user bob (directory user, not an admin) with a client cert" "grep -q created '$OUT/bob.log' && [ -n '$BOB_P12_PW' ]"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
-in_box 'python3 /root/login_test.py /opt/fabric/config/vars.yaml' 2>&1 | tee "$OUT/login.log"
-check "real web UI login end to end" "! grep -q '^FAIL' '$OUT/login.log' && grep -q '^PASS dashboard' '$OUT/login.log'"
+in_box "python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
+check "sign-in: admin gets in; HTTP, missing/foreign certs, non-admins and borrowed certs are refused" \
+    "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"
 
 echo "--- setup again (must converge without changes)"
 in_box 'fabricctl setup --non-interactive --yes' 2>&1 | tee "$OUT/setup2.log"
@@ -183,6 +229,22 @@ check "tsig remove: key gone from every ACL" "! in_box \"grep -q 'key \\\"nas\\\
 check "tsig remove: rfc2136.ini deleted" "! in_box 'test -e /opt/nas/rfc2136.ini'"
 check "BIND still serves after all changes" "in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP"
 check "the npm key is unaffected" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
+
+echo "--- package upgrade and removal"
+sleep 2    # a later build timestamp = a newer package version
+DEB2=$(OUT="$OUT/dist2" bash "$REPO/packaging/build-deb.sh")
+docker cp "$DEB2" "$NAME:/root/fabricctl-new.deb"
+in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > "$OUT/apt2.log" 2>&1
+check "newer package installs over the old one" "grep -q 'package updated' '$OUT/apt2.log'"
+check "until setup runs, commands say the package is newer" "in_box 'fabricctl status' 2>&1 | grep -q 'package is newer'"
+in_box 'fabricctl setup --non-interactive --yes' > "$OUT/setup-upgrade.log" 2>&1
+check "setup applies the upgrade" "grep -q 'fabric is ready' '$OUT/setup-upgrade.log' && ! in_box 'fabricctl status' 2>&1 | grep -q 'package is newer'"
+check "the install runs the upgraded build" "in_box 'cmp /usr/lib/fabricctl/fabric/BUILD /opt/fabric/BUILD'"
+in_box 'DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq fabricctl' > "$OUT/apt-remove.log" 2>&1
+check "apt remove removes the command but not the running install" \
+    "! in_box 'test -e /usr/bin/fabricctl' && in_box 'systemctl is-active fabric.target' | grep -qx active && in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP"
+in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > /dev/null 2>&1
+check "reinstalling the package gives the command back" "in_box 'fabricctl status' | grep -qE '^fabric.target +active'"
 
 cat > "$OUT/argv_check.py" <<'PY'
 import glob, yaml

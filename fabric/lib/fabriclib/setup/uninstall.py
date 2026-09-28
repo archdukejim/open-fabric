@@ -6,6 +6,7 @@ import subprocess
 from fabriclib.common.console import info, ok, warn
 
 UNITS = ["webui", "fabric-agent", "nginx", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
+TARGET = "/etc/systemd/system/fabric.target"
 CONTAINERS = ["webui", "nginx", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
 DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui"]
 LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:local", "fabric/keycloak:local",
@@ -26,6 +27,9 @@ def uninstall(ctx):
         path = f"/etc/systemd/system/{unit}.service"
         if os.path.exists(path):
             os.remove(path)
+    subprocess.run(["systemctl", "disable", "--now", "fabric.target"], capture_output=True)
+    if os.path.exists(TARGET):
+        os.remove(TARGET)
     subprocess.run(["systemctl", "daemon-reload"], capture_output=True)
     for c in CONTAINERS:
         subprocess.run(["docker", "rm", "-f", c], capture_output=True)

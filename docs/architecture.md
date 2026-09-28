@@ -44,7 +44,7 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   │   ├── manage.sh
 │   │   ├── output.sh
 │   │   └── vars.sh
-│   └── VERSION             # fabricctl version (BUILD is stamped by setup.sh, git-ignored)
+│   └── VERSION             # fabricctl version (BUILD is stamped by the package build or setup.sh, git-ignored)
 ├── custom-vars.yaml
 ├── docs
 │   ├── architecture.md
@@ -56,7 +56,8 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   ├── subordinate.md
 │   ├── testplan.md
 │   └── vars.md
-├── setup.sh
+├── packaging/        # build-deb.sh -> fabricctl_<version>_all.deb
+├── setup.sh          # development: install from a checkout
 └── tests
 ```
 

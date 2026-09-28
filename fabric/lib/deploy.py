@@ -516,6 +516,15 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
             
         if needs_restart:
             services_to_restart.add(svc_name)
+    # fabric.target groups every fabric unit (systemctl start/stop/restart fabric.target)
+    target_src = os.path.join(jinja_dir, "systemd", "fabric.target")
+    target_dst = "/etc/systemd/system/fabric.target"
+    if not os.path.exists(target_dst) or not filecmp.cmp(target_src, target_dst, shallow=False):
+        shutil.copy2(target_src, target_dst)
+        os.chmod(target_dst, 0o644)
+        os.chown(target_dst, 0, 0)
+        daemon_reload_needed = True
+
     # Nginx Conf
     ensure_dir(os.path.join(DEPLOY_BASE_DIR, "nginx/config"), 0o755, nginx_uid, nginx_gid)
     src_nginx = os.path.join(render_tmp, "nginx/nginx.conf")

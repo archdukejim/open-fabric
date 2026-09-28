@@ -14,7 +14,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] Variables in `custom-vars.yaml` have been correctly rendered.
 
 ## 2. Full Installation Test
-- [ ] **Action**: Run `sudo ./setup.sh --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox).
+- [ ] **Action**: `sudo apt install ./fabricctl_<v>_all.deb`, then `sudo fabricctl setup --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox with no checkout inside).
 - [ ] **Expected**:
   - Every setup step completes and setup prints `fabric is ready`; `sudo fabricctl doctor` passes; a second `sudo fabricctl setup` converges without re-issuing certificates; no secret appears in any process's argv.
   - Docker containers `nginx`, `bind9`, `step-ca` (and optionally `dirsrv`, `keycloak`, `postgres`, `webui`) are healthy.

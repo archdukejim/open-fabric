@@ -13,10 +13,11 @@ ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv
 
 
 def _start(unit, container, restart):
+    # Always (re-)enable: links the unit into multi-user.target and fabric.target.
+    subprocess.run(["systemctl", "enable", unit], check=True, capture_output=True)
     active = subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0
     if active and not restart:
         return "running"
-    subprocess.run(["systemctl", "enable", unit], check=True, capture_output=True)
     subprocess.run(["systemctl", "restart" if active else "start", unit], check=True)
     healthy, why = wait_healthy(container, timeout=900)
     if not healthy:
@@ -29,6 +30,8 @@ def run(ctx):
     """Start the stack in dependency order (local image layers build on first
     start), seed 389-DS, configure Keycloak, then fabric-agent and the web UI."""
     v, lib = ctx.vars, os.path.join(ctx.target_dir, "lib")
+    # fabric.target groups every unit: systemctl start|stop|restart fabric.target
+    subprocess.run(["systemctl", "enable", "fabric.target"], check=True, capture_output=True)
     for unit, container, flag in ORDER:
         if flag and not v.get(flag, flag == "install_ldap"):
             continue
@@ -59,3 +62,8 @@ def run(ctx):
             subprocess.run(["systemctl", "restart", "fabric-agent"], check=True)
         ok(f"fabric-agent: {'restarted' if 'fabric-agent' in ctx.restart_services else 'running'}")
         ok(f"webui: {_start('webui', 'webui', 'webui' in ctx.restart_services)}")
+
+    # Everything is up: activate the target now (it is enabled for boot), so
+    # `fabricctl stop|restart` / `systemctl ... fabric.target` reach every unit.
+    subprocess.run(["systemctl", "start", "fabric.target"], check=True, capture_output=True)
+    ok("fabric.target active (systemctl status fabric.target)")
