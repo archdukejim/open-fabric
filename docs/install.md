@@ -25,7 +25,7 @@ fabric is installed as a Debian package, `fabricctl`, on the host it runs on (am
 - cgroup v2 with the memory controller (Raspberry Pi: add `cgroup_enable=memory` to `/boot/firmware/cmdline.txt` if `preflight` asks for it)
 - Nothing else listening on the LAN IP's ports 53, 80, 443, 636, 853
 
-Setup installs what it needs from apt: `openssl`, `ca-certificates`, `curl`, `gnupg`, `ufw`, `iptables`, `dnsutils`, `ldap-utils`, `python3-yaml`, `python3-jinja2`, and Docker Engine (`docker-ce`, `containerd.io`, compose and buildx plugins) from Docker's own apt repository if Docker is missing.
+Setup installs what it needs from apt: `openssl`, `ca-certificates`, `curl`, `gnupg`, `ufw`, `iptables`, `dnsutils`, `python3-yaml`, `python3-jinja2`, and Docker Engine (`docker-ce`, `containerd.io`, compose and buildx plugins) from Docker's own apt repository if Docker is missing.
 
 ## Configure vars
 
@@ -89,6 +89,7 @@ Key tunables with their defaults:
 - [ ] `tsig_keys` — keys for RFC2136 clients (e.g. nginx-proxy-manager); an existing key's `secret` can be given so its clients keep working — see [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates)
 - [ ] `bind_dns_port` — change from `53` only if another DNS server must keep port 53 on `host_ip`
 - [ ] `webui_admin_user` — the first web UI admin setup creates (default: the account that ran `sudo`)
+- [ ] `webui_hostname` — the web UI's address (default `fabric.<domain>`; any host name)
 - [ ] `image_nginx` / `image_bind9` / `image_stepca` / `image_dirsrv` — override to pin images to specific digests or a local registry (optional)
 
 ---
@@ -135,7 +136,7 @@ Every default is the hardened choice. Setup shows the plan and asks **[P]roceed,
 | `security.docker_daemon_hardening` | on | `/etc/docker/daemon.json` gains `no-new-privileges`, `icc: false`, no userland proxy, `live-restore`, bounded logs (merged into what is there, never replaced). |
 | `install_ldap` | on | 389 Directory Server |
 | `install_keycloak` | on | Keycloak SSO + Postgres (needed by the web UI) |
-| `install_webui` | on | Web UI at `https://mgr.<domain>`: client certificate + Keycloak login + TOTP |
+| `install_webui` | on | Web UI at `https://fabric.<domain>`: client certificate + Keycloak login + TOTP |
 
 Regardless of the plan, every container runs non-root with all capabilities dropped, `no-new-privileges` and a read-only root filesystem (see [architecture.md](architecture.md#container-hardening)).
 
@@ -163,9 +164,25 @@ sudo fabricctl setup --file vars.yaml --non-interactive --yes
 
 After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time.
 
+### CA certificates for your devices
+
+`https://certs.<domain>/` lists the root and intermediate CA certificates with their fingerprints, per-system instructions and every format:
+
+| File | Format | For |
+|---|---|---|
+| `root-ca.cer`, `intermediate-ca.cer` | DER | Windows |
+| `root-ca.crt`, `intermediate-ca.crt` | PEM | Linux, macOS, iOS, Android |
+| `root-ca.pem`, `intermediate-ca.pem` | PEM, shown as text | copy & paste into network devices |
+| `root-ca.der`, `intermediate-ca.der` | DER | devices that want a binary certificate |
+| `ca-chain.p7b` | PKCS#7 (root + intermediate) | Windows, Java, many appliances |
+| `ca-chain.pem` | PEM bundle (intermediate, then root) | devices that import a chain |
+| `ca-certs.json` | subjects, validity, SHA-256/SHA-1 fingerprints | scripts |
+
+`https://ca.<domain>/` is Step-CA's API (ACME: `https://ca.<domain>/acme/acme/directory`); opened in a browser it redirects to the certificate page. The files are re-published on every setup run.
+
 ### The login kit
 
-With the web UI enabled, setup finishes by creating your first admin and leaving everything your computer needs in `~/fabric-admin/` (of the account that ran `sudo`): the client certificate `<user>.p12` and its password, the initial Keycloak password (you choose a new one at first login), the fabric root CA (`.crt`, and `.cer` for Windows) and a README with the remaining steps: copy the folder to your computer, trust the CA, import the `.p12`, open `https://mgr.<domain>`. Details: [webui.md](webui.md#first-time-setup).
+With the web UI enabled, setup finishes by creating your first admin and leaving everything your computer needs in `~/fabric-admin/` (of the account that ran `sudo`): the client certificate `<user>.p12` and its password, the initial Keycloak password (you choose a new one at first login), the fabric root CA (`.crt`, and `.cer` for Windows) and a README with the remaining steps: copy the folder to your computer, trust the CA, import the `.p12`, open `https://fabric.<domain>`. Details: [webui.md](webui.md#first-time-setup).
 
 On this host setup already trusts the fabric CA (`/usr/local/share/ca-certificates`), and every service has its certificate from it.
 

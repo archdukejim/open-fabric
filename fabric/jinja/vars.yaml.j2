@@ -54,7 +54,11 @@ landing_page_cname: {{ landing_page_cname | default('', true) }}
 cname_dns: {{ cname_dns | default('dns') }}
 cname_ldap: {{ cname_ldap | default('ldap') }}
 cname_sso: {{ cname_sso | default('sso') }}
-cname_mgr: {{ cname_mgr | default('mgr') }}
+cname_mgr: {{ cname_mgr | default('fabric') }}
+cname_certs: {{ cname_certs | default('certs') }}
+{# The web UI's address: any host name (default fabric.<domain>). Outside the
+   domain, fabric issues its certificate but you point DNS at this host. #}
+webui_hostname: {{ webui_hostname | default('', true) }}
 
 hostname_nginx: {{ hostname_nginx | default('nginx.' ~ domain) }}
 hostname_bind9: {{ hostname_bind9 | default((cname_dns | default('dns')) ~ '.' ~ domain) }}
@@ -62,7 +66,10 @@ hostname_stepca: {{ hostname_stepca | default((cname_ca | default('ca')) ~ '.' ~
 hostname_landing: {{ hostname_landing | default((landing_page_cname ~ '.' ~ domain) if landing_page_cname | default('', true) else domain) }}
 hostname_ldap: {{ hostname_ldap | default((cname_ldap | default('ldap')) ~ '.' ~ domain) }}
 hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~ '.' ~ domain) }}
-hostname_mgr: {{ hostname_mgr | default((cname_mgr | default('mgr')) ~ '.' ~ domain) }}
+{% set _hostname_mgr = (webui_hostname | default('', true) or ((cname_mgr | default('fabric')) ~ '.' ~ domain)) | lower %}
+hostname_mgr: {{ _hostname_mgr }}
+{# CA certificates for every system (certs.<domain>); ca.<domain> is Step-CA's API. #}
+hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
 
 # ============================================================
 # DOCKER IMAGES
@@ -145,7 +152,6 @@ service_users:
 # CERTIFICATES / PKI
 # ============================================================
 byoc: {{ byoc | default(false) }}
-root_cert_name: {{ root_cert_name | default('root_ca') }}
 ca_crt_path: {{ ca_crt_path | default('/home/default_admin/output/root_ca.crt') }}
 ica_crt_path: {{ ica_crt_path | default('/home/default_admin/output/ica.crt') }}
 {% if ica_key_path is defined and ica_key_path | length > 0 %}
@@ -214,8 +220,14 @@ bind_acl_policies:
   { 'canonical': hostname, 'name': cname_ldap | default('ldap') },
   { 'canonical': hostname, 'name': cname_sso | default('sso') }
 ] %}
-{% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) %}
-{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_mgr | default('mgr') }) %}
+{% if (cname_certs | default('certs')) != hostname %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_certs | default('certs') }) %}
+{% endif %}
+{# The web UI name gets a CNAME only inside this domain, and not when it is the
+   host's own name (that already has an A record). #}
+{% set _mgr_label = _hostname_mgr[:-(domain | length) - 1] if _hostname_mgr.endswith('.' ~ domain) else '' %}
+{% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) and _mgr_label and _mgr_label != hostname %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': _mgr_label }) %}
 {% endif %}
 {% if landing_page_cname | default('', true) %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname }) %}

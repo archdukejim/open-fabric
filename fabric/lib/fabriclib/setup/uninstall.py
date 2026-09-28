@@ -57,9 +57,9 @@ def uninstall(ctx):
             subprocess.run(["groupdel", name], capture_output=True)
     ok("service accounts removed")
 
-    for name in (v.get("root_cert_name"), f"{v.get('domain_file')}_ca"):
-        path = f"/usr/local/share/ca-certificates/{name}.crt"
-        if name and os.path.exists(path):
+    for name in ("root-ca", "intermediate-ca"):          # written by pki/publish_ca_certs.py
+        path = f"/usr/local/share/ca-certificates/fabric-{v.get('domain_file')}-{name}.crt"
+        if v.get("domain_file") and os.path.exists(path):
             os.remove(path)
     subprocess.run(["update-ca-certificates", "--fresh"], capture_output=True)
     for path in ("/usr/local/bin/fabricctl", "/etc/systemd/resolved.conf.d/fabric-dns.conf"):

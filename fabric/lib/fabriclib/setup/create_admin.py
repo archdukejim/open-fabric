@@ -15,15 +15,15 @@ README = """fabric web UI — first login
 
 Everything your computer needs to reach https://{mgr}:
 
-  {root}.crt / {root}_win.cer   fabric root CA (PEM / DER for Windows)
+  root-ca.crt / root-ca.cer     fabric root CA (Linux, macOS, iOS, Android / Windows)
   {user}.p12                    your client certificate (password: p12-password.txt)
   initial-password.txt          your first Keycloak password (changed at first login)
 
 1. Copy this folder to your computer, e.g.
      scp -r {login}@{host}:{folder} .
-2. Trust the root CA ({root}.crt): Windows/macOS: double-click it and put it in
-   "Trusted Root Certification Authorities"; Linux: see https://{landing}
-   (install scripts for the system, Firefox and Chrome).
+2. Trust the root CA: Windows: double-click root-ca.cer and put it in
+   "Trusted Root Certification Authorities"; macOS/Linux: root-ca.crt. Every
+   system, format and installer: https://{certs}
 3. Import {user}.p12 into your browser (Firefox: Settings > Certificates >
    Your Certificates > Import; Chrome/Edge/Windows: double-click it).
 4. Your computer must resolve {mgr} (use fabric as its DNS server,
@@ -90,13 +90,12 @@ def run(ctx):
     else:
         ok(f"client certificate for '{user}' is current")
 
-    www = ctx.path("nginx", "www", "certificates")
-    root = v["root_cert_name"]
-    for name in (f"{root}.crt", f"{root}_win.cer"):
+    www = ctx.path("nginx", "www", "certs")
+    for name in ("root-ca.crt", "root-ca.cer"):
         shutil.copy2(os.path.join(www, name), os.path.join(folder, name))
         os.chown(os.path.join(folder, name), uid, gid)
     _write(os.path.join(folder, "README.txt"),
-           README.format(mgr=v["hostname_mgr"], landing=v["hostname_landing"], root=root, user=user,
+           README.format(mgr=v["hostname_mgr"], certs=v["hostname_certs"], user=user,
                          login=login, host=v["host_ip"], ip=v["host_ip"], folder=folder,
                          group=v.get("webui_admin_group", "admins")), (uid, gid))
     info(f"web UI login kit: {folder} (see README.txt)")

@@ -18,8 +18,8 @@ These variables define top-level identity and basic settings.
 - `bind9/data/reverse-zone.j2`
 - `bind9/data/zone.j2`
 - `docs/testplan.md.j2`
-- `nginx/www/certificates/index.html.j2`
-- `nginx/www/certificates/install-certs.sh.j2`
+- `nginx/www/certs/index.html.j2`
+- `nginx/www/certs/install-certs.sh.j2`
 - `vars.yaml.j2`
 
 ### `domain_file`
@@ -29,9 +29,9 @@ These variables define top-level identity and basic settings.
 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
-- `nginx/www/certificates/index.html.j2`
-- `nginx/www/certificates/install-all-ubuntu.sh.j2`
-- `nginx/www/certificates/install-certs.sh.j2`
+- `nginx/www/certs/index.html.j2`
+- `nginx/www/certs/install-all-ubuntu.sh.j2`
+- `nginx/www/certs/install-certs.sh.j2`
 - `vars.yaml.j2`
 
 ### `hostname`
@@ -48,11 +48,11 @@ These variables define top-level identity and basic settings.
 **Default Value:** `"Example Org"`
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
-- `nginx/www/certificates/install-certs.sh.j2`
-- `nginx/www/certificates/install-chrome-ubuntu.sh.j2`
-- `nginx/www/certificates/install-firefox-ubuntu.sh.j2`
-- `nginx/www/certificates/install-python-ubuntu.sh.j2`
+- `nginx/www/certs/index.html.j2`
+- `nginx/www/certs/install-certs.sh.j2`
+- `nginx/www/certs/install-chrome-ubuntu.sh.j2`
+- `nginx/www/certs/install-firefox-ubuntu.sh.j2`
+- `nginx/www/certs/install-python-ubuntu.sh.j2`
 - `nginx/www/landing/index.html.j2`
 - `nginx/www/manual/index.html.j2`
 - `vars.yaml.j2`
@@ -256,7 +256,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -269,7 +269,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -282,7 +282,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -295,7 +295,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -308,7 +308,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -321,7 +321,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_root_digest`
@@ -342,7 +342,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_root_key_param`
@@ -353,7 +353,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_intermediate_days`
@@ -364,7 +364,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_intermediate_digest`
@@ -385,7 +385,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_intermediate_key_param`
@@ -396,7 +396,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_service_days`
@@ -413,7 +413,7 @@ These variables define how the internal Certificate Authority generates and sign
 **Default Value:** `"720h"` (30 days)
 
 **Effected Jinja Templates:**
-- `nginx/www/certificates/index.html.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `stepca_port`
@@ -454,22 +454,6 @@ If you already possess a securely offline-generated Root and Intermediate CA, yo
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `vars.yaml.j2`
-
-### `root_cert_name`
-**Description:** Basename (without extension) for the imported root CA.
-
-**Default Value:** `"root_ca"`
-
-**Immutable:** Yes 🔒
-
-**Effected Jinja Templates:**
-- `nginx/nginx.conf.j2`
-- `nginx/www/certificates/index.html.j2`
-- `nginx/www/certificates/install-certs.sh.j2`
-- `nginx/www/certificates/install-chrome-ubuntu.sh.j2`
-- `nginx/www/certificates/install-firefox-ubuntu.sh.j2`
-- `nginx/www/certificates/install-python-ubuntu.sh.j2`
 - `vars.yaml.j2`
 
 ### `ca_crt_path`
@@ -604,7 +588,9 @@ Allows overriding the default short hostnames (CNAMEs) automatically assigned to
 | `cname_dns` | `"dns"` |
 | `cname_ldap` | `"ldap"` |
 | `cname_sso` | `"sso"` |
-| `cname_mgr` | `"mgr"` (DNS CNAME added only when webui is enabled) |
+| `cname_mgr` | `"fabric"` (label of the default web UI name; CNAME added only when webui is enabled and it differs from `hostname`) |
+| `cname_certs` | `"certs"` (CA certificate page) |
+| `webui_hostname` | *(empty)* — any host name for the web UI; overrides `cname_mgr` |
 
 ### Internal Subdomain Routing (Nginx)
 By default, the fully qualified hostnames are constructed using the CNAMEs above appended with the base `domain`.
@@ -616,7 +602,8 @@ By default, the fully qualified hostnames are constructed using the CNAMEs above
 | `hostname_landing` | `landing_page_cname + "." + domain` (or `domain` if empty) |
 | `hostname_ldap` | `cname_ldap + "." + domain` |
 | `hostname_keycloak`| `cname_sso + "." + domain` |
-| `hostname_mgr`| `cname_mgr + "." + domain` (webui vhost; `redirect_uri` is `https://<hostname_mgr>/oidc/callback`) |
+| `hostname_mgr`| `webui_hostname`, else `cname_mgr + "." + domain` — computed on every render (webui vhost; `redirect_uri` is `https://<hostname_mgr>/oidc/callback`) |
+| `hostname_certs`| `cname_certs + "." + domain` — CA certificates for every system (`ca.<domain>` is Step-CA's API) |
 
 ## 5. Security Contexts & Features
 Toggle features and control system-level UNIX isolation mapping.
@@ -641,7 +628,7 @@ Toggle features and control system-level UNIX isolation mapping.
 - `vars.yaml.j2`
 
 ### `install_webui`
-**Description:** Deploys the webui management UI (unprivileged container `webui` + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `mgr` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
+**Description:** Deploys the webui management UI (unprivileged container `webui` + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `fabric` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
 
 **Default Value:** `true` (effective only with Keycloak)
 

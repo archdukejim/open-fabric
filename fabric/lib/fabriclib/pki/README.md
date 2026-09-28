@@ -12,3 +12,4 @@ Certificates from fabric's Step-CA.
 | `issue_client_cert.py` | Web UI client certificate for a user (CN = Keycloak username) as `<user>.p12` with a generated password |
 | `mint_extra_cert.py` | One `extra_certs` entry → `<cn>.crt`/`.key` in its `out_dir` (or the sudo user's home); used by setup and `--mint-certs` |
 | `hand_out_client_cert.py` | `fabricctl client-cert <user>`: client `.p12` into the sudo user's `~/fabric-admin` |
+| `publish_ca_certs.py` | Root + intermediate for every system on `certs.<domain>` (PEM `.crt`/`.pem`, DER `.cer`/`.der`, chain `.pem`/`.p7b`, fingerprints JSON); trust them on this host |

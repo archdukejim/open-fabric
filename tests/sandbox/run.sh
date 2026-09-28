@@ -82,6 +82,17 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
+echo "--- certs.<domain>: CA certificates for every system; web UI at fabric.<domain>"
+docker cp "$REPO/tests/sandbox/certs_page_test.sh" "$NAME:/root/certs_page_test.sh"
+in_box 'bash /root/certs_page_test.sh certs.lan.test ca.lan.test $(python3 -c "import yaml;print(yaml.safe_load(open(\"/opt/fabric/config/vars.yaml\"))[\"ip_nginx\"])") '"$IP" \
+    > "$OUT/certs-page.log" 2>&1
+check "certs page: every format real, right CA, right MIME, plain HTTP by name and IP; ca.<domain> stays Step-CA" \
+    "! grep -q '^FAIL' '$OUT/certs-page.log' && [ \"\$(grep -c '^PASS' '$OUT/certs-page.log')\" -ge 18 ]"
+check "DNS: certs.<domain> and fabric.<domain> resolve to the host" \
+    "in_box 'dig +short @$IP certs.lan.test' | grep -qx $IP && in_box 'dig +short @$IP fabric.lan.test' | grep -qx $IP"
+check "web UI answers at fabric.<domain> (refuses without a client cert)" \
+    "[ \"\$(in_box 'curl -s -o /dev/null -w %{http_code} --cacert /opt/stepca/data/certs/root_ca.crt --resolve fabric.lan.test:443:$IP https://fabric.lan.test/')\" = 400 ]"
+
 echo "--- systemd control: fabric.target"
 check "fabric.target enabled and active" "in_box 'systemctl is-enabled fabric.target && systemctl is-active fabric.target' >/dev/null"
 check "every unit is part of fabric.target" \

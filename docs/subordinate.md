@@ -106,7 +106,7 @@ Once you have your CSR file (e.g., `hardware-key.csr`), you can use the First Le
 You will also need the Root CA certificate. You can download it directly from the First Level PKI web endpoint:
 
 ```bash
-curl -k -o root_ca.crt https://certificates.top.internal/root_ca.crt
+curl -k -o root_ca.crt https://certs.top.internal/root-ca.crt
 ```
 
 ## Step 3: Transfer Files to the Subordinate Host

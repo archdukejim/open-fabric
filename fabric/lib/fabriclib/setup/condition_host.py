@@ -4,10 +4,11 @@ import subprocess
 import time
 
 from fabriclib.common.console import info, ok
-from fabriclib.common.run import run as sh
+from fabriclib.common.run import CommandError, run as sh
 from fabriclib.setup.errors import SetupError
 
-HOST_PACKAGES = ["openssl", "ca-certificates", "curl", "gnupg", "ufw", "iptables", "dnsutils", "ldap-utils",
+# Only what the host itself runs; LDAP tools live in the dirsrv container.
+HOST_PACKAGES = ["openssl", "ca-certificates", "curl", "gnupg", "ufw", "iptables", "dnsutils",
                  "python3-yaml", "python3-jinja2"]
 DOCKER_PACKAGES = ["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]
 APT_ENV = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a"}
@@ -52,7 +53,13 @@ def run(ctx):
             raise SetupError(f"offline install but host packages are missing: {' '.join(missing)}")
         info(f"installing {' '.join(missing)}")
         sh(["apt-get", "update"], env=APT_ENV, timeout=900)
-        sh(["apt-get", "install", "-y", "--no-install-recommends", *missing], env=APT_ENV, timeout=1800)
+        try:
+            sh(["apt-get", "install", "-y", "--no-install-recommends", *missing], env=APT_ENV, timeout=1800)
+        except CommandError as e:
+            raise SetupError(f"apt could not install {' '.join(missing)}: {str(e)[-600:]}\n"
+                             "If apt reports unmet dependencies or held broken packages, the host's apt sources "
+                             "are usually incomplete (e.g. missing <release>-updates, which the installed "
+                             "libraries came from). Fix the sources, run `apt-get update`, then re-run setup.") from None
     ok("host packages present")
 
     if not (shutil.which("docker") and _docker_ok()):

@@ -50,7 +50,7 @@
         
         <strong>SSSD Auto-Installer Script:</strong>
         <p style="color:var(--muted);font-size:.85rem;margin-top:.5rem;">Installs required packages, injects the Root CA, configures SSSD, and enables automatic home directory creation.</p>
-        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate -O- https://{{ hostname_landing }}/install-ldap-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <pre><code><span class="cmd">wget</span> -nv -O- https://{{ hostname_landing }}/install-ldap-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
       </div>
     </div>
 
@@ -62,9 +62,9 @@
         </p>
 
         <strong>1. Install the Root CA:</strong>
-        <pre><code><span class="cmd">wget</span> -nv --no-check-certificate https://{{ hostname_landing }}/{{ root_cert_name }}.crt -O /tmp/{{ root_cert_name }}.crt
-<span class="cmd">sudo cp</span> /tmp/{{ root_cert_name }}.crt /usr/local/share/ca-certificates/{{ root_cert_name }}.crt
-<span class="cmd">sudo update-ca-certificates --fresh</span></code></pre>
+        <pre><code><span class="cmd">sudo wget</span> -nv -O /usr/local/share/ca-certificates/fabric-{{ domain_file }}-root-ca.crt http://{{ hostname_certs }}/root-ca.crt
+<span class="cmd">sudo update-ca-certificates</span></code></pre>
+        <p style="color:var(--muted);font-size:.85rem;">Other systems and formats: <a href="http://{{ hostname_certs }}/">http://{{ hostname_certs }}/</a></p>
 
         <strong style="display:block;margin-top:1.5rem;">2. Install Required Packages:</strong>
         <pre><code><span class="cmd">sudo apt-get</span> update

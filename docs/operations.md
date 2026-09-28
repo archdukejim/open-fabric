@@ -285,7 +285,7 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 |------|-------|---------|---------|
 | 80 | TCP | nginx | health check · ACME passthrough · HTTPS redirect |
 | 389 | TCP | nginx | `dirsrv:3389` (TCP passthrough; 389-DS requires StartTLS before bind) |
-| 443 | TCP | nginx | `step-ca:9000` · `bind9:8053` (`/dns-query`) · Keycloak · webui (`mgr.<domain>`, mTLS → `/opt/webui/run/web.sock`; the webui container publishes no ports, fabric-agent has no network listener) |
+| 443 | TCP | nginx | `step-ca:9000` (`ca.<domain>`) · CA certificate page (`certs.<domain>`) · `bind9:8053` (`/dns-query`) · Keycloak · webui (`fabric.<domain>`, mTLS → `/opt/webui/run/web.sock`; the webui container publishes no ports, fabric-agent has no network listener) |
 | 636 | TCP | nginx | `dirsrv:3636` (TCP passthrough; LDAPS terminated by 389-DS) |
 | `bind_dns_port` | TCP + UDP | bind9 | DNS for the LAN (`host_ip:bind_dns_port` → container 53); default `53` |
 | `bind9_doh_port` | TCP | bind9 | plain-HTTP DoH; default `8053` |

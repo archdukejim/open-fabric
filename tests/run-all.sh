@@ -35,7 +35,7 @@ for s in "${SUITES[@]}"; do
         render)   run render   python3 "$HERE/render.py" "$FABRIC_TEST_OUT/rendered" ;;
         nginx)    run nginx    bash "$HERE/nginx_check.sh" "$FABRIC_TEST_OUT/rendered" ;;
         zone)     run zone     python3 "$HERE/zone_test.py" ;;
-        webui)    run webui    python3 "$HERE/webui/test_container.py" ;;
+        webui)    run webui    bash -c "python3 \"$HERE/webui/test_container.py\" && python3 \"$HERE/webui/test_devserver.py\"" ;;
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
         keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
         hardening) run hardening bash "$HERE/hardening/run.sh" ;;

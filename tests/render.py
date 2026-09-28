@@ -1,5 +1,6 @@
 """Render every template the way deploy.py does, against a vars file shaped like a
 long-running install (round-tripped values). Usage: render.py <out-dir>"""
+import copy
 import json
 import os
 import sys
@@ -45,6 +46,7 @@ user = dict(deploy_base_dir='/opt', domain='lan.j-j.family', hostname='pi-core',
 user.update(json.loads(os.environ.get("FABRIC_TEST_VARS", "{}")))
 
 ctx = {**secrets, **user, 'render_date': '2026-01-01'}
+PRISTINE = copy.deepcopy(ctx)      # vars.yaml.j2 updates the dns dict it is given in place
 v1 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**ctx))
 v2 = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1}))
 import re as _re
@@ -99,4 +101,16 @@ acl = env.get_template('bind9/config/named.conf.acl.j2').render(**full)
 assert 'acl "certbot-devices"' in acl and 'key "dev1";' in acl, 'policy ACL not rendered'
 assert 'secret "bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch";' in keys, 'embedded TSIG secret not rendered'
 print('TSIG keys and RFC2136 grants rendered')
+
+# Web UI at any host name; certificate page on its own host.
+assert v2['hostname_mgr'] == 'fabric.lan.j-j.family' and v2['hostname_certs'] == 'certs.lan.j-j.family', v2['hostname_mgr']
+custom = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'webui_hostname': 'Admin.Example.org'}))
+assert custom['hostname_mgr'] == 'admin.example.org', custom['hostname_mgr']
+names = [r['name'] for r in custom['dns']['dynamic_zone_var']['CNAME']]
+assert 'fabric' not in names and 'admin' not in names, f'no CNAME for a web UI outside the domain: {names}'
+ngx = env.get_template('nginx/nginx.conf.j2').render(**{**secrets, **custom})
+assert 'server_name admin.example.org;' in ngx and 'server_name certs.lan.j-j.family;' in ngx
+same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'hostname': 'fabric'}))
+assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
+print('web UI host name (default, custom, same as host) and certs host rendered')
 print('all templates rendered')

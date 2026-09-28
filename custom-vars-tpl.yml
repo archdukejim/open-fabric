@@ -39,7 +39,6 @@ cert_ou: IT
 
 # Uncomment to use your own pre-generated root/intermediate CAs instead of letting Step-CA mint one
 # byoc: true
-# root_cert_name: root_ca
 # ca_crt_path: "/path/to/root_ca.crt"
 # ica_crt_path: "/path/to/ica.crt"
 # ica_key_path: "/path/to/ica.key"

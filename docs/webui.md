@@ -1,6 +1,6 @@
 # webui Management UI
 
-webui is a browser front end for `fabricctl`. It runs as an unprivileged container (`webui`, systemd service `webui`) and is reachable only through nginx at `https://mgr.<domain>` (`hostname_mgr`). Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
+webui is a browser front end for `fabricctl`. It runs as an unprivileged container (`webui`, systemd service `webui`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
 
 ### Table of Contents
 - [Features](#features)
@@ -52,7 +52,7 @@ The web app (TLS header checks, OIDC, sessions, HTML) holds no privilege: no Doc
 | fabric-agent | `/opt/fabric/lib/agent/server.py` (routes to `fabric/lib/fabriclib/`); unit `/etc/systemd/system/fabric-agent.service` from `fabric/jinja/systemd/fabric-agent.service.j2` (root, sandboxed, no network listener) |
 | Agent socket | `/opt/webui/agent/agent.sock` (`root:<webui gid> 0660`; dir `root:<webui gid> 0750`) |
 | nginx vhost | `server_name hostname_mgr`; `ssl_verify_client on`, `ssl_verify_depth 2`, trust `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root) |
-| Server cert | `mgr.<domain>` offline Step-CA leaf, issued by the `certs` setup step (renew: `fabricctl certs`) |
+| Server cert | `fabric.<domain>` offline Step-CA leaf, issued by the `certs` setup step (renew: `fabricctl certs`) |
 | Keycloak | realm `webui_realm`, client `fabric-webui`, role `fabric-admin`, flow `fabric-webui-mfa` — created by `keycloak_bootstrap.py` |
 
 ---
@@ -96,7 +96,8 @@ Enabled by default whenever `install_keycloak: true` (`install_webui` is forced 
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `install_webui` | `true` | Effective only with Keycloak |
-| `cname_mgr` / `hostname_mgr` | `mgr` / `mgr.<domain>` | CNAME is added to the zone automatically |
+| `webui_hostname` | `fabric.<domain>` | The web UI's address — any host name. Inside the domain a CNAME to this host is added automatically; outside it, point DNS at the host yourself. The certificate and the OIDC redirect follow |
+| `cname_mgr` | `fabric` | The default name's label (`<cname_mgr>.<domain>`) when `webui_hostname` is not set |
 | `webui_realm` | `domain` | Keycloak realm |
 | `webui_admin_role` | `fabric-admin` | Required realm role |
 | `webui_admin_group` | `admins` | Group granted the role |
@@ -129,10 +130,10 @@ Re-running setup keeps the user and its password, and renews the certificate onl
 What is left is your computer, which setup cannot touch:
 
 1. **Copy the kit** to your computer, e.g. `scp -r <you>@<fabric-host>:fabric-admin .`
-2. **Trust the root CA**: the `.crt` (or `_win.cer` on Windows) from the kit; Linux install scripts for the system, Firefox and Chrome are on `https://<domain>/`.
+2. **Trust the root CA**: `root-ca.cer` (Windows) or `root-ca.crt` (macOS, Linux) from the kit; every system, format and installer is on `https://certs.<domain>/`.
 3. **Import `<user>.p12`** into your browser (password in `p12-password.txt`).
-4. **Resolve `mgr.<domain>`**: use fabric as your DNS server (or add a hosts entry).
-5. **Browse** to `https://mgr.<domain>`, pick the certificate, log in with the password from `initial-password.txt`, choose a new password and **enrol TOTP** (scan the QR code with an authenticator app). Later logins ask for the one-time code.
+4. **Resolve `fabric.<domain>`**: use fabric as your DNS server (or add a hosts entry).
+5. **Browse** to `https://fabric.<domain>`, pick the certificate, log in with the password from `initial-password.txt`, choose a new password and **enrol TOTP** (scan the QR code with an authenticator app). Later logins ask for the one-time code.
 
 Then delete `initial-password.txt` and `p12-password.txt`.
 
@@ -147,6 +148,18 @@ which writes `~/fabric-admin/<username>.p12` and shows its password once. `fabri
 Use **Logout** to end both the webui session and the Keycloak session.
 
 ---
+
+## Dev preview
+
+To look at the pages without a CA, client certificate, Keycloak or a running install:
+
+```bash
+python3 fabric/lib/webui/devserver.py            # from a checkout (needs python3-jinja2) -> http://127.0.0.1:8080
+docker run --rm -p 127.0.0.1:8080:8080 --entrypoint /usr/bin/python3 \
+    fabric/webui:local /app/webui/devserver.py --bind 0.0.0.0     # from the image, on a fabric host
+```
+
+It renders the real pages (`views.py`) with sample data under an orange **DEV PREVIEW** banner. Record edits and Apply work in memory only — there is no fabric-agent, nothing is saved, rendered or reloaded, and a restart resets everything. `/preview/denied` shows a refused sign-in. It is a separate entry point on purpose: the production server (`server.py`) has no dev switch, so a real install can never run without sign-in. It listens on 127.0.0.1 unless told otherwise; never expose it.
 
 ## Troubleshooting
 

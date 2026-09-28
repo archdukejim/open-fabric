@@ -2,6 +2,45 @@
 {# nginx.conf — rendered by fabricctl from nginx/nginx.conf.j2         #}
 {# ----------------------------------------------------------------- #}
 
+{# How the CA certificate files are served (certs.<domain> on 80 and 443, and
+   http://<host_ip>/certs/): the MIME types operating systems recognise;
+   .pem/.json readable in the browser, the rest downloads. #}
+{% macro cert_file_types() %}
+            location ~ \.pem$ {
+                default_type text/plain;
+                types { }
+                charset utf-8;
+            }
+            location ~ \.json$ {
+                default_type application/json;
+                types { }
+            }
+            location ~ \.crt$ {
+                default_type application/x-x509-ca-cert;
+                types { }
+                add_header Content-Disposition 'attachment' always;
+                add_header X-Content-Type-Options nosniff always;
+            }
+            location ~ \.(cer|der)$ {
+                default_type application/pkix-cert;
+                types { }
+                add_header Content-Disposition 'attachment' always;
+                add_header X-Content-Type-Options nosniff always;
+            }
+            location ~ \.p7b$ {
+                default_type application/x-pkcs7-certificates;
+                types { }
+                add_header Content-Disposition 'attachment' always;
+                add_header X-Content-Type-Options nosniff always;
+            }
+            location ~ \.sh$ {
+                default_type text/x-shellscript;
+                types { }
+                add_header Content-Disposition 'attachment' always;
+                add_header X-Content-Type-Options nosniff always;
+            }
+{% endmacro %}
+
 # Global settings
 worker_processes  auto;
 worker_rlimit_nofile 65535;
@@ -55,7 +94,7 @@ http {
 
     resolver 127.0.0.11 valid=30s;
 
-    # HTTP — health check, ACME passthrough, redirect everything else to HTTPS
+    # HTTP — health check, CA certificates (/certs/), redirect everything else to HTTPS
     server {
         listen 80 default_server;
         server_name _;
@@ -63,6 +102,18 @@ http {
         location /health {
             access_log off;
             return 200 'OK';
+        }
+
+        # CA certificates without DNS or TLS: http://<host_ip>/certs/
+        location = /certs {
+            return 301 /certs/;
+        }
+        location /certs/ {
+            root /srv/www;
+            index index.html;
+{{ cert_file_types() }}        }
+        location = /style.css {
+            root /srv/www/shared;
         }
 
         location / {
@@ -102,61 +153,13 @@ http {
 
         set $stepca_backend "{{ nginx_backend_stepca }}";
 
-        # PKI info page and certificate downloads
-        location = /certificates {
-            return 301 /certificates/;
+        # Step-CA's API / ACME only. People opening ca.<domain> in a browser
+        # (or an old /certificates link) get the certificate page.
+        location = / {
+            return 302 https://{{ hostname_certs }}/;
         }
-        location = /certificates/ {
-            alias /srv/www/certificates/;
-            index index.html;
-        }
-        location = /certificates/index.html {
-            alias /srv/www/certificates/index.html;
-        }
-        location = /certificates/{{ root_cert_name }}.crt {
-            alias /srv/www/certificates/{{ root_cert_name }}.crt;
-            default_type application/x-pem-file;
-            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}.crt"';
-        }
-        location = /certificates/{{ root_cert_name }}_win.cer {
-            alias /srv/www/certificates/{{ root_cert_name }}_win.cer;
-            default_type application/x-x509-ca-cert;
-            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}_win.cer"';
-        }
-        location = /certificates/{{ domain_file }}_ca.crt {
-            alias /srv/www/certificates/{{ domain_file }}_ca.crt;
-            default_type application/x-pem-file;
-            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_ca.crt"';
-        }
-        location = /certificates/{{ domain_file }}_win_ca.cer {
-            alias /srv/www/certificates/{{ domain_file }}_win_ca.cer;
-            default_type application/x-x509-ca-cert;
-            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_win_ca.cer"';
-        }
-        location = /certificates/install-certs-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-certs-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-certs-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-firefox-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-firefox-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-firefox-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-chrome-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-chrome-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-chrome-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-all-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-all-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-all-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-python-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-python-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-python-{{ domain_file }}.sh"';
+        location /certificates {
+            return 301 https://{{ hostname_certs }}/;
         }
 
         location / {
@@ -206,57 +209,33 @@ http {
             add_header Content-Disposition 'attachment; filename="install-ldap-{{ domain_file }}.sh"';
         }
 
-        location /certificates/ {
-            alias /srv/www/certificates/;
-            index index.html;
-            default_type text/html;
+        location /certificates {
+            return 301 https://{{ hostname_certs }}/;
         }
+    }
 
-        location = /certificates/{{ root_cert_name }}.crt {
-            alias /srv/www/certificates/{{ root_cert_name }}.crt;
-            default_type application/x-pem-file;
-            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}.crt"';
+    # CA certificates for every kind of system (published by fabricctl setup:
+    # fabriclib/pki/publish_ca_certs.py). Read-only static files, deliberately
+    # also on plain HTTP: a client fetching the CA does not trust it yet.
+    # Integrity: compare the fingerprints shown on the page.
+    server {
+        listen 80;
+        listen 443 ssl;
+        server_name {{ hostname_certs }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_certs }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_certs }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+        root /srv/www/certs;
+        index index.html;
+        add_header X-Content-Type-Options nosniff always;
+
+        location = /style.css {
+            alias /srv/www/shared/style.css;
         }
-        location = /certificates/{{ root_cert_name }}_win.cer {
-            alias /srv/www/certificates/{{ root_cert_name }}_win.cer;
-            default_type application/x-x509-ca-cert;
-            add_header Content-Disposition 'attachment; filename="{{ root_cert_name }}_win.cer"';
-        }
-        location = /certificates/{{ domain_file }}_ca.crt {
-            alias /srv/www/certificates/{{ domain_file }}_ca.crt;
-            default_type application/x-pem-file;
-            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_ca.crt"';
-        }
-        location = /certificates/{{ domain_file }}_win_ca.cer {
-            alias /srv/www/certificates/{{ domain_file }}_win_ca.cer;
-            default_type application/x-x509-ca-cert;
-            add_header Content-Disposition 'attachment; filename="{{ domain_file }}_win_ca.cer"';
-        }
-        location = /certificates/install-certs-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-certs-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-certs-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-firefox-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-firefox-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-firefox-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-chrome-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-chrome-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-chrome-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-all-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-all-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-all-{{ domain_file }}.sh"';
-        }
-        location = /certificates/install-python-{{ domain_file }}.sh {
-            alias /srv/www/certificates/install-python-{{ domain_file }}.sh;
-            default_type text/x-shellscript;
-            add_header Content-Disposition 'attachment; filename="install-python-{{ domain_file }}.sh"';
-        }
+        location / {
+{{ cert_file_types() }}        }
     }
 
 {% if install_keycloak | default(false) | bool %}

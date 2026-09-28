@@ -21,6 +21,7 @@ _BASE = """<!doctype html>
   </form>
   {% endif %}
 </header>
+{% if ctx and ctx.dev %}<p class="devbanner">DEV PREVIEW — sample data, no sign-in, nothing is saved or applied</p>{% endif %}
 <main>{% block body %}{% endblock %}</main>
 {% if ctx %}<footer>fabricctl {{ ctx.version.version }}{% if ctx.version.build %} · {{ ctx.version.build | replace('\\n', ' · ') }}{% endif %}</footer>{% endif %}
 </body></html>"""
@@ -163,4 +164,5 @@ button.link{background:none;border:none;color:var(--accent);padding:0}
 .apply{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:12px}
 pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:13px}
 code{font-size:13px}
+.devbanner{margin:0;padding:8px 16px;text-align:center;font-weight:600;background:#b45309;color:#fff}
 """

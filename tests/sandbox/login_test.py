@@ -36,7 +36,8 @@ import yaml
 V = yaml.safe_load(open(sys.argv[1]))
 OTHER, OTHER_PW, OTHER_P12_PW = sys.argv[2], sys.argv[3], sys.argv[4]
 ADMIN = V["webui_admin_user"]
-KIT = os.path.join(os.path.expanduser("~"), "fabric-admin")
+# The login kit lands in the home of the account that ran `sudo fabricctl setup`.
+KIT = os.environ.get("FABRIC_KIT") or os.path.join(os.path.expanduser("~"), "fabric-admin")
 ROOT_CA = os.path.join(V["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
 MGR, SSO, NGINX = V["hostname_mgr"], V["hostname_keycloak"], V["ip_nginx"]
 TMP = tempfile.mkdtemp()

@@ -17,6 +17,7 @@ def _targets(ctx):
          [nginx(v["hostname_bind9"]), (p("bind9", "ssl"), "bind")], ["nginx", "bind9"]),
         (v["hostname_stepca"], [], [nginx(v["hostname_stepca"])], ["nginx"]),
         (v["hostname_landing"], [], [nginx(v["hostname_landing"])], ["nginx"]),
+        (v["hostname_certs"], [], [nginx(v["hostname_certs"])], ["nginx"]),
     ]
     if v.get("install_ldap", True):
         t.append((v["hostname_ldap"], [], [("dirsrv-tls", "ldap")], ["ldap"]))

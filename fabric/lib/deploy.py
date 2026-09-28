@@ -288,7 +288,7 @@ def apply_deployment(start_services=True):
 
     # Nginx
     render_file('nginx/nginx.conf.j2', 'nginx/nginx.conf')
-    render_file('nginx/www/certificates/index.html.j2', 'nginx/www/certificates/index.html')
+    render_file('nginx/www/certs/index.html.j2', 'nginx/www/certs/index.html')
     render_file('nginx/www/landing/index.html.j2', 'nginx/www/landing/index.html')
     render_file('nginx/www/manual/index.html.j2', 'nginx/www/manual/index.html')
     render_file('nginx/www/ldap/index.html.j2', 'nginx/www/ldap/index.html')
@@ -301,8 +301,8 @@ def apply_deployment(start_services=True):
     
     domain_file = merged_context.get('domain_file', 'example_com')
     for script in ['certs', 'firefox-ubuntu', 'chrome-ubuntu', 'all-ubuntu', 'python-ubuntu']:
-        src = f'nginx/www/certificates/install-{script}.sh.j2'
-        dest = f'nginx/www/certificates/install-{script.replace("-ubuntu", "")}-{domain_file}.sh'
+        src = f'nginx/www/certs/install-{script}.sh.j2'
+        dest = f'nginx/www/certs/install-{script.replace("-ubuntu", "")}-{domain_file}.sh'
         render_file(src, dest)
         
     # Docker Compose and Systemd Wrappers
@@ -395,7 +395,7 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
     print("Deploying configurations...")
     
     # Ensure Base Directories
-    for d in ['fabric/config/certs', 'nginx/www/certificates', 'nginx/www/shared', 'nginx/www/landing', 'nginx/www/manual/docs', 'nginx/www/ldap']:
+    for d in ['fabric/config/certs', 'nginx/www/certs', 'nginx/www/shared', 'nginx/www/landing', 'nginx/www/manual/docs', 'nginx/www/ldap']:
         ensure_dir(os.path.join(DEPLOY_BASE_DIR, d), 0o755)
 
     nginx_uid, nginx_gid = get_service_user(final_vars, 'nginx')
@@ -446,7 +446,7 @@ dns_rfc2136_base_domain = {key.get('domain', final_vars.get('domain'))}
         os.chmod(os.path.join(TARGET_FABRIC, "config/link-vars.yaml"), 0o644)
     
     # Nginx Web Assets
-    for folder in ['certificates', 'shared', 'landing', 'manual', 'ldap']:
+    for folder in ['certs', 'shared', 'landing', 'manual', 'ldap']:
         src_dir = os.path.join(render_tmp, f"nginx/www/{folder}")
         dest_dir = os.path.join(DEPLOY_BASE_DIR, f"nginx/www/{folder}")
         if os.path.exists(src_dir):

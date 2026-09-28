@@ -1,0 +1,193 @@
+{% extends "../shared/base.html.j2" %}
+
+{% block title %}{{ friendly_name | default(ca_name) }} &mdash; CA certificates{% endblock %}
+
+{% block header_subtitle %}{{ cert_org }} &mdash; Certificate Authority for {{ domain }}{% endblock %}
+
+{% block back_link %}<a href="https://{{ hostname_landing }}/" class="back-link">&larr; Back to Landing Portal</a>{% endblock %}
+
+{% block content %}
+    <div class="card">
+      <h2>Trust this network's certificate authority</h2>
+      <p style="color:var(--muted);font-size:.9rem;">
+        Every service on <strong>{{ domain }}</strong> uses certificates from this CA. Install the
+        <strong>root CA</strong> on a device to trust them; appliances that build the chain themselves may also need the
+        <strong>intermediate CA</strong>. Before trusting a certificate, compare its <strong>SHA-256 fingerprint</strong>
+        with the one shown here. This page works over plain HTTP on purpose (a device cannot check TLS before it
+        trusts the CA): <code>http://{{ hostname_certs }}/</code>, or without DNS <code>http://{{ host_ip }}/certs/</code>.
+        To check a fingerprint independently of this page, on the fabric host:
+        <code>openssl x509 -noout -fingerprint -sha256 -in /opt/stepca/data/certs/root_ca.crt</code>.
+      </p>
+    </div>
+
+{% for cert in [('root-ca', 'Root CA', 'Trust anchor — install this on every device', 'label-root'),
+                ('intermediate-ca', 'Intermediate CA', 'Signs every service certificate — for chain-building devices', 'label-intermediate')] %}
+    <div class="card cert-card" id="{{ cert[0] }}">
+      <span class="chain-label {{ cert[3] }}">{{ cert[1] }}</span>
+      <p style="color:var(--muted);font-size:.85rem;margin:.4rem 0 .8rem;">{{ cert[2] }}</p>
+      <table class="subject-table">
+        <tr><th>Subject</th><td data-field="subject">&hellip;</td></tr>
+        <tr><th>Issuer</th><td data-field="issuer">&hellip;</td></tr>
+        <tr><th>Valid</th><td><span data-field="not_before">&hellip;</span> &rarr; <span data-field="not_after">&hellip;</span></td></tr>
+        <tr><th>SHA-256</th><td><code data-field="sha256">&hellip;</code></td></tr>
+        <tr><th>SHA-1</th><td><code data-field="sha1">&hellip;</code></td></tr>
+      </table>
+      <div class="downloads" style="margin-top:1rem;">
+        <a class="btn btn-primary" href="{{ cert[0] }}.cer" download>Windows (.cer)</a>
+        <a class="btn btn-primary" href="{{ cert[0] }}.crt" download>Linux / macOS / iOS / Android (.crt)</a>
+        <a class="btn btn-secondary" href="{{ cert[0] }}.pem" target="_blank">PEM text (.pem)</a>
+        <a class="btn btn-secondary" href="{{ cert[0] }}.der" download>Binary DER (.der)</a>
+      </div>
+      <details style="margin-top:1rem;">
+        <summary>Show the PEM text (copy &amp; paste into a device)</summary>
+        <pre><code class="pem" data-pem="{{ cert[0] }}.pem">loading&hellip;</code></pre>
+        <button class="btn btn-secondary copy" data-copy="{{ cert[0] }}.pem">Copy</button>
+      </details>
+    </div>
+{% endfor %}
+
+    <div class="card">
+      <h2>Chain bundles</h2>
+      <p style="color:var(--muted);font-size:.9rem;">Both certificates in one file, for devices that import a whole chain.</p>
+      <div class="downloads">
+        <a class="btn btn-secondary" href="ca-chain.p7b" download>PKCS#7 chain (.p7b)</a>
+        <a class="btn btn-secondary" href="ca-chain.pem" target="_blank">PEM chain (.pem)</a>
+      </div>
+    </div>
+
+    <div class="tabs-wrapper">
+      <div class="tabs">
+        <button class="tab active" onclick="showTab(event,'tab-windows')">Windows</button>
+        <button class="tab" onclick="showTab(event,'tab-linux')">Linux</button>
+        <button class="tab" onclick="showTab(event,'tab-apple')">macOS / iOS</button>
+        <button class="tab" onclick="showTab(event,'tab-android')">Android</button>
+        <button class="tab" onclick="showTab(event,'tab-browsers')">Browsers</button>
+        <button class="tab" onclick="showTab(event,'tab-devices')">Network devices</button>
+        <button class="tab" onclick="showTab(event,'tab-formats')">Formats</button>
+      </div>
+    </div>
+
+    <div class="tab-content active" id="tab-windows">
+      <div class="card">
+        <h2>Windows</h2>
+        <p style="color:var(--muted);font-size:.9rem;">Double-click <code>root-ca.cer</code> &rarr; <em>Install Certificate</em> &rarr;
+          <em>Local Machine</em> &rarr; <em>Trusted Root Certification Authorities</em>. Put <code>intermediate-ca.cer</code>
+          in <em>Intermediate Certification Authorities</em>. Or, in PowerShell as Administrator:</p>
+        <pre><code><span class="cmd">Invoke-WebRequest</span> http://{{ hostname_certs }}/root-ca.cer -OutFile $env:TEMP\root-ca.cer
+<span class="cmd">Invoke-WebRequest</span> http://{{ hostname_certs }}/intermediate-ca.cer -OutFile $env:TEMP\intermediate-ca.cer
+<span class="cmd">Import-Certificate</span> -FilePath $env:TEMP\root-ca.cer -CertStoreLocation Cert:\LocalMachine\Root
+<span class="cmd">Import-Certificate</span> -FilePath $env:TEMP\intermediate-ca.cer -CertStoreLocation Cert:\LocalMachine\CA</code></pre>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-linux">
+      <div class="card">
+        <h2>Linux</h2>
+        <strong>Ubuntu / Debian — everything (system, Python, Firefox, Chrome):</strong>
+        <pre><code><span class="cmd">wget</span> -nv -O- http://{{ hostname_certs }}/install-all-{{ domain_file }}.sh | <span class="cmd">sudo bash</span></code></pre>
+        <strong style="display:block;margin-top:1rem;">Debian / Ubuntu — system only, by hand:</strong>
+        <pre><code><span class="cmd">sudo wget</span> -nv -O /usr/local/share/ca-certificates/{{ domain_file }}-root-ca.crt http://{{ hostname_certs }}/root-ca.crt
+<span class="cmd">sudo update-ca-certificates</span></code></pre>
+        <strong style="display:block;margin-top:1rem;">RHEL / Fedora / Rocky:</strong>
+        <pre><code><span class="cmd">sudo curl</span> -sSo /etc/pki/ca-trust/source/anchors/{{ domain_file }}-root-ca.crt http://{{ hostname_certs }}/root-ca.crt
+<span class="cmd">sudo update-ca-trust</span></code></pre>
+        <strong style="display:block;margin-top:1rem;">Other installers:</strong>
+        <pre><code>http://{{ hostname_certs }}/install-certs-{{ domain_file }}.sh     <span style="color:var(--muted)"># system store only</span>
+http://{{ hostname_certs }}/install-python-{{ domain_file }}.sh    <span style="color:var(--muted)"># Python requests / SSL_CERT_FILE</span>
+http://{{ hostname_certs }}/install-firefox-{{ domain_file }}.sh   <span style="color:var(--muted)"># Firefox NSS</span>
+http://{{ hostname_certs }}/install-chrome-{{ domain_file }}.sh    <span style="color:var(--muted)"># Chrome / Chromium / Brave / Edge NSS</span></code></pre>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-apple">
+      <div class="card">
+        <h2>macOS / iOS</h2>
+        <strong>macOS (Terminal):</strong>
+        <pre><code><span class="cmd">curl</span> -sSo /tmp/root-ca.crt http://{{ hostname_certs }}/root-ca.crt
+<span class="cmd">sudo security</span> add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain /tmp/root-ca.crt</code></pre>
+        <p style="color:var(--muted);font-size:.9rem;"><strong>iOS / iPadOS:</strong> open <code>http://{{ hostname_certs }}/root-ca.crt</code> in Safari &rarr;
+          <em>Settings &rarr; Profile Downloaded &rarr; Install</em>, then <em>Settings &rarr; General &rarr; About &rarr;
+          Certificate Trust Settings</em> &rarr; enable full trust for the root.</p>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-android">
+      <div class="card">
+        <h2>Android</h2>
+        <p style="color:var(--muted);font-size:.9rem;">Download <code>root-ca.crt</code>, then <em>Settings &rarr; Security &rarr; Encryption &amp; credentials
+          &rarr; Install a certificate &rarr; CA certificate</em>. Apps must opt in to user CAs; browsers such as Chrome do.</p>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-browsers">
+      <div class="card">
+        <h2>Browsers with their own store</h2>
+        <p style="color:var(--muted);font-size:.9rem;"><strong>Firefox:</strong> <em>Settings &rarr; Privacy &amp; Security &rarr; Certificates &rarr;
+          View Certificates &rarr; Authorities &rarr; Import</em> <code>root-ca.crt</code>, and tick <em>Trust this CA to identify websites</em>.
+          Chrome, Edge and Safari use the operating system's store (see the other tabs).</p>
+        <strong>Linux NSS (Chrome/Chromium) by hand:</strong>
+        <pre><code><span class="cmd">certutil</span> -d sql:$HOME/.pki/nssdb -A -t "C,," -n "{{ friendly_name }} Root CA" -i root-ca.crt</code></pre>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-devices">
+      <div class="card">
+        <h2>Network devices and appliances</h2>
+        <p style="color:var(--muted);font-size:.9rem;">Most switches, routers, firewalls, printers and NAS devices accept one of:</p>
+        <ul style="color:var(--muted);font-size:.9rem;">
+          <li><strong>PEM text</strong> — paste it at the prompt: open <code>root-ca.pem</code> (or use <em>Show the PEM text</em> above).</li>
+          <li><strong>DER file</strong> — upload <code>root-ca.der</code> (same as <code>.cer</code>).</li>
+          <li><strong>Chain</strong> — <code>ca-chain.p7b</code> (PKCS#7) or <code>ca-chain.pem</code> for devices that import a whole chain.</li>
+        </ul>
+        <strong>Cisco IOS / IOS-XE:</strong>
+        <pre><code>crypto pki trustpoint {{ domain_file | upper }}-ROOT
+ enrollment terminal
+ revocation-check none
+crypto pki authenticate {{ domain_file | upper }}-ROOT
+<span style="color:var(--muted)">! paste root-ca.pem, end with a line containing only "quit"; confirm the SHA-1 fingerprint above</span></code></pre>
+        <p style="color:var(--muted);font-size:.9rem;">Devices that show a fingerprint during import: compare it with <strong>SHA-1</strong> or
+          <strong>SHA-256</strong> above before accepting.</p>
+      </div>
+    </div>
+
+    <div class="tab-content" id="tab-formats">
+      <div class="card">
+        <h2>Formats</h2>
+        <table class="subject-table">
+          <tr><th>.crt</th><td>PEM (Base64 text) — Linux, macOS, iOS, Android</td></tr>
+          <tr><th>.cer</th><td>DER (binary) — Windows</td></tr>
+          <tr><th>.pem</th><td>PEM, shown as text in the browser — copy &amp; paste into devices</td></tr>
+          <tr><th>.der</th><td>DER (binary) — devices that want a binary certificate</td></tr>
+          <tr><th>.p7b</th><td>PKCS#7 bundle (root + intermediate) — Windows, Java, many appliances</td></tr>
+          <tr><th>ca-chain.pem</th><td>PEM bundle (intermediate, then root)</td></tr>
+          <tr><th>ca-certs.json</th><td>Subjects, validity and fingerprints (machine-readable)</td></tr>
+        </table>
+      </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script>
+    function showTab(e, id) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      e.target.classList.add('active');
+      document.getElementById(id).classList.add('active');
+    }
+    // Details come from the certificates themselves (published by fabricctl setup).
+    fetch('ca-certs.json', {cache: 'no-store'}).then(r => r.json()).then(info => {
+      for (const [id, cert] of Object.entries(info)) {
+        const card = document.getElementById(id);
+        if (!card) continue;
+        card.querySelectorAll('[data-field]').forEach(el => { el.textContent = cert[el.dataset.field] || ''; });
+      }
+    }).catch(() => {});
+    document.querySelectorAll('[data-pem]').forEach(el => {
+      fetch(el.dataset.pem, {cache: 'no-store'}).then(r => r.text()).then(t => { el.textContent = t; });
+    });
+    document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', () => {
+      fetch(btn.dataset.copy).then(r => r.text()).then(t => navigator.clipboard.writeText(t))
+        .then(() => { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); });
+    }));
+  </script>
+{% endblock %}
