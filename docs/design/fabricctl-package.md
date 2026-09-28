@@ -185,9 +185,37 @@ thin bootstrap into `fabricctl setup`.
 - **Source of truth:** `fabric.yaml` gains `dhcp:` (subnets, pools, options,
   reservations). Rendered to `kea-dhcp4.conf`; applied with `config-set` +
   `config-write` via the API — no restart, leases untouched.
-- **DDNS:** `kea-dhcp-ddns` → BIND9 with a dedicated TSIG key, auto-created
-  in `tsig_keys` with `update-policy` scoped to A/AAAA/PTR/DHCID. Reuses the
-  dynamic-zone handling fixed in 1.5.0.
+- **DDNS (decided, D16):** `kea-dhcp-ddns` registers lease hostnames in
+  **their own dynamic subzone**, e.g. `laptop.dhcp.home.arpa`. It never
+  writes to a zone fabric renders from `vars.yaml`.
+  - **Why separate:** apply republishes rendered zones by replacing their
+    files, which would wipe dynamic entries. A separate zone also keeps
+    DHCP-supplied names (which any client can pick) apart from
+    administrator-defined ones.
+  - **802.1X:** RADIUS-assigned VLANs are separate subnets, so each VLAN
+    can get its own subzone (`iot.dhcp.<domain>`, `guest.dhcp.<domain>`) and
+    its own reverse zones.
+  - **Subzones:** created empty once, delegated from the parent zone
+    (NS + glue in the rendered parent), then left to BIND's journal. Apply
+    never rewrites them, and setup re-runs keep their data.
+  - **Key:** a dedicated TSIG key, auto-created in `tsig_keys`, with
+    `update-policy` `zonesub` limited to A/AAAA/DHCID in the DHCP
+    subzone(s) and PTR/DHCID in the DHCP reverse zones. Deny-by-default
+    everywhere else, so it cannot touch `home.arpa` itself.
+  - **Conflicts:** `ddns-conflict-resolution-mode: check-with-dhcid`, so
+    a client cannot take over another client's name.
+  - **Names:** `hostname-char-set`/`replacement` sanitise client names;
+    clients that send none optionally get a MAC-derived name or none
+    (`ddns-generated-prefix`).
+  - **Reverse DNS:** fabric's generated reverse zones
+    (`dns/reverse_zones.py`) skip any /24 or /64 that contains a Kea
+    pool. Kea owns the PTRs there. A static record inside a DHCP subnet
+    must then be a Kea **reservation**, not a plain A record; setup
+    refuses the overlap with that hint.
+  - **Removal:** disabling DHCP deletes the key and the DHCP subzones
+    (after a warning listing how many registered hosts disappear).
+  - **Web UI:** DHCP-registered hosts are shown read-only, marked *DHCP*,
+    under Forward/Reverse zones and on the Kea tab.
 - **Reservations ↔ DNS:** a reservation with a hostname produces the A/PTR
   record, so one entry in the UI does both.
 - **HA (optional):** Kea HA hook, hot-standby between two fabric nodes.
@@ -451,6 +479,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabricd`, `fabric-admins` group, no docker group) and the Fabric UI container; one repo, two artifacts (§1a) |
 | D15 ✅ | Setup UX | Default change list → Proceed / Advanced; everything settable in `vars.yaml`; `--non-interactive` (§1b) |
 | D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
+| D16 ✅ | Where Kea registers DHCP hostnames | A separate dynamic subzone per DHCP scope (`dhcp.<domain>`, per-VLAN subzones with 802.1X); never the rendered zones (§5) |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 
 ## References
