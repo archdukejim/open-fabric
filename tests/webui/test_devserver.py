@@ -106,6 +106,10 @@ try:
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
     page = req("GET", "/openbao")[3]
     check("OpenBao tab: unsealed, static seal, engines", "Unsealed" in page and "static" in page and "fabric/" in page)
+    page = req("GET", "/openbao?view=disk")[3]
+    check("disk encryption guide: LUKS with the same YubiKey (FIDO2) or USB stick, untested note",
+          "systemd-cryptenroll --fido2-device=auto" in page and "/luks.key:UUID=" in page and "Untested" in page
+          and "Disk encryption" in page)
     page = req("GET", "/openbao?view=secrets")[3]
     check("secrets: fabric's own entry, OpenBao UI link (OIDC), break glass", "fabric/secrets" in page
           and "ui/vault/auth?with=oidc" in page and "break-glass" in page)

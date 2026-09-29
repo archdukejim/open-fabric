@@ -395,6 +395,11 @@ cannot be copied, unlike a stick.
 *Tested with SoftHSM2 (a software token). YubiKey, Nitrokey and smart cards
 are untested.*
 
+**Disk encryption** is yours to set up (fabric does not): the web UI's
+OpenBao → Disk encryption page and [disk-encryption.md](disk-encryption.md)
+show how to encrypt fabric's data volume with LUKS, unlocked by the same
+YubiKey or USB stick.
+
 **HSMs and key managers (KMIP).** Any KMIP server (CipherTrust, Fortanix,
 Entrust KeyControl, IBM GKLM, Cosmian, …) with an active AES-256 key that
 fabric's client may use for Encrypt/Decrypt. The device encrypts the vault

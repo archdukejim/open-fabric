@@ -24,8 +24,9 @@ PLACEHOLDERS = {
 # BIND9 tab sections: (view, label)
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
 # OpenBao tab sections and unlock-method (key slot) types
-OPENBAO_SECTIONS = [("status", "Status"), ("unlock", "Unlock methods"), ("secrets", "Secrets")]
-OPENBAO_VIEWS = {"status", "unlock", "secrets", "add-security-key", "add-usb", "add-hsm", "rotate", "remove"}
+OPENBAO_SECTIONS = [("status", "Status"), ("unlock", "Unlock methods"), ("secrets", "Secrets"),
+                    ("disk", "Disk encryption")]
+OPENBAO_VIEWS = {"status", "unlock", "secrets", "disk", "add-security-key", "add-usb", "add-hsm", "rotate", "remove"}
 SLOT_TYPES = {
     "local": ("Key file", "On this host's disk. Always present, so no kill switch."),
     "pkcs11": ("Security key", "YubiKey, Nitrokey, SmartCard-HSM or any PKCS#11 token. The key can't be copied."),
@@ -522,6 +523,44 @@ _TEMPLATES = {
 {% else %}<p class="blank">No such method.</p>{% endif %}
 </section>
 
+{% elif view == 'disk' %}
+<section class="card"><h2>Disk encryption with your security key or USB stick</h2>
+<p class="muted">fabric does not encrypt disks: you do it once, at the console. This encrypts the volume holding fabric's data (<code>/opt</code>, <code>/etc/fabric</code>) with LUKS2, unlocked by the <strong>same YubiKey or USB stick</strong> that unlocks OpenBao. A stolen disk or SD card then reveals nothing.</p>
+<p class="flash warn">Untested with hardware by the fabric project. Try it on a spare machine first, and always keep a passphrase slot. The full guide: <code>docs/disk-encryption.md</code>.</p>
+<h3>Before you start</h3>
+<ul>
+<li><strong>Keep a passphrase</strong> (offline) and back up the LUKS header after every change: <code>sudo cryptsetup luksHeaderBackup /dev/sdX2 --header-backup-file luks-header.img</code></li>
+<li><strong>One YubiKey, two jobs:</strong> OpenBao uses its PIV application (PKCS#11), LUKS its FIDO2 application — both on one YubiKey 5.</li>
+<li>A <strong>data volume</strong> unlocked after boot works on Ubuntu 24.04 as installed. The <strong>root</strong> filesystem with FIDO2 needs <code>dracut</code> instead of initramfs-tools.</li>
+</ul>
+<h3>1. An encrypted volume for fabric's data</h3>
+<pre>sudo cryptsetup luksFormat --type luks2 /dev/sdX2       # passphrase: keep it
+sudo cryptsetup open /dev/sdX2 fabricdata
+sudo mkfs.ext4 -L fabricdata /dev/mapper/fabricdata
+sudo mkdir -p /srv/fabricdata && sudo mount /dev/mapper/fabricdata /srv/fabricdata
+sudo mkdir -p /srv/fabricdata/opt /srv/fabricdata/etc-fabric</pre>
+<p>Bind <code>/srv/fabricdata/opt</code> → <code>/opt</code> and <code>/srv/fabricdata/etc-fabric</code> → <code>/etc/fabric</code> in <code>/etc/fstab</code>, and open the volume from <code>/etc/crypttab</code>:</p>
+<pre>fabricdata  UUID=&lt;luks-partition-uuid&gt;  none  luks,discard</pre>
+<p class="muted small">Best on a fresh host, before <code>fabricctl setup</code> — or <code>fabricctl uninstall --export</code>, encrypt, then <code>fabricctl restore</code>.</p>
+<h3>2a. Unlock with a YubiKey (FIDO2)</h3>
+<pre>sudo apt install fido2-tools
+sudo systemd-cryptenroll --fido2-device=auto /dev/sdX2     # touch the key; --fido2-with-client-pin=yes adds its PIN
+sudo systemd-cryptenroll /dev/sdX2                         # lists: password + fido2</pre>
+<pre>fabricdata  UUID=&lt;luks-partition-uuid&gt;  none  luks,discard,fido2-device=auto</pre>
+<p class="muted small">Enrol a second YubiKey for your safe the same way. Remove one: <code>sudo systemd-cryptenroll --wipe-slot=&lt;slot&gt; /dev/sdX2</code>.</p>
+<h3>2b. Unlock with the USB stick</h3>
+<p>Add the stick in fabric <strong>first</strong> (Unlock methods → Add a USB stick erases it), then put a LUKS key file beside fabric's <code>fabric-vault/</code> folder:</p>
+<pre>sudo mount /dev/disk/by-label/FABRIC-KEY /mnt
+sudo dd if=/dev/urandom of=/mnt/luks.key bs=64 count=1 &amp;&amp; sudo chmod 0400 /mnt/luks.key
+sudo cryptsetup luksAddKey /dev/sdX2 /mnt/luks.key
+sudo blkid -s UUID -o value /dev/disk/by-label/FABRIC-KEY   # the stick's UUID
+sudo umount /mnt</pre>
+<pre>fabricdata  UUID=&lt;luks-partition-uuid&gt;  /luks.key:UUID=&lt;stick-uuid&gt;  luks,discard,keyfile-timeout=30s</pre>
+<p class="muted small">Without the stick the boot asks for the passphrase after 30 s. Adding the stick to fabric again erases it: add the key file again afterwards.</p>
+<h3>3. Check</h3>
+<p>Reboot; <code>lsblk -f</code> shows the volume open and mounted; <code>sudo fabricctl doctor</code> passes. Then reboot without the key or stick: the boot must stop at the passphrase prompt.</p>
+</section>
+
 {% elif view == 'secrets' %}
 <section class="card"><h2>fabric's own secrets</h2>
 {% if s.secrets %}<p><span class="light ok"></span> In OpenBao at <code>fabric/secrets</code> · version {{ s.secrets.version }} · updated {{ s.secrets.updated }}</p>
@@ -718,7 +757,7 @@ TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dns:
              "dirsrv": ("devices:read", "people:read"), "freeradius": ("radius:read",),
              "openbao": ("vault:status",)}
 MENU_PERMS = {"sign": "pki:sign", "issue": "pki:issue", "convert": "pki:issue", "people": "people:read",
-              "devices": "devices:read", "roles": "devices:read", "unlock": "vault:status"}
+              "devices": "devices:read", "roles": "devices:read", "unlock": "vault:status", "disk": "vault:status"}
 
 
 def _render(name, **kw):
@@ -771,7 +810,7 @@ def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host
             add_live=None):
     """status: vault_status(); slots: list_slots(); devices: detect_devices().
     live: whether slot changes are available (False shows them disabled)."""
-    section = view if view in ("status", "secrets") else "unlock"
+    section = view if view in ("status", "secrets", "disk") else "unlock"
     return _render("openbao", ctx=ctx, tab="openbao", s=status, view=view, section=section, sections=OPENBAO_SECTIONS,
                    slots=list(slots), devices=devices or {"tokens": [], "disks": []}, slot_types=SLOT_TYPES,
                    slot_id=slot_id, host=host, live=live, msg=msg, err=err,

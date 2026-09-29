@@ -506,44 +506,18 @@ The web UI gains a Secrets section (browse/edit `apps/`, rotate, issue SSH
 certs) through fabric-agent, which talks to OpenBao with its own AppRole —
 the webui container still holds no secrets itself.
 
-## 7d. Disk encryption: LUKS unlocked by a security key (decided, D18)
+## 7d. Disk encryption: LUKS unlocked by a security key (decided, D18 — revised)
 
-Several secrets still live in plain files: `fabric-secrets.yml` (until it moves
-into OpenBao), Step-CA's intermediate key password, and every rendered config.
-A stolen SD card or NVMe drive exposes them. The layer that closes this is the
-host's disk encryption. fabric **checks and guides** it; it does not
-repartition or encrypt disks itself (a one-time job with data at risk).
-
-- **Layout (recommended, documented in a guide):** OS unencrypted; `/opt` and
-  `/etc/fabric` on a LUKS2 volume. It is unlocked at boot by a FIDO2 security key
-  (`systemd-cryptenroll --fido2-device=auto`, any YubiKey 5 or FIDO2 key),
-  with a second key and an offline recovery key as further slots.
-  `fido2-with-client-pin=no` + `fido2-with-user-presence=no` make an
-  unattended boot work while the key is plugged in (the same kill-switch
-  model as OpenBao's unlock methods). The same YubiKeys also serve OpenBao
-  (FIDO2 applet for LUKS, PIV applet for the vault: independent).
-- **Data volume vs root:** a data volume unlocks through `crypttab`
-  (`fido2-device=auto`). Root unlock at boot needs `dracut` on Ubuntu 24.04
-  (its initramfs-tools lacks FIDO2), or the older `yubikey-luks`
-  challenge-response.
-- **`fabricctl disk status`:** is fabric's data on LUKS, which slots exist
-  (passphrase, FIDO2, recovery), crypttab options, whether the boot path
-  can unlock it.
-- **`fabricctl disk enroll-key`** (root, at the console — never via
-  fabric-agent or the web UI): a guarded `systemd-cryptenroll`.
-  - It only adds slots, asking for the existing passphrase at a hidden prompt.
-  - It offers a recovery key first, then does a test unlock with the key alone.
-  - It never removes the last passphrase or recovery slot.
-  - FIDO2 enrolment needs a touch on the key, i.e. someone at the host,
-    which is another reason it is not a remote action.
-- **Why not fabric-agent:** its job is a narrow, fixed API for fabric's own
-  services. Enrolling a LUKS key needs the disk's master credential typed in,
-  and a mistake can make the host unbootable. The web UI and doctor only
-  **report** the state ("fabric's data is encrypted, unlocked by a FIDO2
-  key" or a warning), with the guide linked.
-- **Also follow-ups:** Step-CA's intermediate key on the security key
-  (step-ca supports YubiKey PIV-backed keys), so issuing certificates needs
-  the token too.
+Owner decision (2026-09-29): **fabric does not set up disk encryption.**
+People do it themselves, once, at the console; fabric documents how, in the
+web UI (OpenBao → Disk encryption) and in
+[disk-encryption.md](../disk-encryption.md): a LUKS2 data volume for `/opt`
+and `/etc/fabric`, unlocked by the **same YubiKey** (its FIDO2 application,
+`systemd-cryptenroll`; OpenBao uses its PIV application) or the **same USB
+stick** (a LUKS key file beside fabric's `fabric-vault/` folder, read by
+`/etc/crypttab`), always with a passphrase slot and a header backup. The
+planned `fabricctl disk` commands, doctor check and Overview light are
+dropped. The guide is untested with hardware.
 
 ## 7e. Access control for people: RBAC across the stack (decided, D19; built)
 
@@ -648,7 +622,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabricd`, `fabric-admins` group, no docker group) and the Fabric UI container; one repo, two artifacts (§1a) |
 | D15 ✅ | Setup UX | Default change list → Proceed / Advanced; everything settable in `vars.yaml`; `--non-interactive` (§1b) |
 | D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
-| D18 ✅ | Disk encryption | LUKS2 for `/opt` + `/etc/fabric`, unlocked by FIDO2 security keys; fabric checks (`disk status`, doctor, UI) and enrols at the console (`fabricctl disk enroll-key`), never via fabric-agent; no automatic repartitioning (§7d) |
+| D18 ✅ | Disk encryption | Done by people themselves: fabric ships a manual guide (web UI + docs/disk-encryption.md) for LUKS2 with the same YubiKey (FIDO2) or USB stick; no `fabricctl disk` (§7d, revised 2026-09-29) |
 | D17 ✅ | How OpenBao is unlocked | Key slots (local file, USB sticks, PKCS#11 security keys, KMIP HSMs); any one enabled slot unlocks; handled on the host by fabric-unlock; vendor-neutral (§7c) |
 | D16 ✅ | Where Kea registers DHCP hostnames | A separate dynamic subzone per DHCP scope (`dhcp.<domain>`, per-VLAN subzones with 802.1X); never the rendered zones (§5) |
 | D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
