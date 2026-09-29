@@ -7,7 +7,7 @@ from fabriclib.pki.common.valid_days import DEFAULT_MAX_DAYS
 def ca_summary(v):
     """The CA certificates (subject, validity, fingerprint), where devices
     fetch them, and the signing limits the web UI enforces."""
-    out = {"certs_url": f"http://{v.get('hostname_certs', '')}/", "max_days": int(v.get("pki_manual_max_days")
+    out = {"domain": v.get("domain", ""), "certs_url": f"http://{v.get('hostname_certs', '')}/", "max_days": int(v.get("pki_manual_max_days")
                                                                                  or DEFAULT_MAX_DAYS)}
     for label, path in zip(("root", "intermediate"), ca_files(v)):
         with open(path) as f:

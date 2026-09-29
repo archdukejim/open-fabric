@@ -282,7 +282,9 @@ ldap_groups:
   { 'name': 'groups', 'description': 'Security Groups' },
   { 'name': 'admins', 'description': 'Privileged accounts', 'parent': 'accounts', 'uid_range': '1101-1999' },
   { 'name': 'users', 'description': 'Regular User accounts', 'parent': 'accounts', 'uid_range': '5001-50000' },
-  { 'name': 'hosts', 'description': 'Computer objects', 'uid_range': '2000-4900' }
+  { 'name': 'hosts', 'description': 'Computer objects', 'uid_range': '2000-4900' },
+  { 'name': 'devices', 'description': 'Network devices (fabric device RBAC)' },
+  { 'name': 'device-roles', 'description': 'What member devices may do (fabric device RBAC)' }
 ] %}
 {% set _merged_ous = (ldap_organizational_units | default([]) + default_ldap_ous) | unique(attribute='name') | list %}
 ldap_organizational_units:

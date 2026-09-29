@@ -18,7 +18,6 @@ TABS = [
 ]
 PLACEHOLDERS = {
     "kea": ("Kea DHCP", "Subnets and pools, reservations, active leases, and DHCP-driven DNS updates into BIND9."),
-    "dirsrv": ("389 Directory Server", "Users, groups and organisational units; role accounts; password policy."),
     "freeradius": ("FreeRADIUS 802.1X", "Network access: EAP-TLS device certificates, MAC authentication, "
                                        "VLAN assignment, switches and access points (NAS clients)."),
     "openbao": ("OpenBao", "Seal status and unseal methods (key file, USB key, KMIP, PKCS#11), secrets engines, "
@@ -26,6 +25,8 @@ PLACEHOLDERS = {
 }
 # BIND9 tab sections: (view, label)
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
+# 389-DS tab sections: (view, label)
+DIRSRV_SECTIONS = [("devices", "Devices"), ("roles", "Roles"), ("people", "People")]
 # Step-CA tab sub-menu: (view, label)
 STEPCA_MENU = [("ca", "Certificate authority"), ("sign", "Sign a CSR"), ("issue", "New key + certificate"),
                ("inspect", "Inspect"), ("convert", "Convert"), ("issued", "Issued")]
@@ -203,7 +204,136 @@ _TEMPLATES = {
 </form>
 {% endblock %}""",
 
-    "stepca": """{% extends "base" %}{% block body %}
+    "dirsrv": """{% extends "base" %}{% from "dirsrv_macros" import device_fields, role_fields with context %}{% block body %}
+<h1>389-DS · Directory</h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+<nav class="sections">
+{% for id, label in sections %}<a href="/dirsrv?view={{ id }}" class="section{{ ' active' if id == section }}">{{ label }}</a>{% endfor %}
+</nav>
+{% if unavailable %}<section class="card"><p class="flash bad">The directory could not be read: {{ unavailable }}</p></section>
+
+{% elif view == 'devices' %}
+<section class="card"><h2>Devices <span class="muted">{{ data.devices | length }}</span></h2>
+<p class="muted">What a device may do comes from its roles. A disabled device gets nothing, whatever its roles say.</p>
+{% if data.devices %}
+<table><thead><tr><th></th><th>Device</th><th>Type</th><th>MAC</th><th>Owner</th><th>Roles</th><th>Access</th></tr></thead><tbody>
+{% for d in data.devices %}
+<tr><td><span class="light {{ 'ok' if d.enabled else 'bad' }}" role="img" aria-label="{{ 'enabled' if d.enabled else 'disabled' }}" title="{{ 'enabled' if d.enabled else 'disabled' }}"></span></td>
+<td><a href="/dirsrv?view=device&name={{ d.name | urlencode }}"><strong>{{ d.name }}</strong></a>{% if d.description %}<div class="muted small">{{ d.description }}</div>{% endif %}</td>
+<td>{{ d.type }}</td><td><code class="small">{{ d.macs | join(' ') or '—' }}</code></td><td>{{ d.owner or '—' }}</td>
+<td>{{ d.roles | join(', ') or '—' }}</td>
+<td class="small">{% if not d.enabled %}<span class="bad-text">disabled</span>{% else %}{% if d.vlan %}VLAN {{ d.vlan }} · {% endif %}{{ d.permissions | length }} permission{{ '' if d.permissions | length == 1 else 's' }}{% endif %}{% if d.certs %} · {{ d.certs | length }} cert{{ '' if d.certs | length == 1 else 's' }}{% endif %}</td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="blank">No devices yet.</p>{% endif %}
+</section>
+<section class="card"><h2>Add a device</h2>
+{% set d = {'enabled': True, 'roles': [], 'macs': [], 'type': 'laptop'} %}
+<form method="post" action="/dirsrv/devices/_new" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Name<input name="name" required pattern="[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?" placeholder="jims-laptop"></label>
+{{ device_fields(d) }}
+<div><button>Add device</button></div>
+</form></section>
+
+{% elif view == 'device' %}
+{% set d = device %}
+<p><a href="/dirsrv?view=devices">← Devices</a></p>
+<section class="card"><h2><span class="light {{ 'ok' if d.enabled else 'bad' }}"></span> {{ d.name }}</h2>
+<dl class="kv"><dt>Roles</dt><dd>{{ d.roles | join(', ') or '—' }}</dd>
+<dt>VLAN</dt><dd>{{ d.vlan or '—' }}{% if d.vlan %} <span class="muted">(from role {{ d.vlan_from }})</span>{% endif %}</dd>
+<dt>May</dt><dd>{% for p in d.permissions %}<div>{{ data.permissions[p][0] }} <span class="muted small">· {{ p }}</span></div>{% else %}{{ 'nothing — disabled' if not d.enabled else 'nothing (no role grants anything)' }}{% endfor %}</dd></dl>
+</section>
+<section class="card"><h2>Edit</h2>
+<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+{{ device_fields(d) }}
+<div><button>Save</button></div>
+</form></section>
+<section class="card"><h2>Certificates</h2>
+<p class="muted">Certificates issued to this device (by SHA-256 fingerprint). 802.1X EAP-TLS will accept these for this device.</p>
+{% if d.certs %}<table><tbody>{% for fp in d.certs %}
+<tr><td><code class="fp small">{{ fp }}</code></td><td class="num"><form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}/certs/unlink">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="sha256" value="{{ fp }}"><button class="danger">Unlink</button></form></td></tr>
+{% endfor %}</tbody></table>{% else %}<p class="blank">None linked.</p>{% endif %}
+<p><a class="btn" href="/stepca?view=issue&device={{ d.name | urlencode }}">Generate key + certificate</a>
+<a class="btn" href="/stepca?view=sign&device={{ d.name | urlencode }}">Sign its CSR</a></p>
+</section>
+<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}/delete" class="card apply">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete device</button>
+<span class="muted">Removes it from every role. Its certificates stay valid until they expire.</span></form>
+
+{% elif view == 'roles' %}
+<section class="card"><h2>Roles <span class="muted">{{ data.roles | length }}</span></h2>
+<p class="muted">A role grants its devices permissions and, optionally, a VLAN. With several roles, permissions add up and the VLAN comes from the role with the lowest priority number.</p>
+{% if data.roles %}
+<table><thead><tr><th>Role</th><th>Priority</th><th>VLAN</th><th>Grants</th><th>Devices</th></tr></thead><tbody>
+{% for r in data.roles %}
+<tr><td><a href="/dirsrv?view=role&name={{ r.name | urlencode }}"><strong>{{ r.name }}</strong></a>{% if r.description %}<div class="muted small">{{ r.description }}</div>{% endif %}</td>
+<td>{{ r.priority }}</td><td>{{ r.vlan or '—' }}</td><td class="small">{{ r.permissions | join(', ') or '—' }}</td><td>{{ r.members | length }}</td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="blank">No roles yet.</p>{% endif %}
+</section>
+<section class="card"><h2>New role</h2>
+<form method="post" action="/dirsrv/roles/_new" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Name<input name="name" required pattern="[a-z0-9][a-z0-9_-]{0,62}" placeholder="iot"></label>
+{{ role_fields({'permissions': [], 'priority': 100}) }}
+<div><button>Create role</button></div>
+</form></section>
+
+{% elif view == 'role' %}
+{% set r = role %}
+<p><a href="/dirsrv?view=roles">← Roles</a></p>
+<section class="card"><h2>{{ r.name }}</h2>
+<p class="muted">Devices: {% for m in r.members %}<a href="/dirsrv?view=device&name={{ m | urlencode }}">{{ m }}</a>{{ ', ' if not loop.last }}{% else %}none{% endfor %} — add or remove devices from each device's page.</p>
+<form method="post" action="/dirsrv/roles/{{ r.name | urlencode }}" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+{{ role_fields(r) }}
+<div><button>Save</button></div>
+</form></section>
+<form method="post" action="/dirsrv/roles/{{ r.name | urlencode }}/delete" class="card apply">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete role</button>
+<span class="muted">Only possible once no device is in it.</span></form>
+
+{% elif view == 'people' %}
+<section class="card"><h2>People <span class="muted">{{ people.users | length }}</span></h2>
+<p class="muted">Managed in Keycloak (sign-up, passwords, two-factor), which writes them here. Read-only on this page. <a href="{{ people.keycloak_url }}">Open the Keycloak admin console</a></p>
+{% if people.users %}
+<table><thead><tr><th></th><th>User</th><th>Name</th><th>E-mail</th><th>Groups</th></tr></thead><tbody>
+{% for u in people.users %}<tr><td><span class="light {{ 'bad' if u.locked else 'ok' }}" title="{{ 'locked' if u.locked else 'active' }}"></span></td>
+<td>{{ u.uid }}</td><td>{{ u.name }}</td><td>{{ u.mail or '—' }}</td><td>{{ u.groups | join(', ') or '—' }}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="blank">No users.</p>{% endif %}
+</section>
+<section class="card"><h2>Groups</h2>
+<table><thead><tr><th>Group</th><th>Members</th></tr></thead><tbody>
+{% for g in people.groups %}<tr><td>{{ g.name }}</td><td>{{ g.members }}</td></tr>{% endfor %}
+</tbody></table></section>
+{% endif %}
+{% endblock %}""",
+
+    "dirsrv_macros": """{% macro device_fields(d) %}
+<label>Type<select name="type">{% for t in data.types %}<option{{ ' selected' if t == d.type }}>{{ t }}</option>{% endfor %}</select></label>
+<label>Owner (username, optional)<input name="owner" value="{{ d.owner or '' }}" placeholder="jim"></label>
+<label class="wide">MAC addresses (space or comma separated)<input name="macs" value="{{ d.macs | join(' ') }}" placeholder="aa:bb:cc:dd:ee:ff"></label>
+<label class="wide">Description<input name="description" value="{{ d.description or '' }}" maxlength="200"></label>
+<fieldset class="wide"><legend>Roles</legend>
+{% for r in data.roles %}<label class="check"><input type="checkbox" name="role_{{ r.name }}" value="1"{{ ' checked' if r.name in d.roles }}> {{ r.name }}</label>{% else %}<span class="muted">No roles yet — <a href="/dirsrv?view=roles">create one</a>.</span>{% endfor %}
+</fieldset>
+<label class="check"><input type="checkbox" name="enabled" value="1"{{ ' checked' if d.enabled }}> Enabled</label>
+{% endmacro %}
+{% macro role_fields(r) %}
+<label>Priority (lower wins)<input name="priority" inputmode="numeric" value="{{ r.priority }}"></label>
+<label>VLAN (optional)<input name="vlan" inputmode="numeric" value="{{ r.vlan or '' }}" placeholder="30"></label>
+<label class="wide">Description<input name="description" value="{{ r.description or '' }}" maxlength="200"></label>
+<fieldset class="wide"><legend>Grants</legend>
+{% for p, info in data.permissions.items() %}<label class="check perm"><input type="checkbox" name="perm_{{ p }}" value="1"{{ ' checked' if p in r.permissions }}> {{ info[0] }} <span class="muted small">· enforced by {{ info[1] }} once installed</span></label>{% endfor %}
+</fieldset>
+{% endmacro %}""",
+
+    "stepca": """{% extends "base" %}
+{% macro device_select() %}{% if devices %}<label>For device (optional — links the certificate to it)<select name="device"><option value="">—</option>{% for d in devices %}<option{{ ' selected' if d.name == device }}>{{ d.name }}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
+{% block body %}
 <h1>Step-CA · PKI</h1>
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 <nav class="subtabs">
@@ -232,6 +362,7 @@ _TEMPLATES = {
 {% else %}
 <form method="post" action="/stepca/sign" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="csr" value="{{ review.pem }}">
+{{ device_select() }}
 <label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
 <div><button>Sign certificate</button></div>
 </form>
@@ -243,7 +374,7 @@ _TEMPLATES = {
 <section class="card"><h2>Sign a certificate signing request</h2>
 <p class="muted">For devices that make their own key (switches, printers, appliances, Windows <code>certreq</code>, <code>openssl req</code>). The private key never leaves the device.</p>
 <form method="post" action="/stepca/sign/review" enctype="multipart/form-data" class="stack">
-<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="device" value="{{ device }}">
 <label>Upload a CSR (.csr, .req, .pem or DER)<input type="file" name="csr_file" accept=".csr,.req,.pem,.der,.txt"></label>
 <label>…or paste it<textarea name="csr" rows="8" placeholder="-----BEGIN CERTIFICATE REQUEST-----"></textarea></label>
 <div><button>Review</button></div>
@@ -254,7 +385,8 @@ _TEMPLATES = {
 <p class="muted">For devices that cannot make a CSR. The key is generated here, shown once for download (PEM and a password-protected .p12) and not kept.</p>
 <form method="post" action="/stepca/issue" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
-<label>Name (CN)<input name="cn" required placeholder="printer.home.arpa"></label>
+<label>Name (CN)<input name="cn" required placeholder="printer.home.arpa" value="{{ (device ~ ('.' ~ ca.domain if ca and ca.domain else '')) if device else '' }}"></label>
+{{ device_select() }}
 <label class="wide">Other names (DNS, IP, e-mail; comma or space separated)<input name="sans" placeholder="printer, 192.168.1.40"></label>
 <label>Key type<select name="key_type">{% for k in key_types %}<option{{ ' selected' if k == 'RSA-2048' }}>{{ k }}</option>{% endfor %}</select></label>
 <label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
@@ -316,6 +448,7 @@ _TEMPLATES = {
 
     "pki_result": """{% extends "base" %}{% block body %}
 <h1>{{ title }}</h1>
+{% if r.device %}<p class="flash ok">Linked to device <a href="/dirsrv?view=device&name={{ r.device | urlencode }}">{{ r.device }}</a>.</p>{% endif %}
 {% if r.key %}<p class="flash warn">This page is the only copy of the private key. It is not stored anywhere — download it now.</p>{% endif %}
 <section class="card"><h2>{{ r.info.subject }}</h2>
 <dl class="kv"><dt>Names</dt><dd>{{ r.info.sans | join(', ') or '—' }}</dd><dt>Key</dt><dd>{{ r.info.key }}</dd>
@@ -400,9 +533,19 @@ def bind9(ctx, section, zones, zone=None, types=(), msg="", err="", tsig_keys=No
                    tsig_scopes=TSIG_SCOPES, tsig_any_types=TSIG_ANY_TYPES)
 
 
-def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err=""):
+def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err="", devices=None, device=""):
+    """devices: directory devices a certificate can be linked to (sign/issue)."""
     return _render("stepca", ctx=ctx, tab="stepca", view=view, menu=STEPCA_MENU, ca=ca, issued=issued,
-                   review=review, inspected=inspected, err=err, key_types=KEY_TYPES)
+                   review=review, inspected=inspected, err=err, key_types=KEY_TYPES, devices=devices or [],
+                   device=device)
+
+
+def dirsrv(ctx, view, data=None, people=None, device=None, role=None, msg="", err="", unavailable=""):
+    """view: devices | device | roles | role | people. data: device_overview()."""
+    section = {"device": "devices", "role": "roles"}.get(view, view)
+    return _render("dirsrv", ctx=ctx, tab="dirsrv", view=view, section=section, sections=DIRSRV_SECTIONS,
+                   data=data or {"devices": [], "roles": [], "types": [], "permissions": {}}, people=people,
+                   device=device, role=role, msg=msg, err=err, unavailable=unavailable)
 
 
 def _b64(text):
@@ -469,12 +612,12 @@ main{max-width:1100px;margin:0 auto;padding:16px}
 footer{max-width:1100px;margin:0 auto;padding:16px;color:var(--muted);font-size:13px}
 h1{font-size:22px;margin:8px 0 12px}h2{font-size:16px;margin:0 0 12px}
 a{color:var(--accent)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin:0 0 16px;overflow-x:auto}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin:0 0 16px;overflow-x:auto;overflow-y:hidden}
 .narrow{max-width:520px;margin:48px auto}
 .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 .tile{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px}
 .tile-head{display:flex;align-items:center;gap:10px}
-.light{flex:none;width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.light{display:inline-block;vertical-align:middle;flex:none;width:10px;height:10px;border-radius:50%;background:var(--muted)}
 .light.ok{background:var(--ok);box-shadow:0 0 6px var(--ok)}.light.warn{background:var(--warn);box-shadow:0 0 6px var(--warn)}
 .light.bad{background:var(--bad);box-shadow:0 0 6px var(--bad)}
 .bad-text{color:var(--bad)}.warn-text{color:var(--warn)}
@@ -516,10 +659,11 @@ details{margin-top:8px}summary{cursor:pointer;color:var(--accent)}
 .btn{display:inline-block;padding:4px 12px;border:1px solid var(--accent);border-radius:6px;text-decoration:none}
 button.ghost{background:transparent;color:var(--accent);padding:2px 10px}
 .row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
-.sections{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 0 16px;overflow-x:auto}
+.sections{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:0 0 16px;overflow-x:auto;overflow-y:hidden}
 .section{flex:none;padding:8px 12px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .section:hover{color:var(--text)}.section.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
 .picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
 .small{font-size:12px}
+label.perm{flex-basis:100%}
 .devbanner{margin:0;padding:8px 16px;text-align:center;font-weight:600;background:#b45309;color:#fff}
 """

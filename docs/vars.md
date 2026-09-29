@@ -762,6 +762,7 @@ Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif
 | `cn=user_creator_admin` | `ldap_user_creator_password` |
 | `cn=user_modifier_admin` | `ldap_user_modifier_password` |
 | `cn=keycloak_admin` | `ldap_keycloak_password` |
+| `cn=device_admin` | `ldap_device_admin_password` — used by fabric-agent for the web UI's devices and device roles; may change only `ou=devices` and `ou=device-roles` |
 
 `cn=Directory Manager` uses `ldap_admin_password`.
 

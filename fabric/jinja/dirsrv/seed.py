@@ -7,6 +7,8 @@ Run inside the dirsrv container:  python3 /seed/seed.py /seed/*.ldif
 * `changetype: modify` records are applied only for attributes whose current
   values differ (case-insensitive), so re-running is a no-op.
 * `replace: userPassword` is skipped when the password already binds.
+* `add: attributeTypes` / `objectClasses` on cn=schema are compared by OID
+  (the server rewrites definitions), so a definition is added once.
 * Prints RESTART_REQUIRED if anything under cn=config changed.
 
 Binds as Directory Manager over LDAPI (a local socket, counted as a secure
@@ -14,6 +16,7 @@ channel), using DS_DM_PASSWORD from the container environment.
 """
 import base64
 import os
+import re
 import sys
 import time
 
@@ -120,6 +123,13 @@ def norm(vals):
     return sorted(v.strip().lower() for v in vals)
 
 
+OID_RE = re.compile(r"^\(\s*([0-9.]+)")
+
+
+def oids(vals):
+    return {m.group(1) for m in (OID_RE.match(v.strip()) for v in vals) if m}
+
+
 def main(paths):
     conn = bind_dm()
     added = modified = 0
@@ -155,6 +165,11 @@ def main(paths):
                         elif norm(have) == norm(values):
                             continue
                         changes.append((ldap.MOD_REPLACE, attr, [v.encode() for v in values]))
+                    elif op == "add" and dn.lower() == "cn=schema":
+                        known = oids(have)
+                        missing = [v for v in values if not oids([v]) <= known]
+                        if missing:
+                            changes.append((ldap.MOD_ADD, attr, [v.encode() for v in missing]))
                     elif op == "add":
                         missing = [v for v in values if v.strip().lower() not in norm(have)]
                         if missing:

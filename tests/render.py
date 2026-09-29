@@ -17,7 +17,7 @@ env = jinja_env(os.path.join(REPO, 'fabric', 'jinja'))
 secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
                ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
-               ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1',
+               ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1', ldap_device_admin_password='Da1',
                webui_oidc_secret='OidcSecret1',
                tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA==',
                              'dev1': 'ZGV2MS1zZWNyZXQ=', 'lonely': 'bG9uZWx5LXNlY3JldA=='})

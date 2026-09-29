@@ -105,13 +105,13 @@ def describe_csr(actor, csr):
     return _call("POST", "/v1/pki/describe-csr", {"actor": actor, "csr": csr})
 
 
-def sign_csr(actor, csr, days):
-    return _call("POST", "/v1/pki/sign", {"actor": actor, "csr": csr, "days": days}, timeout=120)
+def sign_csr(actor, csr, days, device=""):
+    return _call("POST", "/v1/pki/sign", {"actor": actor, "csr": csr, "days": days, "device": device}, timeout=120)
 
 
-def issue_key_pair(actor, cn, sans, key_type, days):
+def issue_key_pair(actor, cn, sans, key_type, days, device=""):
     return _call("POST", "/v1/pki/issue", {"actor": actor, "cn": cn, "sans": sans, "key_type": key_type,
-                                           "days": days}, timeout=180)
+                                           "days": days, "device": device}, timeout=180)
 
 
 def inspect_pem(actor, data):
@@ -141,6 +141,38 @@ def rotate_tsig_key(actor, name):
 
 def delete_tsig_key(actor, name):
     return _call("POST", f"/v1/tsig/{_q(name)}/delete", {"actor": actor})
+
+
+def device_overview():
+    return _call("GET", "/v1/devices")
+
+
+def list_people():
+    return _call("GET", "/v1/people")
+
+
+def save_device(actor, name, fields, new=False):
+    if new:
+        return _call("POST", "/v1/devices", {"actor": actor, "name": name, "fields": fields})
+    return _call("POST", f"/v1/devices/{_q(name)}", {"actor": actor, "fields": fields})
+
+
+def delete_device(actor, name):
+    return _call("POST", f"/v1/devices/{_q(name)}/delete", {"actor": actor})
+
+
+def link_device_cert(actor, name, sha256, link=True):
+    return _call("POST", f"/v1/devices/{_q(name)}/certs", {"actor": actor, "sha256": sha256, "link": link})
+
+
+def save_role(actor, name, fields, new=False):
+    if new:
+        return _call("POST", "/v1/roles", {"actor": actor, "name": name, "fields": fields})
+    return _call("POST", f"/v1/roles/{_q(name)}", {"actor": actor, "fields": fields})
+
+
+def delete_role(actor, name):
+    return _call("POST", f"/v1/roles/{_q(name)}/delete", {"actor": actor})
 
 
 def audit(actor, action, detail):

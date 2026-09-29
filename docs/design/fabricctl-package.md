@@ -240,9 +240,14 @@ thin bootstrap into `fabricctl setup`.
   (and should not).
 - **MAB** (MAC auth bypass) for printers/IoT, keyed off Kea reservations —
   a device reserved in DHCP can be admitted to its VLAN by MAC.
-- **Dynamic VLANs:** LDAP group → `Tunnel-Private-Group-Id` mapping
-  (`vlans:` in `fabric.yaml`), so group membership in 389-DS/Keycloak
-  decides the network segment. CoA/Disconnect for quarantine from the UI.
+- **Dynamic VLANs and access (built: device RBAC in 389-DS):** devices
+  live in `ou=devices` and belong to roles in `ou=device-roles`. A role
+  grants permissions (`network:eap-tls`, `network:mab`, …) and optionally a
+  VLAN (lowest priority number wins). FreeRADIUS looks the device up by
+  certificate fingerprint (EAP-TLS) or MAC (MAB), refuses disabled devices
+  and devices without the permission, and returns the role's VLAN as
+  `Tunnel-Private-Group-Id`. People stay in Keycloak. CoA/Disconnect for
+  quarantine from the UI.
 
 ## 7. Web UI as the single pane
 

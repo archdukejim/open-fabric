@@ -339,8 +339,31 @@ class Handler(BaseHTTPRequestHandler):
             ca = actions.ca_summary()
         except (actions.AgentError, actions.ValidationError):
             ca = None
+        devices = []
+        if view in ("sign", "issue"):
+            try:                                # linking to a device is optional; the directory may be down
+                devices = actions.device_overview()["devices"]
+            except (actions.AgentError, actions.ValidationError):
+                pass
         issued = actions.list_issued() if view == "issued" else None
-        return self.send(status, views.stepca(ctx, view, ca, issued=issued, **extra))
+        return self.send(status, views.stepca(ctx, view, ca, issued=issued, devices=devices, **extra))
+
+    def dirsrv_page(self, ctx, query, status=200):
+        view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
+        kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}
+        try:
+            if view == "people":
+                return self.send(status, views.dirsrv(ctx, view, people=actions.list_people(), **kw))
+            data = actions.device_overview()
+        except (actions.AgentError, actions.ValidationError) as exc:
+            return self.send(status, views.dirsrv(ctx, view, unavailable=str(exc), **kw))
+        if view == "device":
+            kw["device"] = next((d for d in data["devices"] if d["name"] == query.get("name")), None)
+            view = view if kw["device"] else "devices"
+        if view == "role":
+            kw["role"] = next((r for r in data["roles"] if r["name"] == query.get("name")), None)
+            view = view if kw["role"] else "roles"
+        return self.send(status, views.dirsrv(ctx, view, data=data, **kw))
 
     def get(self, sess, path, query):
         ctx = self.ctx(sess)
@@ -349,7 +372,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/bind9":
             return self.bind9_page(ctx, query)
         if path == "/stepca":
-            return self.stepca_page(ctx, query.get("view", "ca"))
+            return self.stepca_page(ctx, query.get("view", "ca"), device=query.get("device", ""))
+        if path == "/dirsrv":
+            return self.dirsrv_page(ctx, query)
         if path.lstrip("/") in views.PLACEHOLDERS:
             return self.send(200, views.placeholder(ctx, path.lstrip("/")))
         if path == "/audit":
@@ -389,6 +414,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.apply_result(self.ctx(sess), ok, output))
         if path.startswith("/stepca/"):
             return self.stepca_post(sess, path[len("/stepca/"):], form)
+        if path.startswith("/dirsrv/"):
+            return self.dirsrv_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[2:]], form)
         if path.startswith("/bind9/tsig/"):
             return self.tsig_post(sess, urllib.parse.unquote(path[len("/bind9/tsig/"):]), form)
         return self.deny(404, "Not found.")
@@ -403,14 +430,14 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if op == "sign/review":
                 req = actions.describe_csr(user, self.upload(form, "csr_file", "csr"))
-                return self.stepca_page(ctx, "sign", review=req)
+                return self.stepca_page(ctx, "sign", review=req, device=form.get("device", ""))
             if op == "sign":
-                result = actions.sign_csr(user, form.get("csr", ""), form.get("days", ""))
+                result = actions.sign_csr(user, form.get("csr", ""), form.get("days", ""), form.get("device", ""))
                 return self.send(200, views.pki_result(ctx, "sign", result))
             if op == "issue":
                 sans = [n for n in re.split(r"[\s,]+", form.get("sans", "")) if n]
                 result = actions.issue_key_pair(user, form.get("cn", ""), sans, form.get("key_type", ""),
-                                                form.get("days", ""))
+                                                form.get("days", ""), form.get("device", ""))
                 return self.send(200, views.pki_result(ctx, "issue", result))
             if op == "inspect":
                 return self.stepca_page(ctx, "inspect",
@@ -420,6 +447,50 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.pki_result(ctx, "convert", result))
         except actions.ValidationError as exc:
             return self.stepca_page(ctx, back, status=400, err=str(exc))
+
+    @staticmethod
+    def device_form(form):
+        return {"type": form.get("type", ""), "owner": form.get("owner", ""), "description": form.get("description", ""),
+                "macs": [m for m in re.split(r"[\s,]+", form.get("macs", "")) if m],
+                "enabled": bool(form.get("enabled")),
+                "roles": [k[5:] for k, val in form.items() if k.startswith("role_") and val]}
+
+    @staticmethod
+    def role_form(form):
+        return {"description": form.get("description", ""), "vlan": form.get("vlan", ""),
+                "priority": form.get("priority", ""),
+                "permissions": [k[5:] for k, val in form.items() if k.startswith("perm_") and val]}
+
+    def dirsrv_post(self, sess, parts, form):
+        """Devices and device roles: each form maps to one fabric-agent call."""
+        user = sess["user"]
+        kind, name, op = (parts + ["", "", ""])[:3]
+        if kind not in ("devices", "roles") or not name:
+            return self.deny(404, "Not found.")
+        listing = {"view": kind}
+        here = {"view": kind[:-1], "name": name}
+        save, delete = ((actions.save_device, actions.delete_device) if kind == "devices"
+                        else (actions.save_role, actions.delete_role))
+        fields = self.device_form(form) if kind == "devices" else self.role_form(form)
+        try:
+            if name == "_new" and not op:
+                created = save(user, form.get("name", ""), fields, new=True)["name"]
+                back, msg = {"view": kind[:-1], "name": created}, f"{created} created."
+            elif op == "delete":
+                delete(user, name)
+                back, msg = listing, f"{name} deleted."
+            elif kind == "devices" and op == "certs":
+                actions.link_device_cert(user, name, form.get("sha256", ""), link=False)
+                back, msg = here, "Certificate unlinked."
+            elif not op:
+                save(user, name, fields)
+                back, msg = here, "Saved."
+            else:
+                return self.deny(404, "Not found.")
+            return self.redirect("/dirsrv?" + urllib.parse.urlencode({**back, "msg": msg}))
+        except actions.ValidationError as exc:
+            back = listing if name == "_new" else here
+            return self.redirect("/dirsrv?" + urllib.parse.urlencode({**back, "err": str(exc)}))
 
     def tsig_post(self, sess, rest, form):
         """TSIG keys for a zone: create, rotate, delete (apply publishes them)."""

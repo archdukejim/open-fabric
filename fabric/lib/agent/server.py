@@ -24,6 +24,10 @@ top of the socket's 0660 root:<webui gid> permissions.
   POST /v1/pki/convert                  {actor, cert, key}
   POST /v1/tsig                         {actor, name, zone, scope, hosts, types, secret}
   POST /v1/tsig/<name>/rotate | /v1/tsig/<name>/delete   {actor}
+  GET  /v1/devices | /v1/people
+  POST /v1/devices {actor, name, fields} | /v1/devices/<name> {actor, fields} | /v1/devices/<name>/delete
+  POST /v1/devices/<name>/certs      {actor, sha256, link}
+  POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
 """
 import argparse
 import json
@@ -52,6 +56,15 @@ from fabriclib.dns.remove_tsig_key import remove_tsig_key  # noqa: E402
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 from fabriclib.dns.rotate_tsig_key import rotate_tsig_key  # noqa: E402
 from fabriclib.dns.zone_detail import zone_detail  # noqa: E402
+from fabriclib.ldap.add_device import add_device  # noqa: E402
+from fabriclib.ldap.add_role import add_role  # noqa: E402
+from fabriclib.ldap.device_overview import device_overview  # noqa: E402
+from fabriclib.ldap.link_device_cert import link_device_cert  # noqa: E402
+from fabriclib.ldap.list_people import list_people  # noqa: E402
+from fabriclib.ldap.remove_device import remove_device  # noqa: E402
+from fabriclib.ldap.remove_role import remove_role  # noqa: E402
+from fabriclib.ldap.update_device import update_device  # noqa: E402
+from fabriclib.ldap.update_role import update_role  # noqa: E402
 from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
 from fabriclib.pki.convert_cert import convert_cert  # noqa: E402
 from fabriclib.pki.describe_csr import describe_csr  # noqa: E402
@@ -141,6 +154,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, list_tsig_keys())
                 if route == ["reverse-zones"]:
                     return self.reply(200, reverse_zones(load_vars()))
+                if route == ["devices"]:
+                    return self.reply(200, device_overview(load_vars()))
+                if route == ["people"]:
+                    return self.reply(200, list_people(load_vars()))
                 return self.reply(404, {"error": "not found"})
 
             data = self.body()
@@ -173,6 +190,8 @@ class Handler(BaseHTTPRequestHandler):
             if len(route) == 3 and route[0] == "tsig" and route[2] == "delete":
                 remove_tsig_key(actor, route[1], source="web")
                 return self.reply(200, {})
+            if route[:1] in (["devices"], ["roles"]):
+                return self.reply(200, self.directory(route, actor, data) or {})
             if route == ["events"]:
                 action = data.get("action")
                 if action not in EVENT_ACTIONS:
@@ -195,15 +214,44 @@ class Handler(BaseHTTPRequestHandler):
         if op == "describe-csr":
             return describe_csr(text(data, "csr"))
         if op == "sign":
-            return sign_csr(load_vars(), actor, text(data, "csr"), data.get("days"))
+            return sign_csr(load_vars(), actor, text(data, "csr"), data.get("days"), text(data, "device"))
         if op == "issue":
             return issue_key_pair(load_vars(), actor, text(data, "cn"), strings(data, "sans"),
-                                  text(data, "key_type"), data.get("days"))
+                                  text(data, "key_type"), data.get("days"), text(data, "device"))
         if op == "inspect":
             return inspect_pem(load_vars(), text(data, "data"))
         if op == "convert":
             return convert_cert(load_vars(), actor, text(data, "cert"), text(data, "key"))
         raise ValidationError("unknown operation")
+
+    @staticmethod
+    def directory(route, actor, data):
+        """Devices and device roles in 389-DS (fabriclib.ldap, as cn=device_admin)."""
+        v = load_vars()
+        kind, rest = route[0], route[1:]
+        add, update, remove = ((add_device, update_device, remove_device) if kind == "devices"
+                               else (add_role, update_role, remove_role))
+        if not rest:
+            return {"name": add(v, actor, text(data, "name"), fields(data), source="web")}
+        if len(rest) == 1:
+            return update(v, actor, rest[0], fields(data), source="web")
+        if rest[1:] == ["delete"]:
+            return remove(v, actor, rest[0], source="web")
+        if kind == "devices" and rest[1:] == ["certs"]:
+            return link_device_cert(v, actor, rest[0], text(data, "sha256"), bool(data.get("link", True)), source="web")
+        raise ValidationError("unknown operation")
+
+
+def fields(data):
+    """A device/role form: text values and lists of text only."""
+    value = data.get("fields") or {}
+    if not isinstance(value, dict) or len(value) > 20:
+        raise ValidationError("fields must be an object")
+    for k, x in value.items():
+        ok = isinstance(x, (str, bool)) or (isinstance(x, list) and len(x) <= 100 and all(isinstance(i, str) for i in x))
+        if not ok:
+            raise ValidationError(f"field {k} has an unsupported value")
+    return value
 
 
 def text(data, field):

@@ -44,7 +44,7 @@ try:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
     check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services healthy" in page, st)
-    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "dirsrv", "freeradius", "openbao"))
+    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "freeradius", "openbao"))
     check("every service tab renders (placeholders)", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
     st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")
@@ -80,6 +80,29 @@ try:
     st, _, _, page = req("POST", "/bind9/tsig/create", {"csrf": "dev", "name": "preview-key", "zone": "home.arpa"})
     check("creating a TSIG key shows its secret and rfc2136.ini once",
           st == 200 and "dns_rfc2136_name = preview-key" in page and 'class="secret"' in page)
+    st, _, _, page = req("GET", "/dirsrv")
+    check("389-DS devices page: devices with status lights, roles and access",
+          st == 200 and "jims-laptop" in page and "VLAN 10" in page and 'class="light bad"' in page)
+    st, _, _, page = req("GET", "/dirsrv?view=device&name=jims-laptop")
+    check("device page: effective permissions and linked certificate",
+          "Join the network with its certificate" in page and "AB:AB:AB" in page and "Generate key + certificate" in page)
+    st, loc, _, _ = req("POST", "/dirsrv/devices/_new", {"csrf": "dev", "name": "nas", "type": "server",
+                                                         "macs": "AA-BB-CC-00-00-01", "role_trusted": "1", "enabled": "1"})
+    page = req("GET", "/dirsrv?view=device&name=nas")[3]
+    check("adding a device (in memory, real validation): MAC normalised, role applied",
+          st == 303 and "aa:bb:cc:00:00:01" in page and "VLAN" in page, (st, loc))
+    st, loc, _, _ = req("POST", "/dirsrv/devices/_new", {"csrf": "dev", "name": "dup", "macs": "aa:bb:cc:00:00:01"})
+    check("a MAC already in use is refused with the reason", "already+belongs" in (loc or "") or "already%20belongs" in (loc or ""), loc)
+    st, loc, _, _ = req("POST", "/dirsrv/roles/iot/delete", {"csrf": "dev"})
+    check("a role that still has devices cannot be deleted", "still+has" in (loc or ""), loc)
+    page = req("GET", "/dirsrv?view=roles")[3]
+    check("roles page lists roles with their grants", "quarantine" in page and "network:mab" in page)
+    page = req("GET", "/dirsrv?view=people")[3]
+    check("people page is read-only with a Keycloak link", "jim@home.arpa" in page and "Keycloak admin console" in page
+          and "<form" not in page.split("<main>")[1].split("</main>")[0])
+    page = req("GET", "/stepca?view=issue&device=printer")[3]
+    check("Step-CA generate form offers devices, prefilled from the device page",
+          "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
     st, _, _, page = req("GET", "/preview/denied")
     check("preview of a refused sign-in", st == 403 and "fabric-admin" in page)
 finally:

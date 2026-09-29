@@ -109,6 +109,11 @@ second=$(REPO="$REPO" BASE="$BASE" PW='Other!pw9' python3 "$REPO/tests/dirsrv/ad
 check "re-run leaves an existing user alone" "[ \"\$second\" = exists ]"
 check "re-run did not change the password" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' '$USERDN' 'JimPass!23' | grep -q BOUND"
 
+# ---- device RBAC (fabriclib/ldap device + role operations as cn=device_admin)
+echo "--- devices and roles"
+REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/devices.py" | tee "$W/devices.log"
+PASS=$((PASS + $(grep -c '^PASS' "$W/devices.log"))); FAIL=$((FAIL + $(grep -c '^FAIL' "$W/devices.log")))
+
 echo; echo "$PASS passed, $FAIL failed"
 docker rm -f dstest >/dev/null 2>&1
 exit $FAIL

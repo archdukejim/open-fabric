@@ -1,0 +1,22 @@
+# fabric's own schema: devices and their access roles (RBAC).
+# OID arc 2.25.204492767351757179914238406906488345409 (a UUID OID,
+# ITU-T X.667: needs no registration). .1.x attribute types, .2.x classes.
+# seed.py adds a definition only when its OID is missing; to change one,
+# give it a new OID.
+#
+#   device (structural, cn/owner/description/serialNumber)
+#     + ieee802Device (macAddress)  + fabricDevice (type, enabled, cert fingerprints)
+#   groupOfNames (cn/member/description) + fabricRole (permissions, VLAN, priority)
+dn: cn=schema
+changetype: modify
+add: attributeTypes
+attributeTypes: ( 2.25.204492767351757179914238406906488345409.1.1 NAME 'fabricDeviceType' DESC 'fabric: kind of device (laptop, printer, iot, ...)' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE X-ORIGIN 'fabric' )
+attributeTypes: ( 2.25.204492767351757179914238406906488345409.1.2 NAME 'fabricEnabled' DESC 'fabric: FALSE blocks the device whatever its roles grant' EQUALITY booleanMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE X-ORIGIN 'fabric' )
+attributeTypes: ( 2.25.204492767351757179914238406906488345409.1.3 NAME 'fabricCertFingerprint' DESC 'fabric: SHA-256 fingerprint of a certificate issued to this device' EQUALITY caseIgnoreIA5Match SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 X-ORIGIN 'fabric' )
+attributeTypes: ( 2.25.204492767351757179914238406906488345409.1.4 NAME 'fabricPermission' DESC 'fabric: a permission a role grants its member devices' EQUALITY caseIgnoreMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 X-ORIGIN 'fabric' )
+attributeTypes: ( 2.25.204492767351757179914238406906488345409.1.5 NAME 'fabricVlan' DESC 'fabric: VLAN a role places its member devices on (802.1X)' EQUALITY integerMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 SINGLE-VALUE X-ORIGIN 'fabric' )
+attributeTypes: ( 2.25.204492767351757179914238406906488345409.1.6 NAME 'fabricPriority' DESC 'fabric: lower wins when roles set different VLANs' EQUALITY integerMatch ORDERING integerOrderingMatch SYNTAX 1.3.6.1.4.1.1466.115.121.1.27 SINGLE-VALUE X-ORIGIN 'fabric' )
+-
+add: objectClasses
+objectClasses: ( 2.25.204492767351757179914238406906488345409.2.1 NAME 'fabricDevice' DESC 'fabric: a device on the network' SUP top AUXILIARY MAY ( fabricDeviceType $ fabricEnabled $ fabricCertFingerprint ) X-ORIGIN 'fabric' )
+objectClasses: ( 2.25.204492767351757179914238406906488345409.2.2 NAME 'fabricRole' DESC 'fabric: what member devices may do' SUP top AUXILIARY MAY ( fabricPermission $ fabricVlan $ fabricPriority ) X-ORIGIN 'fabric' )

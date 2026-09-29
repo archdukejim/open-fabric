@@ -157,7 +157,7 @@ def apply_deployment(start_services=True):
         changed_secrets = True
         
     for name in ('ldap_super_admin_password', 'ldap_group_admin_password',
-                 'ldap_user_creator_password', 'ldap_user_modifier_password',
+                 'ldap_user_creator_password', 'ldap_user_modifier_password', 'ldap_device_admin_password',
                  'webui_oidc_secret'):
         if name not in secrets:
             # Alphanumeric: safe inside LDIF and JSON without quoting.
@@ -368,7 +368,7 @@ def apply_deployment(start_services=True):
 
     # 389 Directory Server seed data
     if final_vars.get('install_ldap'):
-        for ldif in ['00-config.ldif.j2', '10-tree.ldif.j2', '20-accounts.ldif.j2', '30-aci.ldif.j2']:
+        for ldif in ['00-config.ldif.j2', '05-schema.ldif.j2', '10-tree.ldif.j2', '20-accounts.ldif.j2', '30-aci.ldif.j2']:
             render_file(f'dirsrv/seed/{ldif}', f"dirsrv/seed/{ldif.replace('.j2', '')}")
         shutil.copy(os.path.join(jinja_dir, 'dirsrv/seed.py'), os.path.join(render_tmp, 'dirsrv/seed/seed.py'))
 

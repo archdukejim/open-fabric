@@ -22,11 +22,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from webui import views  # noqa: E402
-try:        # the real PTR rules when run from a checkout; the webui image carries only webui/
+try:        # the real rules when run from a checkout; the webui image carries only webui/
+    from fabriclib.common.errors import ValidationError  # noqa: E402
     from fabriclib.dns.ptr_for_ip import ptr_for_ip  # noqa: E402
     from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
+    from fabriclib.ldap.common.check_device_fields import check_device_fields  # noqa: E402
+    from fabriclib.ldap.common.check_role_fields import check_role_fields  # noqa: E402
+    from fabriclib.ldap.constants import DEVICE_NAME_RE, DEVICE_TYPES, PERMISSIONS, ROLE_NAME_RE  # noqa: E402
+    from fabriclib.ldap.list_devices import list_devices  # noqa: E402
 except ImportError:
-    ptr_for_ip = reverse_zones = None
+    ptr_for_ip = reverse_zones = list_devices = None
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE = {
@@ -48,6 +53,29 @@ SAMPLE = {
               "scope": "_acme-challenge.npm.home.arpa, _acme-challenge.nas.home.arpa", "acls": ["certbot-devices"]},
              {"name": "home.arpa-acme", "algorithm": "hmac-sha256", "types": "TXT",
               "scope": "_acme-challenge (zone home.arpa)", "acls": []}],
+    "directory": {
+        "roles": [{"name": "trusted", "description": "Managed laptops and phones", "priority": 10, "vlan": 10,
+                   "permissions": ["dns:dhcp-register", "network:eap-tls", "pki:acme"], "members": ["jims-laptop", "jims-phone"]},
+                  {"name": "iot", "description": "Cameras, plugs, thermostats", "priority": 50, "vlan": 30,
+                   "permissions": ["dns:dhcp-register", "network:mab"], "members": ["cam-front", "thermostat"]},
+                  {"name": "printers", "description": "", "priority": 60, "vlan": None,
+                   "permissions": ["network:mab", "pki:scep"], "members": ["printer"]},
+                  {"name": "quarantine", "description": "No access; parked devices", "priority": 1, "vlan": 99,
+                   "permissions": [], "members": []}],
+        "devices": [{"name": "jims-laptop", "type": "laptop", "enabled": True, "macs": ["3c:22:fb:10:20:30"],
+                     "owner": "uid=jim,ou=users", "description": "ThinkPad", "certs": [":".join(["AB"] * 32)]},
+                    {"name": "jims-phone", "type": "phone", "enabled": True, "macs": ["f2:11:22:33:44:55"],
+                     "owner": "uid=jim,ou=users", "description": "", "certs": []},
+                    {"name": "cam-front", "type": "camera", "enabled": True, "macs": ["b0:a7:32:00:00:11"],
+                     "owner": "", "description": "Front door", "certs": []},
+                    {"name": "thermostat", "type": "iot", "enabled": False, "macs": ["18:b4:30:aa:bb:cc"],
+                     "owner": "", "description": "Disabled: firmware out of date", "certs": []},
+                    {"name": "printer", "type": "printer", "enabled": True, "macs": ["00:1b:a9:12:34:56"],
+                     "owner": "", "description": "Office laser", "certs": []}]},
+    "people": {"users": [{"uid": "jim", "name": "Jim", "mail": "jim@home.arpa", "locked": False, "groups": ["admins", "users"]},
+                         {"uid": "sam", "name": "Sam", "mail": "sam@home.arpa", "locked": False, "groups": ["users"]}],
+               "groups": [{"name": "admins", "members": 1}, {"name": "users", "members": 2}],
+               "keycloak_url": "https://sso.home.arpa/admin/home.arpa/console/"},
     "issued": [{"when": "2026-09-20T10:12:00", "actor": "dev", "kind": "csr", "subject": "CN=switch-core.home.arpa",
                 "sans": ["switch-core.home.arpa", "192.168.1.2"], "not_after": "Sep 20 10:12:00 2027 GMT",
                 "status": "valid"},
@@ -55,7 +83,7 @@ SAMPLE = {
                 "sans": ["printer.home.arpa"], "not_after": "Oct 15 08:00:00 2026 GMT", "status": "expires soon"}],
 }
 _FP = ":".join(["AB", "12", "CD", "34"] * 8)
-SAMPLE_CA = {"certs_url": "http://certs.home.arpa/", "max_days": 1825,
+SAMPLE_CA = {"domain": "home.arpa", "certs_url": "http://certs.home.arpa/", "max_days": 1825,
              "root": {"subject": "CN=Fabric Root CA,O=Fabric", "not_after": "Sep  1 00:00:00 2046 GMT",
                       "key": "EC prime256v1", "sha256": _FP},
              "intermediate": {"subject": "CN=Fabric Intermediate CA,O=Fabric", "not_after": "Sep  1 00:00:00 2036 GMT",
@@ -114,6 +142,44 @@ class DevState:
         zone, label = ptr_for_ip(value)
         return {"ptr": f"{label}.{zone}" if zone else "", "ptr_note": "" if zone else label}
 
+    def overview(self):
+        if not list_devices:
+            return None
+        d = self.data["directory"]
+        return {"devices": list_devices({}, d), "roles": sorted(d["roles"], key=lambda r: (r["priority"], r["name"])),
+                "types": DEVICE_TYPES, "permissions": {k: list(v) for k, v in PERMISSIONS.items()}}
+
+    def save(self, kind, name, form):
+        """Device/role create or edit, validated by the real fabriclib rules, in memory."""
+        d = self.data["directory"]
+        if kind == "devices":
+            f = check_device_fields({"type": form.get("type"), "owner": form.get("owner"),
+                                     "description": form.get("description"), "enabled": bool(form.get("enabled")),
+                                     "macs": [m for m in form.get("macs", "").replace(",", " ").split() if m],
+                                     "roles": [k[5:] for k in form if k.startswith("role_")]}, d, name)
+            entry = next((x for x in d["devices"] if x["name"] == name), None)
+            if entry is None:
+                if not DEVICE_NAME_RE.match(name) or name == "_new":
+                    raise ValidationError("device name: a host name label — lowercase letters, digits and '-'")
+                entry = {"name": name, "certs": []}
+                d["devices"].append(entry)
+            entry.update(type=f["type"], enabled=f["enabled"], macs=f["macs"], description=f["description"],
+                         owner=f"uid={f['owner']},ou=users" if f["owner"] else "")
+            for r in d["roles"]:
+                r["members"] = [m for m in r["members"] if m != name] + ([name] if r["name"] in f["roles"] else [])
+        else:
+            f = check_role_fields({"description": form.get("description"), "vlan": form.get("vlan"),
+                                   "priority": form.get("priority"),
+                                   "permissions": [k[5:] for k in form if k.startswith("perm_")]})
+            entry = next((x for x in d["roles"] if x["name"] == name), None)
+            if entry is None:
+                if not ROLE_NAME_RE.match(name):
+                    raise ValidationError("role name: lowercase letters, digits, '-' and '_'")
+                entry = {"name": name, "members": []}
+                d["roles"].append(entry)
+            entry.update(f)
+        self.log("DEVICE_SAVE" if kind == "devices" else "ROLE_SAVE", f"{name} (in memory)")
+
     def log(self, action, detail):
         self.data["audit"].insert(0, f"[dev] User: dev (web) | Action: {action} | {detail}\n")
 
@@ -158,7 +224,25 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/stepca":
                 view = query.get("view", "ca")
                 view = view if view in views.STEPCA_VIEWS else "ca"
-                return self.send(200, views.stepca(self.ctx, view, SAMPLE_CA, issued=self.state.data["issued"]))
+                ov = self.state.overview()
+                return self.send(200, views.stepca(self.ctx, view, SAMPLE_CA, issued=self.state.data["issued"],
+                                                   devices=ov["devices"] if ov else [], device=query.get("device", "")))
+            if path == "/dirsrv":
+                view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
+                kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}
+                if view == "people":
+                    return self.send(200, views.dirsrv(self.ctx, view, people=self.state.data["people"], **kw))
+                data = self.state.overview()
+                if data is None:
+                    return self.send(200, views.dirsrv(self.ctx, view, unavailable="dev preview from the image "
+                                                       "has no fabriclib; run it from a checkout", **kw))
+                if view == "device":
+                    kw["device"] = next((d for d in data["devices"] if d["name"] == query.get("name")), None)
+                    view = view if kw["device"] else "devices"
+                if view == "role":
+                    kw["role"] = next((r for r in data["roles"] if r["name"] == query.get("name")), None)
+                    view = view if kw["role"] else "roles"
+                return self.send(200, views.dirsrv(self.ctx, view, data=data, **kw))
             if path.lstrip("/") in views.PLACEHOLDERS:
                 return self.send(200, views.placeholder(self.ctx, path.lstrip("/")))
             if path == "/audit":
@@ -179,6 +263,35 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, views.apply_result(self.ctx, True,
                                                          "DEV PREVIEW — nothing was rendered or reloaded.\n"
                                                          "On a real install this runs `fabricctl --apply`."))
+            if path.startswith("/dirsrv/") and list_devices:
+                kind, name, op = (path.split("/")[2:] + ["", "", ""])[:3]
+                d = self.state.data["directory"]
+                try:
+                    if name == "_new":
+                        name = form.get("name", "").strip().lower()
+                        if any(x["name"] == name for x in d[kind]):
+                            raise ValidationError(f"{name} already exists")
+                        self.state.save(kind, name, form)
+                        back, msg = {"view": kind[:-1], "name": name}, f"{name} created (in memory)."
+                    elif op == "delete":
+                        if kind == "roles" and any(r["members"] for r in d["roles"] if r["name"] == name):
+                            raise ValidationError(f"role {name} still has devices; take them out first")
+                        d[kind] = [x for x in d[kind] if x["name"] != name]
+                        for r in d["roles"]:
+                            r["members"] = [m for m in r["members"] if m != name]
+                        back, msg = {"view": kind}, f"{name} deleted (in memory)."
+                    elif op == "certs":
+                        for x in d["devices"]:
+                            if x["name"] == name:
+                                x["certs"] = [c for c in x["certs"] if c != form.get("sha256")]
+                        back, msg = {"view": "device", "name": name}, "Certificate unlinked (in memory)."
+                    else:
+                        self.state.save(kind, name, form)
+                        back, msg = {"view": kind[:-1], "name": name}, "Saved (in memory)."
+                    return self.send(303, b"", location="/dirsrv?" + urllib.parse.urlencode({**back, "msg": msg}))
+                except ValidationError as exc:
+                    back = {"view": kind} if name == "_new" or op == "delete" else {"view": kind[:-1], "name": name}
+                    return self.send(303, b"", location="/dirsrv?" + urllib.parse.urlencode({**back, "err": str(exc)}))
             if path == "/stepca/sign/review":
                 review = {"pem": SAMPLE_PEM, "subject": SAMPLE_INFO["subject"], "cn": "device.home.arpa",
                           "sans": SAMPLE_INFO["sans"], "key": "RSA 2048", "ca_requested": False, "problems": [],

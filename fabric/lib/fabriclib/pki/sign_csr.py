@@ -4,6 +4,8 @@ import secrets
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
+from fabriclib.ldap.link_device_cert import link_device_cert
+from fabriclib.ldap.require_device import require_device
 from fabriclib.pki.common.artifacts_dir import artifacts_dir
 from fabriclib.pki.common.ca_chain_pem import ca_chain_pem
 from fabriclib.pki.common.describe_cert import describe_cert
@@ -16,16 +18,20 @@ from fabriclib.pki.common.valid_days import valid_days
 from fabriclib.pki.describe_csr import describe_csr
 
 
-def sign_csr(v, actor, csr, days, source="web"):
+def sign_csr(v, actor, csr, days, device="", source="web"):
     """Sign a device's certificate signing request with the Step-CA
     intermediate: a leaf certificate (serverAuth + clientAuth, the CSR's
     names, the fabric subject defaults) valid for `days`. The private key
     never leaves the device. Refuses requests that fail describe_csr's
-    policy. Returns {name, cert, chain, fullchain, der_b64, info}."""
+    policy. With `device`, the certificate is linked to that directory
+    device (checked first). Returns {name, cert, chain, fullchain, der_b64,
+    info, device}."""
     req = describe_csr(csr)
     if req["problems"]:
         raise ValidationError("cannot sign: " + "; ".join(req["problems"]))
     days = valid_days(v, days)
+    if device:
+        require_device(v, device)
     uid, gid = (int(v["service_users"]["step"][k]) for k in ("uid", "gid"))
     name = f"csr-{secrets.token_hex(8)}.csr"
     path = os.path.join(artifacts_dir(v), name)
@@ -46,9 +52,11 @@ def sign_csr(v, actor, csr, days, source="web"):
     if info["is_ca"]:                       # the leaf template never sets CA:TRUE; belt and braces
         raise ValidationError("refusing: the signed certificate would be a CA")
     chain = ca_chain_pem(v)
-    record_issued(actor, "csr", info, source)
+    if device:
+        link_device_cert(v, actor, device, info["sha256"], source=source)
+    record_issued(actor, "csr", dict(info, device=device), source)
     write_audit(actor, "PKI_SIGN_CSR", f"subject={info['subject']} sans={','.join(info['sans'])} "
                                        f"serial={info['serial']} days={days}", source)
     return {"name": safe_name(req["cn"] or req["sans"][0]), "cert": cert, "chain": chain, "fullchain": cert + chain,
             "der_b64": base64.b64encode(openssl("x509", "-outform", "DER", data=cert.encode())).decode(),
-            "info": info}
+            "info": info, "device": device}

@@ -27,7 +27,7 @@ everything else is core.
 | BIND9 · TSIG keys (`/bind9?view=tsig`) | Keys with their effective update rights and ACLs (never secrets). **New TSIG key for a zone**: a forward zone and one scope — certbot DNS-01 for listed hosts, certbot DNS-01 for any host in the zone, or any name with chosen record types; generated secret or an existing one kept. The secret and the `rfc2136.ini` (download) are shown once. **New secret** (rotate) and **Delete**. Apply publishes. ACLs and update policies: placeholder (`fabricctl acl`) |
 | Kea · DHCP (`/kea`) *optional* | Placeholder — left intentionally blank |
 | Step-CA · PKI (`/stepca?view=…`) | Sub-menu: **Certificate authority** (root + intermediate subject, expiry, SHA-256; link to `certs.<domain>`), **Sign a CSR** (upload or paste PEM/DER → review names, key, policy → sign), **New key + certificate** (for devices that cannot make a CSR: RSA-2048/3072/4096 or EC P-256/P-384), **Inspect** (decode a certificate, chain or CSR; says whether this fabric issued it), **Convert** (PEM `.crt`, DER `.cer`, full chain `.pem`/`.p7b`, and with its key a `.p12`), **Issued** (every certificate issued by hand, with expiry status). See [Manual certificates](#manual-certificates) |
-| 389-DS · Directory (`/dirsrv`) | Placeholder — left intentionally blank |
+| 389-DS · Directory (`/dirsrv?view=…`) | **Devices**: list (status light, type, MACs, owner, roles, effective access), add, and a page per device to edit it, see what its roles add up to, manage its linked certificates (issue one from Step-CA, sign its CSR, unlink), delete. **Roles**: what member devices may do (permissions, optional VLAN, priority), add/edit/delete (refused while devices are in it). **People**: users and groups, read-only, with a link to the Keycloak admin console — people are managed in Keycloak. See [Device access (RBAC)](#device-access-rbac) |
 | FreeRADIUS · 802.1X (`/freeradius`) *optional* | Placeholder — left intentionally blank |
 | OpenBao · Secrets (`/openbao`) | Placeholder — left intentionally blank |
 | Apply | fabric-agent runs the same apply as `sudo fabricctl --apply` (`interactive.py --apply`); the output is shown |
@@ -62,6 +62,39 @@ boxes, Windows machines with `certreq`.
 - Signing uses the Step-CA intermediate key through the pinned step image
   (`docker run --network none`), as setup does. The CA key never enters the
   web UI container.
+
+### Device access (RBAC)
+
+People sign up and are managed in **Keycloak**. **389-DS** holds the
+*devices* and what they may do:
+
+- **Device** (`cn=<name>,ou=devices,<base>`): type, MAC addresses (each MAC
+  belongs to one device only), owner (a user), description, enabled flag,
+  and the SHA-256 fingerprints of certificates issued to it.
+- **Role** (`cn=<name>,ou=device-roles,<base>`, a group of devices):
+  permissions, an optional VLAN and a priority.
+- **Effective access** is the union of a device's roles' permissions. The
+  VLAN comes from the role with the lowest priority number. A disabled
+  device gets nothing.
+
+| Permission | Grants | Enforced by (once installed) |
+|---|---|---|
+| `network:eap-tls` | Join the network with its certificate (802.1X EAP-TLS) | FreeRADIUS |
+| `network:mab` | Join the network by MAC address (printers, IoT) | FreeRADIUS |
+| `dns:dhcp-register` | Register its DHCP hostname in the DHCP zone | Kea DHCP-DDNS |
+| `pki:acme` | Obtain and renew certificates by ACME | Step-CA |
+| `pki:scep` | Enrol certificates by SCEP (MDM, network gear) | Step-CA |
+
+Nothing enforces these yet: FreeRADIUS, Kea and SCEP read them when they
+are added. The schema (`dirsrv/seed/05-schema.ldif`) is fabric's own:
+`fabricDevice`, `fabricRole`, OID arc
+`2.25.204492767351757179914238406906488345409`.
+
+The web UI changes the directory through fabric-agent bound as
+**`cn=device_admin`**, which the ACIs allow to change only `ou=devices`
+and `ou=device-roles`. It can read people but not change them, not change
+groups, and never read passwords. Every change is audited
+(`DEVICE_*`, `ROLE_*`).
 
 ---
 
@@ -121,7 +154,7 @@ A compromise of the web app yields only the webui container: uid 912, no capabil
 |---------|--------|
 | Socket access | `agent.sock` is `0660 root:<webui gid>` in a `0750` dir; other host users cannot reach it |
 | Peer check | `SO_PEERCRED` on every connection: only the webui uid and root are accepted (right group, wrong uid → `403`) |
-| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`, `/v1/pki/ca`, `/v1/pki/issued`, `/v1/tsig`, `/v1/reverse-zones`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only), `/v1/pki/{describe-csr,sign,issue,inspect,convert}`, `/v1/tsig`, `/v1/tsig/<name>/{rotate,delete}`. Anything else → `404` |
+| Fixed API | `GET /v1/version`, `/v1/services`, `/v1/zones`, `/v1/zones/<key>`, `/v1/audit`, `/v1/pki/ca`, `/v1/pki/issued`, `/v1/tsig`, `/v1/reverse-zones`, `/v1/devices`, `/v1/people`; `POST /v1/zones/<key>/records`, `/v1/zones/<key>/records/delete`, `/v1/apply`, `/v1/events` (`LOGIN`/`LOGOUT`/`LOGIN_DENIED` only), `/v1/pki/{describe-csr,sign,issue,inspect,convert}`, `/v1/tsig`, `/v1/tsig/<name>/{rotate,delete}`, `/v1/devices`, `/v1/devices/<name>`, `/v1/devices/<name>/{delete,certs}`, `/v1/roles`, `/v1/roles/<name>`, `/v1/roles/<name>/delete`. Anything else → `404` |
 | Validation | Record input validated in `fabriclib/dns/validate_record.py`; actor must match `^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$`; body ≤ 64 KiB |
 | Audit | Every change is written to `/opt/fabric/archive/audit.log` with the acting user |
 | Sandbox | systemd hardening (`NoNewPrivileges`, `ProtectHome`, `ProtectKernel*`, `RestrictNamespaces`, ...); no network listener; IP access limited to localhost + `fabric_subnet` |

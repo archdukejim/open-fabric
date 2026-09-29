@@ -288,7 +288,7 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("overview tab renders service health", st == 200 and "Overview" in body and "services healthy" in body, st)
-for tab in ("kea", "dirsrv", "freeradius", "openbao"):
+for tab in ("kea", "freeradius", "openbao"):
     st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
     check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
@@ -369,6 +369,12 @@ check("convert cert + key -> downloads incl. .p12 and a one-time password",
 st, hd, sc, body = req("POST", "/stepca/issue", POSTH, {"csrf": csrf, "cn": "bad name!", "key_type": "RSA-2048",
                                                         "days": "30"}, cookie=session)
 check("invalid request -> form again with the reason (400)", st == 400 and "not a host name" in body, (st, body[:300]))
+
+# ---- 389-DS tab without a directory container: the page says so, nothing breaks
+st, hd, sc, body = req("GET", "/dirsrv", ALICE, cookie=session)
+check("389-DS tab reports an unreachable directory instead of failing", st == 200 and "could not be read" in body, (st, body[:300]))
+st, hd, sc, body = req("GET", "/stepca?view=issue", ALICE, cookie=session)
+check("Step-CA still works without the directory (no device list)", st == 200 and 'select name="device"' not in body, st)
 
 # ---- BIND9 tab: TSIG keys for a zone
 st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)
