@@ -360,7 +360,7 @@ both architectures. `debian` pins the base of the locally built images.
    with no regressions it is promoted to `stable.json` with a higher serial.
    The signing key lives only in a protected GitHub environment.
 
-**Consuming it (`fabric-update.timer`, optional, asked at install):**
+**Consuming it** — superseded in detail by [image-updates.md](image-updates.md) (D21): hosts *fetch* the validated list automatically unless in offline mode, and apply it only when the admin runs `fabricctl images update` (or turns on `image_auto_apply`). The original outline:
 
 1. Fetch channel + signature (TLS); verify signature, `serial` greater than
    the installed one (no rollback/freeze attacks), not expired,
@@ -644,6 +644,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D16 ✅ | Where Kea registers DHCP hostnames | A separate dynamic subzone per DHCP scope (`dhcp.<domain>`, per-VLAN subzones with 802.1X); never the rendered zones (§5) |
 | D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
 | D20 ✅ | Central logging | Fluent Bit as an optional stack component (`install_fluentbit`, chosen at setup, hot-addable): forwards all logs to syslog (RFC 5424, TLS) and/or Elasticsearch/OpenSearch, disk-buffered, credentials in OpenBao (§7f) |
+| D21 | Image updates (validation pipeline and host side) | Daily watcher → regression on amd64 + arm64 incl. an upgrade test → pass: PR auto-merged, signed list published; fail: GitHub issue. Hosts fetch the list automatically unless offline, apply only on command (or opt-in auto-apply), prune old fabric images ([image-updates.md](image-updates.md)) |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 
 ## References
