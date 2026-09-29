@@ -45,7 +45,7 @@ FABRIC_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Lifecycle commands are Python (fabric/lib/fabriclib/cli.py).
 case "${1:-}" in
-    setup|doctor|certs|client-cert|tsig|acl|vault|secrets|status|start|stop|restart|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
+    setup|doctor|certs|client-cert|tsig|acl|images|vault|secrets|status|start|stop|restart|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
 esac
 VARS_FILE="$FABRIC_DIR/config/vars.yaml"
 
@@ -203,7 +203,7 @@ case "$MODE" in
     print)        python3 "${FABRIC_DIR}/lib/interactive.py" --print ;;
     interactive)  python3 "${FABRIC_DIR}/lib/interactive.py" --interactive ;;
     apply)        python3 "${FABRIC_DIR}/lib/interactive.py" --apply ;;
-    update-containers) python3 "${FABRIC_DIR}/lib/interactive.py" --update-containers ;;
+    update-containers) exec python3 "${FABRIC_DIR}/lib/fabriclib/cli.py" images update --all ;;   # old name
     client-cert)  exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" client-cert "$CLIENT_CERT_USER" ;;
     keycloak-sync) python3 "${FABRIC_DIR}/lib/keycloak_bootstrap.py" --vars "$VARS_FILE" --secrets "${FABRIC_DIR}/config/fabric-secrets.yml" ;;
     version)      echo "fabricctl version $(cat "$FABRIC_DIR/VERSION" 2>/dev/null || echo unknown)"

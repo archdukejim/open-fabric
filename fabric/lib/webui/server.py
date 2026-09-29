@@ -113,7 +113,7 @@ class App:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "webui"
+    server_version = "fabric-web"
     sys_version = ""
     app: App = None
 

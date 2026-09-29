@@ -134,4 +134,25 @@ assert 'server_name admin.example.org;' in ngx and 'server_name certs.lan.j-j.fa
 same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'hostname': 'fabric'}))
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
+# Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
+# no compose file or Dockerfile names an image any other way.
+import re  # noqa: E402
+from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
+lock = read_images_lock(os.path.join(REPO, 'fabric'))
+assert lock and all(re.fullmatch(r'sha256:[0-9a-f]{64}', e['digest']) for e in lock.values()), 'bad images.lock.yaml'
+for e in lock.values():
+    assert v2[e['var']] == e['ref'], f"{e['var']} default is not the lock's ref: {v2[e['var']]}"
+for key, val in v2.items():
+    if key.startswith('image_') and isinstance(val, str):
+        assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local'), f'{key} not pinned: {val}'
+for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao'):
+    dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
+    for name, spec in dc['services'].items():
+        ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
+        assert '@sha256:' in ref or (spec.get('build') and '@sha256:' in spec['build']['args'].get('BASE_IMAGE', '')),             f'{svc}/{name}: image not pinned: {ref}'
+for df in glob.glob(os.path.join(REPO, 'fabric', 'jinja', '*', 'build', 'Dockerfile')):
+    text = open(df).read()
+    assert not re.search(r'^ARG BASE_IMAGE=', text, re.M), f'{df}: BASE_IMAGE must have no default'
+    assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')),         f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
+print('every image pinned by digest (lock, vars defaults, compose files, Dockerfiles)')
 print('all templates rendered')

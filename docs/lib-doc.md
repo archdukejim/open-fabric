@@ -33,8 +33,8 @@ split as they are touched (see [stale-code register](maintenance/stale-code.md) 
 
 | File | What |
 |---|---|
-| `manage.sh` | `fabricctl` dispatcher: lifecycle subcommands → `fabriclib/cli.py`; `--interactive`, `--apply`, `--print`, `--update-containers`, `--mint-certs`, `--service-cert`, `--client-cert`, `--keycloak-sync`, `--render-jinja`, `--version`. |
-| `interactive.py` | `--interactive` menus (variables, DNS editor on `fabriclib.dns`, links, cert minting), `--apply` (→ `deploy.py`), `--update-containers` (pull; `build --pull` for `dirsrv`/`webui`). |
+| `manage.sh` | `fabricctl` dispatcher: lifecycle subcommands → `fabriclib/cli.py`; `--interactive`, `--apply`, `--print`, `--update-containers` (= `fabricctl images update --all`), `--mint-certs`, `--service-cert`, `--client-cert`, `--keycloak-sync`, `--render-jinja`, `--version`. |
+| `interactive.py` | `--interactive` menus (variables, DNS editor on `fabriclib.dns`, links, cert minting), `--apply` (→ `deploy.py`). |
 | `deploy.py` | Native render + deploy: secrets, templates, compose files, systemd units; restarts only what changed; zones compared ignoring the serial and swapped with `rndc freeze`/`thaw`; 389-DS seed; webui build context; fabric-agent unit. |
 | `certs.sh` | `--mint-certs` menu (→ `fabriclib/pki/mint_extra_cert.py`), `--service-cert` (→ `fabricctl certs --force`). `--client-cert` → `fabricctl client-cert`. |
 | `vars.sh` | Comment-preserving YAML list append (`_vars_list_append`) and pre-change backups (`_vars_archive`) used by `certs.sh`. |

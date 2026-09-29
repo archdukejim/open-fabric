@@ -36,7 +36,7 @@ docker run -d --name kc-keycloak --network kctest --ip 10.254.9.60 \
   -e KC_HOSTNAME=sso.lan.j-j.family -e KC_PROXY_HEADERS=xforwarded -e KC_HEALTH_ENABLED=true \
   -e KC_HTTPS_CERTIFICATE_FILE=/certs/fullchain.pem -e KC_HTTPS_CERTIFICATE_KEY_FILE=/certs/privkey.pem \
   -e KC_TRUSTSTORE_PATHS=/certs/root_ca.crt \
-  -v "$W/kc:/certs:ro" keycloak/keycloak:latest start-dev >/dev/null
+  -v "$W/kc:/certs:ro" "$(python3 "$REPO/tests/image_ref.py" keycloak)" start-dev >/dev/null
 
 echo "waiting for Keycloak..."
 for i in $(seq 1 90); do

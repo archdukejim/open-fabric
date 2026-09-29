@@ -18,7 +18,7 @@ import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/openbao"
-NET, SUBNET, IP = "obtest_net", "10.254.9.0/24", "10.254.9.90"
+NET, SUBNET, IP = "obtest_net", "10.254.19.0/24", "10.254.19.90"   # its own range: suites may run back to back
 HOST = "vault.lan.test"
 FAILED = 0
 
@@ -69,13 +69,12 @@ shutil.copy("bao.key", "openbao/certs/privkey.pem")
 shutil.copy("root.crt", "openbao/certs/root_ca.crt")
 sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout other.key -out other.crt -days 2 -subj '/CN=Other Root'")
 
-V = {"deploy_base_dir": W, "domain": "lan.test", "hostname_openbao": HOST, "ip_openbao": IP, "ip_bind9": "10.254.9.30",
+V = {"deploy_base_dir": W, "domain": "lan.test", "hostname_openbao": HOST, "ip_openbao": IP, "ip_bind9": "10.254.19.30",
      "openbao_key_dir": f"{W}/keys", "openbao_runtime_dir": f"{W}/run", "openbao_seal_key_id": "fabric-1",
      "openbao_udev_rules": f"{W}/90-fabric-unlock.rules", "openbao_admin_dir": f"{W}/admin",
      "openbao_mem_limit": "256m",
      "fabric_subnet": SUBNET, "service_users": {"openbao": {"uid": 913, "gid": 913}},
-     "image_openbao": yaml.safe_load(sh(["grep", "^image_openbao", f"{REPO}/fabric/jinja/vars.yaml.j2"]).stdout
-                                     .split("default(")[1].split(")")[0])}
+     "image_openbao": sh([sys.executable, f"{REPO}/tests/image_ref.py", "openbao"]).stdout.strip()}
 env = jinja2.Environment()
 for tpl, dest in (("docker-compose.yml.j2", "openbao/docker-compose.yml"), ("openbao.hcl.j2", "openbao/config/openbao.hcl")):
     text = env.from_string(open(f"{REPO}/fabric/jinja/openbao/{tpl}").read()).render(**V)

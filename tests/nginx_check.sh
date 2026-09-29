@@ -9,7 +9,7 @@ grep -oE '/etc/nginx/certs/[^;]+' "$R/nginx.conf" | sort -u | while read -r p; d
   rel="${p#/etc/nginx/certs/}"; mkdir -p "$W/certs/$(dirname "$rel")"
   case "$p" in *privkey.pem) cp "$W/k.pem" "$W/certs/$rel" ;; *) cp "$W/c.pem" "$W/certs/$rel" ;; esac
 done
-out=$(docker run --rm -v "$R/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$W/certs:/etc/nginx/certs:ro"   nginx:latest nginx -t 2>&1)
+out=$(docker run --rm -v "$R/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$W/certs:/etc/nginx/certs:ro"   "$(python3 "$(dirname "$0")/image_ref.py" nginx)" nginx -t 2>&1)
 rm -rf "$W"
 echo "$out" | grep -E 'nginx:'
 grep -q 'test is successful' <<<"$out" || { echo "FAIL nginx -t"; exit 1; }

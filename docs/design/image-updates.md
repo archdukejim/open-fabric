@@ -31,7 +31,7 @@ D7), updating Docker or the host OS.
   `repo:tag@sha256:<index digest>`; the multi-arch index digest covers
   amd64 and arm64. `:latest` or a bare tag never runs. An upstream push can
   never change what a host runs.
-- **One source of truth in git**: `images.lock.yaml`. The validated list
+- **One source of truth in git**: `fabric/images.lock.yaml` (ships with fabric). The validated list
   hosts fetch is generated from it and signed.
 - **Nothing untested ships**: a digest reaches the list only after the full
   suites passed on both architectures with exactly that digest.
@@ -296,6 +296,17 @@ After every successful update (and weekly from the timer):
 5. Channel: signing, `gh-pages` publishing, promotion; host
    `fabric-channel.timer` fetch + verify; offline export/import.
 6. Web UI Updates panel; automatic applying; Pi self-hosted runner.
+
+**Precondition for step 5:** rename the GitHub repository to `fabricctl`
+*before* the validated list (or the APT repo) is published on GitHub Pages:
+GitHub redirects git and web URLs after a rename, but not Pages URLs, and
+hosts will have the list's URL built in.
+
+**Built (steps 1–2):** everything pinned by digest in
+`fabric/images.lock.yaml` (render test refuses anything else), setup keeps
+running images across upgrades, `fabricctl images status / update /
+rollback / prune` (sandbox: update, setup keeps it, rollback, a broken
+image rolled back by itself, prune keeps the rollback image).
 
 ## 9. Decisions (D21)
 

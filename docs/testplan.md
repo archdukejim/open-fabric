@@ -18,7 +18,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Expected**:
   - Every setup step completes and setup prints `fabric is ready`; `sudo fabricctl doctor` passes; a second `sudo fabricctl setup` converges without re-issuing certificates; no secret appears in any process's argv.
   - Docker containers `nginx`, `bind9`, `step-ca` (and optionally `dirsrv`, `keycloak`, `postgres`, `webui`) are healthy.
-  - If Keycloak is enabled, `systemctl is-active webui fabric-agent` reports `active` for both.
+  - If Keycloak is enabled, `systemctl is-active fabric-web fabric-agent` reports `active` for both.
   - The `verify` step's LDAP/webui checks pass (role-account binds, plaintext bind refused, LDAPS cert verifies, agent socket `0660` with webui gid, webui returns `400` without a client cert).
 - [ ] **Validation**: 
   - `docker ps` shows all containers running.
@@ -65,7 +65,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Expected**: the challenge succeeds for the listed hosts only. After **New secret** + Apply the old secret is refused.
 
 ### 3.6 webui Isolation
-- [ ] **Action**: Inspect the container: `docker inspect webui`, `docker exec webui id`, `docker exec webui sh -c 'grep Cap /proc/self/status'`.
+- [ ] **Action**: Inspect the container: `docker inspect fabric-web`, `docker exec fabric-web id`, `docker exec fabric-web sh -c 'grep Cap /proc/self/status'`.
 - [ ] **Expected**: uid/gid `912` (`service_users.webui`), `CapEff` all zero, `ReadonlyRootfs: true`, `no-new-privileges`, no published ports, no `/var/run/docker.sock`, only `/config`, `/certs`, `/run/webui`, `/agent` (+ tmpfs `/tmp`) mounted; writing to `/` or `/agent` fails; host config (`/opt/fabric`, `vars.yaml`, `stepca/data/secrets`) not visible.
 - [ ] **Action**: As another host user, and as a process with the webui gid but a different uid, connect to `/opt/webui/agent/agent.sock`.
 - [ ] **Expected**: Other users get permission denied; the wrong uid with the right group is rejected (`403`, `SO_PEERCRED`).

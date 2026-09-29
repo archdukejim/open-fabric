@@ -2,9 +2,15 @@
 #
 # Why not the upstream 389ds/dirsrv image: it is rebuilt rarely (its base OS
 # goes unpatched for months) and its dscontainer bootstrap crashes at random
-# during first start (see dscontainer-launch.py). Rebuilding this image with
-# `docker compose build --pull` picks up Debian security updates.
-FROM debian:trixie-slim
+# during first start (see dscontainer-launch.py). `fabricctl images update`
+# rebuilds it on a newer validated Debian base, which also takes the latest
+# Debian security updates of these packages.
+# The base is always given by the compose file: a digest-pinned ref from
+# fabric/images.lock.yaml (no default, so an unpinned build cannot happen).
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
+LABEL org.fabric.base="${BASE_IMAGE}"
 
 # Runtime account (service_users.ldap); dscontainer needs it in /etc/passwd.
 ARG DS_UID=911

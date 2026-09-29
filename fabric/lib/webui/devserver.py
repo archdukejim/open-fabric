@@ -8,7 +8,7 @@ dev switch, so this can never be turned on in a real install.
 
   python3 fabric/lib/webui/devserver.py                      # http://127.0.0.1:8080
   docker run --rm -p 127.0.0.1:8080:8080 --entrypoint /usr/bin/python3 \\
-      fabric/webui:local /app/webui/devserver.py --bind 0.0.0.0   # from the image
+      fabric/web:local /app/webui/devserver.py --bind 0.0.0.0   # from the image
 """
 import argparse
 import email.parser
@@ -39,7 +39,7 @@ RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE = {
     "services": [("nginx", "active", "healthy"), ("bind9", "active", "healthy"), ("stepca", "active", "healthy"),
                  ("ldap", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),
-                 ("openbao", "active", "healthy"), ("webui", "active", "healthy"), ("fabric-agent", "active", "")],
+                 ("openbao", "active", "healthy"), ("fabric-web", "active", "healthy"), ("fabric-agent", "active", "")],
     "zones": {
         "dynamic_zone_var": {"name": "home.arpa", "records": [
             ("A", "fabric", "192.168.1.53"), ("A", "@", "192.168.1.53"), ("A", "nas", "192.168.1.10"),

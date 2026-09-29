@@ -575,17 +575,24 @@ Allows deep customization of the container orchestration, including overriding i
 | `ip_webui` | `"10.255.0.80"` (webui container; on `fabric_net` only to reach Keycloak, no published ports) |
 
 ### Container Images
-| Variable | Default Value |
-|----------|---------------|
-| `image_nginx` | `"nginx:latest"` |
-| `image_bind9` | `"ubuntu/bind9:latest"` — base of the local hardened layer `fabric/bind9:local` (`fabric/jinja/bind9/build`) |
-| `image_stepca` | `"smallstep/step-ca:latest"` |
-| `image_dirsrv`| `"fabric/dirsrv:local"` (built locally from `fabric/jinja/dirsrv/build`, Debian stable + `389-ds-base`) |
-| `image_keycloak`| `"keycloak/keycloak:latest"` — base of the local pre-built layer `fabric/keycloak:local` (`fabric/jinja/keycloak/build`, `kc.sh build`, started with `start --optimized`) |
-| `image_postgres`| `"postgres:latest"` |
-| `image_webui`| `"fabric/webui:local"` (built locally from `fabric/jinja/webui/build`, `debian:trixie-slim` + `python3`, `python3-jinja2`, `openssl`, `tini`; app = `fabric/lib/webui`) |
+| Variable | Default | Notes |
+|---|---|---|
+| `image_nginx` | validated `nginx:1.30.x@sha256:…` | from `fabric/images.lock.yaml` |
+| `image_stepca` | validated `smallstep/step-ca:0.30.x@sha256:…` | base of `fabric/stepca:local` |
+| `image_keycloak` | validated `keycloak/keycloak:26.x@sha256:…` | base of the pre-built layer `fabric/keycloak:local` (`kc.sh build`, `start --optimized`) |
+| `image_postgres` | validated `postgres:18.x@sha256:…` | a new major is never automatic (data upgrade) |
+| `image_debian` | validated `debian:trixie-slim@sha256:…` | base of `fabric/bind9:local` (BIND 9.20 from Debian packages), `fabric/dirsrv:local` (389-DS) and `fabric/web:local` |
+| `image_dirsrv`, `image_webui` | `fabric/dirsrv:local`, `fabric/web:local` | names of the locally built images |
+| `image_prune` | `true` | after `fabricctl images update`, remove old images of fabric's repositories (never the rollback image or anything in use) |
 
-**Upgrades:** re-running `fabricctl setup` on an existing install takes this release's default for every `image_*` key, except the ones you pinned: keys set in a `--file` or the checkout's `custom-vars.yaml` are recorded in `image_pins` and kept on every later run. To unpin, remove the key from `image_pins` in `/opt/fabric/config/vars.yaml`.
+**Every image is pinned by digest** (amd64 + arm64); the defaults come from
+`fabric/images.lock.yaml`. **Upgrades never change running images:**
+re-running `fabricctl setup` keeps the image each host runs;
+`sudo fabricctl images update` moves it to the validated list (see
+operations.md). Refs that are not pinned by digest (`nginx:latest`, from
+older installs) are replaced once by the validated pin. Keys you set in a
+`--file` or `custom-vars.yaml` are recorded in `image_pins`, kept, and
+skipped by `images update` unless `--force`.
 
 ### Service CNAMEs
 Allows overriding the default short hostnames (CNAMEs) automatically assigned to the services.
@@ -636,7 +643,7 @@ Toggle features and control system-level UNIX isolation mapping.
 - `vars.yaml.j2`
 
 ### `install_webui`
-**Description:** Deploys the webui management UI (unprivileged container `webui` + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `fabric` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
+**Description:** Deploys the webui management UI (unprivileged container `fabric-web`, shown as "Fabric — web control", + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `fabric` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
 
 **Default Value:** `true` (effective only with Keycloak)
 

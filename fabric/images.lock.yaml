@@ -1,0 +1,54 @@
+# The validated container images fabric runs (docs/design/image-updates.md).
+#
+# Every image is pinned by its multi-arch index digest (amd64 + arm64): an
+# upstream push never changes what a host runs. vars.yaml.j2 takes its
+# image_* defaults from here, and `fabricctl images status/update` compares
+# each host against this list. Later the watch-images workflow proposes
+# changes to this file after the regression suites pass.
+#
+#   track:  which new upstream tags may become candidates (a tag pattern
+#           within one major/minor, or a floating tag whose digest moves)
+#   policy: auto | manual (manual: frozen, the watcher only reports)
+images:
+  nginx:
+    var: image_nginx
+    repo: nginx
+    tag: "1.30.5"
+    digest: sha256:b972f831f200b19ef0767938224f9711e74cd783718738cd7405d5cabf75c442
+    track: "1.30.*"                  # the stable branch
+    policy: auto
+  stepca:                            # base of fabric/stepca:local
+    var: image_stepca
+    repo: smallstep/step-ca
+    tag: "0.30.2"
+    digest: sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270
+    track: "0.30.*"
+    policy: auto
+  keycloak:                          # base of fabric/keycloak:local
+    var: image_keycloak
+    repo: keycloak/keycloak
+    tag: "26.7.4"
+    digest: sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    track: "26.*"
+    policy: auto
+  postgres:
+    var: image_postgres
+    repo: postgres
+    tag: "18.6"
+    digest: sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    track: "18.*"                    # a new major needs a data upgrade: never automatic
+    policy: auto
+  openbao:
+    var: image_openbao
+    repo: openbao/openbao
+    tag: "2.7.0"
+    digest: sha256:71156a1c6623a5fa3f5e61b0c6a8ead0faf0df29a778339188443551995d1315
+    track: "2.7.*"
+    policy: auto
+  debian:                            # base of fabric/bind9:local, fabric/dirsrv:local and fabric/web:local
+    var: image_debian
+    repo: debian
+    tag: trixie-slim
+    digest: sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+    track: trixie-slim
+    policy: auto

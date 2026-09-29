@@ -99,7 +99,7 @@ class Handler(BaseHTTPRequestHandler):
     allowed_uids = {0}
 
     def address_string(self):
-        return "webui"
+        return "fabric-web"
 
     def log_message(self, fmt, *args):
         sys.stderr.write(f"{fmt % args}\n")

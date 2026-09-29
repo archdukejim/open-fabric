@@ -23,7 +23,9 @@ import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/pki"
-IMAGE = os.environ.get("FABRIC_STEP_IMAGE", "smallstep/step-ca:latest")
+IMAGE = os.environ.get("FABRIC_STEP_IMAGE") or subprocess.run(
+    [sys.executable, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "image_ref.py"), "stepca"],
+    capture_output=True, text=True, check=True).stdout.strip()
 STEP_UID = 1912
 FAILED = 0
 

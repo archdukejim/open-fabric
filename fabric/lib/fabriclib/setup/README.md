@@ -29,6 +29,7 @@
 | `setup_openbao.py` | `vault` step: seal key, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration, move fabric's secrets file into OpenBao |
 | `create_admin.py` | First web UI admin: LDAP user in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
 | `verify_install.py` | End-to-end checks (DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services) |
+| `retire_renamed_units.py` | Upgrade: stop and remove units/containers that were renamed (`webui` → `fabric-web`) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
 | `run_uninstall_command.py` | `fabricctl uninstall`: asks about an export and the package first, then exports, uninstalls, optionally `apt purge` |
 | `export_install.py` | Export all of fabric's data (secrets from OpenBao, then every folder copied cold, vault key, README) to a folder you choose |

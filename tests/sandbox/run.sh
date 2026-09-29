@@ -96,13 +96,13 @@ check "web UI answers at fabric.<domain> (refuses without a client cert)" \
 echo "--- systemd control: fabric.target"
 check "fabric.target enabled and active" "in_box 'systemctl is-enabled fabric.target && systemctl is-active fabric.target' >/dev/null"
 check "every unit is part of fabric.target" \
-    "[ \"\$(in_box 'systemctl list-dependencies --plain fabric.target' | grep -cE '(bind9|stepca|nginx|ldap|postgres|keycloak|fabric-agent|webui)\\.service')\" -ge 8 ]"
+    "[ \"\$(in_box 'systemctl list-dependencies --plain fabric.target' | grep -cE '(bind9|stepca|nginx|ldap|postgres|keycloak|fabric-agent|fabric-web)\\.service')\" -ge 8 ]"
 in_box 'fabricctl status' > "$OUT/status.log" 2>&1
 check "fabricctl status: target active, containers healthy" \
     "grep -qE '^fabric.target +active' '$OUT/status.log' && [ \"\$(grep -c ' healthy' '$OUT/status.log')\" -ge 7 ]"
 in_box 'fabricctl stop' > "$OUT/stop.log" 2>&1
 check "fabricctl stop: every service stopped" \
-    "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak openbao webui fabric-agent' | grep -qx active"
+    "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak openbao fabric-web fabric-agent' | grep -qx active"
 check "fabricctl stop: DNS no longer answers" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 in_box 'fabricctl start' > "$OUT/start.log" 2>&1
 sleep 20
@@ -196,6 +196,21 @@ in_box "python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '
 check "sign-in: admin gets in; HTTP, missing/foreign certs, non-admins and borrowed certs are refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"
 
+echo "--- container images: pinned, status, update (compose down/up, health-gated)"
+NGX_OLD=sha256:d5792f71a9496b833bc08ea834a758c46e2b6a6306c10f4be926f38a656cdc1c     # nginx 1.30.4
+NGX_REF="nginx:1.30.4@$NGX_OLD"
+docker cp "$REPO/tests/sandbox/set_lock.py" "$NAME:/root/set_lock.py"
+certs_ok() { [ "$(in_box "curl -s -o /dev/null -w %{http_code} http://$IP/certs/")" = 200 ]; }
+nginx_ref() { in_box 'docker inspect -f {{.Config.Image}} nginx'; }
+check "every running image is pinned by digest; images status: all current" \
+    "! in_box 'docker inspect -f {{.Config.Image}} \$(docker ps -q)' | grep -vE '@sha256:|^fabric/' && in_box 'fabricctl images status' | grep -q 'all images current'"
+in_box "python3 /root/set_lock.py nginx nginx 1.30.4 $NGX_OLD"
+check "a new validated list only reports: status shows the nginx update, nothing changed" \
+    "in_box 'fabricctl images status' | grep -qE '^nginx +update available' && [ \"\$(nginx_ref)\" != '$NGX_REF' ]"
+in_box 'fabricctl images update nginx' > "$OUT/images-update.log" 2>&1
+check "images update nginx: recreated on the validated image, healthy, serving; others untouched" \
+    "grep -q 'updated nginx' '$OUT/images-update.log' && [ \"\$(nginx_ref)\" = '$NGX_REF' ] && certs_ok && in_box 'fabricctl images status' | grep -qE '^keycloak +current'"
+
 echo "--- setup again (must converge without changes)"
 in_box 'fabricctl setup --non-interactive --yes' 2>&1 | tee "$OUT/setup2.log"
 check "re-run completes" "grep -q 'fabric is ready' '$OUT/setup2.log'"
@@ -204,6 +219,19 @@ check "re-run neither re-initialises nor changes OpenBao" \
     "! grep -q 'OpenBao initialised' '$OUT/setup2.log' && grep -q 'OpenBao configured (no changes)' '$OUT/setup2.log'"
 check "re-run keeps the admin and their certificate" \
     "grep -q \"admin 'fabricadmin' exists\" '$OUT/setup2.log' && grep -q 'is current' '$OUT/setup2.log'"
+check "re-run keeps the images this host runs (a fabric upgrade never changes them)" \
+    "[ \"\$(nginx_ref)\" = '$NGX_REF' ]"
+in_box 'fabricctl images rollback nginx' > "$OUT/images-rollback.log" 2>&1
+check "images rollback nginx: back to the image before the update" \
+    "grep -q 'rolled back nginx' '$OUT/images-rollback.log' && [ \"\$(nginx_ref)\" != '$NGX_REF' ] && certs_ok"
+in_box "python3 /root/set_lock.py nginx busybox 1.37 sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
+in_box 'fabricctl images update nginx' > "$OUT/images-bad.log" 2>&1
+check "a validated image that does not come up healthy is rolled back by itself" \
+    "grep -q 'rolled back to' '$OUT/images-bad.log' && nginx_ref | grep -q '^nginx:1.30.5@' && certs_ok"
+in_box "python3 /root/set_lock.py nginx nginx 1.30.5 sha256:b972f831f200b19ef0767938224f9711e74cd783718738cd7405d5cabf75c442"
+in_box 'fabricctl images prune' > "$OUT/images-prune.log" 2>&1
+check "images prune keeps the rollback image and everything in use" \
+    "in_box 'docker image inspect nginx@$NGX_OLD' >/dev/null 2>&1 && in_box 'fabricctl images status' | grep -q 'all images current'"
 
 echo "--- setup with a changed setting (live DNS zone must update, bind9 keeps serving)"
 cat > "$OUT/change.yaml" <<EOF
@@ -345,7 +373,7 @@ in_box 'fabricctl uninstall --yes --export /root/fabric-export --purge-package' 
 EX=/root/fabric-export
 check "export: config, secrets, CA, directory, Keycloak, the vault and its key, README (root 0700)"     "in_box 'test -s $EX/fabric/config/fabric-secrets.yml && test -d $EX/stepca/data && test -d $EX/dirsrv && test -d $EX/postgres && test -d $EX/openbao/data && test -f $EX/@root/etc/fabric/openbao/slots.json && test -f $EX/README.txt && [ \"\$(stat -c %a $EX)\" = 700 ]'"
 check "the package was purged too, and nothing was written to /var/backups"     "! in_box 'dpkg -s fabricctl' >/dev/null 2>&1 && ! in_box 'test -e /var/backups/fabric'"
-check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|webui)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,webui,fabric-agent}.service' >/dev/null 2>&1"
+check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,fabric-agent}.service' >/dev/null 2>&1"
 check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id openbao' >/dev/null 2>&1"
 check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 

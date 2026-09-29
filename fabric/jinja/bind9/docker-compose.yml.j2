@@ -1,12 +1,12 @@
 services:
   bind9:
-    # Thin local layer over the upstream image: bind uid/gid baked in, runs
-    # as bind from the first instruction, no capabilities (see build/Dockerfile).
+    # Built from Debian packages on the validated Debian base: bind uid/gid baked
+    # in, runs as bind from the first instruction, no capabilities (build/Dockerfile).
     image: fabric/bind9:local
     build:
       context: {{ deploy_base_dir }}/bind9/build
       args:
-        BASE_IMAGE: "{{ image_bind9 }}"
+        BASE_IMAGE: "{{ image_debian }}"
         BIND_UID: "{{ service_users.bind.uid }}"
         BIND_GID: "{{ service_users.bind.gid }}"
     container_name: bind9

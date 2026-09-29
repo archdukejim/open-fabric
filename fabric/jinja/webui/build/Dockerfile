@@ -4,9 +4,14 @@
 # HTML). It has no Docker socket and no host access: every action is a call
 # to fabric-agent on the host over a mounted unix socket.
 #
-# Debian packages only (python3 + jinja2 + openssl); rebuilt with
-# `docker compose build --pull` to pick up security updates.
-FROM debian:trixie-slim
+# Debian packages only (python3 + jinja2 + openssl); `fabricctl images update`
+# rebuilds it on a newer validated Debian base (and its security updates).
+# The base is always given by the compose file: a digest-pinned ref from
+# fabric/images.lock.yaml (no default, so an unpinned build cannot happen).
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
+LABEL org.fabric.base="${BASE_IMAGE}"
 
 ARG WEBUI_UID=912
 ARG WEBUI_GID=912

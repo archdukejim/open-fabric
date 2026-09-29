@@ -90,7 +90,7 @@ Key tunables with their defaults:
 - [ ] `bind_dns_port` — change from `53` only if another DNS server must keep port 53 on `host_ip`
 - [ ] `webui_admin_user` — the first web UI admin setup creates (default: the account that ran `sudo`)
 - [ ] `webui_hostname` — the web UI's address (default `fabric.<domain>`; any host name)
-- [ ] `image_nginx` / `image_bind9` / `image_stepca` / `image_dirsrv` — override to pin images to specific digests or a local registry (optional)
+- [ ] `image_*` — every image is already pinned by digest (`fabric/images.lock.yaml`); override only to use a local registry (optional; `fabricctl images update` then leaves it alone)
 
 ---
 
@@ -195,7 +195,7 @@ sudo fabricctl status            # the target, every unit and its container heal
 sudo fabricctl stop              # = systemctl stop fabric.target (every fabric service)
 sudo fabricctl start             # returns once every service is up and healthy
 sudo fabricctl restart
-systemctl status webui           # one service (units: bind9 stepca nginx ldap postgres keycloak fabric-agent webui)
+systemctl status fabric-web      # one service (units: bind9 stepca nginx ldap postgres keycloak openbao fabric-agent fabric-web)
 ```
 
 ### Steps

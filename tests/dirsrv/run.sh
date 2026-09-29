@@ -11,7 +11,7 @@ PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 
 docker rm -f dstest >/dev/null 2>&1
-docker build -q --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabric/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
+docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabric/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
 rm -rf "$W"; mkdir -p "$W/data/tls/ca" "$W/seed"
 cd "$W"
 

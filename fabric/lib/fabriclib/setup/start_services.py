@@ -4,6 +4,7 @@ import time
 
 from fabriclib.common.console import info, ok
 from fabriclib.setup.errors import SetupError
+from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
 
 # (systemd unit, container, enabled-if flag); order = start order
@@ -18,6 +19,8 @@ def run(ctx):
     v, lib = ctx.vars, os.path.join(ctx.target_dir, "lib")
     # fabric.target groups every unit: systemctl start|stop|restart fabric.target
     subprocess.run(["systemctl", "enable", "fabric.target"], check=True, capture_output=True)
+    for unit in retire_renamed_units():
+        ok(f"{unit}: retired (renamed)")
     for unit, container, flag in ORDER:
         if flag and not v.get(flag, flag == "install_ldap"):
             continue
@@ -47,7 +50,7 @@ def run(ctx):
         if "fabric-agent" in ctx.restart_services:
             subprocess.run(["systemctl", "restart", "fabric-agent"], check=True)
         ok(f"fabric-agent: {'restarted' if 'fabric-agent' in ctx.restart_services else 'running'}")
-        ok(f"webui: {start_unit('webui', 'webui', 'webui' in ctx.restart_services)}")
+        ok(f"fabric-web: {start_unit('fabric-web', 'fabric-web', 'fabric-web' in ctx.restart_services)}")
 
     # Everything is up: activate the target now (it is enabled for boot), so
     # `fabricctl stop|restart` / `systemctl ... fabric.target` reach every unit.

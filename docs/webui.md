@@ -1,6 +1,6 @@
-# webui Management UI
+# Fabric — web control
 
-webui is a browser front end for `fabricctl`. It runs as an unprivileged container (`webui`, systemd service `webui`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
+**Fabric** (subtitle *web control*) is the browser front end for `fabricctl`. It runs as an unprivileged container (`fabric-web`, systemd service `fabric-web`; the code lives in `fabric/lib/webui/`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
 
 ### Table of Contents
 - [Features](#features)
@@ -114,12 +114,12 @@ The web app (TLS header checks, OIDC, sessions, HTML) holds no privilege: no Doc
 
 | Item | Location |
 |------|----------|
-| Container | `webui` — `/opt/webui/docker-compose.yml` from `fabric/jinja/webui/docker-compose.yml.j2`; image `image_webui` (`fabric/webui:local`) built locally from `fabric/jinja/webui/build/Dockerfile` (`debian:trixie-slim` + `python3`, `python3-jinja2`, `openssl`, `tini`) |
+| Container | `fabric-web` — `/opt/webui/docker-compose.yml` from `fabric/jinja/webui/docker-compose.yml.j2`; image `image_webui` (`fabric/web:local`) built locally from `fabric/jinja/webui/build/Dockerfile` (the validated Debian base + `python3`, `python3-jinja2`, `openssl`, `tini`) |
 | Container code | `fabric/lib/webui/` (`server.py`, `oidc.py`, `tlsclient.py`, `agentclient.py`, `views.py`; stdlib + `jinja2`), copied to `/opt/webui/build/app/` at deploy time and baked into the image |
 | Container user | `service_users.webui` (default uid/gid `912`) + `group_add` nginx gid; `read_only`, `cap_drop: ALL`, `no-new-privileges`, tmpfs `/tmp`; `ip_webui` (default `10.255.0.80`) on `fabric_net` |
 | Container mounts | `/opt/webui/config` → `/config` (ro); `/opt/stepca/data/certs` → `/certs` (ro, public CA certs only); `/opt/webui/run` → `/run/webui`; `/opt/webui/agent` → `/agent` (ro) |
 | Config | `/opt/webui/config/webui.json` (webui uid, `0400`; contains the OIDC client secret; in-container paths incl. `agent_socket`) — from `fabric/jinja/webui/webui.json.j2` |
-| webui unit | `/etc/systemd/system/webui.service` — standard compose wrapper; requires `fabric-agent` |
+| fabric-web unit | `/etc/systemd/system/fabric-web.service` — standard compose wrapper; requires `fabric-agent` (upgrades retire the old `webui` unit and container) |
 | Web socket | `/opt/webui/run/web.sock` (socket `0660`, group nginx; dir `webui:nginx 0750`), created by the container, mounted into nginx at `/srv/webui` |
 | fabric-agent | `/opt/fabric/lib/agent/server.py` (routes to `fabric/lib/fabriclib/`); unit `/etc/systemd/system/fabric-agent.service` from `fabric/jinja/systemd/fabric-agent.service.j2` (root, sandboxed, no network listener) |
 | Agent socket | `/opt/webui/agent/agent.sock` (`root:<webui gid> 0660`; dir `root:<webui gid> 0750`) |
@@ -180,11 +180,11 @@ Enabled by default whenever `install_keycloak: true` (`install_webui` is forced 
 | `webui_session_max` | `28800` | Seconds |
 | `webui_oidc_secret` | *(generated)* | With fabric's secrets (OpenBao) |
 
-Related: `image_webui` (`fabric/webui:local`), `ip_webui` (`10.255.0.80`), `service_users.webui` (uid/gid `912`) — see [vars.md](vars.md).
+Related: `image_webui` (`fabric/web:local`), `ip_webui` (`10.255.0.80`), `service_users.webui` (uid/gid `912`) — see [vars.md](vars.md).
 
 After changing the realm/role/group vars: `sudo fabricctl --apply` then `sudo fabricctl --keycloak-sync`.
 
-Image updates: `sudo fabricctl --update-containers` rebuilds the image on a fresh Debian base (`build --pull`). An apply that changes the app code or Dockerfile rebuilds the image; `webui` is always restarted last with `--no-block`, since the apply may have been started from the web UI.
+Image updates: `sudo fabricctl images update webui` rebuilds the image on the validated Debian base (pinned by digest). An apply that changes the app code or Dockerfile rebuilds the image; `webui` is always restarted last with `--no-block`, since the apply may have been started from the web UI.
 
 ---
 
@@ -228,7 +228,7 @@ To look at the pages without a CA, client certificate, Keycloak or a running ins
 ```bash
 python3 fabric/lib/webui/devserver.py            # from a checkout (needs python3-jinja2) -> http://127.0.0.1:8080
 docker run --rm -p 127.0.0.1:8080:8080 --entrypoint /usr/bin/python3 \
-    fabric/webui:local /app/webui/devserver.py --bind 0.0.0.0     # from the image, on a fabric host
+    fabric/web:local /app/webui/devserver.py --bind 0.0.0.0     # from the image, on a fabric host
 ```
 
 It renders the real pages (`views.py`) with sample data under an orange **DEV PREVIEW** banner. Record edits and Apply work in memory only — there is no fabric-agent, nothing is saved, rendered or reloaded, and a restart resets everything. `/preview/denied` shows a refused sign-in. It is a separate entry point on purpose: the production server (`server.py`) has no dev switch, so a real install can never run without sign-in. It listens on 127.0.0.1 unless told otherwise; never expose it.
@@ -244,7 +244,7 @@ It renders the real pages (`views.py`) with sample data under an orange **DEV PR
 | `403` "missing the 'fabric-admin' role" | User not in `admins` (or role mapping drifted). Fix membership, then `sudo fabricctl --keycloak-sync`. |
 | `403` "CSRF check failed" | Stale page or cross-origin post. Reload and retry. |
 | Login loops / "Login expired" | Login took over 10 min or started in another browser. Start again at `/`. |
-| `502 Bad Gateway` | `webui` container not running or socket missing: `systemctl status webui`, `docker ps -a --filter name=webui`, `ls -l /opt/webui/run/`. |
+| `502 Bad Gateway` | `fabric-web` container not running or socket missing: `systemctl status fabric-web`, `docker ps -a --filter name=fabric-web`, `ls -l /opt/webui/run/`. |
 | `503` "fabric-agent service is unavailable" | Agent down or socket missing: `systemctl status fabric-agent`, `journalctl -u fabric-agent -e`, `ls -l /opt/webui/agent/`. |
 | `500` / any error | `journalctl -u webui -e` (container), `journalctl -u fabric-agent -e` (agent) |
 | Keycloak client/flow missing or wrong | `sudo fabricctl --keycloak-sync` (idempotent) |

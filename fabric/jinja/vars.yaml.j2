@@ -77,18 +77,23 @@ hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower
 # ============================================================
 # DOCKER IMAGES
 # ============================================================
-image_nginx: {{ image_nginx | default('nginx:latest') }}
-image_bind9: {{ image_bind9 | default('ubuntu/bind9:latest') }}
-image_stepca: {{ image_stepca | default('smallstep/step-ca:latest') }}
-{# Built locally from Debian packages (fabric/jinja/dirsrv/build); `fabricctl --update-containers` rebuilds it. #}
+{# Defaults: the validated images, pinned by digest (fabric/images.lock.yaml). A host keeps
+   the images it runs across fabric upgrades; `fabricctl images update` moves it to this list. #}
+image_nginx: {{ image_nginx | default(images_lock.nginx) }}
+{# stepca and keycloak run thin local layers built FROM these (fabric/jinja/<svc>/build). #}
+image_stepca: {{ image_stepca | default(images_lock.stepca) }}
+image_keycloak: {{ image_keycloak | default(images_lock.keycloak) }}
+image_postgres: {{ image_postgres | default(images_lock.postgres) }}
+image_openbao: {{ image_openbao | default(images_lock.openbao) }}
+{# Base of the locally built bind9, dirsrv and webui images (Debian packages). #}
+image_debian: {{ image_debian | default(images_lock.debian) }}
+{# Names of the locally built images (not pulled). #}
 image_dirsrv: {{ image_dirsrv | default('fabric/dirsrv:local') }}
-image_keycloak: {{ image_keycloak | default('keycloak/keycloak:latest') }}
-image_postgres: {{ image_postgres | default('postgres:latest') }}
-{# Built locally from fabric/jinja/webui/build (Debian + python3-jinja2). #}
-image_webui: {{ image_webui | default('fabric/webui:local') }}
-image_openbao: {{ image_openbao | default('openbao/openbao:2.7.0@sha256:71156a1c6623a5fa3f5e61b0c6a8ead0faf0df29a778339188443551995d1315') }}
-{# image_* keys set explicitly by the admin; kept across upgrades (others follow the release). #}
+image_webui: {{ image_webui | default('fabric/web:local') }}
+{# image_* keys the admin set explicitly: `fabricctl images update` leaves them alone. #}
 image_pins: {{ image_pins | default([], true) | to_json }}
+# After `fabricctl images update`: remove old images of fabric's repositories (never the rollback one).
+image_prune: {{ image_prune | default(true) | bool }}
 
 install_ldap: {{ install_ldap | default(true) | bool }}
 # OpenBao (secrets) is core. Its unlock methods (slots.json) and their key files / token PINs, root-only.
@@ -133,12 +138,12 @@ keycloak_data_dir: {{ keycloak_data_dir | default((deploy_base_dir | default('/o
 postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/opt')) ~ '/postgres/data') }}
 {# Optional containers are derived from the install_* flags on every render, so
    strip them from any value read back from a previously rendered vars.yaml. #}
-{% set _optional_containers = ['dirsrv', 'keycloak', 'postgres', 'webui'] %}
+{% set _optional_containers = ['dirsrv', 'keycloak', 'postgres', 'webui', 'fabric-web'] %}
 {% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9', 'openbao'])) | reject('in', _optional_containers) | list %}
 {% if 'openbao' not in _containers %}{% set _ = _containers.append('openbao') %}{% endif %}
 {% if install_ldap | default(true) | bool %}{% set _ = _containers.append('dirsrv') %}{% endif %}
 {% if install_keycloak | default(false) | bool %}{% set _ = _containers.extend(['keycloak', 'postgres']) %}{% endif %}
-{% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) %}{% set _ = _containers.append('webui') %}{% endif %}
+{% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) %}{% set _ = _containers.append('fabric-web') %}{% endif %}
 project_containers:
 {{ _containers | unique | list | to_nice_yaml(indent=2) | indent(2, first=True) }}
 {% set default_service_dirs = [

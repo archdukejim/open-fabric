@@ -3,6 +3,7 @@
 | File | What |
 |---|---|
 | `paths.py` | Well-known paths derived from the install location (`FABRIC_DIR`, `VARS_FILE`, `AUDIT_FILE`, …) |
+| `read_images_lock.py` | The validated, digest-pinned images (`fabric/images.lock.yaml`) with their refs |
 | `errors.py` | `ValidationError` — input rejected; message is safe to show to users |
 | `load_vars.py` | Read `vars.yaml` (empty dict if missing) |
 | `save_vars.py` | Write `vars.yaml`, empty strings stored as null |

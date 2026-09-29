@@ -9,6 +9,8 @@ import time
 import jinja2
 import yaml
 
+from fabriclib.common.read_images_lock import read_images_lock
+
 
 class _RelativeEnvironment(jinja2.Environment):
     """Resolve `{% extends "../shared/base.html.j2" %}` relative to the
@@ -75,4 +77,6 @@ def jinja_env(template_dir):
     })
     env.tests["match"] = lambda value, pattern: bool(re.search(pattern, str(value)))
     env.globals["lookup"] = _lookup
+    # image_* defaults: the validated, digest-pinned refs (fabric/images.lock.yaml)
+    env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(os.path.dirname(template_dir)).items()}
     return env

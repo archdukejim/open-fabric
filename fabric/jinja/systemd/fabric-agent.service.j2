@@ -1,8 +1,8 @@
 [Unit]
-Description=fabric-agent — privileged API for the webui container (unix socket only)
+Description=fabric-agent — privileged API for the fabric-web container (unix socket only)
 After=network-online.target docker.service
 Wants=network-online.target
-Before=webui.service
+Before=fabric-web.service
 PartOf=fabric.target
 Before=fabric.target
 
@@ -10,7 +10,7 @@ Before=fabric.target
 Type=simple
 # Root is required: it edits {{ deploy_base_dir }}/fabric and drives systemctl
 # and docker exactly like `fabricctl`. It has no network listener — only a
-# unix socket mounted into the webui container, accepting that container's
+# unix socket mounted into the fabric-web container, accepting that container's
 # uid ({{ service_users.webui.uid }}) and root. The sandboxing below limits
 # what it can touch otherwise.
 ExecStart=/usr/bin/python3 {{ deploy_base_dir }}/fabric/lib/agent/server.py \

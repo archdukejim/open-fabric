@@ -119,7 +119,7 @@ def checks(ctx):
     code = _curl(f"https://{v['hostname_openbao']}/v1/sys/health", v["hostname_openbao"], v["ip_nginx"], 443, root_ca)
     add(f"https://{v['hostname_openbao']} (OpenBao via nginx, TLS verified)", code == (0, "200"), code)
 
-    for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "fabric-agent", "webui",
+    for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "fabric-agent", "fabric-web",
                  "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()

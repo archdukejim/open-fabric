@@ -47,7 +47,7 @@ WARNED_KEYS = {
 }
 
 CATEGORIES = [
-    ("Docker & Services", ["host_ram_capacity", "compose_file", "project_containers", "nginx_backend_ldap", "nginx_backend_stepca", "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_ldap", "ip_keycloak", "ip_postgres", "image_nginx", "image_bind9", "image_stepca", "image_dirsrv", "image_keycloak", "image_postgres", "cname_ca", "landing_page_cname", "cname_dns", "cname_ldap", "cname_sso", "cname_mgr", "hostname_nginx", "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_ldap", "hostname_keycloak", "hostname_mgr"])
+    ("Docker & Services", ["host_ram_capacity", "compose_file", "project_containers", "nginx_backend_ldap", "nginx_backend_stepca", "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_ldap", "ip_keycloak", "ip_postgres", "image_nginx", "image_debian", "image_stepca", "image_dirsrv", "image_keycloak", "image_postgres", "cname_ca", "landing_page_cname", "cname_dns", "cname_ldap", "cname_sso", "cname_mgr", "hostname_nginx", "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_ldap", "hostname_keycloak", "hostname_mgr"])
 ]
 
 def load_yaml(path):
@@ -715,42 +715,9 @@ def apply_mode():
             
     print(f"\n{BOLD}{GREEN}Apply complete!{NC}")
 
-def update_containers_mode():
-    import glob
-    print(f"{BOLD}Updating container images...{NC}")
-    sys_svcs = [
-        {'service': 'nginx', 'folder': 'nginx'},
-        {'service': 'bind9', 'folder': 'bind9'},
-        {'service': 'stepca', 'folder': 'stepca'},
-        {'service': 'ldap', 'folder': 'dirsrv'},
-        {'service': 'postgres', 'folder': 'postgres'},
-        {'service': 'keycloak', 'folder': 'keycloak'},
-        {'service': 'webui', 'folder': 'webui'}
-    ]
-    
-    def get_svc_timeout(s):
-        if s == "keycloak": return 90
-        if s == "postgres": return 60
-        return 30
-
-    for svc in sys_svcs:
-        dc_path = f"/opt/fabric/{svc['folder']}/docker-compose.yml"
-        if os.path.exists(dc_path):
-            # bind9, stepca, dirsrv, keycloak and webui are local layers: rebuild on a fresh Debian base instead of pulling.
-            action = ["build", "--pull"] if svc['folder'] in ('bind9', 'stepca', 'dirsrv', 'keycloak', 'webui') else ["pull"]
-            print(f"\n{BLUE}Updating images for {svc['service']} ({' '.join(action)})...{NC}")
-            try:
-                res = subprocess.run(["docker", "compose", "-f", dc_path] + action, timeout=900)
-                if res.returncode == 0:
-                    print(f"{GREEN}Restarting {svc['service']} to apply updates...{NC}")
-                    subprocess.run(["systemctl", "restart", svc['service']], timeout=get_svc_timeout(svc['service']))
-            except subprocess.TimeoutExpired:
-                print(f"{RED}Timeout during update for {svc['service']}.{NC}")
-    print(f"\n{BOLD}{GREEN}Container updates complete!{NC}")
-
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: interactive.py [--print | --interactive | --apply | --update-containers]")
+        print("Usage: interactive.py [--print | --interactive | --apply]")
         sys.exit(1)
         
     mode = sys.argv[1]
@@ -760,8 +727,6 @@ if __name__ == "__main__":
         interactive_mode()
     elif mode == "--apply":
         apply_mode()
-    elif mode == "--update-containers":
-        update_containers_mode()
     else:
         print(f"Unknown mode: {mode}")
         sys.exit(1)

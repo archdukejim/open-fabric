@@ -15,11 +15,26 @@ class R:
         self.returncode, self.stdout, self.stderr = rc, out, ""
 
 
+DST = {}                          # set below: the deployed zone folder
+RACE = {"lan.test": True}         # BIND's own write lands after ours, once
+
+
 def fake_rndc(args, timeout=15):
+    """rndc as BIND answers it. zonestatus reports the serial of the zone
+    file BIND loaded; the first thaw of lan.test puts the old file back, as
+    BIND's freeze-time write did in the sandbox (the race reload_zone must
+    detect and repeat)."""
     calls.append(args)
     verb, zone = args.split()[0], args.split()[-1]
+    path = os.path.join(DST.get("dir", ""), f"db.{zone}")
+    if verb == "thaw" and RACE.pop(zone, False):
+        with open(path, "w") as f:
+            f.write(DST["old"])
     if verb in ("freeze", "thaw"):
         return R(0 if zone in FREEZE_OK else 1)
+    if verb == "zonestatus":
+        serial = deploy._file_serial(path) if os.path.exists(path) else None
+        return R(0, f"name: {zone}\nserial: {serial}\n")
     return R(0)
 
 
@@ -39,6 +54,7 @@ with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
 
     # deployed: old records + a journal; rendered: same records, new serial
     write(dst, "db.lan.test", 100, "www A 1.1.1.1")
+    DST.update(dir=dst, old=open(os.path.join(dst, "db.lan.test")).read())
     open(os.path.join(dst, "db.lan.test.jnl"), "w").write("journal")
     write(src, "db.lan.test", 200, "www A 1.1.1.1")
     changed = deploy.deploy_zone_files(src, dst, uid, gid)
@@ -55,7 +71,9 @@ with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
     for zone, s, d in changed:
         deploy.reload_zone(zone, s, d, uid, gid)
     print("rndc calls:", calls)
-    ok &= calls[:2] == ["freeze lan.test", "thaw lan.test"] or calls[2:4] == ["freeze lan.test", "thaw lan.test"]
+    swaps = [c for c in calls if c in ("freeze lan.test", "thaw lan.test")]
+    print("BIND's late write detected and the swap repeated:", swaps == ["freeze lan.test", "thaw lan.test"] * 2)
+    ok &= swaps == ["freeze lan.test", "thaw lan.test"] * 2
     ok &= "reload 7.168.192.in-addr.arpa" in calls
     deployed = open(os.path.join(dst, "db.lan.test")).read()
     print("new record deployed:", "shelfmark" in deployed)

@@ -9,7 +9,7 @@ Use `fabricctl` (the global wrapper powered by the interactive Python engine) fo
   - [`--interactive`](#--interactive)
   - [`--print`](#--print)
   - [`--apply`](#--apply)
-  - [`--update-containers`](#--update-containers)
+  - [`fabricctl images`](#fabricctl-images) (was `--update-containers`)
   - [`--version`](#--version)
   - [`--client-cert <user>`](#--client-cert-user)
   - [`--keycloak-sync`](#--keycloak-sync)
@@ -57,11 +57,37 @@ Apply any manual changes made directly to `vars.yaml`. `fabricctl` leverages the
 sudo fabricctl --apply
 ```
 
-#### `--update-containers`
-Pulls the latest images for all deployed containers and recreates them. The 389-DS and webui images are built locally, so for `dirsrv` and `webui` this runs `docker compose build --pull` instead — a fresh `debian:trixie-slim` base plus the current Debian packages (`389-ds-base`; `python3`, `python3-jinja2`, `openssl`), which is how their security updates arrive. Each step is protected by a timeout (pull 300 s, build 900 s) to prevent indefinite hangs if registries or mirrors are slow.
+#### `fabricctl images`
+Every container image is pinned by digest (amd64 + arm64). The validated
+list is `fabric/images.lock.yaml` of the installed fabric. **A fabric
+upgrade never changes a running image**: `fabricctl setup` keeps what each
+host runs; these commands move it.
+
+| Command | What |
+|---|---|
+| `sudo fabricctl images status` | Each service: what it runs, the validated image, `current` / `update available` / `held (set by the admin)` |
+| `sudo fabricctl images update <service…>` or `--all` | Move to the validated images |
+| `sudo fabricctl images rollback <service>` | Back to the image before the last update |
+| `sudo fabricctl images prune` | Remove old images of fabric's repositories now |
+
+`update`, per service in dependency order: download by digest (nothing is
+touched if that fails), re-render, rebuild local layers on the new base,
+**compose down/up through the service's systemd unit**, wait until it is
+healthy. A service that does not come back healthy is put back on its
+previous image the same way, and the run stops. bind9, dirsrv and webui share the
+Debian base and move together. Images you set yourself in `vars.yaml`
+(`image_pins`) are skipped unless `--force`. After an update, old images
+are pruned (`image_prune: false` turns that off): only images of fabric's
+repositories that no container uses, keeping each service's previous image
+for `rollback`. `sudo fabricctl --update-containers` is the old name of
+`images update --all`.
+
+Automatic fetching of newly validated lists (and optional automatic
+applying) follow in the next step (design `image-updates.md`).
 
 ```bash
-sudo fabricctl --update-containers
+sudo fabricctl images status
+sudo fabricctl images update --all
 ```
 
 #### `--version`

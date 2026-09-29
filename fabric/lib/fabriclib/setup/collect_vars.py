@@ -72,8 +72,10 @@ def collect_vars(ctx):
         # or editor) are the base; a --file only overrides the keys it sets.
         data = _load(ctx.vars_file)
         info(f"current settings from {ctx.vars_file}")
-        # Images the admin pinned explicitly (a vars file now or on an earlier
-        # run, recorded in image_pins) survive an upgrade; the rest follow the release.
+        # The images this host runs are kept (a fabric upgrade never changes
+        # them: `fabricctl images update` does). Images the admin set
+        # explicitly (a vars file now or earlier, recorded in image_pins) are
+        # also left alone by `images update`.
         explicit = {**_load(repo_vars), **user}
         pins = set(data.get("image_pins") or []) | {k for k in explicit if k.startswith("image_")}
         data["image_pins"] = sorted(pins)

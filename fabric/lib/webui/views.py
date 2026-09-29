@@ -51,17 +51,17 @@ SERVICES = {
     "nginx": ("Reverse proxy", None), "bind9": ("DNS", "bind9"), "stepca": ("Certificate authority", "stepca"),
     "ldap": ("389-DS directory", "dirsrv"), "postgres": ("Keycloak database", None),
     "keycloak": ("Single sign-on", None), "openbao": ("Secrets", "openbao"), "kea": ("DHCP", "kea"),
-    "freeradius": ("802.1X", "freeradius"), "webui": ("This web UI", None), "fabric-agent": ("Host API", None),
+    "freeradius": ("802.1X", "freeradius"), "fabric-web": ("This web UI", None), "fabric-agent": ("Host API", None),
 }
 
 _BASE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Fabric{% endblock %}</title>
+<title>{% block title %}Fabric · web control{% endblock %}</title>
 <link rel="stylesheet" href="/static/app.css"></head>
 <body>
 <header>
-  <a class="brand" href="/">Fabric</a>
+  <a class="brand" href="/">Fabric <span class="subtitle">web control</span></a>
   {% if ctx %}
   <div class="who">
     <a href="/audit">Audit log</a>
@@ -793,7 +793,7 @@ def css():
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
 header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;padding:12px max(16px,calc((100% - 1100px)/2 + 16px));border-bottom:1px solid var(--border);background:var(--surface)}
-.brand{font-weight:600;color:var(--text);text-decoration:none}
+.brand{font-weight:600;color:var(--text);text-decoration:none}.brand .subtitle{font-weight:400;color:var(--muted);font-size:.85em;margin-left:.35em}
 .who{display:flex;gap:12px;align-items:center;color:var(--muted);margin:0}.who form{margin:0}
 .tabs{display:flex;gap:4px;overflow-x:auto;padding:0 max(16px,calc((100% - 1100px)/2 + 16px));border-bottom:1px solid var(--border);background:var(--surface);scrollbar-width:thin}
 .tab{flex:none;padding:10px 12px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;white-space:nowrap}

@@ -12,5 +12,6 @@ and import as `fabriclib.<domain>.<file>`.
 | [setup/](setup/) | `fabricctl setup`, `doctor`, `uninstall`, `reinstall` — the installer |
 | [pki/](pki/) | Issue, check and install certificates from Step-CA |
 | [security/](security/) | Firewall for Docker-published ports |
+| [images/](images/) | Container images: status against the validated list, update (health-gated, rollback), prune |
 
 `cli.py` routes the lifecycle commands (`fabricctl setup|doctor|uninstall|reinstall`).

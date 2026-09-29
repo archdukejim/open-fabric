@@ -148,6 +148,8 @@ open(f"{W}/fabric/config/vars.yaml", "w").write(
     "domain: lan.test\ndns:\n  dynamic_zone_var:\n    zone_authority: true\n    A:\n    - {name: pi-core, ip: 192.168.7.53}\n"
     "    CNAME:\n    - {name: calibre, canonical: nas25-apps}\n")
 UID = 912
+DEBIAN = subprocess.run([sys.executable, f"{REPO}/tests/image_ref.py", "debian"], capture_output=True, text=True,
+                        check=True).stdout.strip()
 for d, owner, group, mode in [("agent", 0, UID, 0o750), ("run", UID, 0, 0o750), ("config", 0, UID, 0o750),
                               ("certs", 0, 0, 0o755)]:
     os.makedirs(f"{W}/{d}", exist_ok=True)
@@ -173,7 +175,7 @@ os.chown(f"{W}/config/webui.json", UID, UID)
 os.chmod(f"{W}/config/webui.json", 0o400)
 os.makedirs(f"{W}/build")
 sh(f"cp -a {REPO}/fabric/jinja/webui/build/. {W}/build/ && cp -a {REPO}/fabric/lib/webui {W}/build/app")
-sh(f"docker build -q --build-arg WEBUI_UID={UID} --build-arg WEBUI_GID={UID} -t fabric/webui:test {W}/build >/dev/null")
+sh(f"docker build -q --build-arg BASE_IMAGE={DEBIAN} --build-arg WEBUI_UID={UID} --build-arg WEBUI_GID={UID} -t fabric/webui:test {W}/build >/dev/null")
 sh(f"docker run -d --name cwebui --network cwnet --ip 10.254.8.80 --user {UID}:{UID} --group-add 0 "
    f"--read-only --security-opt no-new-privileges:true --cap-drop ALL --tmpfs /tmp:noexec,nosuid,size=16m "
    f"-v {W}/config:/config:ro -v {W}/certs:/certs:ro -v {W}/run:/run/webui -v {W}/agent:/agent:ro "

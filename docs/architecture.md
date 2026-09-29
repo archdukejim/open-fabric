@@ -174,7 +174,7 @@ Where an upstream image fights these settings, a thin **local build layer** (`fa
 
 Low ports need no capability: Docker sets `net.ipv4.ip_unprivileged_port_start=0` inside each container's network namespace.
 
-`apply` rebuilds a local layer (without `--pull`) only when its build context changed; `fabricctl --update-containers` rebuilds all of them with `--pull`.
+`apply` rebuilds a local layer only when its build context changed or it was built from another base than its pinned one; every base is pinned by digest (`fabric/images.lock.yaml`), and `fabricctl images update` moves bases and pulled images to the validated list (health-gated, with rollback).
 
 ---
 
@@ -315,7 +315,7 @@ All `.j2` files in this repo are rendered by the `fabricctl` deployment engine (
 | `fabric/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
 | `fabric/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
 | `fabric/jinja/webui/webui.json.j2` | `/opt/webui/config/webui.json` |
-| `fabric/jinja/webui/build/*` + `fabric/lib/webui/` | `/opt/webui/build/` (+ `app/`) — copied, not rendered; image `fabric/webui:local` |
+| `fabric/jinja/webui/build/*` + `fabric/lib/webui/` | `/opt/webui/build/` (+ `app/`) — copied, not rendered; image `fabric/web:local` (container and unit `fabric-web`) |
 | `fabric/jinja/systemd/fabric-agent.service.j2` | `/etc/systemd/system/fabric-agent.service` |
 | `fabric/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
 | `fabric/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |

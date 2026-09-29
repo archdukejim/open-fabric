@@ -109,7 +109,7 @@ fabricctl_<ver>_<arch>.deb
   /usr/share/fabricctl/templates/         fabric/jinja
   /usr/share/fabricctl/images/            (optional, "fabricctl-images" package) docker save tarballs
   /lib/systemd/system/fabric-agent.service shipped static, config in /etc
-  /lib/systemd/system/webui.service       compose wrapper for the webui container
+  /lib/systemd/system/fabric-web.service  compose wrapper for the fabric-web container
   /etc/fabric/                            conffiles: fabric.yaml (vars), link-vars.yaml
   /var/lib/fabric/                        secrets, rendered vars, archive/audit
 ```

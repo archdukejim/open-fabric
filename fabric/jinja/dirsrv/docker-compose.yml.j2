@@ -4,6 +4,7 @@ services:
     build:
       context: {{ deploy_base_dir }}/dirsrv/build
       args:
+        BASE_IMAGE: "{{ image_debian }}"
         DS_UID: "{{ service_users.ldap.uid }}"
         DS_GID: "{{ service_users.ldap.gid }}"
     container_name: dirsrv

@@ -7,6 +7,7 @@ import subprocess
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
+from fabriclib.images.needs_rebuild import needs_rebuild  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
@@ -17,6 +18,7 @@ from fabriclib.secrets.save_secrets import save_secrets  # noqa: E402
 import filecmp
 import json
 import re
+import time
 from datetime import datetime
 
 FABRIC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,20 +107,48 @@ def deploy_zone_files(src_dir, dst_dir, uid, gid):
             changed.append((fname[3:], src, dst))
     return changed
 
+def _file_serial(path):
+    m = re.search(r"^\s*(\d+)\s*;\s*Serial", open(path).read(), re.MULTILINE)
+    return m.group(1) if m else None
+
+
+def _served_serial(zone):
+    res = rndc(f"zonestatus {zone}")
+    m = re.search(r"^serial: (\d+)", res.stdout if res else "", re.MULTILINE)
+    return m.group(1) if m else None
+
+
 def reload_zone(zone, src, dst, uid, gid):
+    """Swap a zone file under a running BIND and make sure BIND serves it.
+
+    Freezing a dynamic zone makes BIND write its in-memory copy to the file,
+    and that write can land after ours and put the old zone back (seen in
+    the sandbox: "zone serial unchanged" on thaw, the new record missing).
+    So the served serial is checked against the new file, and the swap is
+    repeated until it matches."""
     print(f"Updating zone {zone}...")
-    frozen = rndc(f"freeze {zone}")
-    install_zone_file(src, dst, uid, gid)
-    jnl = dst + ".jnl"
-    if os.path.exists(jnl):
-        os.remove(jnl)
-    if frozen is not None and frozen.returncode == 0:
-        res = rndc(f"thaw {zone}")
-    else:
-        # Static zone (no update-policy): a plain reload is enough.
-        res = rndc(f"reload {zone}")
+    want = _file_serial(src)
+    res = None
+    for attempt in range(5):
+        frozen = rndc(f"freeze {zone}")
+        if attempt:
+            time.sleep(1)                      # let BIND finish writing its copy
+        install_zone_file(src, dst, uid, gid)
+        jnl = dst + ".jnl"
+        if os.path.exists(jnl):
+            os.remove(jnl)
+        if frozen is not None and frozen.returncode == 0:
+            res = rndc(f"thaw {zone}")
+        else:
+            # Static zone (no update-policy): a plain reload is enough.
+            res = rndc(f"reload {zone}")
+        if res is None or res.returncode != 0 or not want or _served_serial(zone) == want:
+            break
+        print(f"  BIND9 still serves the old {zone} (its own write raced ours); again")
     if res is None or res.returncode != 0:
         print(f"  Warning: BIND9 did not accept zone {zone}: {(res.stderr or res.stdout).strip() if res else 'timeout'}")
+    elif want and _served_serial(zone) != want:
+        print(f"  Warning: BIND9 serves {zone} serial {_served_serial(zone)}, not {want}")
 
 def apply_deployment(start_services=True):
     """Render and deploy all configuration. With start_services=False (first
@@ -327,7 +357,7 @@ def apply_deployment(start_services=True):
         {'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []},
         {'service': 'postgres', 'compose': 'postgres', 'folder': 'postgres', 'requires': []},
         {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']},
-        {'service': 'webui', 'compose': 'webui', 'folder': 'webui', 'requires': ['fabric-agent']},
+        {'service': 'fabric-web', 'compose': 'fabric-web', 'folder': 'webui', 'requires': ['fabric-agent']},
         # fabric-unlock: OpenBao starts only when an unlock method gives its key; the key is wiped once unsealed.
         {'service': 'openbao', 'compose': 'openbao', 'folder': 'openbao', 'requires': [],
          'condition': f"/usr/bin/python3 {DEPLOY_BASE_DIR}/fabric/lib/fabriclib/cli.py vault unlock",
@@ -517,7 +547,8 @@ def apply_deployment(start_services=True):
             if svc_folder == 'webui':
                 context_changed |= copy_tree_with_perms(os.path.join(FABRIC_DIR, "lib", "webui"),
                                                         os.path.join(build_dst, "app"), 0, 0, 0o644, 0o755)
-            if context_changed:
+            # ... and so does a base image other than the pinned one it was built FROM.
+            if context_changed or needs_rebuild(src_dc):
                 images_to_rebuild.add(svc_folder)
                 needs_restart = True
             
@@ -653,7 +684,7 @@ def apply_deployment(start_services=True):
         if nginx_config_changed:
             services_to_restart.add("nginx")
         if webui_changed:
-            services_to_restart.add("webui")
+            services_to_restart.add("fabric-web")
         if agent_unit_changed:
             services_to_restart.add("fabric-agent")
         if daemon_reload_needed:
@@ -698,8 +729,8 @@ def apply_deployment(start_services=True):
 
     # webui is restarted last and without blocking: this apply may have been
     # started from the web UI, and restarting it drops that request.
-    restart_webui = "webui" in services_to_restart or webui_changed
-    services_to_restart.discard("webui")
+    restart_webui = "fabric-web" in services_to_restart or webui_changed
+    services_to_restart.discard("fabric-web")
 
     # No --pull on purpose: apply never takes a new base image; only an
     # explicit update (`fabricctl --update-containers`) does.
@@ -747,10 +778,10 @@ def apply_deployment(start_services=True):
         print("Restarting fabric-agent (queued)...")
         subprocess.run(["systemctl", "restart", "--no-block", "fabric-agent"], timeout=15)
 
-    if restart_webui and subprocess.run(["systemctl", "is-enabled", "--quiet", "webui"]).returncode == 0:
+    if restart_webui and subprocess.run(["systemctl", "is-enabled", "--quiet", "fabric-web"]).returncode == 0:
         print("Restarting webui (queued)...")
-        subprocess.run(["systemctl", "restart", "--no-block", "webui"], timeout=15)
-        services_to_restart.add("webui")
+        subprocess.run(["systemctl", "restart", "--no-block", "fabric-web"], timeout=15)
+        services_to_restart.add("fabric-web")
 
     print("Deployment complete.")
     return services_to_restart

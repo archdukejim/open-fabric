@@ -10,6 +10,8 @@
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
+  fabricctl images status|update|rollback|prune
+                                 container images: validated versions, update, roll back, clean up
   fabricctl secrets list|show <name>
                                  fabric's own secrets (in OpenBao); `show` is audited
   fabricctl client-cert <user> [--days N]
@@ -28,6 +30,7 @@ import sys
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
+from fabriclib.images.run_images_command import run_images_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
 from fabriclib.secrets.run_secrets_command import run_secrets_command  # noqa: E402
 from fabriclib.pki.mint_extra_cert import mint_extra_cert  # noqa: E402
@@ -63,6 +66,8 @@ def main(argv):
         return run_setup.main(["--doctor", *args])
     if cmd == "secrets":
         return run_secrets_command(args, SetupContext(deploy_base=_base(args)).secrets_file)
+    if cmd == "images":
+        return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":

@@ -38,13 +38,14 @@ Everything is rendered from Jinja2 templates. Settings come from a vars file (`-
 - **Host:** Ubuntu 24.04 LTS, amd64 or arm64 (Raspberry Pi 4/5, 4 GB+). Setup installs Docker Engine (with compose v2) from Docker's apt repository if it is missing.
 
 ### Required Images
-Setup pulls or builds these images on the host:
-- `nginx:latest`
-- `ubuntu/bind9:latest`
-- `smallstep/step-ca:latest`
-- `fabric/dirsrv:local` (optional, if LDAP is enabled) — 389 Directory Server built locally from Debian stable packages (`fabric/jinja/dirsrv/build`); `fabricctl --update-containers` rebuilds it with the latest security updates
-- `keycloak/keycloak:latest` (optional, if Keycloak is enabled)
-- `postgres:latest` (optional, if Keycloak is enabled)
+Every image is pinned by digest (amd64 + arm64) in
+[`fabric/images.lock.yaml`](fabric/images.lock.yaml); a fabric upgrade never
+changes a running image, `sudo fabricctl images update` does. Setup pulls or
+builds:
+- `nginx` (stable branch), `openbao/openbao`
+- `smallstep/step-ca` and `keycloak/keycloak` (optional) — bases of thin local hardened layers
+- `postgres` (optional, with Keycloak)
+- `debian:trixie-slim` — base of the images built locally from Debian packages: `fabric/bind9:local` (BIND 9.20), `fabric/dirsrv:local` (389 Directory Server, optional) and `fabric/web:local` (the web UI, container `fabric-web`)
 
 ### Deployment Modes
 - **Install:** `sudo apt install ./fabricctl_<version>_all.deb`, then `sudo fabricctl setup` — shows the hardened default plan; Proceed or Advanced (relax any item).
@@ -78,9 +79,6 @@ The following gaps were identified while writing this document:
 **Missing features:**
 - No automated health check for DoH (`/dns-query`) or DoT (`:853`) endpoints — these are core delivery paths.
 - No LDAP user/group provisioning tooling — `vars.yaml` defines the OU structure but adding actual users requires manual `ldapadd` (as `super_admin`/`user_creator_admin` over StartTLS or LDAPS) or the Keycloak admin console (writable LDAP federation).
-
-**Hardening gaps:**
-- Docker images are still referenced by `:latest` tag by default. All image references are now centralized in `vars.yaml` (`image_nginx`, `image_bind9`, `image_stepca`) making digest pinning straightforward — but the defaults remain mutable `:latest` tags.
 
 **Documentation gaps:**
 - `fabric/lib/manage.sh --mint-certs` ACME mode references a Portainer webhook URL but its expected format and behavior are not documented.
