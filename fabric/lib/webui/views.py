@@ -135,13 +135,13 @@ _TEMPLATES = {
 {% for r in zone.records %}
 <tr><td><span class="pill">{{ r.type }}</span></td><td>{{ r.name or '(missing)' }}</td><td><code>{{ r.value }}</code></td>
 <td>{% if r.ptr %}<span class="muted small">auto</span> <code class="small">{{ r.ptr }}</code>{% elif r.ptr_note %}<span class="muted small">none — {{ r.ptr_note }}</span>{% endif %}</td>
-<td class="num"><form method="post" action="/bind9/zone/{{ zone.key | urlencode }}/delete">
+<td class="num">{% if can('dns:write') %}<form method="post" action="/bind9/zone/{{ zone.key | urlencode }}/delete">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="type" value="{{ r.type }}">
 <input type="hidden" name="index" value="{{ r.index }}"><input type="hidden" name="name" value="{{ r.name }}">
-<button class="danger">Delete</button></form></td></tr>
+<button class="danger">Delete</button></form>{% endif %}</td></tr>
 {% endfor %}</tbody></table></section>
 <section class="card"><h2>Add record</h2>
-<form method="post" action="/bind9/zone/{{ zone.key | urlencode }}/add" class="grid">
+{% if can('dns:write') %}<form method="post" action="/bind9/zone/{{ zone.key | urlencode }}/add" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Type<select name="type">{% for t in types %}<option>{{ t }}</option>{% endfor %}</select></label>
 <label>Name<input name="name" required placeholder="www or @"></label>
@@ -152,7 +152,7 @@ _TEMPLATES = {
 <label>Weight (SRV)<input name="weight" inputmode="numeric"></label>
 <label>Port (SRV)<input name="port" inputmode="numeric"></label>
 <div><button>Add record</button></div>
-</form>
+</form>{% endif %}
 <p class="muted">A and AAAA records with a private address get their PTR record automatically — see Reverse zones.</p></section>
 {% else %}<section class="card"><p class="blank">No forward zones.</p></section>{% endif %}
 
@@ -184,14 +184,14 @@ _TEMPLATES = {
 <tr><td><strong>{{ k.name }}</strong><div class="muted small">{{ k.algorithm }}</div></td><td>{{ k.scope }}</td>
 <td>{{ k.types }}</td><td>{{ k.acls | join(', ') or '—' }}</td>
 <td class="num"><div class="row-actions">
-<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/rotate"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">New secret</button></form>
-<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete</button></form>
+{% if can('tsig:manage') %}<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/rotate"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">New secret</button></form>{% endif %}
+{% if can('tsig:manage') %}<form method="post" action="/bind9/tsig/{{ k.name | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete</button></form>{% endif %}
 </div></td></tr>
 {% endfor %}</tbody></table>
 {% else %}<p class="blank">No TSIG keys yet.</p>{% endif %}
 </section>
 <section class="card"><h2>New TSIG key for a zone</h2>
-<form method="post" action="/bind9/tsig/create" class="grid">
+{% if can('tsig:manage') %}<form method="post" action="/bind9/tsig/create" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Key name<input name="name" required pattern="[A-Za-z0-9][A-Za-z0-9_.-]{0,62}" placeholder="npm-certbot"></label>
 <label>Zone<select name="zone">{% for z in forward_zones %}<option>{{ z.name }}</option>{% endfor %}</select></label>
@@ -202,15 +202,15 @@ _TEMPLATES = {
 </fieldset>
 <label class="wide">Existing secret (optional — keep a current client working)<input name="secret" type="password" autocomplete="off" placeholder="base64; leave empty to generate"></label>
 <div><button>Create key</button></div>
-</form></section>
+</form>{% endif %}</section>
 <section class="card"><h2>ACLs and update policies</h2><p class="blank">Left intentionally blank.</p>
 <p class="muted">Who may query the zones, and which certbot devices may prove which names (today: <code>fabricctl acl</code>).</p></section>
 {% endif %}
-<form method="post" action="/apply" class="apply card">
+{% if can('dns:write') %}<form method="post" action="/apply" class="apply card">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <button>Apply changes</button>
 <span class="muted">Publishes zone, reverse-zone and key changes to BIND9 — reloads only what changed (same as <code>fabricctl --apply</code>).</span>
-</form>
+</form>{% endif %}
 {% endblock %}""",
 
     "dirsrv": """{% extends "base" %}{% from "dirsrv_macros" import device_fields, role_fields with context %}{% block body %}
@@ -238,12 +238,12 @@ _TEMPLATES = {
 </section>
 <section class="card"><h2>Add a device</h2>
 {% set d = {'enabled': True, 'roles': [], 'macs': [], 'type': 'laptop'} %}
-<form method="post" action="/dirsrv/devices/_new" class="grid">
+{% if can('devices:enroll') %}<form method="post" action="/dirsrv/devices/_new" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Name<input name="name" required pattern="[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?" placeholder="jims-laptop"></label>
 {{ device_fields(d) }}
 <div><button>Add device</button></div>
-</form></section>
+</form>{% endif %}</section>
 
 {% elif view == 'device' %}
 {% set d = device %}
@@ -254,23 +254,23 @@ _TEMPLATES = {
 <dt>May</dt><dd>{% for p in d.permissions %}<div>{{ data.permissions[p][0] }} <span class="muted small">· {{ p }}</span></div>{% else %}{{ 'nothing — disabled' if not d.enabled else 'nothing (no role grants anything)' }}{% endfor %}</dd></dl>
 </section>
 <section class="card"><h2>Edit</h2>
-<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}" class="grid">
+{% if can('devices:admin') %}<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 {{ device_fields(d) }}
 <div><button>Save</button></div>
-</form></section>
+</form>{% endif %}</section>
 <section class="card"><h2>Certificates</h2>
 <p class="muted">Certificates issued to this device (by SHA-256 fingerprint). 802.1X EAP-TLS will accept these for this device.</p>
 {% if d.certs %}<table><tbody>{% for fp in d.certs %}
-<tr><td><code class="fp small">{{ fp }}</code></td><td class="num"><form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}/certs/unlink">
-<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="sha256" value="{{ fp }}"><button class="danger">Unlink</button></form></td></tr>
+<tr><td><code class="fp small">{{ fp }}</code></td><td class="num">{% if can('pki:link-device') %}<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}/certs/unlink">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="sha256" value="{{ fp }}"><button class="danger">Unlink</button></form>{% endif %}</td></tr>
 {% endfor %}</tbody></table>{% else %}<p class="blank">None linked.</p>{% endif %}
 <p><a class="btn" href="/stepca?view=issue&device={{ d.name | urlencode }}">Generate key + certificate</a>
 <a class="btn" href="/stepca?view=sign&device={{ d.name | urlencode }}">Sign its CSR</a></p>
 </section>
-<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}/delete" class="card apply">
+{% if can('devices:admin') %}<form method="post" action="/dirsrv/devices/{{ d.name | urlencode }}/delete" class="card apply">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete device</button>
-<span class="muted">Removes it from every role. Its certificates stay valid until they expire.</span></form>
+<span class="muted">Removes it from every role. Its certificates stay valid until they expire.</span></form>{% endif %}
 
 {% elif view == 'roles' %}
 <section class="card"><h2>Roles <span class="muted">{{ data.roles | length }}</span></h2>
@@ -284,26 +284,26 @@ _TEMPLATES = {
 {% else %}<p class="blank">No roles yet.</p>{% endif %}
 </section>
 <section class="card"><h2>New role</h2>
-<form method="post" action="/dirsrv/roles/_new" class="grid">
+{% if can('roles:admin') %}<form method="post" action="/dirsrv/roles/_new" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Name<input name="name" required pattern="[a-z0-9][a-z0-9_-]{0,62}" placeholder="iot"></label>
 {{ role_fields({'permissions': [], 'priority': 100}) }}
 <div><button>Create role</button></div>
-</form></section>
+</form>{% endif %}</section>
 
 {% elif view == 'role' %}
 {% set r = role %}
 <p><a href="/dirsrv?view=roles">← Roles</a></p>
 <section class="card"><h2>{{ r.name }}</h2>
 <p class="muted">Devices: {% for m in r.members %}<a href="/dirsrv?view=device&name={{ m | urlencode }}">{{ m }}</a>{{ ', ' if not loop.last }}{% else %}none{% endfor %} — add or remove devices from each device's page.</p>
-<form method="post" action="/dirsrv/roles/{{ r.name | urlencode }}" class="grid">
+{% if can('roles:admin') %}<form method="post" action="/dirsrv/roles/{{ r.name | urlencode }}" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 {{ role_fields(r) }}
 <div><button>Save</button></div>
-</form></section>
-<form method="post" action="/dirsrv/roles/{{ r.name | urlencode }}/delete" class="card apply">
+</form>{% endif %}</section>
+{% if can('roles:admin') %}<form method="post" action="/dirsrv/roles/{{ r.name | urlencode }}/delete" class="card apply">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Delete role</button>
-<span class="muted">Only possible once no device is in it.</span></form>
+<span class="muted">Only possible once no device is in it.</span></form>{% endif %}
 
 {% elif view == 'people' %}
 <section class="card"><h2>People <span class="muted">{{ people.users | length }}</span></h2>
@@ -385,7 +385,7 @@ _TEMPLATES = {
 <td><code class="small">{{ sl.device }}</code>{% if sl.detail %}<div class="muted small">{{ sl.detail }}</div>{% endif %}</td>
 <td><code class="small">{{ sl.key_id }}</code></td><td class="small">{{ sl.added }}</td>
 <td class="num"><div class="row-actions">
-<form method="post" action="/openbao/slots/{{ sl.id | urlencode }}/test"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost"{{ '' if live else ' disabled' }}>Test</button></form>
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/{{ sl.id | urlencode }}/test"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost"{{ '' if live else ' disabled' }}>Test</button></form>{% endif %}
 <a class="btn danger-link{{ '' if live and slots | length > 1 else ' disabled' }}" href="/openbao?view=remove&slot={{ sl.id | urlencode }}">Remove</a>
 </div></td></tr>
 {% endfor %}</tbody></table>
@@ -413,7 +413,7 @@ _TEMPLATES = {
 <p class="flash warn">Tested with a software token (SoftHSM2) only. YubiKey, Nitrokey and other hardware tokens are untested.</p>
 {% set pk = devices.pkcs11 or [] %}
 {% if pk %}
-<form method="post" action="/openbao/slots/add-security-key" class="grid">
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-security-key" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <fieldset class="wide"><legend>Tokens the PKCS#11 libraries see</legend>
 {% set enrolled = slots | map(attribute='device') | join(' ') %}
@@ -428,7 +428,7 @@ _TEMPLATES = {
 <label>Token PIN<input name="pin" type="password" autocomplete="off" required minlength="4" maxlength="64"></label>
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button{{ '' if add_live['security-key'] else ' disabled' }}>Add security key</button></div>
-</form>
+</form>{% endif %}
 <p class="muted small">fabric wraps the vault key with the token, unwraps it again and checks it before saving. It never spends a token's last PIN try, and after a wrong PIN it does not retry unattended. You may be asked to sign in again first.</p>
 {% else %}<p class="blank">No PKCS#11 token found. Plug one in; the library must be installed (<code>ykcs11</code> for YubiKey, <code>opensc-pkcs11</code> for most others, both with <code>pcscd</code>).</p>{% endif %}
 {% set seen = pk | map(attribute='serial') | list %}
@@ -440,7 +440,7 @@ _TEMPLATES = {
 <section class="card"><h2>Add a USB stick</h2>
 <p class="muted">The stick is wiped and gets a copy of the vault key. fabric records its serial and filesystem UUID and ignores sticks it did not make. Keypad-encrypted drives (Apricorn, IronKey, iStorage) work too: unlock them with their PIN first. A plain stick can be copied by anyone who holds it for a moment — a security key cannot.</p>
 {% if devices.disks %}
-<form method="post" action="/openbao/slots/add-usb" class="grid">
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-usb" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <fieldset class="wide"><legend>Plugged into this host (will be erased)</legend>
 {% for d in devices.disks %}<label class="check perm"><input type="radio" name="disk" value="{{ d.path }}"{{ ' checked' if loop.first }}> <strong>{{ d.model }}</strong> <span class="muted small">{{ d.size_gb }} GB · serial {{ d.serial or '—' }} · {{ d.path }}{% if d.labels %} · {{ d.labels | join(', ') }}{% endif %}</span></label>{% endfor %}
@@ -448,7 +448,7 @@ _TEMPLATES = {
 <label>Label<input name="label" placeholder="safe stick" maxlength="60"></label>
 <label class="wide">Type this host's name to confirm erasing it<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button class="danger"{{ '' if add_live['usb'] else ' disabled' }}>Erase and add</button></div>
-</form>
+</form>{% endif %}
 {% else %}<p class="blank">No USB disk found. Plug one into this host and reload.</p>{% endif %}
 </section>
 
@@ -456,7 +456,7 @@ _TEMPLATES = {
 <p><a href="/openbao?view=unlock">← Unlock methods</a></p>
 <section class="card"><h2>Add an HSM or key manager (KMIP)</h2>
 <p class="muted">Any KMIP server that can AES-GCM encrypt with a key you created on it (CipherTrust, Fortanix, Entrust KeyControl, IBM GKLM, Cosmian, OVHcloud KMS, …). The vault key is encrypted by a key that never leaves the device, over mutual TLS. Revoking fabric's client on the device is the kill switch.</p>
-<form method="post" action="/openbao/slots/add-hsm" enctype="multipart/form-data" class="grid">
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-hsm" enctype="multipart/form-data" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Endpoint<input name="endpoint" required placeholder="kms.lan:5696"></label>
 <label>Key id (an active AES-256 key)<input name="key_id" required></label>
@@ -469,7 +469,7 @@ _TEMPLATES = {
 </fieldset>
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button{{ '' if add_live['hsm'] else ' disabled' }}>Test and add</button></div>
-</form>
+</form>{% endif %}
 <p class="muted small">A trial encrypt/decrypt through the device runs before anything is saved.</p></section>
 
 {% elif view == 'rotate' %}
@@ -479,11 +479,11 @@ _TEMPLATES = {
 {% for sl in slots %}<tr><td><span class="light {{ 'ok' if sl.present else 'bad' }}"></span></td><td>{{ slot_types[sl.type][0] }} <span class="muted small">{{ sl.label }}</span></td>
 <td>{% if sl.present %}re-protected with the new key{% else %}<span class="bad-text">stops working (device not present)</span>{% endif %}</td></tr>{% endfor %}
 </tbody></table>
-<form method="post" action="/openbao/rotate" class="grid">
+{% if can('vault:unlock') %}<form method="post" action="/openbao/rotate" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button{{ '' if live and slots | selectattr('present') | list else ' disabled' }}>Rotate</button></div>
-</form>
+</form>{% endif %}
 <p class="muted small">OpenBao restarts once with the old and new key, re-protects itself, then keeps only the new one. You will be asked to sign in again first.</p></section>
 
 {% elif view == 'remove' %}
@@ -492,11 +492,11 @@ _TEMPLATES = {
 <section class="card"><h2>Remove {{ slot_types[sl.type][0] | lower if sl else 'method' }}</h2>
 {% if sl %}<p>{{ sl.label }} — <code class="small">{{ sl.device }}</code></p>
 <p class="muted">{% if sl.type == 'local' %}The key file is shredded. From then on only your devices unlock the vault.{% elif sl.type == 'usb' %}Its record is removed; the copy on the stick stays usable until you rotate the key — rotate if the stick is lost.{% else %}Its protected copy is deleted; the device's own key is untouched.{% endif %}</p>
-<form method="post" action="/openbao/slots/{{ sl.id | urlencode }}/remove" class="grid">
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/{{ sl.id | urlencode }}/remove" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button class="danger"{{ '' if live and slots | length > 1 else ' disabled' }}>Remove</button></div>
-</form>{% if slots | length < 2 %}<p class="muted">The last unlock method cannot be removed.</p>{% endif %}
+</form>{% endif %}{% if slots | length < 2 %}<p class="muted">The last unlock method cannot be removed.</p>{% endif %}
 {% else %}<p class="blank">No such method.</p>{% endif %}
 </section>
 
@@ -543,12 +543,12 @@ _TEMPLATES = {
 {% if review.problems %}
 <p class="flash bad">This request cannot be signed:</p><ul>{% for p in review.problems %}<li>{{ p }}</li>{% endfor %}</ul>
 {% else %}
-<form method="post" action="/stepca/sign" class="grid">
+{% if can('pki:sign') %}<form method="post" action="/stepca/sign" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="csr" value="{{ review.pem }}">
 {{ device_select() }}
 <label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
 <div><button>Sign certificate</button></div>
-</form>
+</form>{% endif %}
 <p class="muted">Issued as a leaf certificate for server and client authentication, from the fabric intermediate CA.</p>
 {% endif %}
 <details><summary>Decoded request</summary><pre>{{ review.text }}</pre></details>
@@ -556,17 +556,17 @@ _TEMPLATES = {
 {% endif %}
 <section class="card"><h2>Sign a certificate signing request</h2>
 <p class="muted">For devices that make their own key (switches, printers, appliances, Windows <code>certreq</code>, <code>openssl req</code>). The private key never leaves the device.</p>
-<form method="post" action="/stepca/sign/review" enctype="multipart/form-data" class="stack">
+{% if can('pki:sign') %}<form method="post" action="/stepca/sign/review" enctype="multipart/form-data" class="stack">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="device" value="{{ device }}">
 <label>Upload a CSR (.csr, .req, .pem or DER)<input type="file" name="csr_file" accept=".csr,.req,.pem,.der,.txt"></label>
 <label>…or paste it<textarea name="csr" rows="8" placeholder="-----BEGIN CERTIFICATE REQUEST-----"></textarea></label>
 <div><button>Review</button></div>
-</form></section>
+</form>{% endif %}</section>
 
 {% elif view == 'issue' %}
 <section class="card"><h2>New private key and certificate</h2>
 <p class="muted">For devices that cannot make a CSR. The key is generated here, shown once for download (PEM and a password-protected .p12) and not kept.</p>
-<form method="post" action="/stepca/issue" class="grid">
+{% if can('pki:issue') %}<form method="post" action="/stepca/issue" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Name (CN)<input name="cn" required placeholder="printer.home.arpa" value="{{ (device ~ ('.' ~ ca.domain if ca and ca.domain else '')) if device else '' }}"></label>
 {{ device_select() }}
@@ -574,7 +574,7 @@ _TEMPLATES = {
 <label>Key type<select name="key_type">{% for k in key_types %}<option{{ ' selected' if k == 'RSA-2048' }}>{{ k }}</option>{% endfor %}</select></label>
 <label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
 <div><button>Generate</button></div>
-</form>
+</form>{% endif %}
 <p class="muted">RSA-2048 is the most widely accepted by older devices; EC keys are smaller and faster where supported.</p></section>
 
 {% elif view == 'inspect' %}
@@ -595,24 +595,24 @@ _TEMPLATES = {
 {% endif %}
 <section class="card"><h2>Inspect a certificate or CSR</h2>
 <p class="muted">Decodes PEM, DER or base64: subject, names, validity, usages, fingerprints, and whether this fabric issued it. Private keys are refused unread.</p>
-<form method="post" action="/stepca/inspect" enctype="multipart/form-data" class="stack">
+{% if can('pki:read') %}<form method="post" action="/stepca/inspect" enctype="multipart/form-data" class="stack">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Upload (.crt, .cer, .pem, .der, .csr)<input type="file" name="file"></label>
 <label>…or paste<textarea name="data" rows="8" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
 <div><button>Inspect</button></div>
-</form></section>
+</form>{% endif %}</section>
 
 {% elif view == 'convert' %}
 <section class="card"><h2>Convert a certificate</h2>
 <p class="muted">Get a certificate as PEM (.crt), DER (.cer), full chain (.pem / .p7b) — and, with its private key, a password-protected .p12 for Windows, macOS and phones. The key is not kept.</p>
-<form method="post" action="/stepca/convert" enctype="multipart/form-data" class="stack">
+{% if can('pki:issue') %}<form method="post" action="/stepca/convert" enctype="multipart/form-data" class="stack">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Certificate (upload)<input type="file" name="cert_file"></label>
 <label>…or paste<textarea name="cert" rows="6" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
 <label>Private key for a .p12 (optional, unencrypted PEM; upload)<input type="file" name="key_file"></label>
 <label>…or paste<textarea name="key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" autocomplete="off"></textarea></label>
 <div><button>Convert</button></div>
-</form></section>
+</form>{% endif %}</section>
 
 {% elif view == 'issued' %}
 <section class="card"><h2>Issued by hand</h2>
@@ -660,9 +660,9 @@ _TEMPLATES = {
 <textarea readonly rows="9">{{ ini }}</textarea>
 <p><a class="btn" href="data:text/plain;base64,{{ ini_b64 }}" download="{{ key_name }}-rfc2136.ini">{{ key_name }}-rfc2136.ini</a></p>
 </section>
-<form method="post" action="/apply" class="apply card">
+{% if can('dns:write') %}<form method="post" action="/apply" class="apply card">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button>Apply changes</button>
-<span class="muted">Until applied, BIND9 does not know this {{ 'key' if action == 'created' else 'secret' }}.</span></form>
+<span class="muted">Until applied, BIND9 does not know this {{ 'key' if action == 'created' else 'secret' }}.</span></form>{% endif %}
 <p><a href="/bind9?view=tsig">Back to TSIG keys</a></p>
 {% endblock %}""",
 
@@ -687,10 +687,32 @@ _TEMPLATES = {
 _env.loader = jinja2.DictLoader(_TEMPLATES)
 
 
+# every permission a page asks about (the dev preview's fallback when it runs without fabriclib)
+PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "pki:read", "pki:issue", "pki:sign",
+                 "pki:link-device", "devices:read", "devices:enroll", "devices:admin", "roles:admin", "radius:read",
+                 "people:read", "vault:status", "vault:unlock", "audit:read"]
+# tab -> the permission(s) that show it (any of them)
+TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dns:read",), "stepca": ("pki:read",),
+             "dirsrv": ("devices:read", "people:read"), "freeradius": ("radius:read",),
+             "openbao": ("vault:status",)}
+MENU_PERMS = {"sign": "pki:sign", "issue": "pki:issue", "convert": "pki:issue", "people": "people:read",
+              "devices": "devices:read", "roles": "devices:read", "unlock": "vault:status"}
+
+
 def _render(name, **kw):
+    """Pages see `can(permission)`: what the signed-in person may do
+    (fabric-agent enforces it; the pages only hide what they cannot use)."""
     kw.setdefault("ctx", None)
     kw.setdefault("tab", None)
-    kw["tabs"] = TABS
+    perms = set((kw["ctx"] or {}).get("perms") or ())
+
+    def can(perm):
+        return perm in perms
+    kw["can"] = can
+    kw["tabs"] = [t for t in TABS if any(can(q) for q in TAB_PERMS.get(t[0], ()))]
+    for key in ("menu", "sections"):
+        if kw.get(key):
+            kw[key] = [(v, label) for v, label in kw[key] if can(MENU_PERMS.get(v, "")) or v not in MENU_PERMS]
     return _env.get_template(name).render(**kw)
 
 

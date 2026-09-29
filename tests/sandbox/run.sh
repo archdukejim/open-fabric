@@ -191,8 +191,15 @@ docker cp "$OUT/bob.py" "$NAME:/root/bob.py"
 in_box "BOB_PW='$BOB_PW' python3 /root/bob.py" > "$OUT/bob.log" 2>&1
 BOB_P12_PW=$(in_box 'fabricctl client-cert bob' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
 check "second user bob (directory user, not an admin) with a client cert" "grep -q created '$OUT/bob.log' && [ -n '$BOB_P12_PW' ]"
+# carol: a member of the auditors group -> the fabric-auditor bundle (read-only)
+CAROL_PW=$(openssl rand -base64 18)
+sed 's/webui_admin_group="users"), "bob", os.environ\["BOB_PW"\], "bob@lan.test"/webui_admin_group="auditors"), "carol", os.environ["BOB_PW"], "carol@lan.test"/' "$OUT/bob.py" > "$OUT/carol.py"
+docker cp "$OUT/carol.py" "$NAME:/root/carol.py"
+in_box "BOB_PW='$CAROL_PW' python3 /root/carol.py" > "$OUT/carol.log" 2>&1
+CAROL_P12_PW=$(in_box 'fabricctl client-cert carol' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
+check "third user carol in the auditors group, with a client cert" "grep -q created '$OUT/carol.log' && [ -n '$CAROL_P12_PW' ]"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
-in_box "python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
+in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
 check "sign-in: admin gets in; HTTP, missing/foreign certs, non-admins and borrowed certs are refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"
 

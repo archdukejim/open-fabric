@@ -32,8 +32,10 @@ try:        # the real rules when run from a checkout; the webui image carries o
     from fabriclib.ldap.common.check_role_fields import check_role_fields  # noqa: E402
     from fabriclib.ldap.constants import DEVICE_NAME_RE, DEVICE_TYPES, PERMISSIONS, ROLE_NAME_RE  # noqa: E402
     from fabriclib.ldap.list_devices import list_devices  # noqa: E402
+    from fabriclib.rbac.permissions import BUNDLES, PERMISSIONS as FABRIC_PERMISSIONS  # noqa: E402
 except ImportError:
     ptr_for_ip = reverse_zones = list_devices = None
+    BUNDLES, FABRIC_PERMISSIONS = {}, {p: "" for p in views.PREVIEW_PERMS}
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE = {
@@ -254,7 +256,7 @@ class DevState:
 
 class Handler(BaseHTTPRequestHandler):
     state = DevState()
-    ctx = {"user": "dev (preview)", "csrf": "dev", "dev": True,
+    ctx = {"user": "dev (preview)", "csrf": "dev", "dev": True, "perms": sorted(FABRIC_PERMISSIONS),
            "version": {"version": "dev preview", "build": "sample data · no sign-in · nothing is saved"}}
 
     def log_message(self, fmt, *args):
@@ -438,7 +440,14 @@ def main():
     ap = argparse.ArgumentParser(description="Fabric web UI dev preview (sample data, no sign-in, no backend)")
     ap.add_argument("--bind", default="127.0.0.1", help="address to listen on (default 127.0.0.1)")
     ap.add_argument("--port", type=int, default=8080)
+    ap.add_argument("--as", dest="bundle", default="admin",
+                    help="see the UI as this role bundle: " + ", ".join(sorted(BUNDLES)) + " (default admin)")
     args = ap.parse_args()
+    if args.bundle != "admin":
+        if args.bundle not in BUNDLES:
+            ap.error(f"unknown bundle {args.bundle!r}")
+        Handler.ctx = dict(Handler.ctx, perms=sorted(BUNDLES[args.bundle]),
+                           user=f"dev (preview as {args.bundle})")
     server = ThreadingHTTPServer((args.bind, args.port), Handler)
     print(f"Fabric web UI DEV PREVIEW on http://{args.bind}:{args.port}/ — sample data, no sign-in, "
           "nothing is saved. Never expose this.", flush=True)

@@ -7,10 +7,12 @@ unix socket, mounted into this container.
 import http.client
 import json
 import socket
+import threading
 import urllib.parse
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 _socket_path = "/agent/agent.sock"
+_local = threading.local()          # the signed-in person's ID token for this request's calls
 
 
 class ValidationError(ValueError):
@@ -19,6 +21,19 @@ class ValidationError(ValueError):
 
 class AgentError(RuntimeError):
     """The agent is unreachable or failed."""
+
+
+class AuthError(RuntimeError):
+    """The agent did not accept the sign-in token (expired, ended): sign in again."""
+
+
+class PermissionDenied(RuntimeError):
+    """The signed-in person lacks the permission this needs; message is safe to show."""
+
+
+def set_token(token):
+    """Every call from this thread carries `token` (fabric-agent checks it)."""
+    _local.token = token
 
 
 def configure(path):
@@ -40,7 +55,10 @@ def _call(method, path, body=None, timeout=30):
     conn = _UnixConnection(timeout)
     try:
         payload = json.dumps(body).encode() if body is not None else None
-        conn.request(method, path, body=payload, headers={"Content-Type": "application/json"})
+        headers = {"Content-Type": "application/json"}
+        if getattr(_local, "token", None):
+            headers["Authorization"] = f"Bearer {_local.token}"
+        conn.request(method, path, body=payload, headers=headers)
         resp = conn.getresponse()
         data = json.loads(resp.read() or b"null")
     except (OSError, ValueError) as exc:
@@ -49,6 +67,10 @@ def _call(method, path, body=None, timeout=30):
         conn.close()
     if resp.status == 400:
         raise ValidationError((data or {}).get("error", "rejected"))
+    if resp.status == 401:
+        raise AuthError((data or {}).get("error", "not signed in"))
+    if resp.status == 403:
+        raise PermissionDenied((data or {}).get("error", "not allowed"))
     if resp.status != 200:
         raise AgentError(f"fabric-agent error {resp.status}: {(data or {}).get('error', '')}")
     return data

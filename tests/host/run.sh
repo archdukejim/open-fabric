@@ -85,6 +85,12 @@ put "$OUT/bob.py"
 R "BOB_PW='$BOB_PW' python3 /tmp/bob.py" > "$OUT/bob.log" 2>&1
 BOB_P12_PW=$(R 'fabricctl client-cert bob' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
 KIT=$(R "getent passwd $LOGIN | cut -d: -f6")/fabric-admin
+# A host signed into before (this suite re-run on the same machine): put the admin and
+# bob back to their first-login state, so the scripted sign-in sees the same flow.
+put "$REPO/tests/host/reset_user.py"
+ADMIN=$(R "awk '/^webui_admin_user:/{print \$2}' /opt/fabric/config/vars.yaml")
+R "PW=\$(cat $KIT/initial-password.txt) python3 /tmp/reset_user.py $ADMIN" > "$OUT/reset.log" 2>&1
+R "PW='$BOB_PW' python3 /tmp/reset_user.py bob" >> "$OUT/reset.log" 2>&1
 R "FABRIC_KIT=$KIT python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" > "$OUT/login.log" 2>&1
 check "sign-in: admin in; HTTP, missing/foreign certs, non-admin and borrowed certs refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"

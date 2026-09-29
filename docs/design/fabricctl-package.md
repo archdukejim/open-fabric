@@ -542,7 +542,7 @@ repartition or encrypt disks itself (a one-time job with data at risk).
   (step-ca supports YubiKey PIV-backed keys), so issuing certificates needs
   the token too.
 
-## 7e. Access control for people: RBAC across the stack (decided, D19)
+## 7e. Access control for people: RBAC across the stack (decided, D19; built)
 
 Today the web UI has one role (`fabric-admin`) that can do everything. The
 389-DS roles of §5/§6 are what *devices* may do on the network; this is
@@ -572,7 +572,12 @@ what *people* may do in fabric.
   (signature via the realm's keys, issuer, audience, expiry, roles). A
   compromised web UI container cannot act beyond the signed-in user.
 - **OpenBao** uses the same roles: each bundle maps to OpenBao policies
-  through the OIDC role's claims (Admin today: `fabric-admin`).
+  through the OIDC role's claims (built: Admin → `fabric-admin`; the other
+  bundles' OpenBao policies are still to come).
+- **Built:** permission roles, bundles and their groups in Keycloak and
+  389-DS, the agent's token check and route table, pages that follow the
+  permissions, token renewal (a removed role ends the session). The people
+  pages for Helpdesk (create users, reset sign-in) are still to come.
 - **The host CLI** stays root (`sudo fabricctl` = everything); RBAC covers
   the web UI and its agent API. Step-up sign-in (5 min) and the typed host
   name stay on dangerous changes whatever the role.

@@ -11,7 +11,10 @@ Talks to the Keycloak admin REST API over TLS pinned to the core root CA
   * LDAP user federation -> 389 Directory Server (an existing LDAP
     provider is updated in place)
   * group mapper for ou=groups, synced into Keycloak
-  * realm role <webui_admin_role>, granted to group <webui_admin_group>
+  * fabric's access control (design D19): a realm role per permission
+    (fabric:<area>:<action>) and a composite role per bundle; <webui_admin_role>
+    is the admin bundle, granted to <webui_admin_group>; other bundles are
+    granted to the ldap_groups that name them (fabriclib/keycloak/ensure_rbac_roles.py)
   * confidential OIDC client "fabric-webui" (code flow + PKCE S256, exact
     redirect URI, only the admin role in scope, roles in the ID token)
   * browser flow "fabric-webui-mfa" with TOTP required, bound to fabric-webui
@@ -29,6 +32,7 @@ import yaml
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from webui.tlsclient import TLSClient  # noqa: E402
 from fabriclib.keycloak.ensure_openbao_client import ensure_openbao_client  # noqa: E402
+from fabriclib.keycloak.ensure_rbac_roles import ensure_rbac_roles  # noqa: E402
 from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
 
 CLIENT_ID = "fabric-webui"
@@ -158,15 +162,6 @@ def ensure_group_mapper(kc, realm, ldap_id, v):
     step("synced LDAP groups into Keycloak")
 
 
-def ensure_role(kc, realm, role):
-    status, rep = kc.call("GET", f"/{q(realm)}/roles/{q(role)}", allow=(404,))
-    if status == 404:
-        kc.call("POST", f"/{q(realm)}/roles", {"name": role, "description": "Full access to the webui management UI"})
-        rep = kc.call("GET", f"/{q(realm)}/roles/{q(role)}")[1]
-        step(f"created realm role {role}")
-    return rep
-
-
 def grant_role_to_group(kc, realm, role_rep, group_name):
     _, groups = kc.call("GET", f"/{q(realm)}/groups?search={q(group_name)}&exact=true&briefRepresentation=true")
     group = next((g for g in groups if g.get("name") == group_name), None)
@@ -216,7 +211,7 @@ def ensure_mfa_flow(kc, realm):
     return next(f["id"] for f in flows if f["alias"] == MFA_FLOW)
 
 
-def ensure_client(kc, realm, v, s, role_rep, flow_id):
+def ensure_client(kc, realm, v, s, role_reps, flow_id):
     base = f"https://{v['hostname_mgr']}"
     rep = {
         "clientId": CLIENT_ID,
@@ -263,9 +258,11 @@ def ensure_client(kc, realm, v, s, role_rep, flow_id):
                        "userinfo.token.claim": "false"}})
         step("added roles claim to fabric-webui ID tokens")
 
+    # every fabric role in scope, so the roles claim carries the person's permissions
     _, scoped = kc.call("GET", f"/{q(realm)}/clients/{cid}/scope-mappings/realm")
-    if not any(r["name"] == role_rep["name"] for r in scoped):
-        kc.call("POST", f"/{q(realm)}/clients/{cid}/scope-mappings/realm", [role_rep])
+    missing = [r for r in role_reps if r["name"] not in {s["name"] for s in scoped}]
+    if missing:
+        kc.call("POST", f"/{q(realm)}/clients/{cid}/scope-mappings/realm", missing)
 
 
 def main():
@@ -288,13 +285,19 @@ def main():
         ldap_id = ensure_ldap(kc, realm, realm_id, v, s)
         ensure_group_mapper(kc, realm, ldap_id, v)
     # The admin role and the TOTP flow serve both the web UI and OpenBao's UI.
-    role = ensure_role(kc, realm, v.get("webui_admin_role", "fabric-admin"))
-    grant_role_to_group(kc, realm, role, v.get("webui_admin_group", "admins"))
+    admin_role = v.get("webui_admin_role", "fabric-admin")
+    reps = ensure_rbac_roles(kc, realm, admin_role)
+    step(f"access control: {len(reps)} fabric roles (permissions and bundles)")
+    grant_role_to_group(kc, realm, reps[admin_role], v.get("webui_admin_group", "admins"))
+    for group in v.get("ldap_groups") or []:
+        if group.get("bundle") in reps:
+            grant_role_to_group(kc, realm, reps[group["bundle"]], group["name"])
     flow_id = ensure_mfa_flow(kc, realm)
     if v.get("install_webui"):
-        ensure_client(kc, realm, v, s, role, flow_id)
+        ensure_client(kc, realm, v, s, list(reps.values()), flow_id)
     if s.get("openbao_oidc_secret"):
-        step(f"{ensure_openbao_client(kc, realm, v, s['openbao_oidc_secret'], role, flow_id)} client fabric-openbao")
+        step(f"{ensure_openbao_client(kc, realm, v, s['openbao_oidc_secret'], list(reps.values()), flow_id)}"
+             " client fabric-openbao")
     print("Keycloak configuration complete.")
 
 

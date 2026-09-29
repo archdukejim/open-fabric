@@ -7,12 +7,12 @@ def _q(s):
     return urllib.parse.quote(s, safe="")
 
 
-def ensure_openbao_client(kc, realm, v, secret, role_rep, flow_id):
+def ensure_openbao_client(kc, realm, v, secret, role_reps, flow_id):
     """Keycloak client for signing in to OpenBao's own UI: confidential,
     code flow only, the exact OpenBao UI callback as redirect URI, the same
-    TOTP login flow as the web UI, and only the admin realm role in its
-    tokens (a `roles` claim in the ID token, which OpenBao's role is bound
-    to). `kc` is keycloak_bootstrap's admin client. Converges."""
+    TOTP login flow as the web UI, and fabric's roles (`role_reps`) in a
+    `roles` claim of the ID token, which OpenBao's role is bound to. `kc` is
+    keycloak_bootstrap's admin client. Converges."""
     base = f"https://{v['hostname_openbao']}"
     rep = {
         "clientId": OIDC_CLIENT_ID, "name": "OpenBao (secrets)", "enabled": True, "protocol": "openid-connect",
@@ -41,6 +41,7 @@ def ensure_openbao_client(kc, realm, v, secret, role_rep, flow_id):
             "config": {"claim.name": "roles", "multivalued": "true", "jsonType.label": "String",
                        "id.token.claim": "true", "access.token.claim": "false", "userinfo.token.claim": "false"}})
     _, scoped = kc.call("GET", f"/{_q(realm)}/clients/{cid}/scope-mappings/realm")
-    if not any(r["name"] == role_rep["name"] for r in scoped):
-        kc.call("POST", f"/{_q(realm)}/clients/{cid}/scope-mappings/realm", [role_rep])
+    missing = [r for r in role_reps if r["name"] not in {s["name"] for s in scoped}]
+    if missing:
+        kc.call("POST", f"/{_q(realm)}/clients/{cid}/scope-mappings/realm", missing)
     return changed

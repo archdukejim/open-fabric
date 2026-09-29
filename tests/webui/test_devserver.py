@@ -132,6 +132,22 @@ finally:
     proc.terminate()
     proc.wait(timeout=5)
 
+PORT += 1                                   # the preview as a role bundle sees it
+proc = subprocess.Popen([sys.executable, os.path.join(LIB, "webui", "devserver.py"), "--port", str(PORT),
+                         "--as", "fabric-auditor"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+try:
+    for _ in range(50):
+        try:
+            req("GET", "/")
+            break
+        except OSError:
+            time.sleep(0.2)
+    page = req("GET", "/bind9")[3]
+    check("--as fabric-auditor: records shown, no add form", "nas" in page and "/add" not in page and "as fabric-auditor" in page)
+finally:
+    proc.terminate()
+    proc.wait(timeout=5)
+
 prod = views.overview({"user": "u", "csrf": "x", "version": {"version": "1", "build": ""}}, [])
 check("production pages never show the banner", "DEV PREVIEW" not in prod)
 src = open(os.path.join(LIB, "webui", "server.py")).read()

@@ -20,6 +20,17 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+from fabriclib.rbac.permissions import BUNDLES  # noqa: E402
+
+
+def bundle_roles(bundle, name=None):
+    """The roles claim Keycloak issues for a bundle: the composite and its permissions."""
+    return [name or bundle] + [f"fabric:{p}" for p in BUNDLES[bundle]]
+
+
+ADMIN_ROLES = bundle_roles("admin", "fabric-admin")
+AUDITOR_ROLES = bundle_roles("fabric-auditor")
 W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/webui"
 shutil.rmtree(W, ignore_errors=True)
 os.makedirs(W)
@@ -74,6 +85,7 @@ JWKS = {"keys": [{"kid": "k1", "kty": "RSA", "alg": "RS256", "use": "sig",
 ISSUER = "https://sso.test/realms/test"
 CODES = {}          # code -> dict(nonce, challenge, user, roles, tamper)
 MOCK = {"user": "alice", "roles": ["fabric-admin"], "tamper": None}
+REFRESH = {}        # refresh token -> {"user", "roles", "short"}: what a refresh grant returns (roles can be revoked)
 
 
 def sign_jwt(claims, kid="k1"):
@@ -106,6 +118,15 @@ class KC(BaseHTTPRequestHandler):
         form = dict(urllib.parse.parse_qsl(self.rfile.read(int(self.headers["Content-Length"])).decode()))
         if self.path != "/realms/test/protocol/openid-connect/token":
             return self.reply(404, {})
+        if form.get("grant_type") == "refresh_token":
+            r = REFRESH.get(form.get("refresh_token"))
+            if not r or form.get("client_secret") != "s3cret" or r["user"] is None:
+                return self.reply(400, {"error": "invalid_grant"})
+            now = int(time.time())
+            return self.reply(200, {"id_token": sign_jwt({
+                "iss": ISSUER, "aud": "fabric-webui", "azp": "fabric-webui", "sub": "u1", "iat": now,
+                "exp": now + (20 if r["short"] else 300), "preferred_username": r["user"], "roles": r["roles"]}),
+                "refresh_token": form["refresh_token"]})
         entry = CODES.pop(form.get("code"), None)
         if not entry or form.get("client_secret") != "s3cret" or form.get("client_id") != "fabric-webui":
             return self.reply(400, {"error": "invalid_grant"})
@@ -123,12 +144,16 @@ class KC(BaseHTTPRequestHandler):
             claims["auth_time"] = now - 3600
         if t == "expired":
             claims["exp"] = now - 600
+        if t == "short":                 # expires soon: the next request renews it
+            claims["exp"] = now + 20
         token = sign_jwt(claims)
         if t == "sig":
             h, p, s = token.split(".")
             p = b64u(json.dumps({**claims, "roles": ["fabric-admin", "x"]}).encode())
             token = f"{h}.{p}.{s}"
-        self.reply(200, {"id_token": token, "access_token": "unused", "token_type": "Bearer"})
+        rt = f"rt-{os.urandom(6).hex()}"
+        REFRESH[rt] = {"user": entry["user"], "roles": entry["roles"], "short": t == "short"}
+        self.reply(200, {"id_token": token, "access_token": "unused", "token_type": "Bearer", "refresh_token": rt})
 
 
 kc = ThreadingHTTPServer(("0.0.0.0", 18443), KC)
@@ -171,6 +196,8 @@ cfg = {"socket": "/run/webui/web.sock", "socket_gid": 0, "agent_socket": "/agent
        "keycloak": {"ip": "10.254.8.1", "port": 18443, "hostname": "sso.test", "realm": "test",
                     "client_id": "fabric-webui", "client_secret": "s3cret"}}
 json.dump(cfg, open(f"{W}/config/webui.json", "w"))
+os.makedirs(f"{W}/webui/config")                 # where fabric-agent reads the Keycloak settings it verifies against
+json.dump(cfg, open(f"{W}/webui/config/webui.json", "w"))
 os.chown(f"{W}/config/webui.json", UID, UID)
 os.chmod(f"{W}/config/webui.json", 0o400)
 os.makedirs(f"{W}/build")
@@ -228,6 +255,12 @@ def req_upload(path, headers, fields, files, cookie):
     return r.status, dict(r.getheaders()), r.read().decode()
 
 
+def cookie_csrf(session_cookie):
+    """The session's CSRF token, from the sign-out form every page has."""
+    body = req("GET", "/", ALICE, cookie=session_cookie)[3]
+    return body.split('name="csrf" value="')[1].split('"')[0]
+
+
 def cookie_val(set_cookie, name):
     for part in set_cookie.split(", "):
         if part.startswith(name + "="):
@@ -243,7 +276,7 @@ def check(name, cond, detail=""):
     print(("PASS " if cond else "FAIL ") + name + ("" if cond else f"  -> {detail}"))
 
 
-def login(cert=ALICE, user="alice", roles=("fabric-admin",), tamper=None, callback_cert=None, next_path=None):
+def login(cert=ALICE, user="alice", roles=tuple(ADMIN_ROLES), tamper=None, callback_cert=None, next_path=None):
     st, hd, sc, _ = req("GET", "/login" + (f"?next={urllib.parse.quote(next_path)}" if next_path else ""), cert)
     loc = urllib.parse.urlparse(hd.get("Location", ""))
     q = dict(urllib.parse.parse_qsl(loc.query))
@@ -275,8 +308,9 @@ check("login cookie is __Host-, Secure, HttpOnly", "__Host-webui-login=" in sc a
 
 (st, hd, sc, body), _, _ = login(user="bob")
 check("Keycloak user != cert CN -> 403", st == 403, st)
-(st, *_), _, _ = login(roles=())
-check("user without fabric-admin role -> 403", st == 403, st)
+(st, hd, sc, body), _, _ = login(roles=("offline_access", "fabric-admin"))
+check("user without any fabric permission -> 403 (a bundle name alone grants nothing)",
+      st == 403 and "no fabric role" in body, (st, body[:200]))
 for t in ("nonce", "aud", "expired", "sig"):
     (st, *_), _, _ = login(tamper=t)
     check(f"ID token with bad {t} -> 401", st == 401, st)
@@ -445,6 +479,42 @@ check("logout -> Keycloak end-session with id_token_hint",
 st, *_ = req("GET", "/", ALICE, cookie=session)
 check("session invalid after logout", st == 303, st)
 
+print("--- role bundles in the pages (RBAC)")
+(st, hd, sc, body), _, _ = login(roles=tuple(AUDITOR_ROLES))
+aud = cookie_val(sc, "__Host-webui")
+check("an auditor signs in", st == 200 and aud, st)
+st, _, _, body = req("GET", "/bind9", ALICE, cookie=aud)
+check("auditor: DNS records shown, no add/delete forms, no Apply", st == 200 and "nas25-apps" in body
+      and "/bind9/zone/dynamic_zone_var/add" not in body and 'action="/apply"' not in body, body[:300])
+st, _, _, body = req("GET", "/stepca", ALICE, cookie=aud)
+check("auditor: Step-CA without Sign / New key / Convert", st == 200 and "Sign a CSR" not in body
+      and "New key + certificate" not in body and "Certificate authority" in body, body[:300])
+st, _, _, body = req("GET", "/openbao?view=unlock", ALICE, cookie=aud)
+check("auditor: unlock methods listed, no rotate / add / remove", st == 200 and 'action="/openbao/rotate"' not in body
+      and "/openbao/slots/add-usb" not in body, body[:300])
+st, hd, _, body = req("GET", "/", ALICE, cookie=aud)
+check("auditor: every tab shown (all read permissions)", all(t in body for t in ("/bind9", "/stepca", "/dirsrv", "/openbao")))
+st, _, _, body = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
+                     {"csrf": cookie_csrf(aud), "type": "A", "name": "sneaky", "ip": "192.168.7.9"}, cookie=aud)
+check("auditor: a crafted POST is refused by fabric-agent (403, permission named)",
+      st == 403 and "dns:write" in body and "sneaky" not in open(f"{W}/fabric/config/vars.yaml").read(), (st, body[:200]))
+netops = bundle_roles("fabric-network-operator")
+(st, hd, sc, body), _, _ = login(roles=tuple(netops))
+net = cookie_val(sc, "__Host-webui")
+st, _, _, body = req("GET", "/", ALICE, cookie=net)
+check("network operator: no Directory or 802.1X tab (no device management)",
+      "/dirsrv" not in body and "/freeradius" not in body and "/bind9" in body, body[:300])
+
+(st, hd, sc, body), _, _ = login(tamper="short")
+short = cookie_val(sc, "__Host-webui")
+st, *_ = req("GET", "/", ALICE, cookie=short)
+check("a token about to expire is renewed (refresh grant), the session goes on", st == 200, st)
+for r in REFRESH.values():
+    r["roles"] = []                    # an administrator removed the user from every fabric group
+st, hd, *_ = req("GET", "/", ALICE, cookie=short)
+check("roles removed in Keycloak: at the next renewal the session ends", st == 303 and hd.get("Location") == "/login",
+      (st, hd.get("Location")))
+
 print("--- isolation")
 def dexec(cmd):
     return subprocess.run(["docker", "exec", "cwebui", "sh", "-c", cmd], capture_output=True, text=True)
@@ -462,9 +532,44 @@ check("other users cannot reach the agent socket", "Permission denied" in r.stde
 r = subprocess.run(["setpriv", "--reuid=913", f"--regid={UID}", "--clear-groups", sys.executable, "-c", probe,
                     f"{W}/agent/agent.sock"], capture_output=True, text=True)
 check("agent rejects a wrong uid even with the right group (SO_PEERCRED)", "403" in r.stdout, r.stdout + r.stderr[-200:])
-r = subprocess.run(["docker", "exec", "cwebui", "python3", "-c", probe.replace("/v1/zones", "/v1/nope"),
-                    "/agent/agent.sock"], capture_output=True, text=True)
-check("agent only serves its fixed API", "404" in r.stdout, r.stdout + r.stderr[-200:])
+r = subprocess.run(["docker", "exec", "cwebui", "python3", "-c", probe, "/agent/agent.sock"],
+                   capture_output=True, text=True)
+check("from the web UI container, a call without a sign-in token is refused (401)", "401" in r.stdout,
+      r.stdout + r.stderr[-200:])
+
+print("--- fabric-agent: permissions from the signed token (RBAC)")
+CALL = ("import json,socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); b=sys.argv[4].encode(); "
+        "s.sendall(f'{sys.argv[2]} {sys.argv[3]} HTTP/1.0\\r\\nAuthorization: Bearer {sys.argv[5]}\\r\\n"
+        "Content-Type: application/json\\r\\nContent-Length: {len(b)}\\r\\n\\r\\n'.encode()+b); "
+        "r=b''\nwhile True:\n c=s.recv(65536)\n if not c: break\n r+=c\n"
+        "print(r.split(b'\\r\\n')[0].decode()); print(r.split(b'\\r\\n\\r\\n',1)[1].decode()[:300])")
+
+
+def agent_call(method, path, user, roles, body=None, exp=300):
+    now = int(time.time())
+    token = sign_jwt({"iss": ISSUER, "aud": "fabric-webui", "azp": "fabric-webui", "sub": "u1", "iat": now,
+                      "exp": now + exp, "preferred_username": user, "roles": list(roles)})
+    r = subprocess.run(["setpriv", f"--reuid={UID}", f"--regid={UID}", "--clear-groups", sys.executable, "-c", CALL,
+                        f"{W}/agent/agent.sock", method, path, json.dumps(body or {}), token],
+                       capture_output=True, text=True)
+    return r.stdout + r.stderr[-300:]
+
+
+out = agent_call("GET", "/v1/zones", "alice", AUDITOR_ROLES)
+check("auditor token: may read zones", " 200 " in out, out)
+out = agent_call("POST", "/v1/zones/dynamic_zone_var/records", "carol", AUDITOR_ROLES,
+                 {"actor": "carol", "type": "A", "name": "nope", "ip": "192.168.7.9"})
+check("auditor token: may not add a record (403, the permission named)", " 403 " in out and "dns:write" in out, out)
+out = agent_call("GET", "/v1/nope", "alice", ADMIN_ROLES)
+check("a route that is not in the permission table is refused even for the admin", " 403 " in out, out)
+out = agent_call("GET", "/v1/zones", "alice", ADMIN_ROLES, exp=-600)
+check("an expired token is refused (401)", " 401 " in out, out)
+out = agent_call("POST", "/v1/zones/dynamic_zone_var/records", "alice", ADMIN_ROLES,
+                 {"actor": "mallory", "type": "A", "name": "rbac-probe", "ip": "192.168.7.9"})
+audit_tail = open(f"{W}/fabric/archive/audit.log").read().splitlines()[-1] if os.path.exists(
+    f"{W}/fabric/archive/audit.log") else ""
+check("the audit log names the token's user, not the actor the request claims",
+      " 200 " in out and "alice" in audit_tail and "mallory" not in audit_tail, (out, audit_tail))
 subprocess.run("docker rm -f cwebui >/dev/null; docker network rm cwnet >/dev/null; docker rmi fabric/webui:test >/dev/null",
                shell=True)
 agent.terminate()

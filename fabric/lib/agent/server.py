@@ -7,9 +7,16 @@ It is deliberately not a general executor: every endpoint maps to one
 fixed operation in fabriclib (one file per operation), inputs are validated there, and every change
 is written to the audit log with the acting user.
 
-Only peers whose uid is listed in --allow-uid (the webui container user) or
-root may connect; this is checked with SO_PEERCRED on every connection, on
+Only peers whose uid is listed in --allow-uid (the fabric-web container user)
+or root may connect; this is checked with SO_PEERCRED on every connection, on
 top of the socket's 0660 root:<webui gid> permissions.
+
+Every call from the web UI carries the signed-in person's Keycloak ID token
+(Authorization: Bearer). The agent verifies it itself and allows the call
+only if the token grants the permission the route needs
+(fabriclib/rbac/required_permission.py; unlisted routes are refused). The
+acting user in the audit log is the token's user, never a value from the
+request. Root peers (the host itself) are not asked for a token.
 
   GET  /v1/version | /v1/services | /v1/zones | /v1/zones/<key> | /v1/audit
   POST /v1/zones/<key>/records          {actor, type, name, ip|target|...}
@@ -48,6 +55,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.common.read_audit import read_audit  # noqa: E402
+from fabriclib.keycloak.verify_user_token import verify_user_token  # noqa: E402
+from fabriclib.rbac.required_permission import required_permission  # noqa: E402
+from fabriclib.rbac.user_permissions import user_permissions  # noqa: E402
 from fabriclib.common.write_audit import write_audit  # noqa: E402
 from fabriclib.dns.add_record import add_record  # noqa: E402
 from fabriclib.dns.create_zone_tsig_key import create_zone_tsig_key  # noqa: E402
@@ -112,10 +122,28 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def peer_ok(self):
+    def peer_uid(self):
         creds = self.connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
-        _pid, uid, _gid = struct.unpack("3i", creds)
-        return uid in self.allowed_uids
+        return struct.unpack("3i", creds)[1]
+
+    def authorize(self, method, route):
+        """(status, error) if the call is refused, else None. Sets self.user
+        to the token's user (None for root)."""
+        self.user = None
+        if self.peer_uid() == 0:
+            return None
+        auth = self.headers.get("Authorization", "")
+        try:
+            claims = verify_user_token(load_vars(), auth[7:] if auth.startswith("Bearer ") else "")
+        except ValidationError as exc:
+            return 401, str(exc)
+        need = required_permission(method, route)
+        if need is None:
+            return 403, "not allowed"
+        if need != "session" and need not in user_permissions(claims):
+            return 403, f"you need the permission {need}"
+        self.user = claims["preferred_username"]
+        return None
 
     def body(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -126,8 +154,9 @@ class Handler(BaseHTTPRequestHandler):
             raise ValidationError("expected a JSON object")
         return data
 
-    @staticmethod
-    def actor(data):
+    def actor(self, data):
+        if self.user:                       # the verified token's user, not what the request says
+            return self.user
         actor = str(data.get("actor", ""))
         if not ACTOR_RE.match(actor):
             raise ValidationError("invalid actor")
@@ -140,13 +169,16 @@ class Handler(BaseHTTPRequestHandler):
         self.dispatch("POST")
 
     def dispatch(self, method):
-        if not self.peer_ok():
+        if self.peer_uid() not in self.allowed_uids:
             return self.reply(403, {"error": "peer not allowed"})
         try:
             parts = [urllib.parse.unquote(p) for p in urllib.parse.urlsplit(self.path).path.strip("/").split("/")]
             if parts[:1] != ["v1"]:
                 return self.reply(404, {"error": "not found"})
             route = parts[1:]
+            refused = self.authorize(method, route)
+            if refused:
+                return self.reply(refused[0], {"error": refused[1]})
             if method == "GET":
                 if route == ["version"]:
                     return self.reply(200, version_info())

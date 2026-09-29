@@ -753,9 +753,15 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 
 **Default Value:** `[{name: admins, gidNumber: 1100, permissions: [read, write, modify]}, ...]`
 
+Defaults also include one group per fabric role bundle (design D19): `auditors`,
+`network-operators`, `equipment-operators`, `pki-operators`, `helpdesk`. A
+group with a `bundle:` key has that Keycloak composite role granted to it
+(`keycloak_bootstrap.py`); add people to the group to give them the bundle.
+
 **Effected Jinja Templates:**
 - `dirsrv/seed/10-tree.ldif.j2`
 - `vars.yaml.j2`
+- `keycloak_bootstrap.py` (bundle grants)
 
 ### `ldap_organizational_units`
 **Description:** Defines the tree structure/OUs to pre-provision.

@@ -53,6 +53,16 @@ LOGIN_TTL = 600
 STEP_UP = 300            # vault changes need a sign-in no older than this (seconds)
 
 
+PERM_PREFIX = "fabric:"          # fabric's permission roles (fabriclib/rbac/permissions.py)
+REFRESH_BEFORE = 60              # renew the ID token this many seconds before it expires
+
+
+def token_perms(claims):
+    """fabric permissions in a verified ID token's roles claim."""
+    return sorted({r[len(PERM_PREFIX):] for r in claims.get("roles") or []
+                   if isinstance(r, str) and r.startswith(PERM_PREFIX)})
+
+
 def parse_dn(dn):
     """Parse an RFC 2253 DN (as nginx's $ssl_client_s_dn gives it) into a
     list of (attr, value), honouring backslash escapes."""
@@ -224,7 +234,32 @@ class Handler(BaseHTTPRequestHandler):
                 del self.app.sessions[sid]
                 return None
             s["last"] = now
-            return dict(s, sid=sid)
+            sess = dict(s, sid=sid)
+        if sess["exp"] - now < REFRESH_BEFORE and not self.renew(sess):
+            return None
+        return sess
+
+    def renew(self, sess):
+        """A fresh ID token (current roles) for the session; False (and the
+        session ends) if Keycloak refuses: signed out, disabled, role gone."""
+        try:
+            claims, id_token, refresh_token = self.app.oidc.refresh(sess["refresh_token"])
+        except OIDCError:
+            with self.app.lock:
+                self.app.sessions.pop(sess["sid"], None)
+            return False
+        perms = token_perms(claims)
+        with self.app.lock:
+            if not perms or claims.get("preferred_username") != sess["user"]:
+                self.app.sessions.pop(sess["sid"], None)
+                return False
+            stored = self.app.sessions.get(sess["sid"])
+            if stored is None:
+                return False
+            stored.update(id_token=id_token, refresh_token=refresh_token, perms=perms,
+                          exp=float(claims.get("exp") or 0))
+        sess.update(id_token=id_token, refresh_token=refresh_token, perms=perms, exp=float(claims.get("exp") or 0))
+        return True
 
     # -- dispatch -----------------------------------------------------------
     def do_HEAD(self):
@@ -237,6 +272,7 @@ class Handler(BaseHTTPRequestHandler):
         self.handle_request("POST")
 
     def handle_request(self, method):
+        actions.set_token(None)          # this thread may have served someone else before
         try:
             self.app.sweep()
             cert = self.client_cert()
@@ -256,6 +292,7 @@ class Handler(BaseHTTPRequestHandler):
             sess = self.session(cert)
             if not sess:
                 return self.redirect("/login")
+            actions.set_token(sess["id_token"])
 
             if method == "POST":
                 origin = self.headers.get("Origin", "")
@@ -268,6 +305,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.get(sess, path, query)
         except actions.ValidationError as exc:
             self.deny(400, str(exc))
+        except actions.AuthError:
+            self.redirect("/login")
+        except actions.PermissionDenied as exc:
+            self.deny(403, f"Not allowed: {exc}.")
         except actions.AgentError:
             traceback.print_exc()
             self.deny(503, "The fabric-agent service is unavailable. See `journalctl -u fabric-agent`.")
@@ -297,23 +338,28 @@ class Handler(BaseHTTPRequestHandler):
         if "error" in query or "code" not in query:
             return self.deny(401, "Login was cancelled or refused by the identity provider.")
         try:
-            claims, id_token = self.app.oidc.finish_login(query["code"], pending["verifier"], pending["nonce"])
+            claims, id_token, refresh_token = self.app.oidc.finish_login(query["code"], pending["verifier"],
+                                                                         pending["nonce"])
         except OIDCError as exc:
             return self.deny(401, f"Login failed: {exc}")
 
         user = claims.get("preferred_username", "")
+        actions.set_token(id_token)          # the audit calls below go to fabric-agent as this user
         if user != cert["cn"]:
             actions.audit(user or "unknown", "LOGIN_DENIED", f"cert CN {cert['cn']!r} does not match user")
             return self.deny(403, "Your client certificate does not belong to this user.")
-        if self.app.admin_role not in (claims.get("roles") or []):
-            actions.audit(user, "LOGIN_DENIED", f"missing role {self.app.admin_role}")
-            return self.deny(403, f"Your account is missing the '{self.app.admin_role}' role.")
+        perms = token_perms(claims)
+        if not perms:
+            actions.audit(user, "LOGIN_DENIED", "no fabric role")
+            return self.deny(403, f"Your account has no fabric role (for example '{self.app.admin_role}'). "
+                                  "Ask an administrator to add you to a fabric group.")
 
         sid = secrets.token_urlsafe(32)
         now = time.time()
         with self.app.lock:
             self.app.sessions[sid] = {"user": user, "fp": cert["fp"], "csrf": secrets.token_urlsafe(32),
-                                      "id_token": id_token, "created": now, "last": now,
+                                      "id_token": id_token, "refresh_token": refresh_token, "perms": perms,
+                                      "exp": float(claims.get("exp") or now), "created": now, "last": now,
                                       # when the person last proved password + TOTP (step-up for vault changes)
                                       "auth_at": min(float(claims.get("auth_time") or now), now)}
         actions.audit(user, "LOGIN", f"cert={cert['fp'][:16]}")
@@ -326,7 +372,8 @@ class Handler(BaseHTTPRequestHandler):
     # -- pages --------------------------------------------------------------
     @staticmethod
     def ctx(sess):
-        return {"user": sess["user"], "csrf": sess["csrf"], "version": actions.version_info()}
+        return {"user": sess["user"], "csrf": sess["csrf"], "perms": sess.get("perms") or [],
+                "version": actions.version_info()}
 
     def bind9_page(self, ctx, query, status=200):
         section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"

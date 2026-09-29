@@ -88,7 +88,20 @@ class KeycloakOIDC:
         if status != 200 or not isinstance(tokens, dict) or "id_token" not in tokens:
             raise OIDCError(f"token exchange failed ({status})")
         claims = self.verify_id_token(tokens["id_token"], nonce)
-        return claims, tokens["id_token"]
+        return claims, tokens["id_token"], tokens.get("refresh_token", "")
+
+    def refresh(self, refresh_token):
+        """A fresh ID token (with current roles) from a refresh token.
+        Returns (claims, id_token, refresh_token); raises OIDCError if the
+        session was ended, the user disabled, or the token expired."""
+        status, tokens = self.client.request(
+            "POST", f"{self.realm_path}/protocol/openid-connect/token",
+            form={"grant_type": "refresh_token", "refresh_token": refresh_token,
+                  "client_id": self.client_id, "client_secret": self.client_secret})
+        if status != 200 or not isinstance(tokens, dict) or "id_token" not in tokens:
+            raise OIDCError(f"refresh refused ({status})")
+        claims = self.verify_id_token(tokens["id_token"])
+        return claims, tokens["id_token"], tokens.get("refresh_token", refresh_token)
 
     def logout_url(self, id_token, post_logout_redirect):
         query = urllib.parse.urlencode({
@@ -115,7 +128,9 @@ class KeycloakOIDC:
             raise OIDCError("unknown signing key")
         return self._jwks[kid]
 
-    def verify_id_token(self, token, nonce):
+    def verify_id_token(self, token, nonce=None):
+        """nonce: checked on the login response; None for a refreshed token (fetched
+        directly over the pinned TLS channel) and in fabric-agent."""
         try:
             header_b64, payload_b64, sig_b64 = token.split(".")
             header = json.loads(b64url_decode(header_b64))
@@ -138,7 +153,7 @@ class KeycloakOIDC:
             (claims.get("azp", self.client_id) == self.client_id, "azp mismatch"),
             (float(claims.get("exp", 0)) > now - CLOCK_SKEW, "token expired"),
             (float(claims.get("iat", now)) < now + CLOCK_SKEW, "token issued in the future"),
-            (hmac.compare_digest(str(claims.get("nonce", "")), nonce), "nonce mismatch"),
+            (nonce is None or hmac.compare_digest(str(claims.get("nonce", "")), nonce), "nonce mismatch"),
         ]
         for ok, msg in checks:
             if not ok:

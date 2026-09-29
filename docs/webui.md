@@ -140,11 +140,35 @@ Every request must pass all gates:
 | 3 | Keycloak login: OIDC authorization code + PKCE (S256); ID token signature, issuer, audience, azp, expiry and nonce verified | webui + Keycloak |
 | 4 | TOTP second factor (flow `fabric-webui-mfa`, bound to the `fabric-webui` client only) | Keycloak |
 | 5 | Keycloak username **equals** the client certificate CN | webui → `403` |
-| 6 | User holds realm role `webui_admin_role` (default `fabric-admin`, granted to LDAP group `webui_admin_group`, default `admins`) | webui → `403` |
-| 7 | Session bound to the certificate fingerprint; idle timeout 15 min, max 8 h | webui (session dropped → re-login) |
+| 6 | User holds at least one fabric permission (a bundle, see [Who may do what](#who-may-do-what)) | webui → `403` |
+| 6b | Every fabric-agent call carries the user's ID token; the agent verifies it itself and needs the route's permission | fabric-agent → `401` / `403` |
+| 7 | Session bound to the certificate fingerprint; idle timeout 15 min, max 8 h; the ID token is renewed with Keycloak before it expires, so a disabled user or removed role ends the session within minutes | webui (session dropped → re-login) |
 | 8 | State-changing requests are POST-only with a per-session CSRF token and same-origin `Origin` header | webui → `403` |
 
 nginx always overwrites the `X-SSL-Client-*` headers, and webui listens only on a unix socket that only nginx can reach, so the certificate headers cannot be forged. Responses carry a strict CSP, `no-store`, `X-Frame-Options: DENY`, and `__Host-` cookies.
+
+### Who may do what
+
+Permissions are Keycloak realm roles (`fabric:<area>:<action>`); **bundles**
+are composite roles, granted to directory groups (created by setup, add
+people to them):
+
+| Group | Bundle | Can |
+|---|---|---|
+| `admins` | `fabric-admin` | everything |
+| `auditors` | `fabric-auditor` | read every tab and the audit log; change nothing |
+| `network-operators` | `fabric-network-operator` | DNS records, zones, TSIG keys (DHCP later); read PKI and vault status; **no** device management |
+| `equipment-operators` | `fabric-equipment-operator` | devices, device roles, 802.1X, link certificates to devices |
+| `pki-operators` | `fabric-pki-operator` | sign CSRs, issue key pairs, convert, link certificates to devices |
+| `helpdesk` | `fabric-helpdesk` | realm users (create, reset sign-in — the pages come later), enrol devices; read-only elsewhere |
+
+Own bundles: create a composite role in Keycloak holding `fabric:*` roles and
+grant it to a group. The pages hide what a person cannot use; **fabric-agent
+enforces it** on every call, from the token's roles
+(`fabriclib/rbac/required_permission.py`; routes not listed there are
+refused), and writes the token's user to the audit log. A request crafted
+past the pages gets `403 Not allowed: you need the permission …`. The dev
+preview shows the pages as a bundle sees them: `devserver.py --as fabric-auditor`.
 
 ### Privilege separation
 
@@ -171,7 +195,7 @@ Enabled by default whenever `install_keycloak: true` (`install_webui` is forced 
 | `webui_hostname` | `fabric.<domain>` | The web UI's address — any host name. Inside the domain a CNAME to this host is added automatically; outside it, point DNS at the host yourself. The certificate and the OIDC redirect follow |
 | `cname_mgr` | `fabric` | The default name's label (`<cname_mgr>.<domain>`) when `webui_hostname` is not set |
 | `webui_realm` | `domain` | Keycloak realm |
-| `webui_admin_role` | `fabric-admin` | Required realm role |
+| `webui_admin_role` | `fabric-admin` | The admin bundle (every permission), granted to `webui_admin_group` |
 | `webui_admin_group` | `admins` | Group granted the role |
 | `webui_admin_user` | account that ran `sudo`, else `fabricadmin` | First admin, created by setup (asked for interactively) |
 | `webui_admin_email` | `<user>@<domain>` | Mail attribute of that user (Keycloak's profile needs one) |
@@ -241,7 +265,8 @@ It renders the real pages (`views.py`) with sample data under an orange **DEV PR
 | `400 The SSL certificate error` | Cert not from this fabric's CA (or expired). Mint a new one with `fabricctl client-cert <user>`. |
 | `403` "client certificate issued by this fabric's certificate authority is required" | Cert chains to the root but was not issued directly by the Step-CA intermediate (e.g. under a sub-CA). |
 | `403` "certificate does not belong to this user" | Keycloak username ≠ cert CN. Mint a cert for the exact username. |
-| `403` "missing the 'fabric-admin' role" | User not in `admins` (or role mapping drifted). Fix membership, then `sudo fabricctl --keycloak-sync`. |
+| `403` "has no fabric role" | User in none of the fabric groups (`admins`, `auditors`, …). Fix membership, then `sudo fabricctl --keycloak-sync`. |
+| `403` "you need the permission …" | The user's bundle does not include that action: add them to a group whose bundle does. |
 | `403` "CSRF check failed" | Stale page or cross-origin post. Reload and retry. |
 | Login loops / "Login expired" | Login took over 10 min or started in another browser. Start again at `/`. |
 | `502 Bad Gateway` | `fabric-web` container not running or socket missing: `systemctl status fabric-web`, `docker ps -a --filter name=fabric-web`, `ls -l /opt/webui/run/`. |

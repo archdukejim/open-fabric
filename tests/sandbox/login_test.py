@@ -265,6 +265,22 @@ fields.update(username=ADMIN, password=read("initial-password.txt"))
 st, loc, page = fresh.request("POST", action, fields)
 check("initial password no longer accepted", st == 200 and "Invalid" in page, (st, loc))
 
+# -- a role bundle through a directory group (real Keycloak composite roles) --------------
+if os.environ.get("CAROL_PW"):
+    carol_pem = pem_from_p12(os.path.join(KIT, "carol.p12"), os.environ["CAROL_P12_PW"], "carol.pem")
+    cb = Browser(carol_pem)
+    st, page, seen = login(cb, "carol", os.environ["CAROL_PW"])
+    st, _, page = cb.request("GET", f"https://{MGR}/")
+    check("carol (auditors group -> fabric-auditor bundle) signs in and sees the overview",
+          st == 200 and "services healthy" in page, (st, page[:300], seen))
+    st, _, page = cb.request("GET", f"https://{MGR}/bind9")
+    check("auditor: DNS records readable, no add form", st == 200 and "/add" not in page, (st, page[:200]))
+    csrf = page.split('name="csrf" value="')[1].split('"')[0] if 'name="csrf"' in page else ""
+    st, _, page = cb.request("POST", f"https://{MGR}/bind9/zone/dynamic_zone_var/add",
+                             {"csrf": csrf, "type": "A", "name": "carol-was-here", "ip": "10.77.0.66"})
+    check("auditor: a DNS change is refused by fabric-agent (403, dns:write)", st == 403 and "dns:write" in page,
+          (st, page[:300]))
+
 # -- OpenBao's own UI with Keycloak single sign-on ---------------------------------------
 st, res = vault_login(ADMIN, read("initial-password.txt"))
 token = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) else None

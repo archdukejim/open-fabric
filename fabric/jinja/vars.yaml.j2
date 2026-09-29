@@ -296,8 +296,15 @@ ldap_base_dn: {{ domain.split('.') | map('regex_replace', '^', 'dc=') | join(','
 ldap_domain_components:
 {{ domain.split('.') | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
+{# `bundle`: the fabric role bundle Keycloak grants to members (design D19); admins get
+   webui_admin_role through webui_admin_group. #}
 {% set default_ldap_groups = [
   { 'gidNumber': 1100, 'name': 'admins', 'permissions': ['read', 'write', 'modify'] },
+  { 'gidNumber': 1110, 'name': 'auditors', 'bundle': 'fabric-auditor' },
+  { 'gidNumber': 1111, 'name': 'network-operators', 'bundle': 'fabric-network-operator' },
+  { 'gidNumber': 1112, 'name': 'equipment-operators', 'bundle': 'fabric-equipment-operator' },
+  { 'gidNumber': 1113, 'name': 'pki-operators', 'bundle': 'fabric-pki-operator' },
+  { 'gidNumber': 1114, 'name': 'helpdesk', 'bundle': 'fabric-helpdesk' },
   { 'gidNumber': 5000, 'name': 'users', 'permissions': ['read'] }
 ] %}
 {% set _merged_groups = (ldap_groups | default([]) + default_ldap_groups) | unique(attribute='name') | list %}

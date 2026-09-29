@@ -46,7 +46,17 @@ check("client: fullScopeAllowed off", client["fullScopeAllowed"] is False)
 secret = kc.call("GET", f"{R}/clients/{client['id']}/client-secret")[1]
 check("client: secret matches fabric-secrets.yml", secret.get("value") == "OidcSecret1")
 scoped = kc.call("GET", f"{R}/clients/{client['id']}/scope-mappings/realm")[1]
-check("client: only fabric-admin in scope", [r["name"] for r in scoped] == ["fabric-admin"], scoped)
+names = {r["name"] for r in scoped}
+check("client: only fabric's roles in scope (permissions + bundles), nothing else",
+      "fabric-admin" in names and "fabric:dns:write" in names and "fabric-auditor" in names
+      and all(n.startswith("fabric:") or n.startswith("fabric-") for n in names), sorted(names))
+admin = kc.call("GET", f"{R}/roles/fabric-admin")[1]
+comp = {r["name"] for r in kc.call("GET", f"{R}/roles-by-id/{admin['id']}/composites")[1]}
+aud = kc.call("GET", f"{R}/roles/fabric-auditor")[1]
+aud_comp = {r["name"] for r in kc.call("GET", f"{R}/roles-by-id/{aud['id']}/composites")[1]}
+check("bundles: fabric-admin holds every permission; fabric-auditor only read ones",
+      "fabric:vault:unlock" in comp and "fabric:dns:read" in aud_comp
+      and not any(n.endswith((":write", ":admin", ":unlock", ":issue", ":sign")) for n in aud_comp), (comp, aud_comp))
 
 flows = {f["alias"]: f["id"] for f in kc.call("GET", f"{R}/authentication/flows")[1]}
 check("client bound to MFA browser flow",
