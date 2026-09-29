@@ -305,7 +305,8 @@ be copied by whoever holds it: if one goes missing, `vault rotate`.
 **Kill switch.** udev rules (`/etc/udev/rules.d/90-fabric-unlock.rules`)
 watch enrolled sticks. Pulling one runs `fabricctl vault device-event`,
 which stops OpenBao when no method is left present; plugging it back in
-starts it again. *Tested with loop devices; real plug/unplug is untested.*
+starts it again. *Tested with loop devices and by hand with a real stick on a Pi 5
+(stopped about a second after the pull; unsealed about 10 s after re-plugging).*
 
 Security keys (PKCS#11) and HSMs (KMIP) are shown in the web UI but not
 built yet. Each type states what it was tested against.

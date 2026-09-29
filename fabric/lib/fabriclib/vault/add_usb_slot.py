@@ -47,6 +47,10 @@ def add_usb_slot(v, actor, disk, label="", source="web", require_usb=True):
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
             raise ValidationError(f"preparing {disk} failed: {(res.stderr or res.stdout).strip()[-300:]}")
+    # udev does not re-probe after mkfs on its own; without this its database
+    # keeps the old (empty) ID_FS_UUID and the kill-switch rule never matches
+    # when the stick is pulled (found on real hardware).
+    subprocess.run(["udevadm", "trigger", "--action=change", "--settle", disk], capture_output=True)
     subprocess.run(["udevadm", "settle", "--timeout=10"], capture_output=True)
     slot_id = f"usb-{fs_uuid[:8]}"
     model = facts["model"] or "USB stick"

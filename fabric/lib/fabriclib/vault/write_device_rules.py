@@ -11,7 +11,8 @@ def write_device_rules(v, path=None):
     UUID) or security key (by USB serial) is plugged in or pulled out, run
     `fabricctl vault device-event` (through systemd-run: udev must not wait).
     Only enrolled devices trigger it. Returns True if the rules changed.
-    Untested on hardware: udev does not run in the test containers."""
+    udev does not run in the test containers: tested by hand with a real
+    stick on a Pi 5 (pull → OpenBao stopped, re-plug → started)."""
     path = path or v.get("openbao_udev_rules") or RULES
     store = read_slot_store(v) or {"slots": []}
     cli = f"{v['deploy_base_dir']}/fabric/lib/fabriclib/cli.py"

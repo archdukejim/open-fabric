@@ -28,6 +28,8 @@ ExecStartPre=-/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}
 ExecStart=/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml up --abort-on-container-exit
 ExecStop=/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml stop
 Restart=always
+# `compose up` exits 130 when stopped (fabricctl stop, the unlock kill switch): a clean stop, not a failure.
+SuccessExitStatus=130
 TimeoutStartSec=600
 TimeoutStopSec=30
 {% if item.healthcheck | default(true) %}

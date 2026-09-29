@@ -8,4 +8,4 @@ slot)`, `forget(v, slot, record)`, and `TESTED` (what it was tested against;
 | File | Type | Tested against |
 |---|---|---|
 | `local.py` | key file on this host (root, 0400) | real OpenBao image |
-| `usb.py` | key file on a stick fabric formats (ext4, label FABRIC-KEY, fabric-chosen UUID, root 0400); identified by UUID + serial | loop device (format, read, rotate, remove); plug/unplug on real hardware **untested** |
+| `usb.py` | key file on a stick fabric formats (ext4, label FABRIC-KEY, fabric-chosen UUID, root 0400); identified by UUID + serial | loop device (format, read, rotate, remove); real stick on a Pi 5 (arm64): add, unlock from it alone, pull → stopped, re-plug → unsealed |
