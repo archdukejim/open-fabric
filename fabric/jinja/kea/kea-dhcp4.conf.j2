@@ -1,0 +1,57 @@
+// Kea DHCPv4 — rendered by fabricctl (fabric/jinja/kea/kea-dhcp4.conf.j2) from `dhcp:` in vars.yaml.
+{% set d = dhcp | default({}) %}
+{% set ddns_zone = (d.ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
+{
+"Dhcp4": {
+    "interfaces-config": {
+        "interfaces": {{ d.interfaces | default([]) | to_json }},
+        "dhcp-socket-type": "raw"
+    },
+    "control-socket": { "socket-type": "unix", "socket-name": "/var/run/kea/kea4-ctrl-socket" },
+    "lease-database": { "type": "memfile", "persist": true, "name": "/var/lib/kea/kea-leases4.csv", "lfc-interval": 3600 },
+    "hooks-libraries": [
+        { "library": "libdhcp_lease_cmds.so" },
+        { "library": "libdhcp_stat_cmds.so" }
+    ],
+    "valid-lifetime": {{ d.lease_time | default(86400) }},
+    "renew-timer": {{ ((d.lease_time | default(86400)) / 2) | int }},
+    "rebind-timer": {{ ((d.lease_time | default(86400)) * 7 / 8) | int }},
+{% if d.ddns | default(true) %}
+    // hostnames of leases go to their own dynamic zone, never a zone fabric renders (design D16)
+    "dhcp-ddns": { "enable-updates": true, "server-ip": "{{ ip_kea_ddns }}", "server-port": 53001 },
+    "ddns-send-updates": true,
+    "ddns-qualifying-suffix": "{{ ddns_zone }}.",
+    "ddns-override-client-update": true,
+    "ddns-replace-client-name": "when-not-present",
+    "ddns-generated-prefix": "dhcp",
+    "ddns-conflict-resolution-mode": "check-with-dhcid",
+    "hostname-char-set": "[^A-Za-z0-9.-]",
+    "hostname-char-replacement": "-",
+{% endif %}
+    "option-data": [
+        { "name": "domain-name-servers", "data": "{{ d.dns | default([host_ip]) | join(', ') }}" },
+        { "name": "domain-name", "data": "{{ d.domain | default(domain) }}" },
+        { "name": "domain-search", "data": "{{ ([ddns_zone] if d.ddns | default(true) else []) | join(', ') }}{{ ', ' if d.ddns | default(true) else '' }}{{ domain }}" }
+    ],
+    "subnet4": [
+{% for s in d.subnets | default([]) %}
+        {
+            "id": {{ loop.index }},
+            "subnet": "{{ s.subnet }}",
+            "pools": [ {% for p in s.pools | default([]) %}{ "pool": "{{ p }}" }{{ ', ' if not loop.last }}{% endfor %} ],
+            "option-data": [
+{% if s.routers is defined %}
+                { "name": "routers", "data": "{{ s.routers }}" }
+{% endif %}
+            ],
+            "reservations": [
+{% for r in s.reservations | default([]) %}
+                { "hw-address": "{{ r.mac | lower }}", "ip-address": "{{ r.ip }}"{% if r.hostname is defined and r.hostname %}, "hostname": "{{ r.hostname }}"{% endif %} }{{ ',' if not loop.last }}
+{% endfor %}
+            ]
+        }{{ ',' if not loop.last }}
+{% endfor %}
+    ],
+    "loggers": [ { "name": "kea-dhcp4", "output-options": [ { "output": "stdout" } ], "severity": "INFO" } ]
+}
+}

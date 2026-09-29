@@ -17,7 +17,6 @@ TABS = [
     ("openbao", "/openbao", "OpenBao · Secrets", False),
 ]
 PLACEHOLDERS = {
-    "kea": ("Kea DHCP", "Subnets and pools, reservations, active leases, and DHCP-driven DNS updates into BIND9."),
     "freeradius": ("FreeRADIUS 802.1X", "Network access: EAP-TLS device certificates, MAC authentication, "
                                        "VLAN assignment, switches and access points (NAS clients)."),
 }
@@ -343,6 +342,50 @@ _TEMPLATES = {
 <pre class="secret">{{ password }}</pre>
 <p class="muted">Give it to {{ uid }} over a safe channel. At the next sign-in they choose their own password and set up two-factor (TOTP){{ '; their previous sessions were ended' if what == 'reset' else '' }}.</p>
 </section>
+{% endblock %}""",
+
+    "kea": """{% extends "base" %}
+{% block body %}
+<h1>Kea · DHCP <span class="opt">optional</span></h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+{% if not d.enabled %}
+<section class="card"><h2>DHCP is off</h2>
+<p class="muted">Kea 3.0 LTS hands out addresses on your LAN and registers clients' hostnames in their own DNS zone (<code>dhcp.&lt;domain&gt;</code>). Turn it on in <code>vars.yaml</code> and re-run setup:</p>
+<pre>install_kea: true
+dhcp:
+  interfaces: [eth0]
+  subnets:
+    - subnet: 192.168.4.0/22
+      pools: ["192.168.5.100 - 192.168.5.200"]
+      routers: 192.168.4.1</pre></section>
+{% else %}
+<section class="card"><h2>Subnets</h2>
+<p class="muted">Serving on {{ d.interfaces | join(', ') }} · lease {{ d.lease_time }} s{% if d.ddns_zone %} · hostnames registered in <code>{{ d.ddns_zone }}</code>{% endif %}</p>
+<table><thead><tr><th>Subnet</th><th>Pools</th><th>Router</th><th>Reservations</th></tr></thead><tbody>
+{% for s in d.subnets %}<tr><td>{{ s.subnet }}</td><td>{{ (s.pools or []) | join(', ') }}</td><td>{{ s.routers or '—' }}</td><td class="num">{{ (s.reservations or []) | length }}</td></tr>{% endfor %}
+</tbody></table></section>
+<section class="card"><h2>Reservations</h2>
+<table><thead><tr><th>MAC</th><th>Address</th><th>Hostname</th><th></th></tr></thead><tbody>
+{% for s in d.subnets %}{% for r in s.reservations or [] %}<tr><td><code>{{ r.mac }}</code></td><td>{{ r.ip }}</td><td>{{ r.hostname or '—' }}</td>
+<td class="num">{% if can('dhcp:write') %}<form method="post" action="/kea/reservations/{{ r.mac | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}{% endfor %}
+</tbody></table>
+{% if can('dhcp:write') %}<form method="post" action="/kea/reservations" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>MAC<input name="mac" required placeholder="aa:bb:cc:dd:ee:ff"></label>
+<label>Address (inside a subnet, outside its pools)<input name="ip" required placeholder="192.168.4.20"></label>
+<label>Hostname (optional)<input name="hostname" placeholder="printer"></label>
+<div><button>Reserve</button></div>
+</form>
+<p class="muted small">Saved and applied at once; the client gets the address at its next renewal.</p>{% endif %}
+</section>
+<section class="card"><h2>Leases <span class="muted">{{ d.leases | length }}</span></h2>
+{% if d.leases_error %}<p class="flash warn">{{ d.leases_error }}</p>{% endif %}
+{% if d.leases %}<table><thead><tr><th>Address</th><th>MAC</th><th>Hostname</th><th>Expires</th><th>State</th></tr></thead><tbody>
+{% for l in d.leases %}<tr><td>{{ l.ip }}</td><td><code>{{ l.mac }}</code></td><td>{{ l.hostname or '—' }}</td><td>{{ l.expires }}</td><td>{{ l.state }}</td></tr>{% endfor %}
+</tbody></table>{% elif not d.leases_error %}<p class="blank">No leases yet.</p>{% endif %}
+</section>
+{% endif %}
 {% endblock %}""",
 
     "dirsrv_macros": """{% macro device_fields(d) %}
@@ -749,11 +792,11 @@ _env.loader = jinja2.DictLoader(_TEMPLATES)
 
 
 # every permission a page asks about (the dev preview's fallback when it runs without fabriclib)
-PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "pki:read", "pki:issue", "pki:sign",
+PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write", "pki:read", "pki:issue", "pki:sign",
                  "pki:link-device", "devices:read", "devices:enroll", "devices:admin", "roles:admin", "radius:read",
                  "people:read", "vault:status", "vault:unlock", "audit:read"]
 # tab -> the permission(s) that show it (any of them)
-TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dns:read",), "stepca": ("pki:read",),
+TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dhcp:read",), "stepca": ("pki:read",),
              "dirsrv": ("devices:read", "people:read"), "freeradius": ("radius:read",),
              "openbao": ("vault:status",)}
 MENU_PERMS = {"sign": "pki:sign", "issue": "pki:issue", "convert": "pki:issue", "people": "people:read",
@@ -815,6 +858,10 @@ def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host
                    slots=list(slots), devices=devices or {"tokens": [], "disks": []}, slot_types=SLOT_TYPES,
                    slot_id=slot_id, host=host, live=live, msg=msg, err=err,
                    add_live=add_live or {"security-key": False, "usb": False, "hsm": False})
+
+
+def kea(ctx, overview, msg="", err=""):
+    return _render("kea", ctx=ctx, tab="kea", d=overview, msg=msg, err=err)
 
 
 def person_result(ctx, uid, what, password):

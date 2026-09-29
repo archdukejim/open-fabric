@@ -40,6 +40,7 @@ request. Root peers (the host itself) are not asked for a token.
   POST /v1/devices/<name>/certs      {actor, sha256, link}
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
   POST /v1/people {uid, first, last, email} | /v1/people/<uid>/reset   (one-time password returned)
+  GET  /v1/dhcp | POST /v1/dhcp/reservations {mac, ip, hostname} | /v1/dhcp/reservations/<mac>/delete
 """
 import argparse
 import json
@@ -58,6 +59,9 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.common.read_audit import read_audit  # noqa: E402
 from fabriclib.keycloak.create_person import create_person  # noqa: E402
+from fabriclib.dhcp.add_reservation import add_reservation  # noqa: E402
+from fabriclib.dhcp.dhcp_overview import dhcp_overview  # noqa: E402
+from fabriclib.dhcp.remove_reservation import remove_reservation  # noqa: E402
 from fabriclib.keycloak.reset_sign_in import reset_sign_in  # noqa: E402
 from fabriclib.keycloak.verify_user_token import verify_user_token  # noqa: E402
 from fabriclib.rbac.required_permission import required_permission  # noqa: E402
@@ -207,6 +211,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, device_overview(load_vars()))
                 if route == ["people"]:
                     return self.reply(200, list_people(load_vars()))
+                if route == ["dhcp"]:
+                    return self.reply(200, dhcp_overview(load_vars()))
                 if route == ["vault"]:
                     return self.reply(200, vault_status(load_vars()))
                 if route == ["vault", "slots"]:
@@ -250,6 +256,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, self.vault(route[1:], actor, data))
             if route[:1] in (["devices"], ["roles"]):
                 return self.reply(200, self.directory(route, actor, data) or {})
+            if route == ["dhcp", "reservations"]:
+                saved = add_reservation(actor, text(data, "mac"), text(data, "ip"), text(data, "hostname"), source="web")
+                ok, output = apply_changes(actor, source="web")
+                return self.reply(200, {"reservation": saved, "applied": ok, "output": output[-2000:]})
+            if len(route) == 4 and route[:2] == ["dhcp", "reservations"] and route[3] == "delete":
+                remove_reservation(actor, route[2], source="web")
+                ok, output = apply_changes(actor, source="web")
+                return self.reply(200, {"applied": ok, "output": output[-2000:]})
             if route == ["people"]:
                 return self.reply(200, {"password": create_person(load_vars(), actor, text(data, "uid"), text(data, "first"),
                                                                   text(data, "last"), text(data, "email"))})

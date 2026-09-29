@@ -91,6 +91,7 @@ image_debian: {{ image_debian | default(images_lock.debian) }}
 {# Names of the locally built images (not pulled). #}
 image_dirsrv: {{ image_dirsrv | default('fabric/dirsrv:local') }}
 image_webui: {{ image_webui | default('fabric/web:local') }}
+image_kea: {{ image_kea | default('fabric/kea:local') }}
 {# image_* keys the admin set explicitly: `fabricctl images update` leaves them alone. #}
 image_pins: {{ image_pins | default([], true) | to_json }}
 # After `fabricctl images update`: remove old images of fabric's repositories (never the rollback one).
@@ -115,6 +116,14 @@ install_keycloak: {{ install_keycloak | default(false) | bool }}
 # Log forwarding (optional, design D20): Fluent Bit sends the host journal (all fabric
 # containers and fabric's audit log) and OpenBao's audit log to syslog and/or Elasticsearch.
 install_fluentbit: {{ install_fluentbit | default(false) | bool }}
+# DHCP (optional, design §5): Kea 3.0 LTS on the host network; lease hostnames go
+# to their own dynamic zone <ddns_subdomain>.<domain> (D16).
+install_kea: {{ install_kea | default(false) | bool }}
+ip_kea_ddns: {{ ip_kea_ddns | default('10.255.0.97') }}
+kea_mem_limit: {{ kea_mem_limit | default('128m') }}
+# interfaces: host interfaces to serve; subnets: [{subnet, pools: ["a - b"], routers,
+# reservations: [{mac, ip, hostname}]}]; ddns (true), ddns_subdomain (dhcp), lease_time (s), dns
+dhcp: {{ dhcp | default({}, true) | to_json }}
 ip_fluentbit: {{ ip_fluentbit | default('10.255.0.95') }}
 fluentbit_mem_limit: {{ fluentbit_mem_limit | default('64m') }}
 # syslog: {host, port (6514), tls (true), ca_file}; elastic: {url, index, user, ca_file}.
@@ -178,7 +187,8 @@ service_dirs:
   'postgres': {'uid': 901, 'gid': 901},
   'webui': {'uid': 912, 'gid': 912},
   'openbao': {'uid': 913, 'gid': 913},
-  'fluentbit': {'uid': 914, 'gid': 914}
+  'fluentbit': {'uid': 914, 'gid': 914},
+  'kea': {'uid': 915, 'gid': 915}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:

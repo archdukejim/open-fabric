@@ -328,7 +328,10 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("overview tab renders service health", st == 200 and "Overview" in body and "services healthy" in body, st)
-for tab in ("kea", "freeradius"):
+st, hd, sc, body = req("GET", "/kea", ALICE, cookie=session)
+check("Kea tab: DHCP off on this host, how to turn it on", st == 200 and "DHCP is off" in body and "install_kea" in body,
+      (st, body[:300]))
+for tab in ("freeradius",):
     st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
     check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)

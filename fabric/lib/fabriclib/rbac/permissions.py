@@ -10,6 +10,8 @@ PERMISSIONS = {
     "dns:read": "see zones, records, reverse zones and TSIG key names",
     "dns:write": "add and remove DNS records, apply DNS changes",
     "tsig:manage": "create, rotate and delete TSIG keys",
+    "dhcp:read": "see DHCP subnets, reservations and leases",
+    "dhcp:write": "add and remove DHCP reservations",
     "pki:read": "see the CA and issued certificates; inspect a CSR or certificate",
     "pki:issue": "issue key + certificate pairs, convert to .p12",
     "pki:sign": "sign uploaded CSRs",
@@ -29,14 +31,15 @@ PERMISSIONS = {
     "system:admin": "services, updates and settings",
 }
 
-_READ = ["status:read", "dns:read", "pki:read", "devices:read", "radius:read", "people:read", "vault:status",
+_READ = ["status:read", "dns:read", "dhcp:read", "pki:read", "devices:read", "radius:read", "people:read", "vault:status",
          "audit:read"]
 
 # bundle -> permissions. "admin" is the web UI admin role (webui_admin_role, default fabric-admin).
 BUNDLES = {
     "admin": sorted(PERMISSIONS),
     "fabric-auditor": _READ,
-    "fabric-network-operator": ["status:read", "dns:read", "dns:write", "tsig:manage", "pki:read", "vault:status"],
+    "fabric-network-operator": ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write",
+                                "pki:read", "vault:status"],
     "fabric-equipment-operator": ["status:read", "dns:read", "pki:read", "pki:link-device", "devices:read",
                                   "devices:enroll", "devices:admin", "roles:admin", "radius:read", "radius:admin"],
     "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:link-device", "devices:read"],

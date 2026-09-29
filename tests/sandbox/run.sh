@@ -68,6 +68,14 @@ friendly_name: Sandbox
 install_keycloak: true
 install_ldap: true
 install_webui: true
+install_kea: true
+dhcp:
+  interfaces: [eth0]
+  lease_time: 600
+  subnets:
+    - subnet: $SUBNET
+      pools: ["10.77.0.200 - 10.77.0.220"]
+      routers: 10.77.0.1
 tsig_keys:
 - { name: npm, records: [npm], secret: "$TSIG_SECRET", acls: [npm-updaters] }
 EOF
@@ -81,6 +89,23 @@ check "setup did not shadow the package command" "! in_box 'test -e /usr/local/b
 echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
+
+echo "--- DHCP: Kea 3.0 serves the LAN, lease hostnames in dhcp.<domain>"
+BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
+docker rm -f fabric-sbx-dhcp >/dev/null 2>&1
+docker run --name fabric-sbx-dhcp --network "$NET" --cap-add NET_ADMIN --cap-add NET_RAW "$BUSYBOX" \
+    udhcpc -i eth0 -n -q -f -t 5 -s /bin/true -x hostname:sbxclient > "$OUT/dhcp.log" 2>&1
+docker rm -f fabric-sbx-dhcp >/dev/null 2>&1
+check "kea: DHCP unit active, Kea 3.0 LTS inside" \
+    "in_box 'systemctl is-active kea' | grep -qx active && in_box 'docker exec kea-dhcp4 kea-dhcp4 -v' | grep -q '^3\.0\.'"
+check "kea: a LAN client gets an address from the pool" "grep -q 'lease of 10.77.0.2[0-2][0-9]' '$OUT/dhcp.log'"
+check "kea: its hostname is registered in dhcp.lan.test (delegated from lan.test)" \
+    "for _ in 1 2 3 4 5; do in_box 'dig +short @$IP sbxclient.dhcp.lan.test' | grep -q '^10\.77\.0\.2' && exit 0; sleep 2; done; exit 1"
+check "kea: fabricctl dhcp leases lists the client's lease" "in_box 'fabricctl dhcp leases' | grep -q 'sbxclient.dhcp.lan.test'"
+in_box 'fabricctl dhcp reserve 02:00:00:00:77:01 10.77.0.50 sbxprinter' > "$OUT/dhcp-reserve.log" 2>&1
+check "kea: fabricctl dhcp reserve saves and applies; status lists it"     "grep -q 'applied' '$OUT/dhcp-reserve.log' && in_box 'fabricctl dhcp status' | grep -q '02:00:00:00:77:01  10.77.0.50'"
+check "kea: a reservation inside the pool is refused"     "! in_box 'fabricctl dhcp reserve 02:00:00:00:77:02 10.77.0.205 --no-apply' >/dev/null 2>&1"
+check "kea: fabricctl images status covers the Kea image" "in_box 'fabricctl images status' | grep -qE '^kea '"
 
 echo "--- certs.<domain>: CA certificates for every system; web UI at fabric.<domain>"
 docker cp "$REPO/tests/sandbox/certs_page_test.sh" "$NAME:/root/certs_page_test.sh"
@@ -404,8 +429,8 @@ in_box 'fabricctl uninstall --yes --export /root/fabric-export --purge-package' 
 EX=/root/fabric-export
 check "export: config, secrets, CA, directory, Keycloak, the vault and its key, README (root 0700)"     "in_box 'test -s $EX/fabric/config/fabric-secrets.yml && test -d $EX/stepca/data && test -d $EX/dirsrv && test -d $EX/postgres && test -d $EX/openbao/data && test -f $EX/@root/etc/fabric/openbao/slots.json && test -f $EX/README.txt && [ \"\$(stat -c %a $EX)\" = 700 ]'"
 check "the package was purged too, and nothing was written to /var/backups"     "! in_box 'dpkg -s fabricctl' >/dev/null 2>&1 && ! in_box 'test -e /var/backups/fabric'"
-check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,fabric-agent}.service' >/dev/null 2>&1"
-check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id openbao' >/dev/null 2>&1"
+check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui|kea-dhcp4|kea-ddns)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,kea,fabric-agent}.service' >/dev/null 2>&1"
+check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /opt/kea /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id openbao' >/dev/null 2>&1"
 check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 
 echo "--- fabricctl restore: the same fabric back from the export"

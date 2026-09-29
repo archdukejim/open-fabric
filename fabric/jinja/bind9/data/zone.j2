@@ -16,6 +16,10 @@ $ORIGIN {{ zone_name }}.
 ; NS Records
 ;-----------------------------------------------------------------
 @       IN      NS      ns.{{ domain }}.
+{% if zone_name == domain and install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
+; DHCP-registered hosts live in their own zone on this server (design D16)
+{{ "%-24s" | format((dhcp | default({})).ddns_subdomain | default('dhcp')) }}NS      ns.{{ domain }}.
+{% endif %}
 
 ;-----------------------------------------------------------------
 ; A Records

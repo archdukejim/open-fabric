@@ -4,14 +4,16 @@ import subprocess
 
 
 def detect_network():
-    """Best guesses for hostname, host_ip, lan_gateway, lan_cidr from the
-    interface that carries the default route. Missing values are None."""
+    """Best guesses for hostname, host_ip, lan_gateway, lan_cidr and that
+    interface's name, from the interface that carries the default route.
+    Missing values are None."""
     guess = {"hostname": socket.gethostname().split(".")[0], "host_ip": None,
-             "lan_gateway": None, "lan_cidr": None}
+             "lan_gateway": None, "lan_cidr": None, "interface": None}
     route = subprocess.run(["ip", "-4", "route", "show", "default"], capture_output=True, text=True).stdout.split()
     if "via" in route:
         guess["lan_gateway"] = route[route.index("via") + 1]
     dev = route[route.index("dev") + 1] if "dev" in route else None
+    guess["interface"] = dev
     if dev:
         addr = subprocess.run(["ip", "-o", "-4", "addr", "show", "dev", dev], capture_output=True, text=True).stdout.split()
         if "inet" in addr:

@@ -51,6 +51,21 @@ zone "{{ zone_name }}" {
 };
 
 {% endfor %}
+{% if install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
+{% set ddns_zone = ((dhcp | default({})).ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
+// DHCP-registered hosts: created once, then only Kea's DDNS writes here (BIND's
+// journal); fabric never rewrites this file (design D16).
+zone "{{ ddns_zone }}" {
+    type master;
+    file "/var/lib/bind/db.{{ ddns_zone }}";
+    allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+    allow-transfer { none; };
+    update-policy {
+        grant "kea-ddns" zonesub A AAAA DHCID;
+    };
+};
+
+{% endif %}
 {% for rev_zone in reverse_zone_names | default([]) %}
 zone "{{ rev_zone }}" {
     type master;

@@ -54,6 +54,11 @@ def run(ctx):
     for cidr in allowed:
         subprocess.run(["ufw", "allow", "from", cidr, "to", "any", "port", "22", "proto", "tcp"],
                        check=True, capture_output=True)
+    # DHCP (optional): clients have no address yet (source 0.0.0.0), so allow port 67 on the served interfaces
+    if ctx.vars.get("install_kea"):
+        for iface in (ctx.vars.get("dhcp") or {}).get("interfaces") or []:
+            subprocess.run(["ufw", "allow", "in", "on", iface, "to", "any", "port", "67", "proto", "udp"],
+                           check=True, capture_output=True)
     subprocess.run(["ufw", "--force", "enable"], check=True, capture_output=True)
 
     lib = os.path.join(ctx.target_dir, "lib")

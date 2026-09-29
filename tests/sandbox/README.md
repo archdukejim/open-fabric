@@ -5,7 +5,7 @@ A full install from the `.deb` in a disposable systemd + Docker container
 
 | File | What |
 |---|---|
-| `run.sh` | Install, setup, doctor, fabric.target, secrets in OpenBao, RFC2136, sign-in (admin, non-admin, auditor), images update/rollback/prune, re-runs, upgrade of pre-pinning vars, TSIG/ACL, package upgrade/remove, reinstall, uninstall with export + purge (nothing left), restore from the export |
+| `run.sh` | Install, setup, doctor, fabric.target, DHCP (a LAN client leased and registered in `dhcp.<domain>`, `fabricctl dhcp`), secrets in OpenBao, RFC2136, sign-in (admin, non-admin, auditor), images update/rollback/prune, re-runs, upgrade of pre-pinning vars, TSIG/ACL, package upgrade/remove, reinstall, uninstall with export + purge (nothing left), restore from the export |
 | `Dockerfile` | The sandbox image (systemd + Docker-in-Docker) |
 | `login_test.py` | Real sign-in through nginx, Keycloak (password change, TOTP) and the web UI; OpenBao's UI through Keycloak; a role bundle through a directory group |
 | `rfc2136_test.sh` | `nsupdate` with a TSIG key: allowed names only, wrong keys refused |

@@ -11,7 +11,7 @@
 | `errors.py` | `SetupError` — a step cannot continue; message says why and what to do |
 | `collect_vars.py` | Where settings come from: existing install, `--file` (or a checkout's `custom-vars.yaml` on a fresh install) overrides, prompts for anything missing |
 | `upgrade_vars.py` | Existing install's vars before re-render: new release's images (unless pinned) |
-| `detect_network.py` | Guess hostname, host IP, gateway and LAN CIDR from the default route |
+| `detect_network.py` | Guess hostname, host IP, gateway, LAN CIDR and interface from the default route |
 | `choose_plan.py` | Show the (hardened) default plan; Proceed / Advanced / Quit |
 | `preflight.py` | Architecture, OS, RAM, cgroup memory controller, conflicting listeners |
 | `condition_host.py` | Host packages and Docker Engine (compose v2, buildx) |

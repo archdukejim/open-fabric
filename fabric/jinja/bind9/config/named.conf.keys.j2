@@ -1,3 +1,10 @@
+{% if install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
+// Kea DHCP-DDNS: may only change A/AAAA/DHCID in the DHCP subzone (design D16)
+key "kea-ddns" {
+    algorithm hmac-sha256;
+    secret "{{ kea_ddns_secret }}";
+};
+{% endif %}
 {% for key in tsig_keys %}
 key "{{ key.name }}" {
     algorithm {{ key.algorithm }};

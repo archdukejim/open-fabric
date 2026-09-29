@@ -838,3 +838,19 @@ links:
 | `fluentbit_mem_limit` | `64m` | Container memory limit |
 
 The Elasticsearch password is not a setting: `sudo fabricctl logs set-password elastic` keeps it in OpenBao.
+
+### DHCP (optional)
+| Variable | Default | Notes |
+|---|---|---|
+| `install_kea` | `false` | Kea 3.0 LTS serves DHCP (operations.md → DHCP) |
+| `dhcp.interfaces` | — | Host interface(s) to serve, e.g. `[eth0]`; UDP 67 is opened on them only |
+| `dhcp.subnets` | — | `[{subnet, pools: ["a - b"], routers, reservations: [{mac, ip, hostname}]}]`; reservations inside the subnet, outside its pools |
+| `dhcp.lease_time` | `86400` | Seconds, 300 to 2592000 |
+| `dhcp.dns` | `[host_ip]` | DNS servers handed to clients |
+| `dhcp.domain` | `domain` | Domain name handed to clients |
+| `dhcp.ddns` | `true` | Register client hostnames in DNS |
+| `dhcp.ddns_subdomain` | `dhcp` | The dynamic zone is `<ddns_subdomain>.<domain>` |
+| `ip_kea_ddns` | `10.255.0.97` | kea-dhcp-ddns on fabric_net (sends the updates to BIND) |
+| `kea_mem_limit` | `128m` | Memory limit per Kea container |
+
+The DDNS key's secret is generated (`kea_ddns_secret`, in OpenBao); it is not a setting.

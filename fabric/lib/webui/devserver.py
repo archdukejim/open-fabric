@@ -38,6 +38,13 @@ except ImportError:
     BUNDLES, FABRIC_PERMISSIONS = {}, {p: "" for p in views.PREVIEW_PERMS}
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
+SAMPLE_DHCP = {"enabled": True, "interfaces": ["eth0"], "lease_time": 86400, "ddns_zone": "dhcp.home.arpa",
+               "subnets": [{"subnet": "192.168.1.0/24", "pools": ["192.168.1.100 - 192.168.1.199"],
+                            "routers": "192.168.1.1",
+                            "reservations": [{"mac": "aa:bb:cc:00:11:22", "ip": "192.168.1.20", "hostname": "printer"}]}],
+               "leases": [{"ip": "192.168.1.101", "mac": "02:11:22:33:44:55", "hostname": "laptop1.dhcp.home.arpa",
+                           "expires": "2026-09-30T08:00", "state": "active", "subnet_id": 1}],
+               "leases_error": ""}
 SAMPLE = {
     "services": [("nginx", "active", "healthy"), ("bind9", "active", "healthy"), ("stepca", "active", "healthy"),
                  ("ldap", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),
@@ -319,6 +326,8 @@ class Handler(BaseHTTPRequestHandler):
                     kw["role"] = next((r for r in data["roles"] if r["name"] == query.get("name")), None)
                     view = view if kw["role"] else "roles"
                 return self.send(200, views.dirsrv(self.ctx, view, data=data, **kw))
+            if path == "/kea":
+                return self.send(200, views.kea(self.ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
             if path.lstrip("/") in views.PLACEHOLDERS:
                 return self.send(200, views.placeholder(self.ctx, path.lstrip("/")))
             if path == "/audit":
@@ -351,6 +360,17 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/openbao/"):
                 return self.send(303, b"", location="/openbao?" + urllib.parse.urlencode(
                     {"view": "unlock", **self.state.vault_action(path.split("/")[2:], form)}))
+            if path.startswith("/kea/reservations"):
+                rs = SAMPLE_DHCP["subnets"][0]["reservations"]
+                parts = path.split("/")[3:]
+                if not parts:
+                    rs.append({"mac": form.get("mac", "").lower(), "ip": form.get("ip", ""),
+                               "hostname": form.get("hostname", "")})
+                    msg = f"Reserved {form.get('ip', '')} (dev preview: nothing applied)."
+                else:
+                    rs[:] = [r for r in rs if r["mac"] != urllib.parse.unquote(parts[0])]
+                    msg = "Reservation removed (dev preview)."
+                return self.send(303, b"", location="/kea?" + urllib.parse.urlencode({"msg": msg}))
             if path.startswith("/dirsrv/people/"):
                 name, op = (path.split("/")[3:] + ["", ""])[:2]
                 users = self.state.data["people"]["users"]

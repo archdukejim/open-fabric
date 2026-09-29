@@ -10,6 +10,7 @@ import jinja2
 import yaml
 
 from fabriclib.common.read_images_lock import read_images_lock
+from fabriclib.common.read_packages_lock import read_packages_lock
 
 
 class _RelativeEnvironment(jinja2.Environment):
@@ -79,4 +80,5 @@ def jinja_env(template_dir):
     env.globals["lookup"] = _lookup
     # image_* defaults: the validated, digest-pinned refs (fabric/images.lock.yaml)
     env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(os.path.dirname(template_dir)).items()}
+    env.globals["packages_lock"] = read_packages_lock(os.path.dirname(template_dir))
     return env

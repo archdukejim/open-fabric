@@ -25,7 +25,7 @@ everything else is core.
 | BIND9 · Forward zones (`/bind9?zone=<key>`) | Zone picker; records (A, AAAA, CNAME, MX, TXT, SRV) with each A/AAAA record's automatic PTR (or why it has none); add or delete a record in `vars.yaml`; Apply |
 | BIND9 · Reverse zones (`/bind9?view=reverse`) | Read-only: the reverse zones and PTR records generated from the forward A/AAAA records (see [Reverse DNS](operations.md#reverse-dns)), hand-written reverse zones, and addresses that get no PTR, with the reason |
 | BIND9 · TSIG keys (`/bind9?view=tsig`) | Keys with their effective update rights and ACLs (never secrets). **New TSIG key for a zone**: a forward zone and one scope — certbot DNS-01 for listed hosts, certbot DNS-01 for any host in the zone, or any name with chosen record types; generated secret or an existing one kept. The secret and the `rfc2136.ini` (download) are shown once. **New secret** (rotate) and **Delete**. Apply publishes. ACLs and update policies: placeholder (`fabricctl acl`) |
-| Kea · DHCP (`/kea`) *optional* | Placeholder — left intentionally blank |
+| Kea · DHCP (`/kea`) *optional* | Subnets (pools, router, reservation count), reservations with **Remove**, **Reserve** (MAC, address, hostname; saved and applied at once), and live leases from Kea. When DHCP is off: how to turn it on. Needs `dhcp:read`; changes need `dhcp:write`. See [DHCP](operations.md#dhcp-optional-kea) |
 | Step-CA · PKI (`/stepca?view=…`) | Sub-menu: **Certificate authority** (root + intermediate subject, expiry, SHA-256; link to `certs.<domain>`), **Sign a CSR** (upload or paste PEM/DER → review names, key, policy → sign), **New key + certificate** (for devices that cannot make a CSR: RSA-2048/3072/4096 or EC P-256/P-384), **Inspect** (decode a certificate, chain or CSR; says whether this fabric issued it), **Convert** (PEM `.crt`, DER `.cer`, full chain `.pem`/`.p7b`, and with its key a `.p12`), **Issued** (every certificate issued by hand, with expiry status). See [Manual certificates](#manual-certificates) |
 | 389-DS · Directory (`/dirsrv?view=…`) | **Devices**: list (status light, type, MACs, owner, roles, effective access), add, and a page per device to edit it, see what its roles add up to, manage its linked certificates (issue one from Step-CA, sign its CSR, unlink), delete. **Roles**: what member devices may do (permissions, optional VLAN, priority), add/edit/delete (refused while devices are in it). **People**: users and groups, read-only, with a link to the Keycloak admin console — people are managed in Keycloak. See [Device access (RBAC)](#device-access-rbac) |
 | FreeRADIUS · 802.1X (`/freeradius`) *optional* | Placeholder — left intentionally blank |
@@ -157,7 +157,7 @@ people to them):
 |---|---|---|
 | `admins` | `fabric-admin` | everything |
 | `auditors` | `fabric-auditor` | read every tab and the audit log; change nothing |
-| `network-operators` | `fabric-network-operator` | DNS records, zones, TSIG keys (DHCP later); read PKI and vault status; **no** device management |
+| `network-operators` | `fabric-network-operator` | DNS records, zones, TSIG keys, DHCP reservations; read PKI and vault status; **no** device management |
 | `equipment-operators` | `fabric-equipment-operator` | devices, device roles, 802.1X, link certificates to devices |
 | `pki-operators` | `fabric-pki-operator` | sign CSRs, issue key pairs, convert, link certificates to devices |
 | `helpdesk` | `fabric-helpdesk` | realm users: add a person, reset a sign-in (Directory → People); enrol devices; read-only elsewhere |

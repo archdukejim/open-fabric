@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------
 # Run fabric's test suites against real containers.
 #
-#   sudo tests/run-all.sh [suite ...]      suites: render nginx zone webui pki openbao fluentbit dirsrv keycloak hardening
+#   sudo tests/run-all.sh [suite ...]      suites: render nginx zone webui pki openbao fluentbit kea dirsrv keycloak hardening
 #   sudo tests/run-all.sh sandbox          opt-in: full install in a systemd + Docker sandbox (~10 min)
 #
 # Needs: Linux (amd64 or arm64), Docker with buildx, python3 with yaml +
@@ -14,7 +14,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export FABRIC_TEST_OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(render nginx zone webui pki openbao fluentbit dirsrv keycloak hardening)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(render nginx zone webui pki openbao fluentbit kea dirsrv keycloak hardening)
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo)." >&2; exit 2; }
 rm -rf "$FABRIC_TEST_OUT"; mkdir -p "$FABRIC_TEST_OUT"
@@ -39,6 +39,7 @@ for s in "${SUITES[@]}"; do
         pki)      run pki      python3 "$HERE/pki/run.py" ;;
         openbao)  run openbao  python3 "$HERE/openbao/run.py" ;;
         fluentbit) run fluentbit python3 "$HERE/fluentbit/run.py" ;;
+        kea) run kea python3 "$HERE/kea/run.py" ;;
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
         keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
         hardening) run hardening bash "$HERE/hardening/run.sh" ;;

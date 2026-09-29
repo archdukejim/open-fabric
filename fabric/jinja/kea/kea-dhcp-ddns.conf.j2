@@ -1,0 +1,21 @@
+// Kea DHCP-DDNS — rendered by fabricctl (fabric/jinja/kea/kea-dhcp-ddns.conf.j2).
+// Only dhcp.<domain> is updated, with the dedicated kea-ddns TSIG key (design D16).
+{% set d = dhcp | default({}) %}
+{% set ddns_zone = (d.ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
+{
+"DhcpDdns": {
+    "ip-address": "{{ ip_kea_ddns }}",
+    "port": 53001,
+    "dns-server-timeout": 500,
+    "control-socket": { "socket-type": "unix", "socket-name": "/var/run/kea/kea-ddns-ctrl-socket" },
+    "tsig-keys": [ { "name": "kea-ddns", "algorithm": "HMAC-SHA256", "secret": "{{ kea_ddns_secret }}" } ],
+    "forward-ddns": {
+        "ddns-domains": [
+            { "name": "{{ ddns_zone }}.", "key-name": "kea-ddns",
+              "dns-servers": [ { "ip-address": "{{ ip_bind9 }}", "port": 53 } ] }
+        ]
+    },
+    "reverse-ddns": { "ddns-domains": [] },
+    "loggers": [ { "name": "kea-dhcp-ddns", "output-options": [ { "output": "stdout" } ], "severity": "INFO" } ]
+}
+}

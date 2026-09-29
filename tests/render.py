@@ -176,4 +176,63 @@ print('Fluent Bit: verified TLS to syslog and Elasticsearch, password from the e
 hcl = env.get_template('openbao/openbao.hcl.j2').render(**{**secrets, **v2})
 assert 'audit "file" "file" {\n  description = "fabric: every request"\n  options {\n    file_path = "/openbao/logs/audit.log"\n  }\n}' in hcl, 'the original audit device changed'
 print('OpenBao audit devices: the original one unchanged')
+# Kea (optional DHCP, design §5 / D16): configs, the DHCP subzone, the key's rights, input checks
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
+kv = {**v2, "install_kea": True, "kea_ddns_secret": "a2VhLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmchIQ==",
+      "dhcp": {"interfaces": ["eth0"], "subnets": [{"subnet": "192.168.7.0/24", "pools": ["192.168.7.100 - 192.168.7.199"],
+               "routers": "192.168.7.1", "reservations": [{"mac": "AA-BB-CC-00-11-22", "ip": "192.168.7.20",
+                                                           "hostname": "printer"}]}]}}
+kv["dhcp"] = normalize_dhcp(kv)
+assert kv["dhcp"]["subnets"][0]["reservations"][0]["mac"] == "aa:bb:cc:00:11:22"
+
+
+def kea_json(name):
+    text = env.get_template(f"kea/{name}.j2").render(**kv)
+    return json.loads("\n".join(ln for ln in text.splitlines() if not ln.strip().startswith("//")))
+
+
+k4 = kea_json("kea-dhcp4.conf")["Dhcp4"]
+sn = k4["subnet4"][0]
+assert sn["pools"] == [{"pool": "192.168.7.100 - 192.168.7.199"}] and sn["reservations"][0]["ip-address"] == "192.168.7.20"
+assert k4["ddns-qualifying-suffix"] == "dhcp.lan.j-j.family." and k4["ddns-conflict-resolution-mode"] == "check-with-dhcid"
+assert k4["control-socket"]["socket-name"].startswith("/var/run/kea/") and k4["interfaces-config"]["interfaces"] == ["eth0"]
+d2 = kea_json("kea-dhcp-ddns.conf")["DhcpDdns"]
+assert d2["forward-ddns"]["ddns-domains"][0]["name"] == "dhcp.lan.j-j.family." and d2["tsig-keys"][0]["name"] == "kea-ddns"
+zones = env.get_template('bind9/config/named.conf.zones.j2').render(**{**secrets, **kv, "tsig_keys": [], "tsig_secrets": {}})
+dz = zones[zones.index('zone "dhcp.lan.j-j.family"'):]
+dz = dz[:dz.index("};\n};") + 5]
+assert 'grant "kea-ddns" zonesub A AAAA DHCID;' in dz and dz.count("grant") == 1, dz
+keys = env.get_template('bind9/config/named.conf.keys.j2').render(**{**secrets, **kv, "tsig_keys": [], "tsig_secrets": {}})
+assert 'key "kea-ddns"' in keys and kv["kea_ddns_secret"] in keys
+parent = env.get_template('bind9/data/zone.j2').render(**{**secrets, **kv, "zone_name": "lan.j-j.family",
+                                                        "zone_records": kv["dns"]["dynamic_zone_var"]})
+assert re.search(r"^dhcp\s+NS\s+ns\.lan\.j-j\.family\.$", parent, re.M), "no delegation of the DHCP subzone"
+nokea = env.get_template('bind9/config/named.conf.zones.j2').render(**{**secrets, **v2, "tsig_keys": [], "tsig_secrets": {}})
+assert "dhcp.lan.j-j.family" not in nokea, "no DHCP subzone without Kea"
+for bad, msg in ((lambda d: d["subnets"][0].update(pools=["192.168.8.1 - 192.168.8.9"]), "inside"),
+                 (lambda d: d["subnets"][0]["reservations"][0].update(ip="192.168.7.150"), "outside its pools"),
+                 (lambda d: d.update(interfaces=[]), "interface"),
+                 (lambda d: d["subnets"][0].update(pools=["192.168.7.50 - 192.168.7.60"]), "inside a DHCP pool")):
+    d = copy.deepcopy(kv["dhcp"])
+    bad(d)
+    vv = {**kv, "dhcp": d, "dns": {"dynamic_zone_var": {"A": [{"name": "nas", "ip": "192.168.7.53"}]}}}
+    try:
+        normalize_dhcp(vv)
+        raise AssertionError(f"not refused: {msg}")
+    except ValidationError as e:
+        assert msg in str(e), (msg, str(e))
+kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]
+assert kc["kea-dhcp4"]["cap_add"] == ["NET_RAW", "NET_BIND_SERVICE"] and kc["kea-dhcp4"]["network_mode"] == "host"
+assert kc["kea-ddns"]["user"] == "915:915" and not kc["kea-ddns"].get("cap_add")
+assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
+print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, two capabilities only')
+
+# each systemd unit waits for its health check by container name: that name
+# must be a container_name in its compose template (else start hangs 10 min)
+for container, folder in re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'",
+                                    open(os.path.join(REPO, "fabric", "lib", "deploy.py")).read()):
+    text = open(os.path.join(REPO, "fabric", "jinja", folder, "docker-compose.yml.j2")).read()
+    assert re.search(rf"^\s+container_name: {re.escape(container)}\s*$", text, re.M), (folder, container)
+print('every unit waits on a container its compose file defines')
 print('all templates rendered')

@@ -13,6 +13,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [pki/](pki/) | Issue, check and install certificates from Step-CA |
 | [security/](security/) | Firewall for Docker-published ports |
 | [rbac/](rbac/) | Access control for people: permissions, bundles, what each fabric-agent route needs |
+| [dhcp/](dhcp/) | Optional DHCP (Kea 3.0): `dhcp:` checks, config, DDNS zone, reservations, leases, `fabricctl dhcp` |
 | [logs/](logs/) | Optional log forwarding (Fluent Bit): config, credentials, status |
 | [images/](images/) | Container images: status against the validated list, update (health-gated, rollback), prune |
 

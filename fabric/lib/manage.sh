@@ -45,7 +45,7 @@ FABRIC_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Lifecycle commands are Python (fabric/lib/fabriclib/cli.py).
 case "${1:-}" in
-    setup|doctor|certs|client-cert|tsig|acl|images|logs|vault|secrets|status|start|stop|restart|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
+    setup|doctor|certs|client-cert|tsig|acl|images|logs|dhcp|vault|secrets|status|start|stop|restart|uninstall|reinstall) exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@" ;;
 esac
 VARS_FILE="$FABRIC_DIR/config/vars.yaml"
 

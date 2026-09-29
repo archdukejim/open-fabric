@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 from fabriclib.images.needs_rebuild import needs_rebuild  # noqa: E402
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit  # noqa: E402
+from fabriclib.dhcp.deploy_kea import deploy_kea  # noqa: E402
+from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
@@ -198,6 +200,9 @@ def apply_deployment(start_services=True):
     if 'keycloak_db_password' not in secrets:
         secrets['keycloak_db_password'] = generate_secret_b64(32)
         changed_secrets = True
+    if 'kea_ddns_secret' not in secrets:          # HMAC-SHA256 TSIG key for Kea's DDNS
+        secrets['kea_ddns_secret'] = generate_secret_b64(32)
+        changed_secrets = True
         
     for name in ('ldap_super_admin_password', 'ldap_group_admin_password',
                  'ldap_user_creator_password', 'ldap_user_modifier_password', 'ldap_device_admin_password',
@@ -297,6 +302,11 @@ def apply_deployment(start_services=True):
         shutil.rmtree(render_tmp)
     os.makedirs(render_tmp, exist_ok=True)
     
+    try:                                   # DHCP settings checked before anything is rendered
+        final_vars['dhcp'] = normalize_dhcp(final_vars)
+    except ValidationError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
     save_yaml(final_vars, os.path.join(render_tmp, "vars.yaml"))
     merged_context.update(final_vars)
     try:                                   # Fluent Bit reads the journal through this group
@@ -372,6 +382,8 @@ def apply_deployment(start_services=True):
          'post': [f"/usr/bin/python3 {DEPLOY_BASE_DIR}/fabric/lib/fabriclib/cli.py vault wipe-key"]},
         # optional log forwarding (design D20)
         {'service': 'fluentbit', 'compose': 'fluentbit', 'folder': 'fluentbit', 'requires': []},
+        # optional DHCP (design §5): kea-dhcp4 on the host network + kea-ddns
+        {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
     ]
 
     for svc_info in sys_svcs:
@@ -385,6 +397,8 @@ def apply_deployment(start_services=True):
         if svc_folder == 'webui' and not final_vars.get('install_webui'):
             continue
         if svc_folder == 'fluentbit' and not final_vars.get('install_fluentbit'):
+            continue
+        if svc_folder == 'kea' and not final_vars.get('install_kea'):
             continue
             
         render_file(f'{svc_folder}/docker-compose.yml.j2', f'{svc_folder}/docker-compose.yml')
@@ -625,6 +639,11 @@ def apply_deployment(start_services=True):
     # Fluent Bit (optional): its config, destination CAs, credentials, disk buffer
     if final_vars.get('install_fluentbit') and deploy_fluentbit(final_vars, secrets, jinja_env):
         services_to_restart.add('fluentbit')
+    # Kea (optional): its configs (leases are kept across restarts) and the DHCP subzone, created once
+    if final_vars.get('install_kea'):
+        k_uid, k_gid = get_service_user(final_vars, 'bind')
+        if deploy_kea(final_vars, secrets, jinja_env, k_uid, k_gid):
+            services_to_restart.add('kea')
 
     # webui container (config, build context) + fabric-agent host unit
     webui_changed = agent_unit_changed = False

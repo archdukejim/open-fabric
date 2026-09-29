@@ -5,7 +5,7 @@ SERVICES = ["nginx", "bind9", "stepca", "ldap", "postgres", "keycloak", "openbao
             "fluentbit", "fabric-web", "fabric-agent"]
 # systemd unit -> its container (units without one run on the host)
 CONTAINERS = {"nginx": "nginx", "bind9": "bind9", "stepca": "step-ca", "ldap": "dirsrv", "postgres": "postgres",
-              "keycloak": "keycloak", "openbao": "openbao", "kea": "kea", "freeradius": "freeradius",
+              "keycloak": "keycloak", "openbao": "openbao", "kea": "kea-dhcp4", "freeradius": "freeradius",
               "fluentbit": "fluentbit", "fabric-web": "fabric-web"}
 
 

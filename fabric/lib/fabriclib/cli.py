@@ -9,6 +9,8 @@
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
+  fabricctl dhcp status|leases|reserve|unreserve
+                                 DHCP (optional Kea): subnets, leases, reservations
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
   fabricctl logs status|set-password elastic
                                  log forwarding (optional Fluent Bit): destinations, sent, errors
@@ -32,6 +34,7 @@ import sys
 # Run as a script, Python puts fabriclib/ itself first on sys.path, where its
 # folders (dns/, ldap/, keycloak/) would shadow real packages. Use fabric/lib.
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
@@ -74,6 +77,8 @@ def main(argv):
         return run_secrets_command(args, SetupContext(deploy_base=_base(args)).secrets_file)
     if cmd == "logs":
         return run_logs_command(SetupContext(deploy_base=_base(args)).load_state(), args)
+    if cmd == "dhcp":
+        return run_dhcp_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "images":
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "vault":

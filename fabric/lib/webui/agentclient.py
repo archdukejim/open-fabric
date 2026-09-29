@@ -234,6 +234,19 @@ def delete_role(actor, name):
     return _call("POST", f"/v1/roles/{_q(name)}/delete", {"actor": actor})
 
 
+def dhcp_overview():
+    return _call("GET", "/v1/dhcp")
+
+
+def add_reservation(mac, ip, hostname):
+    """Saved and applied at once (Kea reloads with it)."""
+    return _call("POST", "/v1/dhcp/reservations", {"mac": mac, "ip": ip, "hostname": hostname}, timeout=300)
+
+
+def remove_reservation(mac):
+    return _call("POST", f"/v1/dhcp/reservations/{_q(mac)}/delete", {}, timeout=300)
+
+
 def create_person(uid, first, last, email):
     """Returns the one-time password (shown once)."""
     return _call("POST", "/v1/people", {"uid": uid, "first": first, "last": last, "email": email})["password"]

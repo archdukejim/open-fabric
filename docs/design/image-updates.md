@@ -296,6 +296,12 @@ After every successful update (and weekly from the timer):
 5. Channel: signing, `gh-pages` publishing, promotion; host
    `fabric-channel.timer` fetch + verify; offline export/import.
 6. Web UI Updates panel; automatic applying; Pi self-hosted runner.
+7. **Build fabric's own images in CI** (bind9, dirsrv, kea, webui and the
+   thin layers over step-ca / keycloak) as part of the regression run,
+   publish them multi-arch to fabric's registry (e.g. ghcr.io) and pin them
+   by digest in the list like any other image. Hosts then pull byte-identical,
+   tested images instead of building them from distribution packages at
+   setup (no mirror needed, faster on a Pi, offline = import the images).
 
 **Precondition for step 5:** rename the GitHub repository to `fabricctl`
 *before* the validated list (or the APT repo) is published on GitHub Pages:

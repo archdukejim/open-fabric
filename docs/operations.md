@@ -9,6 +9,8 @@ Use `fabricctl` (the global wrapper powered by the interactive Python engine) fo
   - [`--interactive`](#--interactive)
   - [`--print`](#--print)
   - [`--apply`](#--apply)
+  - [Log forwarding (optional: Fluent Bit)](#log-forwarding-optional-fluent-bit)
+  - [DHCP (optional: Kea)](#dhcp-optional-kea)
   - [`fabricctl images`](#fabricctl-images) (was `--update-containers`)
   - [`--version`](#--version)
   - [`--client-cert <user>`](#--client-cert-user)
@@ -87,6 +89,56 @@ buffer (`/opt/fluentbit/buffer`, 256 MB per destination) keeps records while a
 destination is down; they are delivered when it is back.
 `sudo fabricctl logs status` shows each destination's records sent,
 retries, errors and dropped. Local logs stay; forwarding is a copy.
+
+#### DHCP (optional: Kea)
+Off unless chosen in setup's Advanced plan (it suggests the interface,
+subnet and router of the default route) or `install_kea: true`.
+**Kea 3.0 LTS**, from ISC's signed apt repository (key pinned by
+fingerprint, exact package version in `images.lock.yaml`), built locally on
+fabric's pinned Debian image. One DHCP server per LAN: switch off your
+router's DHCP first.
+
+```yaml
+install_kea: true
+dhcp:
+  interfaces: [eth0]
+  lease_time: 86400                       # seconds, 300 to 2592000
+  # ddns: false                           # don't register hostnames in DNS
+  # ddns_subdomain: dhcp                  # -> <name>.dhcp.<domain>
+  # dns: [192.168.4.2]                    # DNS servers handed out (default: this host)
+  subnets:
+    - subnet: 192.168.4.0/22
+      pools: ["192.168.5.100 - 192.168.5.200"]
+      routers: 192.168.4.1
+      reservations:
+        - { mac: "aa:bb:cc:dd:ee:ff", ip: 192.168.4.20, hostname: printer }
+```
+
+Setup refuses (before changing anything) a pool outside its subnet, a
+reservation inside a pool or outside every subnet, duplicate MACs or
+addresses, and a static A record inside a pool (Kea would hand it out).
+
+**Hostnames in DNS.** Clients that send a hostname are registered as
+`<name>.dhcp.<domain>`: a zone of its own, delegated from `<domain>`, that
+fabric creates once and never re-renders (apply would wipe the dynamic
+names otherwise). Kea's DDNS key (`kea-ddns`, in OpenBao) may change only
+A, AAAA and DHCID records in that zone — nothing in `<domain>` itself — and
+a client cannot take over another client's name (`check-with-dhcid`).
+Reverse (PTR) records for DHCP clients are not registered yet.
+
+Day to day (the Kea tab of the web UI does the same):
+
+```bash
+sudo fabricctl dhcp status                              # subnets, pools, reservations
+sudo fabricctl dhcp leases                              # active leases, from Kea
+sudo fabricctl dhcp reserve aa:bb:cc:dd:ee:ff 192.168.4.20 printer
+sudo fabricctl dhcp unreserve aa:bb:cc:dd:ee:ff
+```
+
+A reservation is saved to `vars.yaml` and applied at once (`--no-apply` to
+batch); the client gets the address at its next renewal. Leases live in
+`/opt/kea/leases` (memfile) and survive restarts and upgrades. The firewall
+opens UDP 67 on the DHCP interfaces only.
 
 #### `fabricctl images`
 Every container image is pinned by digest (amd64 + arm64). The validated

@@ -5,6 +5,7 @@ GET = {
     ("services",): "status:read",
     ("zones",): "dns:read", ("zones", "*"): "dns:read", ("reverse-zones",): "dns:read", ("tsig",): "dns:read",
     ("audit",): "audit:read",
+    ("dhcp",): "dhcp:read",
     ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read",
     ("devices",): "devices:read",
     ("people",): "people:read",
@@ -24,6 +25,7 @@ POST = {
     ("devices", "*", "certs"): "pki:link-device",
     ("roles",): "roles:admin", ("roles", "*"): "roles:admin", ("roles", "*", "delete"): "roles:admin",
     ("people",): "people:create", ("people", "*", "reset"): "people:reset",
+    ("dhcp", "reservations"): "dhcp:write", ("dhcp", "reservations", "*", "delete"): "dhcp:write",
 }
 
 

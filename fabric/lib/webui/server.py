@@ -484,6 +484,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.dirsrv_page(ctx, query)
         if path == "/openbao":
             return self.openbao_page(ctx, query)
+        if path == "/kea":
+            return self.send(200, views.kea(ctx, actions.dhcp_overview(), query.get("msg", ""), query.get("err", "")))
         if path.lstrip("/") in views.PLACEHOLDERS:
             return self.send(200, views.placeholder(ctx, path.lstrip("/")))
         if path == "/audit":
@@ -527,6 +529,23 @@ class Handler(BaseHTTPRequestHandler):
             return self.vault_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[2:]], form)
         if path.startswith("/dirsrv/"):
             return self.dirsrv_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[2:]], form)
+        if path.startswith("/kea/reservations"):
+            parts = [urllib.parse.unquote(p) for p in path.split("/")[3:]]
+            try:
+                if not parts:
+                    res = actions.add_reservation(form.get("mac", ""), form.get("ip", ""), form.get("hostname", ""))
+                    msg = f"Reserved {res['reservation']['ip']} for {res['reservation']['mac']}."
+                elif len(parts) == 2 and parts[1] == "delete":
+                    res = actions.remove_reservation(parts[0])
+                    msg = f"Reservation for {parts[0]} removed."
+                else:
+                    return self.deny(404, "Not found.")
+                if not res.get("applied"):
+                    return self.redirect("/kea?" + urllib.parse.urlencode({"err": msg + " Saved, but applying failed: "
+                                                                          + res.get("output", "")[-300:]}))
+            except actions.ValidationError as exc:
+                return self.redirect("/kea?" + urllib.parse.urlencode({"err": str(exc)}))
+            return self.redirect("/kea?" + urllib.parse.urlencode({"msg": msg}))
         if path.startswith("/bind9/tsig/"):
             return self.tsig_post(sess, urllib.parse.unquote(path[len("/bind9/tsig/"):]), form)
         return self.deny(404, "Not found.")

@@ -5,12 +5,12 @@ import subprocess
 
 from fabriclib.common.console import info, ok, warn
 
-UNITS = ["fabric-web", "webui", "fluentbit", "fabric-agent", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
+UNITS = ["fabric-web", "webui", "fluentbit", "kea", "fabric-agent", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
 TARGET = "/etc/systemd/system/fabric.target"
-CONTAINERS = ["fabric-web", "webui", "fluentbit", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
-DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openbao", "fluentbit"]
+CONTAINERS = ["fabric-web", "webui", "fluentbit", "kea-dhcp4", "kea-ddns", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
+DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openbao", "fluentbit", "kea"]
 LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:local", "fabric/keycloak:local",
-                "fabric/web:local", "fabric/webui:local"]
+                "fabric/web:local", "fabric/webui:local", "fabric/kea:local"]
 
 
 def uninstall(ctx):

@@ -44,7 +44,13 @@ try:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
     check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services healthy" in page, st)
-    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "freeradius"))
+    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("freeradius",))
+    page = req("GET", "/kea")[3]
+    check("Kea tab: subnets, reservations, leases, reserve form", "192.168.1.0/24" in page and "printer" in page
+          and "laptop1.dhcp.home.arpa" in page and 'action="/kea/reservations"' in page)
+    st, loc, _, _ = req("POST", "/kea/reservations", {"csrf": "dev", "mac": "02:00:00:00:00:99", "ip": "192.168.1.30",
+                                                      "hostname": "nas"})
+    check("Kea tab: reserve -> listed", st == 303 and "192.168.1.30" in req("GET", "/kea")[3], loc)
     check("every service tab renders (placeholders)", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
     st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")
