@@ -28,6 +28,8 @@ OPENBAO_SECTIONS = [("status", "Status"), ("unlock", "Unlock methods"), ("secret
 OPENBAO_VIEWS = {"status", "unlock", "secrets", "add-security-key", "add-usb", "add-hsm", "rotate", "remove"}
 SLOT_TYPES = {
     "local": ("Key file", "On this host's disk. Always present, so no kill switch."),
+    "pkcs11": ("Security key", "YubiKey, Nitrokey, SmartCard-HSM or any PKCS#11 token. The key can't be copied."),
+    "kmip": ("HSM / key manager", "Any KMIP server on your network. Revoke fabric there to lock the vault."),
     "security-key": ("Security key", "YubiKey, Nitrokey, SmartCard-HSM or any PKCS#11 token. The key can't be copied."),
     "usb": ("USB stick", "A plain or keypad-encrypted stick. Cheap; a plain stick can be copied."),
     "hsm": ("HSM / key manager", "Any KMIP server on your network. Revoke fabric there to lock the vault."),
@@ -379,7 +381,7 @@ _TEMPLATES = {
 <table><thead><tr><th></th><th>Method</th><th>Device</th><th>Key</th><th>Added</th><th></th></tr></thead><tbody>
 {% for sl in slots %}
 <tr><td><span class="light {{ 'ok' if sl.present else 'bad' }}" title="{{ 'present now' if sl.present else 'not present' }}"></span></td>
-<td><strong>{{ slot_types[sl.type][0] }}</strong><div class="muted small">{{ sl.label }}</div></td>
+<td><strong>{{ slot_types[sl.type][0] }}</strong><div class="muted small">{{ sl.label }}</div>{% if sl.tested %}<div class="muted small">tested: {{ sl.tested }}</div>{% endif %}</td>
 <td><code class="small">{{ sl.device }}</code>{% if sl.detail %}<div class="muted small">{{ sl.detail }}</div>{% endif %}</td>
 <td><code class="small">{{ sl.key_id }}</code></td><td class="small">{{ sl.added }}</td>
 <td class="num"><div class="row-actions">
@@ -392,10 +394,10 @@ _TEMPLATES = {
 {% if has_local and removable %}<p class="flash warn">A device slot works, but the key file on this host still unlocks the vault on its own: anyone with this disk needs nothing else. <a href="/openbao?view=remove&slot=local">Remove the key file</a>.</p>
 {% elif removable | length == 1 and not has_local %}<p class="flash warn">Only one device can unlock this vault. If it is lost or breaks, the vault's data is gone — OpenBao's recovery keys cannot decrypt it. Add a second one for your safe.</p>{% endif %}
 <section class="card"><h2>Add an unlock method</h2>
-{% if not live %}<p class="muted"><span class="pill">arrives next</span> Adding, testing and rotating are being built; the lists below already show what is plugged into this host.</p>{% endif %}
+{% if add_live | select | list | length < 3 %}<p class="muted">Each type says what it was tested against; <span class="pill">arrives next</span> marks types whose adding is still being built.</p>{% endif %}
 <div class="tiles">
 {% for t in ['security-key', 'usb', 'hsm'] %}
-<div class="tile"><div class="tile-head"><strong>{{ slot_types[t][0] }}</strong>{% if t == 'security-key' %}<span class="pill ok">recommended</span>{% endif %}</div>
+<div class="tile"><div class="tile-head"><strong>{{ slot_types[t][0] }}</strong>{% if t == 'security-key' %}<span class="pill ok">recommended</span>{% endif %}{% if not add_live[t] %}<span class="pill">arrives next</span>{% endif %}</div>
 <div class="muted small">{{ slot_types[t][1] }}</div>
 <div><a class="btn" href="/openbao?view=add-{{ t }}">Add…</a></div></div>
 {% endfor %}
@@ -420,7 +422,7 @@ _TEMPLATES = {
 <label class="check wide"><input type="checkbox" name="reset" value="1" checked> New token: replace the factory PIN and management key with random ones (shown once)</label>
 <label class="check wide"><input type="checkbox" name="touch" value="1"> Require a touch to unlock (strongest; after a power cut someone must touch the key)</label>
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
-<div><button{{ '' if live else ' disabled' }}>Add security key</button></div>
+<div><button{{ '' if add_live['security-key'] else ' disabled' }}>Add security key</button></div>
 </form>
 <p class="muted small">fabric checks the token's attestation (the key was made on this genuine device) and tests an unwrap before saving the method. You will be asked to sign in again first.</p>
 {% else %}<p class="blank">No security key found. Plug one into this host and reload.</p>{% endif %}
@@ -438,7 +440,7 @@ _TEMPLATES = {
 </fieldset>
 <label>Label<input name="label" placeholder="safe stick" maxlength="60"></label>
 <label class="wide">Type this host's name to confirm erasing it<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
-<div><button class="danger"{{ '' if live else ' disabled' }}>Erase and add</button></div>
+<div><button class="danger"{{ '' if add_live['usb'] else ' disabled' }}>Erase and add</button></div>
 </form>
 {% else %}<p class="blank">No USB disk found. Plug one into this host and reload.</p>{% endif %}
 </section>
@@ -459,7 +461,7 @@ _TEMPLATES = {
 <label class="check perm"><input type="radio" name="client" value="upload"> Upload one the device issued: <input type="file" name="client_file"></label>
 </fieldset>
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
-<div><button{{ '' if live else ' disabled' }}>Test and add</button></div>
+<div><button{{ '' if add_live['hsm'] else ' disabled' }}>Test and add</button></div>
 </form>
 <p class="muted small">A trial encrypt/decrypt through the device runs before anything is saved.</p></section>
 
@@ -706,13 +708,15 @@ def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err="", devi
                    device=device)
 
 
-def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host="", live=False, msg="", err=""):
+def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host="", live=False, msg="", err="",
+            add_live=None):
     """status: vault_status(); slots: list_slots(); devices: detect_devices().
     live: whether slot changes are available (False shows them disabled)."""
     section = view if view in ("status", "secrets") else "unlock"
     return _render("openbao", ctx=ctx, tab="openbao", s=status, view=view, section=section, sections=OPENBAO_SECTIONS,
                    slots=list(slots), devices=devices or {"tokens": [], "disks": []}, slot_types=SLOT_TYPES,
-                   slot_id=slot_id, host=host, live=live, msg=msg, err=err)
+                   slot_id=slot_id, host=host, live=live, msg=msg, err=err,
+                   add_live=add_live or {"security-key": False, "usb": False, "hsm": False})
 
 
 def dirsrv(ctx, view, data=None, people=None, device=None, role=None, msg="", err="", unavailable=""):

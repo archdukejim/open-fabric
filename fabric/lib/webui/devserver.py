@@ -293,7 +293,8 @@ class Handler(BaseHTTPRequestHandler):
                 view = query.get("view") if query.get("view") in views.OPENBAO_VIEWS else "status"
                 return self.send(200, views.openbao(self.ctx, SAMPLE_VAULT, view, self.state.data["slots"],
                                                     SAMPLE_DEVICES, slot_id=query.get("slot", ""), host="pi-core",
-                                                    live=True, msg=query.get("msg", ""), err=query.get("err", "")))
+                                                    live=True, msg=query.get("msg", ""), err=query.get("err", ""),
+                                                    add_live={"security-key": True, "usb": True, "hsm": True}))
             if path == "/dirsrv":
                 view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
                 kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}

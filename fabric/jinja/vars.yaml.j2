@@ -93,6 +93,8 @@ image_pins: {{ image_pins | default([], true) | to_json }}
 install_ldap: {{ install_ldap | default(true) | bool }}
 # OpenBao (secrets) is core. Its seal key: a 32-byte file readable by the openbao user only.
 openbao_key_dir: {{ openbao_key_dir | default('/etc/fabric/openbao') }}
+# RAM-only: fabric-unlock puts the vault key here just before OpenBao starts, then wipes it.
+openbao_runtime_dir: {{ openbao_runtime_dir | default('/run/fabric/openbao') }}
 openbao_seal_key_id: {{ openbao_seal_key_id | default('fabric-1') }}
 openbao_mem_limit: {{ openbao_mem_limit | default('256m') }}
 # Recovery keys shown once at init (needed for a new root token or a seal migration).

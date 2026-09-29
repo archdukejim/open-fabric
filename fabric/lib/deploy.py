@@ -328,7 +328,10 @@ def apply_deployment(start_services=True):
         {'service': 'postgres', 'compose': 'postgres', 'folder': 'postgres', 'requires': []},
         {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']},
         {'service': 'webui', 'compose': 'webui', 'folder': 'webui', 'requires': ['fabric-agent']},
-        {'service': 'openbao', 'compose': 'openbao', 'folder': 'openbao', 'requires': []},
+        # fabric-unlock: OpenBao starts only when an unlock method gives its key; the key is wiped once unsealed.
+        {'service': 'openbao', 'compose': 'openbao', 'folder': 'openbao', 'requires': [],
+         'condition': f"/usr/bin/python3 {DEPLOY_BASE_DIR}/fabric/lib/fabriclib/cli.py vault unlock",
+         'post': [f"/usr/bin/python3 {DEPLOY_BASE_DIR}/fabric/lib/fabriclib/cli.py vault wipe-key"]},
     ]
 
     for svc_info in sys_svcs:

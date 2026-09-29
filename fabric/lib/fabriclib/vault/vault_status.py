@@ -4,20 +4,27 @@ import stat
 from fabriclib.common.errors import ValidationError
 from fabriclib.vault.common.approle_login import approle_login
 from fabriclib.vault.common.bao_request import bao_request
-from fabriclib.vault.constants import AGENT_CREDS, KEY_FILE
+from fabriclib.vault.common.read_slot_store import read_slot_store
+from fabriclib.vault.constants import AGENT_CREDS, SLOT_STORE
 
 
 def _key_state(v):
-    path = os.path.join(v["openbao_key_dir"], KEY_FILE)
+    """The unlock methods' store: root-only, and no vault key left in RAM."""
+    path = os.path.join(v["openbao_key_dir"], SLOT_STORE)
     try:
         st = os.stat(path)
     except FileNotFoundError:
-        return {"path": path, "present": False, "ok": False, "detail": "missing"}
-    uid = int(v["service_users"]["openbao"]["uid"])
+        return {"path": path, "present": False, "ok": False, "detail": "no unlock methods"}
     mode = stat.S_IMODE(st.st_mode)
-    ok = st.st_uid == uid and mode == 0o400 and st.st_size == 32
-    return {"path": path, "present": True, "ok": ok,
-            "detail": "32 bytes, 0400, openbao only" if ok else f"mode {oct(mode)}, owner uid {st.st_uid}, {st.st_size} bytes"}
+    store = read_slot_store(v) or {}
+    left = [f for f in os.listdir(v["openbao_runtime_dir"]) if f.endswith(".key")] \
+        if os.path.isdir(v.get("openbao_runtime_dir", "")) else []
+    problems = ([f"store mode {oct(mode)} / owner {st.st_uid}"] if st.st_uid != 0 or mode != 0o600 else []) + \
+               ([f"{len(left)} key file(s) still in RAM"] if left else [])
+    n = len(store.get("slots", []))
+    return {"path": path, "present": True, "ok": not problems, "methods": n, "key_id": store.get("key_id"),
+            "detail": "; ".join(problems) or f"{n} unlock method{'s' if n != 1 else ''}, vault key {store.get('key_id')}, "
+                                               "store root-only, no key left in RAM"}
 
 
 def vault_status(v):

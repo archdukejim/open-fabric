@@ -6,7 +6,7 @@ services:
     user: "{{ service_users.openbao.uid }}:{{ service_users.openbao.gid }}"
     # `bao server` directly (the image's entrypoint chowns and setcaps, which
     # a capability-less, read-only container must not need); docker-init reaps.
-    entrypoint: ["bao", "server", "-config=/openbao/config/openbao.hcl"]
+    entrypoint: ["bao", "server", "-config=/openbao/config"]
     init: true
     read_only: true
     security_opt:
@@ -26,8 +26,9 @@ services:
       - {{ deploy_base_dir }}/openbao/data:/openbao/data
       - {{ deploy_base_dir }}/openbao/logs:/openbao/logs
       - {{ deploy_base_dir }}/openbao/certs:/openbao/certs:ro
-      # The static-seal key: readable by this container's user only (0400).
-      - {{ openbao_key_dir }}:/openbao/seal:ro
+      # The vault key, only while OpenBao starts (fabric-unlock writes it to RAM,
+      # wipes it once unsealed): readable by this container's user only.
+      - {{ openbao_runtime_dir }}:/openbao/seal:ro
     networks:
       fabric_net:
         ipv4_address: "{{ ip_openbao }}"

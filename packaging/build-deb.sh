@@ -34,7 +34,9 @@ mkdir -p "$lib" "$root/usr/bin" "$root/usr/share/doc/fabricctl/examples" "$root/
 
 # The fabric tree + docs exactly as tracked (no ignored files: no secrets,
 # no custom-vars.yaml, no __pycache__).
+# Files deleted in the working tree but not yet staged are skipped.
 (cd "$REPO" && git ls-files -z --cached --others --exclude-standard -- fabric docs LICENSE README.md \
+    | while IFS= read -r -d '' f; do [ -e "$f" ] && printf '%s\0' "$f"; done \
     | tar --null -T - -cf -) | tar -xf - -C "$lib"
 find "$lib" -name __pycache__ -prune -exec rm -rf {} +
 {

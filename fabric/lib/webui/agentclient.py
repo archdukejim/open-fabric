@@ -151,6 +151,18 @@ def vault_slots():
     return _call("GET", "/v1/vault/slots")
 
 
+def vault_slot_action(actor, slot_id, op):
+    return _call("POST", f"/v1/vault/slots/{_q(slot_id)}/{op}", {"actor": actor}, timeout=120)
+
+
+def vault_add_usb(actor, disk, label):
+    return _call("POST", "/v1/vault/slots/add-usb", {"actor": actor, "disk": disk, "label": label}, timeout=180)
+
+
+def vault_rotate(actor):
+    return _call("POST", "/v1/vault/rotate", {"actor": actor}, timeout=900)
+
+
 def vault_devices():
     return _call("GET", "/v1/vault/devices")
 

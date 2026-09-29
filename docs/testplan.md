@@ -74,8 +74,8 @@ This document outlines the testing strategy for an AI agent to execute, validate
 
 ### 3.6b OpenBao
 - [ ] **Action**: `sudo fabricctl vault status`; reboot the host; run it again (automated: `sudo tests/run-all.sh openbao hardening sandbox`).
-- [ ] **Expected**: `unsealed (static seal, raft storage)` both times with nobody entering a key; `~/fabric-admin/openbao-recovery-keys.txt` exists once (0600); `/etc/fabric/openbao/unseal.key` is `0400 openbao`; `https://vault.<domain>/ui/` loads with the fabric CA trusted.
-- [ ] **Action**: move `unseal.key` away and restart `openbao`; restore it and restart.
+- [ ] **Expected**: `unsealed (static seal, raft storage)` both times with nobody entering a key; `~/fabric-admin/openbao-recovery-keys.txt` exists once (0600); `/etc/fabric/openbao/slots.json` is `0600 root`, the key-file method `local-fabric-1.key` `0400 root`, and nothing is left in `/run/fabric/openbao/`; `https://vault.<domain>/ui/` loads with the fabric CA trusted.
+- [ ] **Action**: move `local-fabric-1.key` away and restart `openbao`; restore it and restart; `sudo fabricctl vault rotate --yes`.
 - [ ] **Expected**: sealed and *unhealthy* while missing (DNS, LDAP, SSO, nginx keep working); unsealed with all data after the restore; `fabricctl setup` refuses to create a new key while data exists.
 
 ### 3.7 RFC2136 with an existing TSIG key

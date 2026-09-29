@@ -119,6 +119,8 @@ class KC(BaseHTTPRequestHandler):
             claims["nonce"] = "wrong"
         if t == "aud":
             claims["aud"] = "other-client"
+        if t == "stale":                 # signed in long ago (step-up for vault changes)
+            claims["auth_time"] = now - 3600
         if t == "expired":
             claims["exp"] = now - 600
         token = sign_jwt(claims)
@@ -141,7 +143,7 @@ os.makedirs(f"{W}/fabric/config")
 open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
 open(f"{W}/fabric/config/vars.yaml", "w").write(
     f"deploy_base_dir: {W}\nhost_ip: 192.168.7.53\nhostname_certs: certs.lan.test\n"
-    f"hostname_openbao: vault.lan.test\nip_openbao: 10.254.8.99\nopenbao_key_dir: {W}/nokeys\n"
+    f"hostname_openbao: vault.lan.test\nip_openbao: 10.254.8.99\nopenbao_key_dir: {W}/nokeys\nhostname: pi-core\n"
     "service_users: {openbao: {uid: 913, gid: 913}}\n"
     "domain: lan.test\ndns:\n  dynamic_zone_var:\n    zone_authority: true\n    A:\n    - {name: pi-core, ip: 192.168.7.53}\n"
     "    CNAME:\n    - {name: calibre, canonical: nas25-apps}\n")
@@ -239,8 +241,8 @@ def check(name, cond, detail=""):
     print(("PASS " if cond else "FAIL ") + name + ("" if cond else f"  -> {detail}"))
 
 
-def login(cert=ALICE, user="alice", roles=("fabric-admin",), tamper=None, callback_cert=None):
-    st, hd, sc, _ = req("GET", "/login", cert)
+def login(cert=ALICE, user="alice", roles=("fabric-admin",), tamper=None, callback_cert=None, next_path=None):
+    st, hd, sc, _ = req("GET", "/login" + (f"?next={urllib.parse.quote(next_path)}" if next_path else ""), cert)
     loc = urllib.parse.urlparse(hd.get("Location", ""))
     q = dict(urllib.parse.parse_qsl(loc.query))
     code = os.urandom(8).hex()
@@ -384,7 +386,26 @@ st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=session)
 check("unlock methods page renders from the host (changes shown as not yet available)",
       st == 200 and "Add an unlock method" in body and "arrives next" in body, (st, body[:300]))
 st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "x"}, cookie=session)
-check("unlock-method changes are refused until they exist", st == 303 and "next+update" in hd.get("Location", ""), hd)
+check("vault change: the host name must be typed", st == 303 and "Type+this+host" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "pi-core"}, cookie=session)
+check("vault change: confirmed and fresh -> reaches the agent (which refuses: this test host has no vault key)",
+      st == 303 and "no+vault+key" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/slots/add-hsm", POSTH, {"csrf": csrf, "confirm": "pi-core"}, cookie=session)
+check("adding a method type that is not built yet is refused", "next+update" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/slots/add-usb", POSTH, {"csrf": csrf, "confirm": "pi-core", "disk": "/dev/nope"},
+                 cookie=session)
+check("add USB: the agent refuses a disk that does not exist", "not+a+disk" in hd.get("Location", ""), hd)
+(st, hd, sc, body), _, _ = login(tamper="stale")
+stale = cookie_val(sc, "__Host-webui")
+st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=stale)
+stale_csrf = body.split('name="csrf" value="')[1].split('"')[0]
+st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": stale_csrf, "confirm": "pi-core"}, cookie=stale)
+check("vault change with a sign-in older than 5 minutes -> sign in again first (step-up)",
+      st == 303 and hd.get("Location", "").startswith("/login?next=%2Fopenbao"), hd)
+(st, hd, sc, body), _, _ = login(next_path="/openbao?view=unlock")
+check("after signing in, back to where the change was made", st == 200 and "url=/openbao?view=unlock" in body, body[:300])
+(st, hd, sc, body), _, _ = login(next_path="//evil.test/x")
+check("next= cannot leave this site (no open redirect)", st == 200 and 'url=/"' in body and "evil" not in body, body[:300])
 
 # ---- BIND9 tab: TSIG keys for a zone
 st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)

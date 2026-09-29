@@ -1,5 +1,6 @@
 """OpenBao paths and names fabric uses."""
-KEY_FILE = "unseal.key"                    # in openbao_key_dir (default /etc/fabric/openbao)
+SLOT_STORE = "slots.json"                  # unlock methods (key slots), root 0600, signed with the vault key
+KEY_FILE = "unseal.key"                    # iteration-1 layout (a bare key file); migrated into a local slot
 SETUP_CREDS = "setup-approle.json"         # AppRole for fabricctl setup (root 0400)
 AGENT_CREDS = "agent-approle.json"         # AppRole for fabric-agent (root 0400)
 BOOTSTRAP_TOKEN = "bootstrap-root-token"   # initial root token, only until configure succeeds and revokes it

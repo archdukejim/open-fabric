@@ -50,6 +50,7 @@ def uninstall(ctx):
     for path in glob.glob(ctx.path("acme_*")):
         shutil.rmtree(path, ignore_errors=True)
     ok(f"removed fabric directories under {ctx.deploy_base}")
+    shutil.rmtree(v.get("openbao_runtime_dir") or "/run/fabric/openbao", ignore_errors=True)
     key_dir = v.get("openbao_key_dir")
     if key_dir and os.path.isdir(key_dir):
         shutil.rmtree(key_dir)

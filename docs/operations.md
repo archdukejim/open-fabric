@@ -272,12 +272,43 @@ on fabric_net (`ip_openbao`, default `10.255.0.90`), Raft storage in
 `/opt/openbao/data`, TLS from Step-CA, every request in
 `/opt/openbao/logs/audit.log` (secrets HMAC'd).
 
-**Unsealing.** OpenBao uses the *static* seal. It unseals itself at start
-from `/etc/fabric/openbao/unseal.key`: 32 random bytes, `0400`, readable
-only by the `openbao` service user (913). A power cut needs no human.
-The trade-off: whoever holds this disk and that key holds the vault.
-Moving the key to a USB stick (a kill switch), a KMIP appliance or a
-PKCS#11 token is planned (design §7c).
+**Unlocking.** OpenBao uses the *static* seal with one **vault key**. The
+key lives in one or more **unlock methods** (key slots, design §7c), listed
+in `/etc/fabric/openbao/slots.json` (root, 0600, signed with the key).
+A fresh install has one: a key file on this host (`local-<key id>.key`,
+root 0400).
+
+At every start, **fabric-unlock** (the openbao unit's `ExecCondition`) takes
+the key from any present method. It checks the key against its check value
+and writes it to `/run/fabric/openbao/` (RAM, openbao user, 0400). OpenBao
+reads it and unseals, and the unit's `ExecStartPost` wipes it. With no
+method present, systemd does not start OpenBao at all, while DNS, LDAP, SSO
+and nginx keep running. A power cut needs no human as long as a method is
+present. Whoever holds this disk and a method holds the vault.
+
+| Command | What |
+|---|---|
+| `sudo fabricctl vault slots` | Unlock methods: present?, type, key version, what it was tested against |
+| `sudo fabricctl vault test <id>` | Unwrap the key through one method and verify it |
+| `sudo fabricctl vault rotate --yes` | New vault key for every present method (the others are dropped); OpenBao restarts twice |
+| `sudo fabricctl vault remove <id> --yes` | Remove a method (never the last one) |
+
+| `sudo fabricctl vault add-usb /dev/sdX --label NAME --yes` | **Erase** a USB stick and make it an unlock method |
+
+USB sticks can also be added in the web UI (OpenBao → Unlock methods →
+Add USB stick; needs a sign-in within the last 5 minutes and the host name
+typed). Only a whole, unmounted USB disk is accepted. fabric formats it
+(ext4, label `FABRIC-KEY`, a UUID fabric chooses), writes the key
+(root 0400), reads it back and only then saves the method. A plain stick can
+be copied by whoever holds it: if one goes missing, `vault rotate`.
+
+**Kill switch.** udev rules (`/etc/udev/rules.d/90-fabric-unlock.rules`)
+watch enrolled sticks. Pulling one runs `fabricctl vault device-event`,
+which stops OpenBao when no method is left present; plugging it back in
+starts it again. *Tested with loop devices; real plug/unplug is untested.*
+
+Security keys (PKCS#11) and HSMs (KMIP) are shown in the web UI but not
+built yet. Each type states what it was tested against.
 
 **First install.**
 - `init` produces the **recovery key(s)**. They are written once to
@@ -336,13 +367,13 @@ nginx to prove it.
 
 **Backups.** Data without the key is unreadable; the key without the data
 is useless. `fabricctl reinstall` keeps both. For your own backups, copy
-`/opt/openbao/data` together with `/etc/fabric/openbao/`, and keep them
+`/opt/openbao/data` together with `/etc/fabric/openbao/` (the unlock methods), and keep them
 apart from the recovery keys. `fabricctl uninstall` deletes both.
 
-**If it stays sealed.** The key file is missing or wrong: `docker logs
-openbao`, then restore `/etc/fabric/openbao/unseal.key` from your backup.
-Setup never generates a new key next to existing data, because a new key
-cannot open the old vault.
+**If it stays locked.** No unlock method is present (`sudo fabricctl vault
+unlock` says so): plug one in, or restore `/etc/fabric/openbao/` from your
+backup, then `sudo systemctl start openbao`. Setup never generates a new key
+next to existing data, because a new key cannot open the old vault.
 
 ## Resource Utilization
 

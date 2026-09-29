@@ -70,7 +70,9 @@ shutil.copy("root.crt", "openbao/certs/root_ca.crt")
 sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout other.key -out other.crt -days 2 -subj '/CN=Other Root'")
 
 V = {"deploy_base_dir": W, "domain": "lan.test", "hostname_openbao": HOST, "ip_openbao": IP, "ip_bind9": "10.254.9.30",
-     "openbao_key_dir": f"{W}/keys", "openbao_seal_key_id": "fabric-1", "openbao_mem_limit": "256m",
+     "openbao_key_dir": f"{W}/keys", "openbao_runtime_dir": f"{W}/run", "openbao_seal_key_id": "fabric-1",
+     "openbao_udev_rules": f"{W}/90-fabric-unlock.rules",
+     "openbao_mem_limit": "256m",
      "fabric_subnet": SUBNET, "service_users": {"openbao": {"uid": 913, "gid": 913}},
      "image_openbao": yaml.safe_load(sh(["grep", "^image_openbao", f"{REPO}/fabric/jinja/vars.yaml.j2"]).stdout
                                      .split("default(")[1].split(")")[0])}
@@ -89,7 +91,16 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.vault.common.approle_login import approle_login  # noqa: E402
 from fabriclib.vault.common.bao_request import bao_request  # noqa: E402
 from fabriclib.vault.configure_openbao import configure_openbao  # noqa: E402
-from fabriclib.vault.ensure_unseal_key import ensure_unseal_key  # noqa: E402
+from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
+from fabriclib.vault.common.read_slot_store import read_slot_store  # noqa: E402
+from fabriclib.vault.vault_device_event import vault_device_event  # noqa: E402
+from fabriclib.vault.ensure_vault_key import ensure_vault_key  # noqa: E402
+from fabriclib.vault.list_slots import list_slots  # noqa: E402
+from fabriclib.vault.remove_slot import remove_slot  # noqa: E402
+from fabriclib.vault.rotate_vault_key import rotate_vault_key  # noqa: E402
+from fabriclib.vault.test_slot import test_slot  # noqa: E402
+from fabriclib.vault.unlock_vault import unlock_vault  # noqa: E402
+from fabriclib.vault.wipe_runtime_keys import wipe_runtime_keys  # noqa: E402
 from fabriclib.vault.init_openbao import init_openbao  # noqa: E402
 from fabriclib.vault.revoke_token import revoke_token  # noqa: E402
 from fabriclib.vault.vault_status import vault_status  # noqa: E402
@@ -103,19 +114,47 @@ from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao  # noqa: E40
 SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
 os.makedirs(os.path.dirname(SECRETS), exist_ok=True)
 
-# ---------------------------------------------------------------- seal key
-check("seal key created", ensure_unseal_key(V) == "created")
-st = os.stat(f"{W}/keys/unseal.key")
-check("seal key: 32 bytes, 0400, owned by the openbao user only",
-      st.st_size == 32 and oct(st.st_mode & 0o777) == "0o400" and st.st_uid == 913)
-check("seal key directory 0700", oct(os.stat(f"{W}/keys").st_mode & 0o777) == "0o700")
-check("existing key is never replaced", ensure_unseal_key(V) == "present"
-      and open(f"{W}/keys/unseal.key", "rb").read() == open(f"{W}/keys/unseal.key", "rb").read())
-key_bytes = open(f"{W}/keys/unseal.key", "rb").read()
+# ---------------------------------------------------------------- vault key and unlock methods
+fresh = dict(V, openbao_key_dir=f"{W}/fresh-keys", deploy_base_dir=f"{W}/fresh")
+check("fresh install: a random vault key in a key-file unlock method", ensure_vault_key(fresh) == "created"
+      and [sl["type"] for sl in read_slot_store(fresh)["slots"]] == ["local"])
+os.makedirs(f"{W}/keys", mode=0o700)
+legacy = os.urandom(32)
+with open(f"{W}/keys/unseal.key", "wb") as f:           # an iteration-1 install: a bare key file
+    f.write(legacy)
+check("iteration-1 install: its key file becomes the key-file unlock method (no rotation)",
+      ensure_vault_key(V) == "migrated" and not os.path.exists(f"{W}/keys/unseal.key")
+      and open(f"{W}/keys/local-fabric-1.key", "rb").read() == legacy)
+st = os.stat(f"{W}/keys/slots.json")
+kst = os.stat(f"{W}/keys/local-fabric-1.key")
+check("store root 0600, key file root 0400, folder root 0700",
+      (st.st_uid, oct(st.st_mode & 0o777)) == (0, "0o600") and (kst.st_uid, oct(kst.st_mode & 0o777)) == (0, "0o400")
+      and oct(os.stat(f"{W}/keys").st_mode & 0o777) == "0o700")
+check("seal.hcl names the vault key; OpenBao never sees the key folder",
+      'current_key_id = "fabric-1"' in open(f"{W}/openbao/config/seal.hcl").read()
+      and "/keys" not in open(f"{W}/openbao/docker-compose.yml").read())
+check("an existing store is never replaced", ensure_vault_key(V) == "present")
+check("fabric-unlock: the key goes to RAM for the openbao user only", unlock_vault(V)["slot"] == "local"
+      and os.stat(f"{W}/run/fabric-1.key").st_uid == 913 and oct(os.stat(f"{W}/run/fabric-1.key").st_mode & 0o777) == "0o400"
+      and open(f"{W}/run/fabric-1.key", "rb").read() == legacy)
+key_bytes = legacy
+
+
+def start(action="restart"):
+    """What systemd does: fabric-unlock (start condition), start, wipe once unsealed."""
+    if not unlock_vault(V):
+        return False
+    compose(action) if action != "up" else compose("up", "-d")
+    ok_ = health() == "healthy"
+    wipe_runtime_keys(V)
+    return ok_
+
 
 # ---------------------------------------------------------------- container
 up = compose("up", "-d")
 check("compose file starts the pinned image", up.returncode == 0, up.stderr[-400:])
+if up.returncode != 0:
+    print(sh("docker logs openbao", ok=False).stderr[-1500:])
 check("fresh (uninitialised) server counts as healthy", health() == "healthy", sh("docker logs openbao", ok=False).stderr[-600:])
 s = vault_status(V)
 check("status before init: reachable, not initialised", s["reachable"] and not s["initialized"], s)
@@ -132,6 +171,8 @@ check("init returns one recovery key and a root token", first and len(first["rec
       first)
 check("init is not repeated", init_openbao(V) is None)
 check("static seal: unsealed without anyone entering a key", not vault_status(V)["sealed"] and health() == "healthy")
+check("once unsealed the key is wiped from RAM; OpenBao keeps working", wipe_runtime_keys(V) == 1
+      and not os.listdir(f"{W}/run") and not vault_status(V)["sealed"])
 changes = configure_openbao(V, first["root_token"])
 check("configuration applied", {"AppRole auth", "KV fabric/", "KV apps/"} <= set(changes), changes)
 for name in ("setup-approle.json", "agent-approle.json"):
@@ -213,16 +254,55 @@ check("...and re-imported: equal to OpenBao, shredded", import_secrets(V, SECRET
 audit = open(f"{W}/openbao/logs/audit.log").read()
 check("audit log records requests with secrets HMAC'd", '"path":"fabric/data/probe"' in audit and '"v":"1"' not in audit)
 
-# ---------------------------------------------------------------- restarts and the key
-compose("restart")
-check("after a restart it unseals itself", health() == "healthy" and not vault_status(V)["sealed"])
-os.rename(f"{W}/keys/unseal.key", f"{W}/keys/away.key")
-compose("restart")
-time.sleep(5)
-s = vault_status(V)
-gone = health(120)
-check("without the key file it stays sealed and reports unhealthy", s.get("sealed") is not False and gone == "unhealthy",
-      (s, gone))
+# ---------------------------------------------------------------- restarts, unlock methods, rotation
+check("after a restart it unseals itself (fabric-unlock, then wiped)", start() and not vault_status(V)["sealed"]
+      and not os.listdir(f"{W}/run"))
+check("slot test: the key-file method unwraps the vault key", test_slot(V, "tester", "local", source="test"))
+sl = list_slots(V)
+check("slot list: type, presence, key version, what it was tested against",
+      [(x["type"], x["present"], x["key_id"]) for x in sl] == [("local", True, "fabric-1")] and sl[0]["tested"], sl)
+try:
+    remove_slot(V, "tester", "local", source="test")
+    last = False
+except ValidationError as exc:
+    last = "last" in str(exc)
+check("the last unlock method cannot be removed", last)
+
+
+def restart_unsealed():
+    compose("restart")
+    if health() != "healthy" or vault_status(V).get("sealed") is not False:
+        raise ValidationError("not unsealed after restart")
+
+
+res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+store = read_slot_store(V)
+check("rotation: new key fabric-2 in every present method, the old copy shredded",
+      res["key_id"] == "fabric-2" and res["kept"] == ["local"] and store["key_id"] == "fabric-2"
+      and not store.get("previous_key_id") and os.path.exists(f"{W}/keys/local-fabric-2.key")
+      and not os.path.exists(f"{W}/keys/local-fabric-1.key"), res)
+check("rotation: seal.hcl has only the new key; nothing left in RAM",
+      "previous_key" not in open(f"{W}/openbao/config/seal.hcl").read() and not os.listdir(f"{W}/run"))
+check("rotation: OpenBao opens with the new key alone, data intact", start() and
+      bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
+      .get("data", {}).get("data") == {"v": "1"})
+key_bytes = open(f"{W}/keys/local-fabric-2.key", "rb").read()
+check("the new key is not the old one", key_bytes != legacy)
+
+raw = json.load(open(f"{W}/keys/slots.json"))
+raw["slots"][0]["label"] = "changed while locked"
+open(f"{W}/keys/slots.json", "w").write(json.dumps(raw))
+check("a store changed while locked is detected (and still unlocks: the key itself is verified)",
+      unlock_vault(V)["tamper"] and "VAULT_SLOTS_TAMPERED" in open(f"{W}/fabric/archive/audit.log").read())
+wipe_runtime_keys(V)
+raw["slots"][0]["label"] = "Key file on this host"
+open(f"{W}/keys/slots.json", "w").write(json.dumps(raw))
+check("...and the untouched store verifies again", unlock_vault(V)["tamper"] is False)
+wipe_runtime_keys(V)
+
+os.rename(f"{W}/keys/local-fabric-2.key", f"{W}/keys/away.key")
+check("no unlock method present: fabric-unlock refuses (systemd then does not start OpenBao)", unlock_vault(V) is None)
+compose("stop")
 try:
     locked = load_secrets(SECRETS, V)
     locked_ok = False
@@ -230,22 +310,105 @@ except ValidationError:
     locked = None
     locked_ok = True
 check("OpenBao locked: reading fabric's secrets fails loudly (never an empty set)", locked_ok, locked)
-os.rename(f"{W}/keys/away.key", f"{W}/keys/unseal.key")
-os.rename(f"{W}/keys/unseal.key", f"{W}/keys/held.key")
+up = compose("start")
+time.sleep(8)
+check("started anyway without its key (bypassing fabric-unlock): OpenBao refuses to run",
+      sh("docker inspect -f '{{.State.Running}}' openbao", ok=False).stdout.strip() != "true"
+      or health(30) != "healthy")
+os.rename(f"{W}/keys/slots.json", f"{W}/keys/slots.away")
 try:
-    ensure_unseal_key(V)
+    ensure_vault_key(V)
     refused = False
 except ValidationError as exc:
     refused = "restore" in str(exc)
-check("a missing key next to existing data is never regenerated", refused and not os.path.exists(f"{W}/keys/unseal.key"))
-os.rename(f"{W}/keys/held.key", f"{W}/keys/unseal.key")
-compose("restart")
-check("key restored -> unseals again, data intact", health() == "healthy"
-      and bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
+check("no unlock methods next to existing data: a new key is never generated", refused
+      and not os.path.exists(f"{W}/keys/slots.json"))
+os.rename(f"{W}/keys/slots.away", f"{W}/keys/slots.json")
+os.rename(f"{W}/keys/away.key", f"{W}/keys/local-fabric-2.key")
+check("method back -> unseals again, data intact", start() and
+      bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
       .get("data", {}).get("data") == {"v": "1"})
-check("the key never changed", open(f"{W}/keys/unseal.key", "rb").read() == key_bytes)
+check("the key never changed", open(f"{W}/keys/local-fabric-2.key", "rb").read() == key_bytes)
+
+# ---------------------------------------------------------------- USB stick unlock method (loop device)
+sh(f"truncate -s 64M {W}/stick.img")
+loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
+sh(f"truncate -s 64M {W}/other.img")
+other = sh(f"losetup --find --show {W}/other.img").stdout.strip()
+try:
+    add_usb_slot(V, "tester", loop, "safe stick", source="test")
+    usb_refused = False
+except ValidationError as exc:
+    usb_refused = "not a USB disk" in str(exc)
+check("add USB: anything that is not a USB disk is refused", usb_refused)
+os.makedirs(f"{W}/mnt", exist_ok=True)
+sh(f"mkfs.ext4 -q -F {other}")
+sh(f"mount {other} {W}/mnt")
+try:
+    add_usb_slot(V, "tester", other, "", source="test", require_usb=False)
+    busy = False
+except ValidationError as exc:
+    busy = "in use" in str(exc)
+sh(f"umount {W}/mnt")
+check("add USB: a mounted disk is never erased", busy)
+usb_id = add_usb_slot(V, "tester", loop, "safe stick", source="test", require_usb=False)
+store = read_slot_store(V)
+stick = next(sl for sl in store["slots"] if sl["id"] == usb_id)
+check("add USB: stick formatted with fabric's UUID, key written and verified, method saved",
+      stick["type"] == "usb" and stick["device"]["fs_uuid"] in sh(f"blkid -o value -s UUID {loop}").stdout
+      and stick["wraps"].get(store["key_id"]))
+check("add USB: stick not left mounted", sh(f"findmnt -n {loop}", ok=False).returncode != 0)
+check("add USB: kill-switch rule written for this stick's UUID only",
+      stick["device"]["fs_uuid"] in open(f"{W}/90-fabric-unlock.rules").read()
+      and open(f"{W}/90-fabric-unlock.rules").read().count("ACTION==") == 1)
+check("slot test through the stick", test_slot(V, "tester", usb_id, source="test"))
+remove_slot(V, "tester", "local", source="test")
+check("key file removed (the stick vouched): shredded, the stick is the only way in",
+      not any(f.startswith("local-") for f in os.listdir(f"{W}/keys"))
+      and [sl["type"] for sl in read_slot_store(V)["slots"]] == ["usb"])
+check("OpenBao restarts from the stick alone", start() and not vault_status(V)["sealed"])
+calls = []
+
+
+def fake_systemctl(*args, running=True):
+    calls.append(args)
+
+    class R:
+        returncode = 0 if (args[0] != "is-active" or running) else 3
+    return R()
+
+
+sh(f"losetup -d {loop}")
+check("stick pulled: kill switch stops OpenBao", vault_device_event(V, lambda *a: fake_systemctl(*a, running=True))
+      == "stopped" and ("stop", "openbao") in calls)
+check("with the stick gone fabric-unlock refuses", unlock_vault(V) is None)
+loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
+check("stick back: OpenBao is started again", vault_device_event(V, lambda *a: fake_systemctl(*a, running=False))
+      == "started" and ("start", "openbao") in calls)
+check("...and unseals from it, data intact", start() and
+      bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
+      .get("data", {}).get("data") == {"v": "1"})
+res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+check("rotation with the stick: new key on the stick, old one shredded there",
+      res["kept"] == [usb_id] and res["key_id"] == "fabric-3" and test_slot(V, "tester", usb_id, source="test"))
+sh(f"mount -o ro {loop} {W}/mnt")
+on_stick = sorted(os.listdir(f"{W}/mnt/fabric-vault"))
+key_mode = oct(os.stat(f"{W}/mnt/fabric-vault/fabric-3.key").st_mode & 0o777)
+sh(f"umount {W}/mnt")
+check("on the stick: only the current key, root-only", on_stick == ["fabric-3.key"] and key_mode == "0o400", on_stick)
+try:
+    remove_slot(V, "tester", usb_id, source="test")
+    last_usb = False
+except ValidationError as exc:
+    last_usb = "last" in str(exc)
+check("the stick, now the only method, cannot be removed", last_usb)
+compose("stop")
+sh(f"losetup -d {loop}")
+sh(f"losetup -d {other}")
 
 # ---------------------------------------------------------------- hardening
+loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
+start("up")
 insp = json.loads(sh("docker inspect openbao").stdout)[0]
 hc = insp["HostConfig"]
 check("runs as 913:913, not root", insp["Config"]["User"] == "913:913")
@@ -254,10 +417,11 @@ check("no capabilities, no-new-privileges, read-only root, memory limit",
       and hc["ReadonlyRootfs"] and hc["Memory"] == 256 * 1024 * 1024, hc)
 check("effective capabilities are empty",
       "CapEff:\t0000000000000000" in sh("docker exec openbao cat /proc/1/status", ok=False).stdout)
-check("seal key mounted read-only", any(m["Destination"] == "/openbao/seal" and not m["RW"] for m in insp["Mounts"]))
+check("key folder (RAM) mounted read-only", any(m["Destination"] == "/openbao/seal" and not m["RW"] for m in insp["Mounts"]))
 check("no Docker socket", not any("docker.sock" in m["Source"] for m in insp["Mounts"]))
 
 compose("down")
+sh(f"losetup -d {loop}", ok=False)
 sh(f"docker network rm {NET}", ok=False)
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
 sys.exit(1 if FAILED else 0)

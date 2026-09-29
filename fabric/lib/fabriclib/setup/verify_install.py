@@ -113,7 +113,7 @@ def checks(ctx):
     bao = vault_status(v)
     add("OpenBao unsealed (static seal, raft)", bao.get("initialized") and bao.get("sealed") is False
         and bao.get("seal_type") == "static", bao.get("error", ""))
-    add("OpenBao seal key: 32 bytes, 0400, openbao only", bao["key"]["ok"], bao["key"]["detail"])
+    add("OpenBao unlock methods: store root-only, no vault key left in RAM", bao["key"]["ok"], bao["key"]["detail"])
     add("OpenBao KV v2 fabric/ and apps/ (read as fabric-agent)",
         {"fabric/", "apps/"} <= {m["path"] for m in bao.get("mounts", [])}, bao.get("error", ""))
     code = _curl(f"https://{v['hostname_openbao']}/v1/sys/health", v["hostname_openbao"], v["ip_nginx"], 443, root_ca)

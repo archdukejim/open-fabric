@@ -25,6 +25,8 @@ top of the socket's 0660 root:<webui gid> permissions.
   POST /v1/tsig                         {actor, name, zone, scope, hosts, types, secret}
   POST /v1/tsig/<name>/rotate | /v1/tsig/<name>/delete   {actor}
   GET  /v1/devices | /v1/people | /v1/vault | /v1/vault/slots | /v1/vault/devices
+  POST /v1/vault/slots/<id>/test | /v1/vault/slots/<id>/remove | /v1/vault/rotate   {actor}
+  POST /v1/vault/slots/add-usb      {actor, disk, label}
   POST /v1/devices {actor, name, fields} | /v1/devices/<name> {actor, fields} | /v1/devices/<name>/delete
   POST /v1/devices/<name>/certs      {actor, sha256, link}
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
@@ -66,8 +68,13 @@ from fabriclib.ldap.remove_role import remove_role  # noqa: E402
 from fabriclib.ldap.update_device import update_device  # noqa: E402
 from fabriclib.ldap.update_role import update_role  # noqa: E402
 from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
+from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
 from fabriclib.vault.detect_devices import detect_devices  # noqa: E402
 from fabriclib.vault.list_slots import list_slots  # noqa: E402
+from fabriclib.vault.remove_slot import remove_slot  # noqa: E402
+from fabriclib.vault.rotate_vault_key import rotate_vault_key  # noqa: E402
+from fabriclib.vault.run_vault_command import restart_openbao  # noqa: E402
+from fabriclib.vault.test_slot import test_slot  # noqa: E402
 from fabriclib.vault.vault_status import vault_status  # noqa: E402
 from fabriclib.pki.convert_cert import convert_cert  # noqa: E402
 from fabriclib.pki.describe_csr import describe_csr  # noqa: E402
@@ -200,6 +207,8 @@ class Handler(BaseHTTPRequestHandler):
             if len(route) == 3 and route[0] == "tsig" and route[2] == "delete":
                 remove_tsig_key(actor, route[1], source="web")
                 return self.reply(200, {})
+            if route[:1] == ["vault"]:
+                return self.reply(200, self.vault(route[1:], actor, data))
             if route[:1] in (["devices"], ["roles"]):
                 return self.reply(200, self.directory(route, actor, data) or {})
             if route == ["events"]:
@@ -232,6 +241,21 @@ class Handler(BaseHTTPRequestHandler):
             return inspect_pem(load_vars(), text(data, "data"))
         if op == "convert":
             return convert_cert(load_vars(), actor, text(data, "cert"), text(data, "key"))
+        raise ValidationError("unknown operation")
+
+    @staticmethod
+    def vault(route, actor, data):
+        """Unlock-method changes (fabriclib.vault)."""
+        v = load_vars()
+        if route == ["slots", "add-usb"]:
+            return {"id": add_usb_slot(v, actor, text(data, "disk"), text(data, "label"))}
+        if len(route) == 3 and route[0] == "slots" and route[2] == "test":
+            return {"ok": test_slot(v, actor, route[1])}
+        if len(route) == 3 and route[0] == "slots" and route[2] == "remove":
+            remove_slot(v, actor, route[1])
+            return {"ok": True}
+        if route == ["rotate"]:
+            return rotate_vault_key(v, actor, lambda: restart_openbao(v))
         raise ValidationError("unknown operation")
 
     @staticmethod

@@ -395,7 +395,7 @@ everything else.
 ## 7c. Secrets: OpenBao
 
 > **Status (iteration 1, built):** container, Raft, TLS, `vault.<domain>`,
-> static-seal auto-unseal from `/etc/fabric/openbao/unseal.key`, one-time
+> static-seal auto-unseal via key slots (fabric-unlock, key in RAM only at start; key-file slot, rotation), one-time
 > init (recovery keys to `~/fabric-admin`), root token revoked, AppRoles
 > `fabric-setup` / `fabric-agent` bound to fabric_net, KV v2 `fabric/` and
 > `apps/`, declarative audit log, `fabricctl vault status`, web UI status tab,
@@ -440,7 +440,7 @@ source. Multi-arch images; ~150 MB at 4 GB (fits the §7a budget).
   type was tested against.
 
   - **fabric-unlock** (host unit, before `openbao`; re-run by udev on
-    insert): tries every slot, writes K to `/run/fabric/key/unseal.key`
+    insert): tries every slot, writes K to `/run/fabric/openbao/<key id>.key`
     (tmpfs, openbao user, 0400). OpenBao's static seal reads it and
     unseals; the file is then wiped. No slot present → OpenBao stays sealed
     (unhealthy) while every core service keeps running. Last slot device

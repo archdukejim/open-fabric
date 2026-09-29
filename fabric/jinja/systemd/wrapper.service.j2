@@ -20,6 +20,10 @@ ExecStartPre=/bin/sleep 15
 ExecStartPre=/bin/sleep 30
 {% endif %}
 {% endif %}
+{% if item.condition is defined %}
+# Start only if this succeeds (exit 1..254 = skipped, not failed).
+ExecCondition={{ item.condition }}
+{% endif %}
 ExecStartPre=-/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml rm -fsv
 ExecStart=/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml up --abort-on-container-exit
 ExecStop=/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml stop
@@ -35,6 +39,10 @@ ExecStartPost=/bin/bash -c 'for i in {1..120}; do \
     sleep 5; \
 done; exit 1'
 {% endif %}
+
+{% for cmd in item.post | default([]) %}
+ExecStartPost={{ cmd }}
+{% endfor %}
 
 [Install]
 WantedBy=multi-user.target fabric.target

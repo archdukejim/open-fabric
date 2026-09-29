@@ -10,7 +10,9 @@ from fabriclib.vault.common.approle_login import approle_login
 from fabriclib.vault.configure_openbao import configure_openbao
 from fabriclib.vault.common.write_private_file import write_private_file
 from fabriclib.vault.constants import BOOTSTRAP_TOKEN, SETUP_CREDS
-from fabriclib.vault.ensure_unseal_key import ensure_unseal_key
+from fabriclib.vault.ensure_vault_key import ensure_vault_key
+from fabriclib.vault.unlock_vault import unlock_vault
+from fabriclib.vault.wipe_runtime_keys import wipe_runtime_keys
 from fabriclib.vault.init_openbao import init_openbao
 from fabriclib.vault.revoke_token import revoke_token
 from fabriclib.vault.vault_status import vault_status
@@ -54,7 +56,13 @@ def run(ctx):
     configuration as fabric's own AppRole. Core services never wait for it."""
     v = ctx.vars
     try:
-        ok(f"seal key {ensure_unseal_key(v)}: {os.path.join(v['openbao_key_dir'], 'unseal.key')} (0400, openbao only)")
+        state = ensure_vault_key(v)
+        ok(f"vault key {state}" + (": a key file on this host is its first unlock method" if state == "created" else
+                                   ": the iteration-1 key file is now the key-file unlock method" if state == "migrated"
+                                   else ""))
+        if not unlock_vault(v):
+            raise SetupError("no unlock method is present (plug in your security key or USB stick) — "
+                             "OpenBao cannot start without its key")
         info("openbao…")
         ok(f"openbao: {start_unit('openbao', 'openbao', 'openbao' in ctx.restart_services)}")
         # The initial root token is kept (root, 0400) only until fabric's own
@@ -77,6 +85,7 @@ def run(ctx):
                 raise SetupError("the initial root token could not be revoked")
             os.remove(bootstrap)
             ok("initial root token revoked (a new one needs the recovery keys)")
+        wipe_runtime_keys(v)          # the unit's ExecStartPost does this too; setup may have started it itself
         moved = import_secrets(v, ctx.secrets_file, approle_login(v, SETUP_CREDS))
         if moved == "imported":
             ok("fabric's secrets moved into OpenBao (fabric/secrets); the plaintext file was verified and shredded")
@@ -88,5 +97,5 @@ def run(ctx):
     if status.get("sealed") is not False:
         raise SetupError(f"OpenBao is not unsealed: {status}")
     if not status["key"]["ok"]:
-        warn(f"seal key file: {status['key']['detail']}")
+        warn(f"unlock methods: {status['key']['detail']}")
     ok(f"OpenBao {status['version']} unsealed (static seal, raft): https://{v['hostname_openbao']}/")

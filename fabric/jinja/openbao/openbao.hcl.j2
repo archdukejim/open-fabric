@@ -29,10 +29,6 @@ audit "file" "file" {
   }
 }
 
-# Auto-unseal from a local key file (fabricctl setup creates it, 0400).
-# Whoever holds this file and the disk holds the vault. Rotation: add
-# previous_key_id/previous_key and a new current key.
-seal "static" {
-  current_key_id = "{{ openbao_seal_key_id }}"
-  current_key    = "file:///openbao/seal/unseal.key"
-}
+# The seal is in seal.hcl next to this file, written by fabricctl from the
+# unlock methods (key slots): the static seal reads the vault key that
+# fabric-unlock places in RAM just before start.

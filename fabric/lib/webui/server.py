@@ -50,6 +50,7 @@ SESSION_COOKIE = "__Host-webui"
 LOGIN_COOKIE = "__Host-webui-login"
 MAX_BODY = 64 * 1024
 LOGIN_TTL = 600
+STEP_UP = 300            # vault changes need a sign-in no older than this (seconds)
 
 
 def parse_dn(dn):
@@ -248,7 +249,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/static/app.css" and method == "GET":
                 return self.send(200, views.css(), "text/css; charset=utf-8")
             if path == "/login" and method == "GET":
-                return self.login(cert)
+                return self.login(cert, query.get("next", "/"))
             if path == "/oidc/callback" and method == "GET":
                 return self.callback(cert, query)
 
@@ -275,10 +276,14 @@ class Handler(BaseHTTPRequestHandler):
             self.deny(500, "Internal error. See `journalctl -u webui`.")
 
     # -- auth ---------------------------------------------------------------
-    def login(self, cert):
+    def login(self, cert, next_path="/"):
+        # Only a local path may follow the login (no open redirect).
+        if not next_path.startswith("/") or next_path.startswith("//") or "\\" in next_path:
+            next_path = "/"
         url, state, nonce, verifier = self.app.oidc.start_login()
         with self.app.lock:
-            self.app.pending[state] = {"nonce": nonce, "verifier": verifier, "fp": cert["fp"], "created": time.time()}
+            self.app.pending[state] = {"nonce": nonce, "verifier": verifier, "fp": cert["fp"], "created": time.time(),
+                                       "next": next_path}
         # Lax: the cookie must accompany the top-level redirect back from Keycloak.
         self.redirect(url, [self.set_cookie(LOGIN_COOKIE, state, LOGIN_TTL, "Lax")])
 
@@ -308,11 +313,13 @@ class Handler(BaseHTTPRequestHandler):
         now = time.time()
         with self.app.lock:
             self.app.sessions[sid] = {"user": user, "fp": cert["fp"], "csrf": secrets.token_urlsafe(32),
-                                      "id_token": id_token, "created": now, "last": now}
+                                      "id_token": id_token, "created": now, "last": now,
+                                      # when the person last proved password + TOTP (step-up for vault changes)
+                                      "auth_at": min(float(claims.get("auth_time") or now), now)}
         actions.audit(user, "LOGIN", f"cert={cert['fp'][:16]}")
         # A 200 + meta refresh (rather than a redirect) so the first request
         # carrying the Strict session cookie is initiated from this origin.
-        self.send(200, views.continue_page("/"), headers=[
+        self.send(200, views.continue_page(pending.get("next") or "/"), headers=[
             self.set_cookie(SESSION_COOKIE, sid, self.app.max_age),
             self.set_cookie(LOGIN_COOKIE, "", 0, "Lax")])
 
@@ -353,8 +360,40 @@ class Handler(BaseHTTPRequestHandler):
         slots = actions.vault_slots()
         devices = actions.vault_devices() if view in ("add-security-key", "add-usb") else None
         return self.send(200, views.openbao(ctx, actions.vault_status(), view, slots["slots"], devices,
-                                            slot_id=query.get("slot", ""), host=slots["host"], live=False,
-                                            msg=query.get("msg", ""), err=query.get("err", "")))
+                                            slot_id=query.get("slot", ""), host=slots["host"], live=True,
+                                            msg=query.get("msg", ""), err=query.get("err", ""),
+                                            add_live={"security-key": False, "usb": True, "hsm": False}))
+
+    def vault_post(self, sess, parts, form):
+        """Unlock-method changes: a fresh sign-in (step-up) and the host name
+        typed as confirmation, then one fabric-agent call."""
+        back = {"view": "unlock"}
+        if time.time() - sess.get("auth_at", 0) > STEP_UP:
+            return self.redirect("/login?" + urllib.parse.urlencode({"next": "/openbao?view=unlock&msg=" + urllib.parse.quote(
+                "Signed in again. Repeat the change: vault changes need a sign-in from the last 5 minutes.")}))
+        host = actions.vault_slots()["host"]
+        if not host or form.get("confirm", "") != host:
+            return self.redirect("/openbao?" + urllib.parse.urlencode({**back, "err": f"Type this host's name ({host}) "
+                                                                                       "to confirm."}))
+        try:
+            if parts == ["rotate"]:
+                res = actions.vault_rotate(sess["user"])
+                msg = f"Vault key rotated to {res['key_id']}." + (
+                    f" Methods without their device removed: {', '.join(res['dropped'])}." if res["dropped"] else "")
+            elif len(parts) == 3 and parts[0] == "slots" and parts[2] in ("test", "remove"):
+                actions.vault_slot_action(sess["user"], parts[1], parts[2])
+                msg = "Test passed: the method unwrapped and verified the vault key." if parts[2] == "test" else \
+                    "Unlock method removed."
+            elif parts == ["slots", "add-usb"]:
+                slot = actions.vault_add_usb(sess["user"], form.get("disk", ""), form.get("label", ""))["id"]
+                msg = f"USB stick added ({slot}), read back and verified."
+            elif len(parts) == 2 and parts[0] == "slots" and parts[1].startswith("add-"):
+                raise actions.ValidationError("Adding this kind of unlock method arrives in the next update.")
+            else:
+                return self.deny(404, "Not found.")
+        except actions.ValidationError as exc:
+            return self.redirect("/openbao?" + urllib.parse.urlencode({**back, "err": str(exc)}))
+        return self.redirect("/openbao?" + urllib.parse.urlencode({**back, "msg": msg}))
 
     def dirsrv_page(self, ctx, query, status=200):
         view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
@@ -425,9 +464,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/stepca/"):
             return self.stepca_post(sess, path[len("/stepca/"):], form)
         if path.startswith("/openbao/"):
-            # Unlock-method changes are not available yet: the page shows them disabled.
-            return self.redirect("/openbao?" + urllib.parse.urlencode(
-                {"view": "unlock", "err": "Changing unlock methods arrives in the next update."}))
+            return self.vault_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[2:]], form)
         if path.startswith("/dirsrv/"):
             return self.dirsrv_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[2:]], form)
         if path.startswith("/bind9/tsig/"):
