@@ -6,9 +6,11 @@ import time
 from fabriclib.common.errors import ValidationError
 from fabriclib.vault.add_security_key_slot import add_security_key_slot
 from fabriclib.vault.add_usb_slot import add_usb_slot
+from fabriclib.vault.generate_root_token import generate_root_token
 from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens
 from fabriclib.vault.list_slots import list_slots
 from fabriclib.vault.remove_slot import remove_slot
+from fabriclib.vault.revoke_token import revoke_token
 from fabriclib.vault.rotate_vault_key import rotate_vault_key
 from fabriclib.vault.test_slot import test_slot
 from fabriclib.vault.unlock_vault import unlock_vault
@@ -25,6 +27,8 @@ USAGE = """usage: fabricctl vault status
        fabricctl vault tokens                security keys the allowed PKCS#11 libraries see
        fabricctl vault add-key <serial> [--module LIB] [--key-id new|HEX] [--label L] --yes
                                              make a security key an unlock method (PIN asked, or on stdin)
+       fabricctl vault break-glass [--restart]  root token from the recovery keys (keys asked, or on stdin)
+       fabricctl vault revoke-token          revoke a token (asked, or on stdin) — after break-glass
        fabricctl vault unlock                (systemd) put the key in RAM for OpenBao's start
        fabricctl vault device-event          (udev) an unlock device came or went: start/stop OpenBao
        fabricctl vault wipe-key              (systemd) wipe it once OpenBao is unsealed"""
@@ -118,6 +122,28 @@ def run_vault_command(v, argv):
             pin = getpass.getpass("token PIN: ") if sys.stdin.isatty() else sys.stdin.readline().rstrip("\n")
             print("added " + add_security_key_slot(v, "root", tokens[0]["module"], args[0], pin,
                                                    opt.get("--key-id", "new"), opt.get("--label", ""), source="cli"))
+            return 0
+        if cmd == "break-glass" and args in ([], ["--restart"]):
+            # recovery keys and the token never go on a command line
+            if sys.stdin.isatty():
+                keys = []
+                while len(keys) < 10:
+                    key = getpass.getpass(f"recovery key {len(keys) + 1} (empty line when done): ").strip()
+                    if not key:
+                        break
+                    keys.append(key)
+            else:
+                keys = [line.strip() for line in sys.stdin if line.strip()]
+            token = generate_root_token(v, "root", keys, restart=bool(args))
+            print("ROOT TOKEN (shown once; full power over OpenBao — revoke it as soon as you are done):")
+            print(f"  {token}")
+            print("revoke: sudo fabricctl vault revoke-token   (paste it)")
+            return 0
+        if cmd == "revoke-token" and not args:
+            token = getpass.getpass("token: ") if sys.stdin.isatty() else sys.stdin.readline().strip()
+            if not revoke_token(v, token):
+                raise ValidationError("the token still works (or OpenBao refused): not revoked")
+            print("revoked")
             return 0
         if cmd == "rotate" and args in (["--yes"], ["-y"]):
             res = rotate_vault_key(v, "root", lambda: restart_openbao(v), source="cli")

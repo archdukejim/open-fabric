@@ -218,6 +218,11 @@ in_box 'fabricctl setup --file /root/change.yaml --non-interactive --yes' > "$OU
 check "re-run with a change completes" "grep -q 'fabric is ready' '$OUT/setup3.log'"
 check "new record served by the running bind9" \
     "in_box 'dig +short @$IP rerun-test.lan.test' | grep -qx 10.77.0.99"
+if ! in_box "dig +short @$IP rerun-test.lan.test" | grep -qx 10.77.0.99; then
+    echo "    diag: zone files: $(in_box 'grep -rl rerun-test /opt/bind9 2>/dev/null' | xargs)"
+    echo "    diag: SOA served: $(in_box "dig +short SOA @$IP lan.test")"
+    in_box 'docker logs --tail 20 bind9 2>&1' | sed 's/^/    diag: bind9: /'
+fi
 : > "$OUT/rfc2136.log"; rfc2136 > /dev/null
 check "RFC2136 key still works after the re-runs (secret unchanged)" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
 
@@ -330,6 +335,19 @@ print("LEAKS:", sorted(leaks) if leaks else "none")
 PY
 docker cp "$OUT/argv_check.py" "$NAME:/root/argv_check.py"
 check "no secret appears in any process's argv" "in_box 'python3 /root/argv_check.py' | grep -q 'LEAKS: none'"
+
+echo "--- fabricctl uninstall: export to a folder of your choice, remove fabric and the package"
+in_box 'fabricctl uninstall --yes' > "$OUT/uninstall-refused.log" 2>&1
+check "unattended uninstall without an export choice is refused, nothing changed"     "grep -q 'choose --export DIR or --no-export' '$OUT/uninstall-refused.log' && in_box 'systemctl is-active fabric.target' | grep -qx active"
+in_box 'fabricctl uninstall --yes --export /opt/fabric/exported' > "$OUT/uninstall-refused2.log" 2>&1
+check "an export folder the uninstall would delete is refused"     "grep -q 'would be deleted by the uninstall' '$OUT/uninstall-refused2.log' && in_box 'systemctl is-active fabric.target' | grep -qx active"
+in_box 'fabricctl uninstall --yes --export /root/fabric-export --purge-package' > "$OUT/uninstall.log" 2>&1
+EX=/root/fabric-export
+check "export: config, secrets, CA, directory, Keycloak, the vault and its key, README (root 0700)"     "in_box 'test -s $EX/fabric/config/fabric-secrets.yml && test -d $EX/stepca/data && test -d $EX/dirsrv && test -d $EX/postgres && test -d $EX/openbao/data && test -f $EX/@root/etc/fabric/openbao/slots.json && test -f $EX/README.txt && [ \"\$(stat -c %a $EX)\" = 700 ]'"
+check "the package was purged too, and nothing was written to /var/backups"     "! in_box 'dpkg -s fabricctl' >/dev/null 2>&1 && ! in_box 'test -e /var/backups/fabric'"
+check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|webui)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,webui,fabric-agent}.service' >/dev/null 2>&1"
+check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id openbao' >/dev/null 2>&1"
+check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 
 echo; echo "$PASS passed, $FAIL failed"
 if [ "${KEEP:-0}" != 1 ]; then

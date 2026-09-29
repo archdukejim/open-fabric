@@ -81,6 +81,12 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Expected**: OpenBao stops within seconds of the pull (audit `VAULT_LOCKED`) and starts unsealed after the re-plug (`VAULT_UNLOCK`); the unit is `inactive`, not `failed`, while stopped.
 - [ ] **Action** (security key, *untested on hardware*; automated with SoftHSM2 in `tests/openbao`, which needs `softhsm2` and `python3-pykcs11` on the test host): `sudo fabricctl vault tokens`; `vault add-key <serial> --yes` (YubiKey: `--key-id 03` after `ykman piv keys generate 9d`); `vault test <id>`; remove the other methods; reboot.
 - [ ] **Expected**: the vault unseals with only the token plugged in; with a wrong PIN stored, one try is spent and the token is not retried until `vault test`.
+- [ ] **Action**: open `https://vault.<domain>/ui`, method OIDC, sign in as the admin (automated: `tests/sandbox/login_test.py`); try as a user without the admin role.
+- [ ] **Expected**: Keycloak asks for password + TOTP; the admin lands in OpenBao with the `fabric-admin` policy (can write `apps/`, cannot read `fabric/secrets`); the other user is refused.
+- [ ] **Action**: `sudo fabricctl vault break-glass` with the recovery key; use the token; `sudo fabricctl vault revoke-token` (automated: `tests/openbao`).
+- [ ] **Expected**: a working root token; a wrong key is refused and the attempt cancelled; after revoke the token is dead; generate-root is refused on `https://vault.<domain>`.
+- [ ] **Action**: `sudo apt remove fabricctl`, then `sudo apt purge fabricctl` (automated: `tests/sandbox`).
+- [ ] **Expected**: after remove fabric keeps running; purge leaves a root-only backup in `/var/backups/fabric/` and nothing else of fabric (containers, units, `/opt/*`, `/etc/fabric/openbao`, udev rule, CA trust, accounts).
 
 ### 3.7 RFC2136 with an existing TSIG key
 - [ ] **Action**: give `tsig_keys: [{name: npm, records: [npm], secret: <existing>}]` in the vars; after setup, point nginx-proxy-manager (certbot `rfc2136`) at `host_ip:53` with that key (automated: `tests/sandbox/rfc2136_test.sh`).

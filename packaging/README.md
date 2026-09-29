@@ -8,6 +8,7 @@ How fabricctl is built into an installable package.
 | `deb/control.in` | Package metadata; `@VERSION@` is filled in by `build-deb.sh` |
 | `deb/fabricctl` | `/usr/bin/fabricctl`: `setup`/`reinstall`/`uninstall` run the packaged code, everything else the deployed install |
 | `deb/postinst` | Prints the next step; never starts services or touches the network |
+| `deb/postrm` | `remove`: leaves the install running and untouched; `purge`: export to `/var/backups/fabric/`, then uninstall |
 
 Layout on the host:
 
@@ -20,5 +21,8 @@ Layout on the host:
 | `/etc/systemd/system/*.service`, `fabric.target` | `fabricctl setup` |
 
 Upgrade: install the newer `.deb`, then `sudo fabricctl setup` (every other
-command warns until you do). `apt remove fabricctl` removes the tool, not the
-install; `sudo fabricctl uninstall` removes the install.
+command warns until you do). To remove fabric use `sudo fabricctl uninstall`:
+it offers to export all data to a folder you choose and to purge the package.
+`sudo apt remove fabricctl` removes only the tool (fabric keeps running);
+`sudo apt purge fabricctl` removes fabric too, after exporting its data to
+`/var/backups/fabric/` because apt cannot ask where.

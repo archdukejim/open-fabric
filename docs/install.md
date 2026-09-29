@@ -256,9 +256,31 @@ LDAP and Keycloak start empty; setup creates the first admin.
 # first admin with a new login kit.
 sudo fabricctl reinstall
 
-# Remove fabric: its containers, images, network, units, service accounts
-# and /opt/{fabric,nginx,bind9,stepca,dirsrv,keycloak,postgres,webui}
+# Remove fabric. It asks first: export all of fabric's data to a folder
+# you choose? remove the fabricctl package too (apt purge)?
 sudo fabricctl uninstall
+
+# Unattended: the export choice must be explicit
+sudo fabricctl uninstall --yes --export /root/fabric-export --purge-package
+sudo fabricctl uninstall --yes --no-export
 ```
 
-Both ask for confirmation; `--yes` skips it. Uninstall only removes fabric's own objects: other containers, networks and Docker settings are left alone.
+`fabricctl uninstall` is the recommended way: the export goes only where you
+say, so nothing is left in `/var` or anywhere else. It removes every service,
+container, the `fabric_net` network, fabric's locally built images, `/opt/<service>`
+folders, the vault key and unlock-method files, the USB kill-switch rule, the
+service accounts and the CA from the host trust store. Docker, downloaded
+images and other containers are not touched; ufw stays enabled.
+
+| Command | fabric install | Package | Export |
+|---|---|---|---|
+| `sudo fabricctl uninstall` | removed | removed if you say so | to the folder you choose, if you want one |
+| `sudo apt remove fabricctl` | **kept, still running** | removed | — |
+| `sudo apt purge fabricctl` | removed | removed | always, to `/var/backups/fabric/` (apt cannot ask) |
+
+The export (root only, with a README) holds the config, fabric's secrets in
+plain text, the whole CA, the directory (users, devices, roles), Keycloak's
+database, every certificate and OpenBao's data with its vault key. It was
+copied while the stack was stopped, so the databases are consistent.
+Whoever has it has your CA and your vault: move it offline, delete it when
+you no longer need it.

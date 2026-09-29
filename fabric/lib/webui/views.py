@@ -501,8 +501,16 @@ _TEMPLATES = {
 </section>
 
 {% elif view == 'secrets' %}
-<section class="card blank-card"><h2>Browse and edit secrets</h2><p class="blank">Left intentionally blank.</p>
-<p class="muted">Next: fabric's own secrets moved in from <code>fabric-secrets.yml</code>, <code>apps/</code> secrets with Keycloak sign-in for people, rotated database and LDAP credentials, and the SSH certificate authority.</p></section>
+<section class="card"><h2>fabric's own secrets</h2>
+{% if s.secrets %}<p><span class="light ok"></span> In OpenBao at <code>fabric/secrets</code> · version {{ s.secrets.version }} · updated {{ s.secrets.updated }}</p>
+<p class="muted">CA, directory, Keycloak and TSIG secrets. fabric reads them with its own AppRole; people cannot read them, not even in OpenBao's UI. On the host: <code>sudo fabricctl secrets list</code> / <code>show &lt;name&gt;</code> (audited).</p>
+{% else %}<p><span class="light bad"></span> Not readable now{% if s.error %}: {{ s.error }}{% endif %}.</p>{% endif %}
+</section>
+<section class="card"><h2>Your applications' secrets</h2>
+<p class="muted">Browse, edit and version secrets under <code>apps/</code> in OpenBao's own UI. Sign in with Keycloak (method OIDC, your web UI account and TOTP); the web UI admin role gets the <code>fabric-admin</code> policy.</p>
+<p><a class="btn" href="{{ s.url }}ui/vault/auth?with=oidc" target="_blank" rel="noopener">Open OpenBao</a></p>
+<p class="muted small">If nobody can sign in (Keycloak down): <code>sudo fabricctl vault break-glass</code> with the recovery keys gives a root token; revoke it with <code>sudo fabricctl vault revoke-token</code>.</p>
+</section>
 {% endif %}
 {% endblock %}""",
 

@@ -14,7 +14,9 @@
                                  fabric's own secrets (in OpenBao); `show` is audited
   fabricctl client-cert <user> [--days N]
                                  web UI client certificate (.p12) into ~/fabric-admin
-  fabricctl uninstall [--yes]    remove fabric from this host
+  fabricctl uninstall            remove fabric from this host; offers to export all its data to a
+                                 folder you choose first, and to remove the package too
+                                 (unattended: --yes --export DIR|--no-export [--purge-package])
   fabricctl reinstall [--yes]    uninstall + setup, keeping config, secrets, the CA and certificates
 """
 import json
@@ -34,6 +36,7 @@ from fabriclib.setup.backup_install import backup_install  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
 from fabriclib.setup.renew_service_certs import renew_service_certs  # noqa: E402
 from fabriclib.setup.restore_install import restore_install  # noqa: E402
+from fabriclib.setup.run_uninstall_command import run_uninstall_command  # noqa: E402
 from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
@@ -90,11 +93,7 @@ def main(argv):
         print(mint_extra_cert(SetupContext(deploy_base=_base(args)).load_state().vars, json.loads(args[0])))
         return 0
     if cmd == "uninstall":
-        ctx = SetupContext(deploy_base=_base(args))
-        if not _confirm(f"This removes fabric, its data and its CA from {ctx.deploy_base}.", args):
-            return 1
-        uninstall(ctx)
-        return 0
+        return run_uninstall_command(args, _base(args))
     if cmd == "reinstall":
         ctx = SetupContext(deploy_base=_base(args))
         if not _confirm("Reinstall fabric (config, secrets, CA and certificates are kept).", args):

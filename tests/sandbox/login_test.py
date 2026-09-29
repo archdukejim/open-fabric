@@ -11,6 +11,8 @@ handed out. Proves the admin gets in and that everyone else is refused:
   - a real directory user without the fabric-admin role   -> 403
   - a valid certificate presented for another user        -> 403
   - the initial password stops working after the first login
+  - OpenBao's own UI: the admin signs in with Keycloak (TOTP) and gets the
+    fabric-admin policy (apps/ yes, fabric's own secrets no); others refused
 
   python3 login_test.py <vars.yaml> <other-user> <other-password> <other-p12-password>
 Prints PASS/FAIL lines.
@@ -19,6 +21,7 @@ import hashlib
 import hmac
 import html
 import http.client
+import json
 import os
 import re
 import secrets
@@ -39,7 +42,7 @@ ADMIN = V["webui_admin_user"]
 # The login kit lands in the home of the account that ran `sudo fabricctl setup`.
 KIT = os.environ.get("FABRIC_KIT") or os.path.join(os.path.expanduser("~"), "fabric-admin")
 ROOT_CA = os.path.join(V["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
-MGR, SSO, NGINX = V["hostname_mgr"], V["hostname_keycloak"], V["ip_nginx"]
+MGR, SSO, NGINX, VAULT = V["hostname_mgr"], V["hostname_keycloak"], V["ip_nginx"], V["hostname_openbao"]
 TMP = tempfile.mkdtemp()
 FAILED = 0
 
@@ -73,7 +76,7 @@ class Browser:
             self.ctx.load_cert_chain(client_cert)
         self.cookies = {}
 
-    def request(self, method, url, form=None):
+    def request(self, method, url, form=None, json_body=None, token=None):
         u = urllib.parse.urlsplit(url)
         conn = http.client.HTTPSConnection(NGINX, 443, timeout=30)
         conn.sock = self.ctx.wrap_socket(socket.create_connection((NGINX, 443), 30), server_hostname=u.hostname)
@@ -86,6 +89,11 @@ class Browser:
             body = urllib.parse.urlencode(form)
             headers["Content-Type"] = "application/x-www-form-urlencoded"
             headers["Origin"] = f"https://{u.hostname}"
+        if json_body is not None:
+            body = json.dumps(json_body)
+            headers["Content-Type"] = "application/json"
+        if token:
+            headers["X-Vault-Token"] = token
         conn.request(method, u.path + (f"?{u.query}" if u.query else ""), body=body, headers=headers)
         resp = conn.getresponse()
         for k, v in resp.getheaders():
@@ -137,26 +145,23 @@ def fresh_totp(user):
     return code
 
 
-def login(browser, user, password):
-    """Full browser login as `user`. Returns (status, page) of the web UI's
-    OIDC callback, and the Keycloak pages seen on the way."""
-    st, loc, _ = browser.request("GET", f"https://{MGR}/login")
-    if not (st == 303 and loc and loc.startswith(f"https://{SSO}/")):
-        return st, f"login did not redirect to Keycloak: {loc}", []
-    st, loc, page = browser.request("GET", loc)
+def through_keycloak(browser, url, user, password, done):
+    """Keycloak's pages as a person would fill them (password, forced change,
+    TOTP enrolment or code) until it redirects to `done`. Returns
+    (redirect URL or None, pages seen, last status, last page)."""
+    st, loc, page = browser.request("GET", url)
     seen = []
     for _ in range(12):
-        while st in (301, 302, 303) and loc and not loc.startswith(f"https://{MGR}/"):
+        while st in (301, 302, 303) and loc and not loc.startswith(done):
             st, loc, page = browser.request("GET", loc)
-        if loc and loc.startswith(f"https://{MGR}/oidc/callback"):
-            st, _, page = browser.request("GET", loc)
-            return st, page, seen
+        if loc and loc.startswith(done):
+            return loc, seen, st, page
         action, fields = form_of(page)
         if not action:
-            return st, page, seen
+            return None, seen, st, page
         if "username" in fields and "password" in fields:
             seen.append("login")
-            fields.update(username=user, password=password)
+            fields.update(username=user, password=NEW_PW.get(user, password))
         elif "password-new" in fields:
             seen.append("update-password")
             NEW_PW[user] = secrets.token_urlsafe(18)
@@ -171,9 +176,39 @@ def login(browser, user, password):
         elif {"firstName", "lastName", "email"} & set(fields):
             seen.append("update-profile")
         else:
-            return st, f"unknown Keycloak page {sorted(fields)}", seen
+            return None, seen, st, f"unknown Keycloak page {sorted(fields)}"
         st, loc, page = browser.request("POST", action, {k: v for k, v in fields.items() if k != "cancel-aia"})
+    return None, seen, st, page
+
+
+def login(browser, user, password):
+    """Full browser login as `user`. Returns (status, page) of the web UI's
+    OIDC callback, and the Keycloak pages seen on the way."""
+    st, loc, _ = browser.request("GET", f"https://{MGR}/login")
+    if not (st == 303 and loc and loc.startswith(f"https://{SSO}/")):
+        return st, f"login did not redirect to Keycloak: {loc}", []
+    done, seen, st, page = through_keycloak(browser, loc, user, password, f"https://{MGR}/oidc/callback")
+    if not done:
+        return st, page, seen
+    st, _, page = browser.request("GET", done)
     return st, page, seen
+
+
+def vault_login(user, password):
+    """OpenBao's UI sign-in (OIDC auth at auth/oidc): auth URL, Keycloak,
+    then the callback OpenBao's UI would call. Returns (status, response)."""
+    b = Browser()
+    cb = f"https://{VAULT}/ui/vault/auth/oidc/oidc/callback"
+    st, _, page = b.request("POST", f"https://{VAULT}/v1/auth/oidc/oidc/auth_url",
+                            json_body={"role": "fabric-admin", "redirect_uri": cb})
+    url = (json.loads(page).get("data") or {}).get("auth_url") if page.startswith("{") else ""
+    if not url:
+        return st, page
+    done, _, st, page = through_keycloak(b, url, user, password, cb)
+    if not done:
+        return st, page
+    st, _, page = b.request("GET", f"https://{VAULT}/v1/auth/oidc/oidc/callback?{urllib.parse.urlsplit(done).query}")
+    return st, (json.loads(page) if page.startswith("{") else page)
 
 
 admin_pem = pem_from_p12(os.path.join(KIT, f"{ADMIN}.p12"), read("p12-password.txt"), "admin.pem")
@@ -229,5 +264,21 @@ action, fields = form_of(page)
 fields.update(username=ADMIN, password=read("initial-password.txt"))
 st, loc, page = fresh.request("POST", action, fields)
 check("initial password no longer accepted", st == 200 and "Invalid" in page, (st, loc))
+
+# -- OpenBao's own UI with Keycloak single sign-on ---------------------------------------
+st, res = vault_login(ADMIN, read("initial-password.txt"))
+token = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) else None
+check("OpenBao UI: the admin signs in with Keycloak (TOTP) and gets the fabric-admin policy",
+      st == 200 and token and "fabric-admin" in res["auth"]["policies"], (st, str(res)[:300]))
+vb = Browser()
+if token:
+    st, _, _ = vb.request("POST", f"https://{VAULT}/v1/apps/data/sandbox/probe", json_body={"data": {"v": "1"}},
+                          token=token)
+    check("OpenBao UI: the admin may write their applications' secrets (apps/)", st == 200, st)
+    st, _, _ = vb.request("GET", f"https://{VAULT}/v1/fabric/data/secrets", token=token)
+    check("OpenBao UI: fabric's own secrets stay unreadable to people", st == 403, st)
+st, res = vault_login(OTHER, OTHER_PW)
+check(f"OpenBao UI: '{OTHER}' (no admin role) is refused", st in (400, 403) and not (
+    isinstance(res, dict) and res.get("auth")), (st, str(res)[:300]))
 
 sys.exit(1 if FAILED else 0)

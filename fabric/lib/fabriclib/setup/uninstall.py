@@ -51,6 +51,11 @@ def uninstall(ctx):
         shutil.rmtree(path, ignore_errors=True)
     ok(f"removed fabric directories under {ctx.deploy_base}")
     shutil.rmtree(v.get("openbao_runtime_dir") or "/run/fabric/openbao", ignore_errors=True)
+    shutil.rmtree(v.get("openbao_admin_dir") or "/run/fabric/openbao-admin", ignore_errors=True)
+    rules = v.get("openbao_udev_rules") or "/etc/udev/rules.d/90-fabric-unlock.rules"
+    if os.path.exists(rules):                   # the unlock-device kill switch
+        os.remove(rules)
+        subprocess.run(["udevadm", "control", "--reload"], capture_output=True)
     key_dir = v.get("openbao_key_dir")
     if key_dir and os.path.isdir(key_dir):
         shutil.rmtree(key_dir)

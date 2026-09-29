@@ -166,7 +166,7 @@ def apply_deployment(start_services=True):
         
     for name in ('ldap_super_admin_password', 'ldap_group_admin_password',
                  'ldap_user_creator_password', 'ldap_user_modifier_password', 'ldap_device_admin_password',
-                 'webui_oidc_secret'):
+                 'webui_oidc_secret', 'openbao_oidc_secret'):
         if name not in secrets:
             # Alphanumeric: safe inside LDIF and JSON without quoting.
             secrets[name] = run_cmd("openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32").stdout.strip()

@@ -27,6 +27,10 @@ def unlock_vault(v):
     runtime = v["openbao_runtime_dir"]
     os.makedirs(runtime, mode=0o700, exist_ok=True)
     os.chown(runtime, uid, gid)
+    admin = v.get("openbao_admin_dir") or "/run/fabric/openbao-admin"      # break-glass socket
+    os.makedirs(admin, mode=0o700, exist_ok=True)
+    os.chown(admin, uid, gid)
+    os.chmod(admin, 0o700)
     os.chmod(runtime, 0o700)
     write_private_file(os.path.join(runtime, f"{store['key_id']}.key"), key, uid, gid, 0o400)
     if store.get("previous_key_id"):

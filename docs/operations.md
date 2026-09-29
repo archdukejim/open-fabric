@@ -357,7 +357,34 @@ are untested.* HSMs (KMIP) are shown in the web UI but not built yet.
 | Mount | What |
 |---|---|
 | `fabric/` (KV v2) | fabric's own secrets: the entry `fabric/secrets` (see below) |
-| `apps/` (KV v2) | secrets for your applications (Keycloak sign-in for people comes later) |
+| `apps/` (KV v2) | secrets for your applications |
+
+**People sign in to OpenBao's own UI with Keycloak** (when Keycloak is
+installed): `https://vault.<domain>/ui` → method **OIDC** → Keycloak
+(password + TOTP, the same flow as the web UI). Only holders of the web UI
+admin role get in; they get the `fabric-admin` policy:
+
+| May | May not |
+|---|---|
+| everything under `apps/` (read, write, versions) | read or change fabric's own secrets (`fabric/`: listed only) |
+| read engines, sign-in methods and policies | change policies, engines or sign-in methods |
+
+fabric itself keeps full access to its secrets and health through its
+AppRoles; on the host `sudo fabricctl secrets show` stays the way to read
+them (audited). The web UI's OpenBao → Secrets page shows their state and
+links to OpenBao's UI.
+
+**Break glass** (Keycloak down, nobody can sign in):
+
+| Command | What |
+|---|---|
+| `sudo fabricctl vault break-glass` | Enter the recovery key(s) (asked, or on stdin, never as arguments): a root token, shown once, audited |
+| `sudo fabricctl vault revoke-token` | Paste it to revoke it when done |
+
+OpenBao 2.5.3+ disables the unauthenticated generate-root endpoints; fabric
+keeps them off on the network and enables them only on a unix socket in
+`/run/fabric/openbao-admin/` that only root on the host (and OpenBao) can
+reach.
 
 **fabric's own secrets live in OpenBao.** The generated passwords (CA,
 rndc, LDAP role accounts, Keycloak, web UI OIDC) and every TSIG secret are
@@ -435,7 +462,7 @@ Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fab
 | `sudo fabricctl client-cert <user>` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`) |
 | `sudo fabricctl certs [--force]` | Renew service certificates that are missing, expiring within 30 days or missing a name (`--force`: all of them); restarts only the services whose certificates changed |
 | `sudo fabricctl reinstall` | Uninstall + setup, keeping config, secrets, the CA and certificates. Directory users/groups and Keycloak's database are **not** kept; the first admin is re-created with a new login kit |
-| `sudo fabricctl uninstall` | Remove fabric's containers, images, network, units, accounts and `/opt` directories (nothing else) |
+| `sudo fabricctl uninstall` | Remove fabric (asks: export all data to a folder you choose? purge the package too?); see install.md |
 
 ---
 

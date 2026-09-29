@@ -95,6 +95,8 @@ install_ldap: {{ install_ldap | default(true) | bool }}
 openbao_key_dir: {{ openbao_key_dir | default('/etc/fabric/openbao') }}
 # RAM-only: fabric-unlock puts the vault key here just before OpenBao starts, then wipes it.
 openbao_runtime_dir: {{ openbao_runtime_dir | default('/run/fabric/openbao') }}
+# RAM-only: OpenBao's break-glass socket (generate-root), root and the openbao user only.
+openbao_admin_dir: {{ openbao_admin_dir | default('/run/fabric/openbao-admin') }}
 openbao_seal_key_id: {{ openbao_seal_key_id | default('fabric-1') }}
 openbao_mem_limit: {{ openbao_mem_limit | default('256m') }}
 # PKCS#11 libraries fabric may load for security-key unlock methods (paths or globs; they run as root).

@@ -25,11 +25,13 @@ start, and it is wiped once OpenBao is unsealed.
 | `vault_device_event.py` | Kill switch: an enrolled device pulled while it is the only present method → stop OpenBao; plugged back → start it |
 | `remove_slot.py` | Remove a method (never the last; a remaining one must vouch), destroying its copy where possible |
 | `rotate_vault_key.py` | New key for every present method, the rest dropped; OpenBao moved over with previous → current key rotation |
+| `configure_oidc.py` | Sign-in with Keycloak for people: OIDC auth, discovery verified against the fabric CA, one role bound to the admin role → `fabric-admin` policy |
+| `generate_root_token.py` | Break glass: root token from the recovery keys over the root-only socket (one-time pad), audited |
 | `init_openbao.py` | Initialise once: recovery keys + initial root token (None if already initialised) |
 | `configure_openbao.py` | Converge: AppRole auth, KV v2 `fabric/` + `apps/`, policies, AppRoles bound to fabric_net, their credentials (root 0400) |
 | `revoke_token.py` | Revoke a token (the initial root token after bootstrap) and confirm it is dead |
 | `vault_status.py` | Reachable, initialised, sealed, version, seal/storage type, unlock-method store state, engines, auth methods, secrets version (no values) |
 | `detect_devices.py` | Security keys (by USB vendor + serial), USB disks (model, serial, UUID) and, given the vars, PKCS#11 tokens; read-only |
-| `run_vault_command.py` | `fabricctl vault status / slots / test / remove / rotate / add-usb / tokens / add-key / unlock / wipe-key / device-event` |
+| `run_vault_command.py` | `fabricctl vault status / slots / test / remove / rotate / add-usb / tokens / add-key / break-glass / revoke-token / unlock / wipe-key / device-event` |
 | `slots/` | One file per unlock-method type: `wrap`, `unwrap`, `present`, `forget` and what it was `TESTED` against |
 | `common/` | Helpers shared by the operations above (see its README) |

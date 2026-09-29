@@ -105,6 +105,9 @@ try:
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
     page = req("GET", "/openbao")[3]
     check("OpenBao tab: unsealed, static seal, engines", "Unsealed" in page and "static" in page and "fabric/" in page)
+    page = req("GET", "/openbao?view=secrets")[3]
+    check("secrets: fabric's own entry, OpenBao UI link (OIDC), break glass", "fabric/secrets" in page
+          and "ui/vault/auth?with=oidc" in page and "break-glass" in page)
     page = req("GET", "/openbao?view=unlock")[3]
     check("unlock methods: slots, kill-switch state, the key-file warning", "Kill switch off" in page
           and "YubiKey 5 Nano" in page and "Remove the key file" in page)

@@ -7,6 +7,7 @@ from fabriclib.secrets.import_secrets import import_secrets
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.start_unit import start_unit
 from fabriclib.vault.common.approle_login import approle_login
+from fabriclib.vault.configure_oidc import configure_oidc
 from fabriclib.vault.configure_openbao import configure_openbao
 from fabriclib.vault.common.write_private_file import write_private_file
 from fabriclib.vault.constants import BOOTSTRAP_TOKEN, SETUP_CREDS
@@ -22,14 +23,16 @@ RECOVERY = """OpenBao recovery key(s) — fabric at {host}
 
 {keys}
 
-OpenBao unseals itself from {key_file} (static seal): these recovery
-keys are NOT needed to start it. You need them to:
-  - create a new root token:   bao operator generate-root (OpenBao 2.x)
-  - move the seal (to a USB key, KMIP or PKCS#11 later)
+OpenBao unlocks itself from its unlock methods (the vault key in
+{key_dir}, a USB stick or a security key): these recovery keys are NOT
+needed to start it, and they cannot open a vault whose unlock methods are
+all lost. You need them to break glass when nobody can sign in:
+
+  sudo fabricctl vault break-glass     (a root token; revoke it after use)
 
 Store them OFFLINE (password manager, paper in a safe), then delete this
-file from the Pi. They are shown only once; fabric keeps no copy.
-Also back up {key_file}: without it the vault cannot be opened.
+file from the host. They are shown only once; fabric keeps no copy.
+Keep a second unlock method (a stick or key in a safe) as the backup.
 """
 
 
@@ -42,7 +45,7 @@ def _save_recovery(v, keys):
     os.chown(folder, uid, gid)
     path = os.path.join(folder, "openbao-recovery-keys.txt")
     text = RECOVERY.format(host=v["hostname_openbao"], keys="\n".join(f"  {k}" for k in keys),
-                           key_file=os.path.join(v["openbao_key_dir"], "unseal.key"))
+                           key_dir=v["openbao_key_dir"])
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:
         f.write(text)
@@ -80,6 +83,14 @@ def run(ctx):
             token = approle_login(v, SETUP_CREDS)
         changes = configure_openbao(v, token)
         ok("OpenBao configured" + (f" ({', '.join(changes)})" if changes else " (no changes)"))
+        if v.get("install_keycloak"):
+            # Sign-in for people is a convenience: OpenBao never waits for Keycloak.
+            try:
+                oidc = configure_oidc(v, token, ctx.secrets["openbao_oidc_secret"])
+                ok("OpenBao sign-in with Keycloak" + (f" ({', '.join(oidc)})" if oidc else " (no changes)")
+                   + f": https://{v['hostname_openbao']}/ui/")
+            except (ValidationError, KeyError) as exc:
+                warn(f"OpenBao sign-in with Keycloak not configured ({exc}); re-run `sudo fabricctl setup --step vault`")
         if os.path.exists(bootstrap):
             if not revoke_token(v, token):
                 raise SetupError("the initial root token could not be revoked")

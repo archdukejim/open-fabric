@@ -15,6 +15,8 @@ Talks to the Keycloak admin REST API over TLS pinned to the core root CA
   * confidential OIDC client "fabric-webui" (code flow + PKCE S256, exact
     redirect URI, only the admin role in scope, roles in the ID token)
   * browser flow "fabric-webui-mfa" with TOTP required, bound to fabric-webui
+  * confidential OIDC client "fabric-openbao" for OpenBao's own UI (same
+    flow and role claim; fabriclib/keycloak/ensure_openbao_client.py)
 """
 import argparse
 import os
@@ -26,6 +28,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from webui.tlsclient import TLSClient  # noqa: E402
+from fabriclib.keycloak.ensure_openbao_client import ensure_openbao_client  # noqa: E402
 from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
 
 CLIENT_ID = "fabric-webui"
@@ -284,11 +287,14 @@ def main():
     if v.get("install_ldap", True):
         ldap_id = ensure_ldap(kc, realm, realm_id, v, s)
         ensure_group_mapper(kc, realm, ldap_id, v)
+    # The admin role and the TOTP flow serve both the web UI and OpenBao's UI.
+    role = ensure_role(kc, realm, v.get("webui_admin_role", "fabric-admin"))
+    grant_role_to_group(kc, realm, role, v.get("webui_admin_group", "admins"))
+    flow_id = ensure_mfa_flow(kc, realm)
     if v.get("install_webui"):
-        role = ensure_role(kc, realm, v.get("webui_admin_role", "fabric-admin"))
-        grant_role_to_group(kc, realm, role, v.get("webui_admin_group", "admins"))
-        flow_id = ensure_mfa_flow(kc, realm)
         ensure_client(kc, realm, v, s, role, flow_id)
+    if s.get("openbao_oidc_secret"):
+        step(f"{ensure_openbao_client(kc, realm, v, s['openbao_oidc_secret'], role, flow_id)} client fabric-openbao")
     print("Keycloak configuration complete.")
 
 

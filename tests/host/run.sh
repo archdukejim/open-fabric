@@ -118,8 +118,9 @@ put "$OUT/argv_check.py"
 check "no secret in any process's argv" "R 'python3 /tmp/argv_check.py' | grep -q 'LEAKS: none'"
 
 if [ "${CLEANUP:-0}" = 1 ]; then
-    R 'fabricctl uninstall --yes' > "$OUT/uninstall.log" 2>&1
-    check "uninstall" "grep -q removed '$OUT/uninstall.log'"
+    # apt purge: apt cannot ask, so fabric's data is exported to /var/backups/fabric/ first
+    R 'DEBIAN_FRONTEND=noninteractive apt-get purge -y -q fabricctl' > "$OUT/uninstall.log" 2>&1
+    check "apt purge: data exported to /var/backups/fabric, fabric removed"         "R 'ls -d /var/backups/fabric/fabric-export-*/stepca/data' >/dev/null 2>&1 && ! R 'test -e /opt/fabric' && ! R 'dpkg -s fabricctl' >/dev/null 2>&1"
 fi
 echo; echo "$PASS passed, $FAIL failed   (logs: $OUT)"
 exit $FAIL

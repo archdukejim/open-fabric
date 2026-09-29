@@ -542,6 +542,67 @@ repartition or encrypt disks itself (a one-time job with data at risk).
   (step-ca supports YubiKey PIV-backed keys), so issuing certificates needs
   the token too.
 
+## 7e. Access control for people: RBAC across the stack (decided, D19)
+
+Today the web UI has one role (`fabric-admin`) that can do everything. The
+389-DS roles of §5/§6 are what *devices* may do on the network; this is
+what *people* may do in fabric.
+
+- **Permissions** per area and action, each a Keycloak realm role:
+  `dns:read|write`, `tsig:manage`, `pki:read|issue|sign|link-device`,
+  `devices:read|enroll|admin`, `roles:admin` (device roles),
+  `radius:read|admin` (802.1X), `people:read|create|reset`,
+  `vault:status|unlock-methods`, `audit:read`, `system:admin`
+  (services, updates, settings).
+- **Bundles** are Keycloak composite roles granted to LDAP groups; fabric
+  ships these, admins add their own in Keycloak:
+
+  | Bundle | Can |
+  |---|---|
+  | Admin | everything (today's `fabric-admin`) |
+  | Network operator | DNS records and zones, TSIG keys, reverse zones, DHCP (Kea) — **no** device management |
+  | Equipment operator | all 802.1X (FreeRADIUS) and 389-DS hardware management: devices, device roles, enable/disable, link certificates to devices |
+  | PKI operator | sign CSRs, issue key pairs, convert certificates, link issued certificates to devices (TSIG keys belong to Network operator) |
+  | Helpdesk | create realm users, reset their sign-in (password, TOTP), enrol devices; read-only elsewhere |
+  | Auditor | read every tab and the audit log; changes nothing |
+
+- **Enforced twice.** The web UI shows only what the user may do; the
+  fabric-agent re-checks every call against the user's **signed Keycloak
+  token**, which the web UI forwards and the agent verifies itself
+  (signature via the realm's keys, issuer, audience, expiry, roles). A
+  compromised web UI container cannot act beyond the signed-in user.
+- **OpenBao** uses the same roles: each bundle maps to OpenBao policies
+  through the OIDC role's claims (Admin today: `fabric-admin`).
+- **The host CLI** stays root (`sudo fabricctl` = everything); RBAC covers
+  the web UI and its agent API. Step-up sign-in (5 min) and the typed host
+  name stay on dangerous changes whatever the role.
+
+## 7f. Log forwarding (decided, D20)
+
+Optional, off by default: send **all** logs to a syslog server and/or an
+Elastic-style aggregator (Elasticsearch, OpenSearch, anything that speaks
+the Elasticsearch bulk API) for analysis. **Fluent Bit** is the collector,
+an optional stack component like Keycloak: `install_fluentbit` (asked
+during `fabricctl setup`, hot-addable/removable later), its own hardened
+container and systemd unit under `fabric.target`, a Fluent Bit section in
+the web UI (destinations, last delivery, backlog) and in `fabricctl status`.
+
+- **What:** fabric's audit log, OpenBao's audit log (secrets already
+  HMAC'd), every container's output (nginx access/error, Keycloak events,
+  389-DS access/errors, BIND queries and updates, Step-CA, Kea,
+  FreeRADIUS), fabric-agent and fabricctl, and the host's journal.
+- **How:** the Fluent Bit container (arm64 + amd64, ~20–40 MB, memory
+  limit like the rest, non-root, read-only root, no capabilities) reads the
+  journal and the log files read-only, with a disk buffer so nothing is
+  lost while a destination is down. Image pinned by digest.
+  - Syslog: RFC 5424 over TCP+TLS (UDP only as an explicit setting).
+  - Elastic/OpenSearch: HTTPS, API key or basic auth.
+  - TLS verified (fabric CA or a CA you give); credentials in OpenBao, never
+    in `vars.yaml`.
+- **Settings** in `vars.yaml` (`log_forwarding: {syslog: …, elastic: …}`),
+  shown in `fabricctl status` and the Overview tab (last delivery, backlog).
+  Local logs stay where they are; forwarding is a copy.
+
 ## 8. Phases
 
 | Phase | Deliverable | Depends on |
@@ -549,8 +610,8 @@ repartition or encrypt disks itself (a one-time job with data at risk).
 | 0 ✅ | Rename to fabric, `fabricctl` (no migration: pre-fabric hosts are rebuilt) | — |
 | 0.5 | Foundations: container hardening, version lock with digest pinning, LF line endings, arm64 + amd64 CI running the real-container suites, Pi preflight | — |
 | 0.6 | Signed image channels on GitHub Pages, local registry, `fabric-update` timer with rollback, offline export/import | 0.5 |
-| 0.7 | OpenBao: container, auto-unseal from key file, OIDC login via Keycloak, KV for fabric (import `fabric-secrets.yml`) and apps | 0.5 |
-| 0.8 | OpenBao: rotated DB/LDAP credentials, SSH certificate CA, web UI Secrets section | 0.7 |
+| 0.7 ✅ | OpenBao: container, unlock methods (key file, USB, PKCS#11), OIDC login via Keycloak for OpenBao's own UI, break glass, KV for fabric (secrets moved in) and apps | 0.5 |
+| 0.8 | OpenBao: KMIP unlock, rotated DB/LDAP credentials, SSH certificate CA (secrets are browsed in OpenBao's own UI) | 0.7 |
 | 1 ✅ | Native installer `fabricctl setup` (all playbooks ported); Ansible removed | — |
 | 2 | `.deb` build + signed apt repo in CI (amd64 + arm64 test runs); `setup.sh` becomes a wrapper | 1 |
 | 3 | Kea DHCP + DDNS + reservations (CLI + UI) | 2 |
@@ -581,6 +642,8 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D18 ✅ | Disk encryption | LUKS2 for `/opt` + `/etc/fabric`, unlocked by FIDO2 security keys; fabric checks (`disk status`, doctor, UI) and enrols at the console (`fabricctl disk enroll-key`), never via fabric-agent; no automatic repartitioning (§7d) |
 | D17 ✅ | How OpenBao is unlocked | Key slots (local file, USB sticks, PKCS#11 security keys, KMIP HSMs); any one enabled slot unlocks; handled on the host by fabric-unlock; vendor-neutral (§7c) |
 | D16 ✅ | Where Kea registers DHCP hostnames | A separate dynamic subzone per DHCP scope (`dhcp.<domain>`, per-VLAN subzones with 802.1X); never the rendered zones (§5) |
+| D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
+| D20 ✅ | Central logging | Fluent Bit as an optional stack component (`install_fluentbit`, chosen at setup, hot-addable): forwards all logs to syslog (RFC 5424, TLS) and/or Elasticsearch/OpenSearch, disk-buffered, credentials in OpenBao (§7f) |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 
 ## References

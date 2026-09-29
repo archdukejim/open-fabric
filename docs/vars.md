@@ -721,6 +721,7 @@ Built-in folders always come from these defaults; user-added folders are kept.
 | `cname_openbao` / `hostname_openbao` | `vault` / `vault.<domain>` | Published through nginx; CNAME added to the zone |
 | `openbao_key_dir` | `/etc/fabric/openbao` | Unlock methods (`slots.json`, key-file method `local-<id>.key`) and AppRole credentials — all root-only |
 | `openbao_runtime_dir` | `/run/fabric/openbao` | RAM folder fabric-unlock hands the vault key through at start (wiped once unsealed) |
+| `openbao_admin_dir` | `/run/fabric/openbao-admin` | RAM folder with OpenBao's break-glass socket (generate-root), root and the openbao user only |
 | `openbao_seal_key_id` | `fabric-1` | First vault key id (later ids come from `fabricctl vault rotate`) |
 | `openbao_recovery_shares` / `openbao_recovery_threshold` | `1` / `1` | Recovery keys created at the first init |
 | `openbao_mem_limit` | `256m` | Container memory limit |

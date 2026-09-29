@@ -17,6 +17,7 @@ path "sys/auth/*"          { capabilities = ["create", "read", "update", "sudo"]
 path "sys/policies/acl/*"  { capabilities = ["create", "read", "update", "list"] }
 path "auth/approle/role/*" { capabilities = ["create", "read", "update", "list"] }
 path "fabric/*"            { capabilities = ["create", "read", "update", "delete", "list"] }
+path "auth/oidc/*"         { capabilities = ["create", "read", "update", "list"] }
 """,
     "fabric-agent": """
 path "sys/mounts" { capabilities = ["read"] }
@@ -24,4 +25,25 @@ path "sys/auth"   { capabilities = ["read"] }
 path "apps/metadata/*" { capabilities = ["list"] }
 path "fabric/metadata/secrets" { capabilities = ["read"] }
 """,
+    # People who sign in with Keycloak (the web UI admin role): their
+    # applications' secrets, and a read-only look at the configuration.
+    # fabric's own secrets are listed, never read: that stays with
+    # `sudo fabricctl secrets show` (audited on the host).
+    "fabric-admin": """
+path "apps/*"                 { capabilities = ["create", "read", "update", "patch", "delete", "list"] }
+path "fabric/metadata"        { capabilities = ["list"] }
+path "fabric/metadata/*"      { capabilities = ["list"] }
+path "sys/mounts"             { capabilities = ["read"] }
+path "sys/auth"               { capabilities = ["read"] }
+path "sys/policies/acl"       { capabilities = ["list"] }
+path "sys/policies/acl/*"     { capabilities = ["read"] }
+path "sys/internal/ui/mounts" { capabilities = ["read"] }
+path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
+""",
 }
+
+# Sign-in for people: OpenBao's OIDC auth at auth/oidc, a Keycloak client of
+# its own, one role bound to the web UI admin role claim.
+OIDC_MOUNT = "oidc"
+OIDC_CLIENT_ID = "fabric-openbao"
+OIDC_ROLE = "fabric-admin"

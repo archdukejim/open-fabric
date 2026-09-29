@@ -50,6 +50,7 @@ install -m 0644 "$REPO/custom-vars-tpl.yml" "$root/usr/share/doc/fabricctl/examp
 install -m 0644 "$REPO/LICENSE" "$root/usr/share/doc/fabricctl/copyright"
 sed "s/@VERSION@/${DEB_VERSION}/" "$REPO/packaging/deb/control.in" > "$root/DEBIAN/control"
 install -m 0755 "$REPO/packaging/deb/postinst" "$root/DEBIAN/postinst"
+install -m 0755 "$REPO/packaging/deb/postrm" "$root/DEBIAN/postrm"
 
 # Code is root-owned and not writable by anyone else; scripts executable.
 find "$lib" -type d -exec chmod 0755 {} +

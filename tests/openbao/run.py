@@ -71,7 +71,7 @@ sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout other.key -out other.crt -
 
 V = {"deploy_base_dir": W, "domain": "lan.test", "hostname_openbao": HOST, "ip_openbao": IP, "ip_bind9": "10.254.9.30",
      "openbao_key_dir": f"{W}/keys", "openbao_runtime_dir": f"{W}/run", "openbao_seal_key_id": "fabric-1",
-     "openbao_udev_rules": f"{W}/90-fabric-unlock.rules",
+     "openbao_udev_rules": f"{W}/90-fabric-unlock.rules", "openbao_admin_dir": f"{W}/admin",
      "openbao_mem_limit": "256m",
      "fabric_subnet": SUBNET, "service_users": {"openbao": {"uid": 913, "gid": 913}},
      "image_openbao": yaml.safe_load(sh(["grep", "^image_openbao", f"{REPO}/fabric/jinja/vars.yaml.j2"]).stdout
@@ -105,6 +105,7 @@ from fabriclib.vault.rotate_vault_key import rotate_vault_key  # noqa: E402
 from fabriclib.vault.test_slot import test_slot  # noqa: E402
 from fabriclib.vault.unlock_vault import unlock_vault  # noqa: E402
 from fabriclib.vault.wipe_runtime_keys import wipe_runtime_keys  # noqa: E402
+from fabriclib.vault.generate_root_token import generate_root_token  # noqa: E402
 from fabriclib.vault.init_openbao import init_openbao  # noqa: E402
 from fabriclib.vault.revoke_token import revoke_token  # noqa: E402
 from fabriclib.vault.vault_status import vault_status  # noqa: E402
@@ -187,6 +188,35 @@ check("re-run as fabric-setup (not root) changes nothing", configure_openbao(V, 
 check("root token revoked after bootstrap", revoke_token(V, first["root_token"]))
 check("revoked root token is refused",
       bao_request(V, "GET", "sys/mounts", token=first["root_token"])[0] == 403)
+
+# ---------------------------------------------------------------- break glass + the policy for people
+try:
+    generate_root_token(V, "tester", ["bm90IGEgcmVjb3Zlcnkga2V5"], source="test")
+    bad_refused = False
+except ValidationError:
+    bad_refused = bao_request(V, "GET", "sys/generate-root/attempt", admin=True)[1].get("started") is False
+check("break glass: a wrong recovery key is refused and the attempt cancelled", bad_refused)
+check("generate-root stays off on the network listener (OpenBao's default)",
+      bao_request(V, "GET", "sys/generate-root/attempt")[0] == 405)
+glass = generate_root_token(V, "tester", first["recovery_keys"], source="test")
+check("break glass: the recovery keys give a working root token",
+      bao_request(V, "GET", "auth/token/lookup-self", token=glass)[1].get("data", {}).get("policies") == ["root"])
+bao_request(V, "POST", "fabric/data/glass-probe", token=glass, body={"data": {"v": "fabric-only"}})
+person = bao_request(V, "POST", "auth/token/create", token=glass,
+                     body={"policies": ["fabric-admin"], "ttl": "5m"})[1]["auth"]["client_token"]
+check("people (fabric-admin): their applications' secrets, read and write",
+      bao_request(V, "POST", "apps/data/team/db", token=person, body={"data": {"pw": "x"}})[0] == 200
+      and bao_request(V, "GET", "apps/data/team/db", token=person)[0] == 200)
+check("people: fabric's own secrets are listed, never read",
+      "glass-probe" in bao_request(V, "LIST", "fabric/metadata", token=person)[1].get("data", {}).get("keys", [])
+      and bao_request(V, "GET", "fabric/data/glass-probe", token=person)[0] == 403
+      and bao_request(V, "POST", "fabric/data/glass-probe", token=person, body={"data": {"v": "x"}})[0] == 403)
+check("people: configuration readable, not writable",
+      bao_request(V, "GET", "sys/policies/acl/fabric-admin", token=person)[0] == 200
+      and bao_request(V, "PUT", "sys/policies/acl/fabric-admin", token=person, body={"policy": ""})[0] == 403
+      and bao_request(V, "POST", "sys/auth/userpass", token=person, body={"type": "userpass"})[0] == 403)
+bao_request(V, "DELETE", "fabric/metadata/glass-probe", token=glass)
+check("break glass: the root token is revoked after use", revoke_token(V, glass))
 
 agent = approle_login(V, "agent-approle.json")
 check("fabric-agent may read the engine list", bao_request(V, "GET", "sys/mounts", token=agent)[0] == 200)

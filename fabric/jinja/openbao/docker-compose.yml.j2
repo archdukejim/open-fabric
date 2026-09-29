@@ -21,6 +21,13 @@ services:
       BAO_TLS_SERVER_NAME: "{{ hostname_openbao }}"
     dns:
       - {{ ip_bind9 }}
+{% if install_keycloak | default(false) %}
+    # Keycloak by its public name through nginx (443), so the OIDC issuer
+    # OpenBao checks is the one Keycloak puts in its tokens (the keycloak
+    # container's own alias would answer on 8443).
+    extra_hosts:
+      - "{{ hostname_keycloak }}:{{ ip_nginx }}"
+{% endif %}
     volumes:
       - {{ deploy_base_dir }}/openbao/config:/openbao/config:ro
       - {{ deploy_base_dir }}/openbao/data:/openbao/data
@@ -29,6 +36,8 @@ services:
       # The vault key, only while OpenBao starts (fabric-unlock writes it to RAM,
       # wipes it once unsealed): readable by this container's user only.
       - {{ openbao_runtime_dir }}:/openbao/seal:ro
+      # Break-glass socket (generate-root): reachable from the host as root only.
+      - {{ openbao_admin_dir | default('/run/fabric/openbao-admin') }}:/openbao/admin
     networks:
       fabric_net:
         ipv4_address: "{{ ip_openbao }}"

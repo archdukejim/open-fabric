@@ -37,7 +37,7 @@ rm -rf "$W"; mkdir -p "$BASE"
 
 # ---- render with test-safe values ------------------------------------
 export FABRIC_TEST_VARS="{\"deploy_base_dir\": \"$BASE\", \"host_ip\": \"127.0.0.1\", \"bind_dns_port\": 10053,
-  \"host_ram_capacity\": 4, \"hostname\": \"pi-core\", \"stepca_port\": 9000, \"openbao_key_dir\": \"$W/keys\", \"openbao_runtime_dir\": \"$W/run\"}"
+  \"host_ram_capacity\": 4, \"hostname\": \"pi-core\", \"stepca_port\": 9000, \"openbao_key_dir\": \"$W/keys\", \"openbao_runtime_dir\": \"$W/run\", \"openbao_admin_dir\": \"$W/admin\"}"
 python3 "$REPO/tests/render.py" "$W/rendered" >/dev/null || { echo "FAIL render"; exit 1; }
 R="$W/rendered"
 docker network create --subnet 10.255.0.0/24 fabric_net >/dev/null
@@ -199,7 +199,7 @@ printf 'seal "static" {
   current_key = "file:///openbao/seal/fabric-1.key"
 }
 ' > "$BASE/openbao/config/seal.hcl"
-chown -R 913:913 "$BASE/openbao" "$W/run"; chmod 700 "$W/run"; chmod 400 "$W/run/fabric-1.key" "$BASE/openbao/certs/privkey.pem"
+mkdir -p "$W/admin"; chown -R 913:913 "$BASE/openbao" "$W/run" "$W/admin"; chmod 700 "$W/run" "$W/admin"; chmod 400 "$W/run/fabric-1.key" "$BASE/openbao/certs/privkey.pem"
 check "openbao (pinned image) starts; uninitialised counts as healthy" "up openbao && wait_healthy openbao"
 check "openbao hardened: $(hardened openbao 1 | tr -d '\n')" "hardened openbao 1 >/dev/null"
 check "openbao serves TLS with its cert" \

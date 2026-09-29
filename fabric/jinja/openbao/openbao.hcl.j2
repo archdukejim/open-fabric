@@ -20,6 +20,16 @@ listener "tcp" {
   tls_min_version = "tls12"
 }
 
+# Break glass (`fabricctl vault break-glass`): generate-root from the recovery
+# keys. OpenBao 2.5.3+ turns those unauthenticated endpoints off, rightly, on
+# the network listener; they are only on this socket, whose folder is on the
+# host under {{ openbao_admin_dir | default('/run/fabric/openbao-admin') }} (root and the openbao user only).
+listener "unix" {
+  address     = "/openbao/admin/bao.sock"
+  socket_mode = "0600"
+  disable_unauthed_generate_root_endpoints = false
+}
+
 # Every request is logged, secrets HMAC'd (OpenBao 2.x: audit devices are
 # declared here, not enabled through the API).
 audit "file" "file" {
