@@ -171,4 +171,9 @@ for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     assert all(sp.get("logging", {}).get("driver") == "journald" for sp in dc["services"].values()), svc
 print('Fluent Bit: verified TLS to syslog and Elasticsearch, password from the environment; containers log to the journal')
+# A declared OpenBao audit device must never change (OpenBao then refuses to become
+# active on upgrade); new needs get a new device.
+hcl = env.get_template('openbao/openbao.hcl.j2').render(**{**secrets, **v2})
+assert 'audit "file" "file" {\n  description = "fabric: every request"\n  options {\n    file_path = "/openbao/logs/audit.log"\n  }\n}' in hcl, 'the original audit device changed'
+print('OpenBao audit devices: the original one unchanged')
 print('all templates rendered')

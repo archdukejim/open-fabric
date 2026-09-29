@@ -7,6 +7,7 @@ from fabriclib.secrets.import_secrets import import_secrets
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.start_unit import start_unit
 from fabriclib.vault.common.approle_login import approle_login
+from fabriclib.vault.common.wait_active import wait_active
 from fabriclib.vault.configure_oidc import configure_oidc
 from fabriclib.vault.configure_openbao import configure_openbao
 from fabriclib.vault.common.write_private_file import write_private_file
@@ -68,6 +69,7 @@ def run(ctx):
                              "OpenBao cannot start without its key")
         info("openbao…")
         ok(f"openbao: {start_unit('openbao', 'openbao', 'openbao' in ctx.restart_services)}")
+        wait_active(v, uninitialised_ok=True)        # unsealed is not yet active (Raft leader election)
         # The initial root token is kept (root, 0400) only until fabric's own
         # AppRoles work and it is revoked: a failure in between must not
         # leave OpenBao initialised but unreachable for setup.

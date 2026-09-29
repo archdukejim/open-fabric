@@ -1,10 +1,10 @@
 import getpass
 import subprocess
 import sys
-import time
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.vault.add_kmip_slot import add_kmip_slot
+from fabriclib.vault.common.wait_active import wait_active
 from fabriclib.vault.add_security_key_slot import add_security_key_slot
 from fabriclib.vault.add_usb_slot import add_usb_slot
 from fabriclib.vault.generate_root_token import generate_root_token
@@ -42,13 +42,7 @@ def restart_openbao(v, timeout=180):
     """Restart the openbao unit (its start condition runs fabric-unlock) and
     wait until OpenBao is unsealed."""
     subprocess.run(["systemctl", "restart", "openbao"], check=True, timeout=timeout)
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        s = vault_status(v)
-        if s.get("initialized") and s.get("sealed") is False:
-            return
-        time.sleep(3)
-    raise ValidationError("OpenBao did not come back unsealed")
+    wait_active(v, timeout)
 
 
 def _status(v):

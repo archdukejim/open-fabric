@@ -64,8 +64,10 @@ Fluent Bit (its own hardened container, pinned image) sends:
 - the **host journal** — every fabric container logs there (Docker's
   journald driver, tagged with the container name; `docker logs` still
   works) and so does fabric's own audit log (identifier `fabric-audit`);
-- **OpenBao's audit log** (secrets HMAC'd; the file is group-readable for
-  the collector only).
+- **OpenBao's audit log** (secrets HMAC'd): a second audit device writes
+  the same trail to `audit-forward.log`, group-readable for the collector
+  only (a declared audit device is never changed: OpenBao would refuse to
+  become active).
 
 Destinations, in `vars.yaml` (re-run setup to apply):
 

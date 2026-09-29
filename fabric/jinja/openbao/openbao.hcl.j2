@@ -32,11 +32,23 @@ listener "unix" {
 
 # Every request is logged, secrets HMAC'd (OpenBao 2.x: audit devices are
 # declared here, not enabled through the API).
+# NEVER change a declared audit device: OpenBao refuses to become active when
+# a device's options differ from the audit table ("modifications to audit
+# devices are not allowed"), so an upgrade would lock the vault. Add a new
+# device instead (tests/render.py pins this block).
 audit "file" "file" {
   description = "fabric: every request"
   options {
     file_path = "/openbao/logs/audit.log"
-    # group openbao may read it: the optional log forwarder (Fluent Bit) joins that group
+  }
+}
+
+# The same audit trail, group-readable (openbao group) for the optional log
+# forwarder (Fluent Bit), which joins that group.
+audit "file" "forward" {
+  description = "fabric: every request, for log forwarding"
+  options {
+    file_path = "/openbao/logs/audit-forward.log"
     mode      = "0640"
   }
 }

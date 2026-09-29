@@ -136,7 +136,7 @@ V = {"deploy_base_dir": W, "hostname": "pi-core", "install_fluentbit": True, "ip
                         "hosts": {"siem.test": GW, "es.test": GW}}}
 env = jinja_env(os.path.join(REPO, "fabric", "jinja"))
 os.makedirs(f"{W}/openbao/logs")
-audit = f"{W}/openbao/logs/audit.log"
+audit = f"{W}/openbao/logs/audit-forward.log"
 open(audit, "w").close()
 os.chown(f"{W}/openbao/logs", 913, 913)
 os.chown(audit, 913, 913)

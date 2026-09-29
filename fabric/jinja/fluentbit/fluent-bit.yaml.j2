@@ -29,7 +29,7 @@ pipeline:
 {% endif %}
     - name: tail
       tag: openbao.audit
-      path: /openbao-logs/audit.log
+      path: /openbao-logs/audit-forward.log
       db: /buffer/openbao-audit.db
       read_from_head: off
       storage.type: filesystem

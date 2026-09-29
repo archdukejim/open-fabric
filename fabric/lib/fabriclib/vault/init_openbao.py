@@ -1,7 +1,7 @@
-import time
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.vault.common.bao_request import bao_request
+from fabriclib.vault.common.wait_active import wait_active
 
 
 def init_openbao(v):
@@ -23,10 +23,6 @@ def init_openbao(v):
         raise ValidationError(f"OpenBao init failed: {data.get('errors') or status}")
     # Init returns before the node has unsealed and become Raft leader; until
     # then requests fail with "internal error". sys/health says 200 = active.
-    deadline = time.time() + 120
-    while bao_request(v, "GET", "sys/health")[0] != 200:
-        if time.time() > deadline:
-            raise ValidationError("OpenBao did not become active within 2 minutes of init")
-        time.sleep(2)
+    wait_active(v)
     return {"recovery_keys": data.get("recovery_keys_b64") or data.get("recovery_keys") or [],
             "root_token": data["root_token"]}

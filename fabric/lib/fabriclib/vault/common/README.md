@@ -16,4 +16,5 @@
 | `load_pkcs11.py` | Load one library with PyKCS11 (clear error if python3-pykcs11 is missing) |
 | `find_token.py` | The token with a given serial in a library, or None (no login) |
 | `pkcs11_session.py` | Logged-in session that never spends a last PIN try, and does not retry unattended after a wrong PIN |
+| `wait_active.py` | Wait until OpenBao is the active node (unsealed is not enough right after a start) |
 | `write_seal_config.py` | `seal.hcl`: which key id(s) OpenBao's static seal reads from RAM |
