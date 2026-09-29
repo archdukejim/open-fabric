@@ -316,14 +316,17 @@ if os.environ.get("CAROL_PW"):
               st1 == 200 and "sandbox" in page and st2 == 403, (st1, st2, page[:200]))
 
 # -- people (Directory -> People): add a person, reset a sign-in ---------------------------
+# NEW_PERSON: a reused host (tests/host) already has the previous run's person
+NEW = os.environ.get("NEW_PERSON", "dave")
 st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
 csrf = page.split('name="csrf" value="')[1].split('"')[0] if 'name="csrf"' in page else ""
 st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/_new",
-                        {"csrf": csrf, "uid": "dave", "first": "Dave", "last": "Doe", "email": "dave@lan.test"})
-check("people: the admin adds dave -> one-time password shown once", st == 200 and "shown only now" in page, (st, page[:300]))
+                        {"csrf": csrf, "uid": NEW, "first": "Dave", "last": "Doe", "email": f"{NEW}@lan.test"})
+check(f"people: the admin adds {NEW} -> one-time password shown once", st == 200 and "shown only now" in page,
+      (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
-check("people: dave is in the directory (written by Keycloak), in users only", "dave@lan.test" in page, page[:200])
-st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/dave/reset", {"csrf": csrf})
-check("people: the admin resets dave's sign-in", st == 200 and "sign-in reset" in page, (st, page[:300]))
+check(f"people: {NEW} is in the directory (written by Keycloak), in users only", f"{NEW}@lan.test" in page, page[:200])
+st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/{NEW}/reset", {"csrf": csrf})
+check(f"people: the admin resets {NEW}'s sign-in", st == 200 and "sign-in reset" in page, (st, page[:300]))
 
 sys.exit(1 if FAILED else 0)

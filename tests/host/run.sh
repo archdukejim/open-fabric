@@ -91,7 +91,7 @@ put "$REPO/tests/host/reset_user.py"
 ADMIN=$(R "awk '/^webui_admin_user:/{print \$2}' /opt/fabric/config/vars.yaml")
 R "PW=\$(cat $KIT/initial-password.txt) python3 /tmp/reset_user.py $ADMIN" > "$OUT/reset.log" 2>&1
 R "PW='$BOB_PW' python3 /tmp/reset_user.py bob" >> "$OUT/reset.log" 2>&1
-R "FABRIC_KIT=$KIT python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" > "$OUT/login.log" 2>&1
+R "FABRIC_KIT=$KIT NEW_PERSON=dave$(date +%s) python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" > "$OUT/login.log" 2>&1
 check "sign-in: admin in; HTTP, missing/foreign certs, non-admin and borrowed certs refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"
 check "login kit in the admin's home ($KIT), secrets 0600" \
