@@ -99,14 +99,20 @@ SAMPLE_SLOTS = [
     {"id": "local", "type": "local", "label": "Key file on this host", "device": "/etc/fabric/openbao/unseal.key",
      "present": True, "key_id": "fabric-1", "added": "2026-09-28",
      "detail": "always present: while this slot exists, removing a device cannot seal the vault"},
-    {"id": "s-yk1", "type": "security-key", "label": "Pi key", "device": "YubiKey 5 Nano · serial 23456781",
-     "present": True, "key_id": "fabric-1", "added": "2026-09-29", "detail": "PIV slot 9d, RSA-2048 · attested genuine"}]
+    {"id": "s-yk1", "type": "security-key", "label": "Pi key", "device": "YubiKey 5 Nano · serial 23456781 · key 03",
+     "present": True, "key_id": "fabric-1", "added": "2026-09-29", "detail": "the key cannot be copied; its PIN is kept root-only on this host"}]
 SAMPLE_DEVICES = {"tokens": [{"vendor": "Yubico", "product": "YubiKey OTP+FIDO+CCID", "serial": "23456781",
                               "usb_id": "1050:0407", "port": "1-1.2"},
                              {"vendor": "Yubico", "product": "YubiKey OTP+FIDO+CCID", "serial": "23456799",
                               "usb_id": "1050:0407", "port": "1-1.3"}],
                   "disks": [{"path": "/dev/sda", "model": "SanDisk Ultra Fit", "serial": "4C530001230912104582",
-                             "size_gb": 32.0, "uuids": ["9A1C-33F0"], "labels": ["USB"]}]}
+                             "size_gb": 32.0, "uuids": ["9A1C-33F0"], "labels": ["USB"]}],
+                  "pkcs11": [{"module": "/usr/lib/aarch64-linux-gnu/libykcs11.so.2", "library": "libykcs11.so.2",
+                              "serial": "23456781", "label": "YubiKey PIV #23456781", "manufacturer": "Yubico (www.yubico.com)",
+                              "model": "YubiKey YK5", "pin_state": "ok"},
+                             {"module": "/usr/lib/aarch64-linux-gnu/libykcs11.so.2", "library": "libykcs11.so.2",
+                              "serial": "23456799", "label": "YubiKey PIV #23456799", "manufacturer": "Yubico (www.yubico.com)",
+                              "model": "YubiKey YK5", "pin_state": "ok"}]}
 SAMPLE_CA = {"domain": "home.arpa", "certs_url": "http://certs.home.arpa/", "max_days": 1825,
              "root": {"subject": "CN=Fabric Root CA,O=Fabric", "not_after": "Sep  1 00:00:00 2046 GMT",
                       "key": "EC prime256v1", "sha256": _FP},
@@ -233,7 +239,7 @@ class DevState:
         kind = {"add-security-key": "security-key", "add-usb": "usb", "add-hsm": "hsm"}.get(parts[-1])
         if not kind:
             return {"err": "Unknown action."}
-        device = {"security-key": f"YubiKey · serial {form.get('serial', '')}",
+        device = {"security-key": f"YubiKey YK5 · serial {form.get('token', '').rpartition('|')[2]} · key 03",
                   "usb": f"SanDisk Ultra Fit · {form.get('disk', '')} · UUID 9A1C-33F0",
                   "hsm": f"{form.get('endpoint', 'kms')} · key {form.get('key_id', '')}"}[kind]
         slots.append({"id": f"s-{secrets.token_hex(3)}", "type": kind, "label": form.get("label") or kind,

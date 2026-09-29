@@ -27,6 +27,7 @@ top of the socket's 0660 root:<webui gid> permissions.
   GET  /v1/devices | /v1/people | /v1/vault | /v1/vault/slots | /v1/vault/devices
   POST /v1/vault/slots/<id>/test | /v1/vault/slots/<id>/remove | /v1/vault/rotate   {actor}
   POST /v1/vault/slots/add-usb      {actor, disk, label}
+  POST /v1/vault/slots/add-security-key {actor, module, token, pin, key_id, label}
   POST /v1/devices {actor, name, fields} | /v1/devices/<name> {actor, fields} | /v1/devices/<name>/delete
   POST /v1/devices/<name>/certs      {actor, sha256, link}
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
@@ -68,6 +69,7 @@ from fabriclib.ldap.remove_role import remove_role  # noqa: E402
 from fabriclib.ldap.update_device import update_device  # noqa: E402
 from fabriclib.ldap.update_role import update_role  # noqa: E402
 from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
+from fabriclib.vault.add_security_key_slot import add_security_key_slot  # noqa: E402
 from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
 from fabriclib.vault.detect_devices import detect_devices  # noqa: E402
 from fabriclib.vault.list_slots import list_slots  # noqa: E402
@@ -174,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
                     v = load_vars()
                     return self.reply(200, {"slots": list_slots(v), "host": v.get("hostname", "")})
                 if route == ["vault", "devices"]:
-                    return self.reply(200, detect_devices())
+                    return self.reply(200, detect_devices(v=load_vars()))
                 return self.reply(404, {"error": "not found"})
 
             data = self.body()
@@ -249,6 +251,9 @@ class Handler(BaseHTTPRequestHandler):
         v = load_vars()
         if route == ["slots", "add-usb"]:
             return {"id": add_usb_slot(v, actor, text(data, "disk"), text(data, "label"))}
+        if route == ["slots", "add-security-key"]:
+            return {"id": add_security_key_slot(v, actor, text(data, "module"), text(data, "token"), text(data, "pin"),
+                                                text(data, "key_id") or "new", text(data, "label"))}
         if len(route) == 3 and route[0] == "slots" and route[2] == "test":
             return {"ok": test_slot(v, actor, route[1])}
         if len(route) == 3 and route[0] == "slots" and route[2] == "remove":

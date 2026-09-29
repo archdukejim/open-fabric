@@ -36,7 +36,7 @@ def wrap(v, slot, key, key_id):
     return record
 
 
-def unwrap(v, slot, record):
+def unwrap(v, slot, record, attended=False):
     stick = _stick(slot)
     if not stick:
         return None

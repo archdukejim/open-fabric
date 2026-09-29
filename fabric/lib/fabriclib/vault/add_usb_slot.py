@@ -25,9 +25,6 @@ def add_usb_slot(v, actor, disk, label="", source="web", require_usb=True):
     saved. Returns the new slot id."""
     if not LABEL_RE.match(label or ""):
         raise ValidationError("label: letters, digits and simple punctuation, at most 60")
-    store = read_slot_store(v)
-    if not store:
-        raise ValidationError("no vault key yet: run `sudo fabricctl setup` first")
     facts = block_device(path=disk)
     if not facts:
         raise ValidationError(f"{disk} is not a disk on this host")
@@ -35,10 +32,15 @@ def add_usb_slot(v, actor, disk, label="", source="web", require_usb=True):
         raise ValidationError(f"{disk} is not a USB disk")
     if facts["mounted"]:
         raise ValidationError(f"{disk} is in use (mounted at {', '.join(facts['mounted'])}); refusing to erase it")
-    if facts["serial"] and any(s["type"] == "usb" and s["device"].get("serial") == facts["serial"]
-                               for s in store["slots"]):
+    store = read_slot_store(v)
+    if not store:
+        raise ValidationError("no vault key yet: run `sudo fabricctl setup` first")
+    # By the UUID fabric gave the stick, not the serial: cheap sticks share
+    # one generic serial (seen on hardware: "General_UDisk-0:0").
+    if facts["uuid"] and any(s["type"] == "usb" and s["device"].get("fs_uuid") == facts["uuid"]
+                             for s in store["slots"]):
         raise ValidationError("this stick is already an unlock method")
-    key, _ = obtain_key(v, store, store["key_id"])
+    key, _ = obtain_key(v, store, store["key_id"], attended=True)
     if key is None:
         raise ValidationError("no unlock method is present to vouch for the new one")
     fs_uuid = str(uuid.uuid4())

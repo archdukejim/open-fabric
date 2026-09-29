@@ -91,7 +91,11 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.vault.common.approle_login import approle_login  # noqa: E402
 from fabriclib.vault.common.bao_request import bao_request  # noqa: E402
 from fabriclib.vault.configure_openbao import configure_openbao  # noqa: E402
+from fabriclib.vault.add_security_key_slot import add_security_key_slot  # noqa: E402
 from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
+from fabriclib.vault.common.obtain_key import obtain_key  # noqa: E402
+from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens  # noqa: E402
+from fabriclib.vault.slots import pkcs11  # noqa: E402
 from fabriclib.vault.common.read_slot_store import read_slot_store  # noqa: E402
 from fabriclib.vault.vault_device_event import vault_device_event  # noqa: E402
 from fabriclib.vault.ensure_vault_key import ensure_vault_key  # noqa: E402
@@ -406,9 +410,115 @@ compose("stop")
 sh(f"losetup -d {loop}")
 sh(f"losetup -d {other}")
 
-# ---------------------------------------------------------------- hardening
+# ---------------------------------------------------------------- security key (PKCS#11; SoftHSM2 stands in)
 loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
 start("up")
+HSM = "/usr/lib/softhsm/libsofthsm2.so"
+have_hsm = os.path.exists(HSM) and shutil.which("softhsm2-util")
+try:
+    import PyKCS11 as P
+except ImportError:
+    have_hsm = False
+check("test prerequisites: softhsm2 and python3-pykcs11 installed", have_hsm)
+
+
+def refused(fn, text):
+    try:
+        fn()
+        return False
+    except ValidationError as exc:
+        return text in str(exc)
+
+
+def token_flags(serial):
+    lib = P.PyKCS11Lib()
+    lib.load(HSM)
+    return next(lib.getTokenInfo(sl).flags for sl in lib.getSlotList(tokenPresent=True)
+                if lib.getTokenInfo(sl).serialNumber.strip() == serial)
+
+
+if have_hsm:
+    os.makedirs(f"{W}/softhsm/tokens", exist_ok=True)
+    open(f"{W}/softhsm/softhsm2.conf", "w").write(f"directories.tokendir = {W}/softhsm/tokens\nobjectstore.backend = file\n")
+    os.environ["SOFTHSM2_CONF"] = f"{W}/softhsm/softhsm2.conf"
+    # softhsm2-util only takes PINs as arguments: acceptable for a throwaway software token in a test
+    for label in ("fabric-a", "fabric-b"):
+        sh(["softhsm2-util", "--init-token", "--free", "--label", label, "--so-pin", "87654321", "--pin", "123456"])
+    V["openbao_pkcs11_modules"] = [HSM]
+    toks = {t["label"]: t for t in list_pkcs11_tokens(V)}
+    check("tokens listed without a login", set(toks) == {"fabric-a", "fabric-b"}
+          and all(t["pin_state"] == "ok" for t in toks.values()), toks)
+    A, B = toks["fabric-a"]["serial"], toks["fabric-b"]["serial"]
+    check("a library not on the allowed list is refused (never loaded)",
+          refused(lambda: add_security_key_slot(V, "tester", "/tmp/x.so", A, "123456", source="test"), "allowed list"))
+    check("wrong PIN refused, nothing saved",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, A, "000000", source="test"), "wrong PIN")
+          and not any(sl["type"] == "pkcs11" for sl in read_slot_store(V)["slots"])
+          and not any(f.startswith("pin-") for f in os.listdir(f"{W}/keys")))
+    tok = add_security_key_slot(V, "tester", HSM, A, "123456", label="token a", source="test")
+    slot = next(sl for sl in read_slot_store(V)["slots"] if sl["id"] == tok)
+    lib = P.PyKCS11Lib()
+    lib.load(HSM)
+    sess = lib.openSession(next(sl for sl in lib.getSlotList(tokenPresent=True)
+                                if lib.getTokenInfo(sl).serialNumber.strip() == A))
+    sess.login("123456")
+    priv = sess.findObjects([(P.CKA_CLASS, P.CKO_PRIVATE_KEY), (P.CKA_ID, tuple(bytes.fromhex(slot["device"]["key_id"])))])
+    attrs = sess.getAttributeValue(priv[0], [P.CKA_SENSITIVE, P.CKA_EXTRACTABLE]) if priv else None
+    sess.logout()
+    store_text = open(f"{W}/keys/slots.json").read()
+    check("added: key pair made on the token (sensitive, not extractable); only ciphertext in the store",
+          attrs == [True, False] and slot["wraps"][read_slot_store(V)["key_id"]]["alg"] == "RSA-OAEP-SHA1", attrs)
+    pin_file = f"{W}/keys/pin-{tok}"
+    check("PIN kept root 0400 on this host, never in the store",
+          oct(os.stat(pin_file).st_mode & 0o777) == "0o400" and os.stat(pin_file).st_uid == 0 and "123456" not in store_text)
+    check("slot test through the token", test_slot(V, "tester", tok, source="test"))
+    check("the same token twice is refused",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, A, "123456", source="test"), "already"))
+
+    # PIN guard: a stale stored PIN costs one try, unattended starts do not retry
+    pkcs11.save_pin(V, slot, "000000")
+    kid = read_slot_store(V)["key_id"]
+    k1 = obtain_key(V, read_slot_store(V), kid, only=tok)[0]
+    low = bool(token_flags(A) & P.CKF_USER_PIN_COUNT_LOW)
+    pkcs11.save_pin(V, slot, "123456")
+    errs = []
+    k2 = obtain_key(V, read_slot_store(V), kid, only=tok, errors=errs)[0]
+    check("unattended: a wrong stored PIN costs one try, then the token is not tried again",
+          k1 is None and low and k2 is None and "not retried" in " ".join(errs), errs)
+    check("a person's `vault test` logs in once and clears it",
+          test_slot(V, "tester", tok, source="test") and not token_flags(A) & P.CKF_USER_PIN_COUNT_LOW)
+
+    # an existing key pair (the vendor-tool path, e.g. a YubiKey PIV slot)
+    sess = lib.openSession(next(sl for sl in lib.getSlotList(tokenPresent=True)
+                                if lib.getTokenInfo(sl).serialNumber.strip() == B), P.CKF_SERIAL_SESSION | P.CKF_RW_SESSION)
+    sess.login("123456")
+    for ident, extractable in (((0x0a,), True), ((0x03,), False)):
+        common = [(P.CKA_TOKEN, True), (P.CKA_ID, ident)]
+        sess.generateKeyPair([(P.CKA_CLASS, P.CKO_PUBLIC_KEY), (P.CKA_ENCRYPT, True), (P.CKA_MODULUS_BITS, 2048),
+                              (P.CKA_PUBLIC_EXPONENT, (1, 0, 1))] + common,
+                             [(P.CKA_CLASS, P.CKO_PRIVATE_KEY), (P.CKA_PRIVATE, True), (P.CKA_SENSITIVE, not extractable),
+                              (P.CKA_EXTRACTABLE, extractable), (P.CKA_DECRYPT, True)] + common,
+                             mecha=P.MechanismRSAGENERATEKEYPAIR)
+    sess.logout()
+    check("an existing key that can be exported is refused",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, B, "123456", "0a", source="test"), "exported"))
+    check("a key id that is not on the token is refused",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, B, "123456", "7f", source="test"), "no key pair"))
+    tok_b = add_security_key_slot(V, "tester", HSM, B, "123456", "03", label="token b", source="test")
+    check("an existing sensitive key (id 03, like a YubiKey's 9d slot) is accepted and works",
+          test_slot(V, "tester", tok_b, source="test"))
+    remove_slot(V, "tester", tok_b, source="test")
+    check("removing a security key deletes its stored PIN", not os.path.exists(f"{W}/keys/pin-{tok_b}"))
+
+    # the token alone
+    remove_slot(V, "tester", usb_id, source="test")
+    check("OpenBao restarts from the security key alone", start() and not vault_status(V)["sealed"])
+    res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+    check("rotation: the token wraps the new key", res["kept"] == [tok] and test_slot(V, "tester", tok, source="test"))
+    check("the token, now the only method, cannot be removed",
+          refused(lambda: remove_slot(V, "tester", tok, source="test"), "last"))
+
+# ---------------------------------------------------------------- hardening
 insp = json.loads(sh("docker inspect openbao").stdout)[0]
 hc = insp["HostConfig"]
 check("runs as 913:913, not root", insp["Config"]["User"] == "913:913")

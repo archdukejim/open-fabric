@@ -46,8 +46,13 @@ def _disks():
     return out
 
 
-def detect_devices(sys_root="/sys"):
+def detect_devices(sys_root="/sys", v=None):
     """Unlock-capable devices plugged into this host, read-only: security
-    keys (by USB vendor, with serial) and USB disks (model, serial, size,
-    filesystem UUIDs). Nothing is opened, mounted or written."""
-    return {"tokens": _tokens(sys_root), "disks": _disks()}
+    keys (by USB vendor, with serial), USB disks (model, serial, size,
+    filesystem UUIDs) and, given the vars, the PKCS#11 tokens the allowed
+    libraries see (no login). Nothing is mounted or written."""
+    out = {"tokens": _tokens(sys_root), "disks": _disks()}
+    if v is not None:
+        from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens
+        out["pkcs11"] = list_pkcs11_tokens(v)
+    return out

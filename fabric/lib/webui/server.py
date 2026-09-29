@@ -362,7 +362,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(200, views.openbao(ctx, actions.vault_status(), view, slots["slots"], devices,
                                             slot_id=query.get("slot", ""), host=slots["host"], live=True,
                                             msg=query.get("msg", ""), err=query.get("err", ""),
-                                            add_live={"security-key": False, "usb": True, "hsm": False}))
+                                            add_live={"security-key": True, "usb": True, "hsm": False}))
 
     def vault_post(self, sess, parts, form):
         """Unlock-method changes: a fresh sign-in (step-up) and the host name
@@ -387,6 +387,12 @@ class Handler(BaseHTTPRequestHandler):
             elif parts == ["slots", "add-usb"]:
                 slot = actions.vault_add_usb(sess["user"], form.get("disk", ""), form.get("label", ""))["id"]
                 msg = f"USB stick added ({slot}), read back and verified."
+            elif parts == ["slots", "add-security-key"]:
+                module, _, serial = form.get("token", "").rpartition("|")
+                key_id = form.get("key_id", "") if form.get("key") == "existing" else "new"
+                slot = actions.vault_add_security_key(sess["user"], module, serial, form.get("pin", ""), key_id,
+                                                      form.get("label", ""))["id"]
+                msg = f"Security key added ({slot}): the token wrapped and unwrapped the vault key."
             elif len(parts) == 2 and parts[0] == "slots" and parts[1].startswith("add-"):
                 raise actions.ValidationError("Adding this kind of unlock method arrives in the next update.")
             else:

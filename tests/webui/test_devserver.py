@@ -109,12 +109,13 @@ try:
     check("unlock methods: slots, kill-switch state, the key-file warning", "Kill switch off" in page
           and "YubiKey 5 Nano" in page and "Remove the key file" in page)
     page = req("GET", "/openbao?view=add-security-key")[3]
-    check("add security key: plugged-in tokens, enrolled one disabled", "23456799" in page
-          and "already an unlock method" in page and 'name="pin"' in page)
-    st, loc, _, _ = req("POST", "/openbao/slots/add-security-key", {"csrf": "dev", "serial": "23456799", "pin": "x",
+    check("add security key: PKCS#11 tokens, enrolled one disabled, untested-hardware note", "23456799" in page
+          and "already an unlock method" in page and 'name="pin"' in page and "untested" in page
+          and 'value="/usr/lib/aarch64-linux-gnu/libykcs11.so.2|23456799"' in page)
+    st, loc, _, _ = req("POST", "/openbao/slots/add-security-key", {"csrf": "dev", "token": "/usr/lib/aarch64-linux-gnu/libykcs11.so.2|23456799", "pin": "x",
                                                                     "label": "safe key", "confirm": "wrong"})
     check("vault changes need the host name typed", "confirm" in (loc or ""), loc)
-    req("POST", "/openbao/slots/add-security-key", {"csrf": "dev", "serial": "23456799", "pin": "x", "label": "safe key",
+    req("POST", "/openbao/slots/add-security-key", {"csrf": "dev", "token": "/usr/lib/aarch64-linux-gnu/libykcs11.so.2|23456799", "pin": "x", "label": "safe key",
                                                     "confirm": "pi-core"})
     req("POST", "/openbao/slots/local/remove", {"csrf": "dev", "confirm": "pi-core"})
     page = req("GET", "/openbao?view=unlock")[3]

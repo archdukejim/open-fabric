@@ -31,16 +31,17 @@ def rotate_vault_key(v, actor, restart, source="web"):
     if not store or store.get("previous_key_id"):
         raise ValidationError("no vault key, or a rotation is already in progress")
     old_id = store["key_id"]
-    old, _ = obtain_key(v, store, old_id)
+    old, _ = obtain_key(v, store, old_id, attended=True)
     if old is None:
         raise ValidationError("no unlock method is present: plug one in to rotate")
     new, new_id = os.urandom(32), _next_id(old_id)
-    kept, dropped = [], []
+    kept, dropped, dropped_slots = [], [], []
     for slot in store["slots"]:
         mod = slot_type(slot["type"])
-        key, _ = obtain_key(v, store, old_id, only=slot["id"])
+        key, _ = obtain_key(v, store, old_id, only=slot["id"], attended=True)
         if key is None:
             dropped.append(slot["id"])
+            dropped_slots.append(slot)
             continue
         slot["wraps"][new_id] = mod.wrap(v, slot, new, new_id)
         kept.append(slot)
@@ -58,6 +59,9 @@ def rotate_vault_key(v, actor, restart, source="web"):
     store.update(previous_key_id=None)
     store["kcv"].pop(old_id, None)
     write_slot_store(v, store, new)
+    for slot in dropped_slots:
+        if hasattr(slot_type(slot["type"]), "discard"):
+            slot_type(slot["type"]).discard(v, slot)
     write_seal_config(v, new_id)
     unlock_vault(v)
     restart()                                       # proves the new key alone opens the vault

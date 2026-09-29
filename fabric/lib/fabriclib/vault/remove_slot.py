@@ -23,7 +23,7 @@ def remove_slot(v, actor, slot_id, source="web"):
         raise ValidationError("the last working unlock method cannot be removed")
     key = None
     for s in rest:
-        key, _ = obtain_key(v, store, store["key_id"], only=s["id"])
+        key, _ = obtain_key(v, store, store["key_id"], only=s["id"], attended=True)
         if key:
             break
     if key is None:
@@ -34,5 +34,7 @@ def remove_slot(v, actor, slot_id, source="web"):
             mod.forget(v, target, record)
     store["slots"] = [s for s in slots if s["id"] != slot_id]
     write_slot_store(v, store, key)
+    if hasattr(mod, "discard"):
+        mod.discard(v, target)
     write_device_rules(v)
     write_audit(actor, "VAULT_SLOT_REMOVE", f"slot={slot_id} type={target['type']}", source)

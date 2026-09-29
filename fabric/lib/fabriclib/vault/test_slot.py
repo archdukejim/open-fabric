@@ -10,8 +10,10 @@ def test_slot(v, actor, slot_id, source="web"):
     store = read_slot_store(v)
     if not store or not any(s["id"] == slot_id for s in store["slots"]):
         raise ValidationError(f"no unlock method {slot_id!r}")
-    key, _ = obtain_key(v, store, store["key_id"], only=slot_id)
+    errors = []
+    key, _ = obtain_key(v, store, store["key_id"], only=slot_id, attended=True, errors=errors)
     write_audit(actor, "VAULT_SLOT_TEST", f"slot={slot_id} {'ok' if key else 'FAILED'}", source)
     if key is None:
-        raise ValidationError("this method could not unwrap the vault key (device missing, locked or wrong)")
+        why = errors[0].split(": ", 1)[-1] if errors else "device missing, locked or wrong"
+        raise ValidationError(f"this method could not unwrap the vault key ({why})")
     return True

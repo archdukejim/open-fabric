@@ -409,23 +409,30 @@ _TEMPLATES = {
 {% elif view == 'add-security-key' %}
 <p><a href="/openbao?view=unlock">← Unlock methods</a></p>
 <section class="card"><h2>Add a security key</h2>
-<p class="muted">YubiKey 5 (PIV), Nitrokey, SmartCard-HSM or any PKCS#11 token. The token makes its own private key on the chip — it can never be read out — and fabric protects the vault key with it. At start the token unwraps it; nothing secret leaves the token.</p>
-{% if devices.tokens %}
+<p class="muted">YubiKey 5 (PIV), Nitrokey, SmartCard-HSM or any PKCS#11 token. An RSA key on the token that can never be read out wraps the vault key; at start the token unwraps it. The PIN is kept root-only on this host, so the token itself is the factor — but unlike a stick it cannot be copied.</p>
+<p class="flash warn">Tested with a software token (SoftHSM2) only. YubiKey, Nitrokey and other hardware tokens are untested.</p>
+{% set pk = devices.pkcs11 or [] %}
+{% if pk %}
 <form method="post" action="/openbao/slots/add-security-key" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
-<fieldset class="wide"><legend>Plugged into this host</legend>
+<fieldset class="wide"><legend>Tokens the PKCS#11 libraries see</legend>
 {% set enrolled = slots | map(attribute='device') | join(' ') %}
-{% for t in devices.tokens %}{% set used = t.serial and ('serial ' ~ t.serial) in enrolled %}<label class="check perm"><input type="radio" name="serial" value="{{ t.serial }}"{{ ' disabled' if used }}> <strong>{{ t.vendor }} {{ t.product }}</strong> <span class="muted small">serial {{ t.serial or '—' }} · USB {{ t.usb_id }}{{ ' · already an unlock method' if used }}</span></label>{% endfor %}
+{% for t in pk %}{% set used = ('serial ' ~ t.serial ~ ' ') in (enrolled ~ ' ') %}{% set bad = t.pin_state in ('locked', 'last try') %}<label class="check perm"><input type="radio" name="token" value="{{ t.module }}|{{ t.serial }}"{{ ' disabled' if used or bad }}{{ ' checked' if loop.first and not used and not bad }}> <strong>{{ t.manufacturer }} {{ t.model }}</strong> <span class="muted small">serial {{ t.serial }}{% if t.label %} · “{{ t.label }}”{% endif %} · {{ t.library }} · PIN {{ t.pin_state }}{{ ' · already an unlock method' if used }}</span></label>{% endfor %}
+</fieldset>
+<fieldset class="wide"><legend>Key on the token</legend>
+<label class="check perm"><input type="radio" name="key" value="new" checked> Make a new RSA-2048 key on the token</label>
+<label class="check perm"><input type="radio" name="key" value="existing"> Use an existing key, id (hex) <input name="key_id" pattern="[0-9a-fA-F]{2,64}" placeholder="03" size="8"></label>
+<p class="muted small">YubiKey: tokens usually cannot make keys through PKCS#11. Create one with <code>ykman piv keys generate 9d …</code> (add <code>--touch-policy always</code> to require a touch at every unlock), then use id <code>03</code>.</p>
 </fieldset>
 <label>Label<input name="label" placeholder="Pi key / safe key" maxlength="60"></label>
-<label>Token PIN<input name="pin" type="password" autocomplete="off" required></label>
-<label class="check wide"><input type="checkbox" name="reset" value="1" checked> New token: replace the factory PIN and management key with random ones (shown once)</label>
-<label class="check wide"><input type="checkbox" name="touch" value="1"> Require a touch to unlock (strongest; after a power cut someone must touch the key)</label>
+<label>Token PIN<input name="pin" type="password" autocomplete="off" required minlength="4" maxlength="64"></label>
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button{{ '' if add_live['security-key'] else ' disabled' }}>Add security key</button></div>
 </form>
-<p class="muted small">fabric checks the token's attestation (the key was made on this genuine device) and tests an unwrap before saving the method. You will be asked to sign in again first.</p>
-{% else %}<p class="blank">No security key found. Plug one into this host and reload.</p>{% endif %}
+<p class="muted small">fabric wraps the vault key with the token, unwraps it again and checks it before saving. It never spends a token's last PIN try, and after a wrong PIN it does not retry unattended. You may be asked to sign in again first.</p>
+{% else %}<p class="blank">No PKCS#11 token found. Plug one in; the library must be installed (<code>ykcs11</code> for YubiKey, <code>opensc-pkcs11</code> for most others, both with <code>pcscd</code>).</p>{% endif %}
+{% set seen = pk | map(attribute='serial') | list %}
+{% for t in devices.tokens if t.serial not in seen %}{% if loop.first %}<p class="muted small">On USB but not seen by a PKCS#11 library:{% endif %} {{ t.vendor }} {{ t.product }} (serial {{ t.serial or '—' }}){{ '.' if loop.last else ',' }}{% if loop.last %}</p>{% endif %}{% endfor %}
 </section>
 
 {% elif view == 'add-usb' %}

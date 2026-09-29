@@ -428,8 +428,8 @@ source. Multi-arch images; ~150 MB at 4 GB (fits the §7a budget).
   | Slot | K is… | Present when | Tested against |
   |---|---|---|---|
   | Local file | in `/etc/fabric/openbao/` (openbao user, 0400) | always (no kill switch while this slot exists) | real image |
-  | USB stick (one slot per stick) | on the stick; the stick is recognised by filesystem UUID + USB serial and unknown sticks are refused | the stick is plugged into the host | loop device |
-  | Security key (PKCS#11: YubiKey, Nitrokey, SmartCard-HSM, …) | encrypted by a non-exportable key inside the token (AES-GCM or RSA-OAEP); PIN root-only on the host; optional touch | the token is plugged in | SoftHSM2 |
+  | USB stick (one slot per stick) | on the stick; the stick is recognised by filesystem UUID + USB serial and unknown sticks are refused | the stick is plugged into the host | loop device; real stick on a Pi 5 |
+  | Security key (PKCS#11: YubiKey, Nitrokey, SmartCard-HSM, …) | encrypted by a non-exportable RSA-2048 key inside the token (RSA-OAEP; SHA-1, the digest every token supports); PIN root-only on the host; touch via the key's own policy (set with the vendor tool) | the token is plugged in | SoftHSM2 (hardware tokens untested) |
   | HSM / key manager (KMIP: CipherTrust, Fortanix, Entrust, IBM, Cosmian, OVH, …) | encrypted by an active AES key on the device, over mutual TLS | the device is reachable and authorises this client | PyKMIP |
 
   Keypad-encrypted USB drives (Apricorn, IronKey, iStorage, …) are USB

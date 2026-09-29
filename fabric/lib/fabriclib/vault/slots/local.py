@@ -20,7 +20,7 @@ def wrap(v, slot, key, key_id):
     return record
 
 
-def unwrap(v, slot, record):
+def unwrap(v, slot, record, attended=False):
     """The key bytes, or None if the file is gone."""
     try:
         with open(_path(v, record), "rb") as f:

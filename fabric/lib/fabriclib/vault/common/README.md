@@ -11,4 +11,8 @@
 | `key_check_value.py` | Proof that an unwrapped key is the vault key, revealing nothing about it |
 | `obtain_key.py` | Try the methods for a key version; first verified one wins; a broken device never blocks the others |
 | `slot_type.py` | The `slots/<type>.py` module for a type name |
+| `pkcs11_modules.py` | The PKCS#11 libraries fabric may load (allowed list from `openbao_pkcs11_modules`; they run as root) |
+| `load_pkcs11.py` | Load one library with PyKCS11 (clear error if python3-pykcs11 is missing) |
+| `find_token.py` | The token with a given serial in a library, or None (no login) |
+| `pkcs11_session.py` | Logged-in session that never spends a last PIN try, and does not retry unattended after a wrong PIN |
 | `write_seal_config.py` | `seal.hcl`: which key id(s) OpenBao's static seal reads from RAM |

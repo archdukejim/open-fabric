@@ -163,6 +163,12 @@ def vault_rotate(actor):
     return _call("POST", "/v1/vault/rotate", {"actor": actor}, timeout=900)
 
 
+def vault_add_security_key(actor, module, token, pin, key_id, label):
+    """The PIN travels only in this request body over the agent socket."""
+    return _call("POST", "/v1/vault/slots/add-security-key", {"actor": actor, "module": module, "token": token,
+                                                              "pin": pin, "key_id": key_id, "label": label}, timeout=120)
+
+
 def vault_devices():
     return _call("GET", "/v1/vault/devices")
 

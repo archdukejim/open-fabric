@@ -1,9 +1,12 @@
+import getpass
 import subprocess
 import sys
 import time
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.vault.add_security_key_slot import add_security_key_slot
 from fabriclib.vault.add_usb_slot import add_usb_slot
+from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens
 from fabriclib.vault.list_slots import list_slots
 from fabriclib.vault.remove_slot import remove_slot
 from fabriclib.vault.rotate_vault_key import rotate_vault_key
@@ -19,6 +22,9 @@ USAGE = """usage: fabricctl vault status
        fabricctl vault remove <slot> --yes   remove a method (never the last)
        fabricctl vault rotate --yes          new vault key for every present method
        fabricctl vault add-usb <disk> [--label L] --yes   ERASE a USB stick and make it an unlock method
+       fabricctl vault tokens                security keys the allowed PKCS#11 libraries see
+       fabricctl vault add-key <serial> [--module LIB] [--key-id new|HEX] [--label L] --yes
+                                             make a security key an unlock method (PIN asked, or on stdin)
        fabricctl vault unlock                (systemd) put the key in RAM for OpenBao's start
        fabricctl vault device-event          (udev) an unlock device came or went: start/stop OpenBao
        fabricctl vault wipe-key              (systemd) wipe it once OpenBao is unsealed"""
@@ -95,6 +101,23 @@ def run_vault_command(v, argv):
         if cmd == "add-usb" and args and "--yes" in args:
             label = args[args.index("--label") + 1] if "--label" in args else ""
             print(f"added {add_usb_slot(v, 'root', args[0], label, source='cli')}")
+            return 0
+        if cmd == "tokens" and not args:
+            for t in list_pkcs11_tokens(v):
+                print(f"{t['serial']:<18} {t['manufacturer']} {t['model']}  label={t['label']!r}  "
+                      f"PIN: {t['pin_state']}  ({t['module']})")
+            return 0
+        if cmd == "add-key" and args and "--yes" in args:
+            opt = {k: args[args.index(k) + 1] for k in ("--module", "--key-id", "--label") if k in args}
+            tokens = [t for t in list_pkcs11_tokens(v) if t["serial"] == args[0]
+                      and opt.get("--module", t["module"]) == t["module"]]
+            if len(tokens) != 1:
+                raise ValidationError(f"{len(tokens)} tokens with serial {args[0]!r}: see `fabricctl vault tokens`"
+                                      + (" and pass --module" if tokens else ""))
+            # the PIN never goes on the command line (argv is world-readable)
+            pin = getpass.getpass("token PIN: ") if sys.stdin.isatty() else sys.stdin.readline().rstrip("\n")
+            print("added " + add_security_key_slot(v, "root", tokens[0]["module"], args[0], pin,
+                                                   opt.get("--key-id", "new"), opt.get("--label", ""), source="cli"))
             return 0
         if cmd == "rotate" and args in (["--yes"], ["-y"]):
             res = rotate_vault_key(v, "root", lambda: restart_openbao(v), source="cli")

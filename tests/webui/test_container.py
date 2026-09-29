@@ -395,6 +395,10 @@ check("adding a method type that is not built yet is refused", "next+update" in 
 st, hd, *_ = req("POST", "/openbao/slots/add-usb", POSTH, {"csrf": csrf, "confirm": "pi-core", "disk": "/dev/nope"},
                  cookie=session)
 check("add USB: the agent refuses a disk that does not exist", "not+a+disk" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/slots/add-security-key", POSTH,
+                 {"csrf": csrf, "confirm": "pi-core", "token": "/tmp/evil.so|1234", "pin": "123456", "key": "new"},
+                 cookie=session)
+check("add security key: a library not on the allowed list is never loaded", "allowed+list" in hd.get("Location", ""), hd)
 (st, hd, sc, body), _, _ = login(tamper="stale")
 stale = cookie_val(sc, "__Host-webui")
 st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=stale)

@@ -308,8 +308,35 @@ which stops OpenBao when no method is left present; plugging it back in
 starts it again. *Tested with loop devices and by hand with a real stick on a Pi 5
 (stopped about a second after the pull; unsealed about 10 s after re-plugging).*
 
-Security keys (PKCS#11) and HSMs (KMIP) are shown in the web UI but not
-built yet. Each type states what it was tested against.
+**Security keys (PKCS#11).** YubiKey 5 (PIV), Nitrokey, SmartCard-HSM or
+any token with a PKCS#11 library. An RSA-2048 key on the token that can
+never be read out wraps the vault key (RSA-OAEP); only the ciphertext is in
+`slots.json`. The token's PIN is kept root-only on the host
+(`/etc/fabric/openbao/pin-<id>`, 0400), so the token is the factor: it
+cannot be copied, unlike a stick.
+
+| Command | What |
+|---|---|
+| `sudo fabricctl vault tokens` | Tokens the allowed libraries see, with PIN state (no login) |
+| `sudo fabricctl vault add-key <serial> [--key-id new\|HEX] [--label L] --yes` | Add one; the PIN is asked for (or read from stdin), never an argument |
+
+- Needs `python3-pykcs11` (recommended by the package) and the token's
+  library: `ykcs11` for YubiKey, `opensc-pkcs11` for most others, both with
+  `pcscd`. Only libraries on `openbao_pkcs11_modules` are ever loaded.
+- `new` makes a key pair on the token. Tokens that cannot make keys through
+  PKCS#11 (YubiKey PIV) take an existing one: `ykman piv keys generate 9d …`
+  (optionally `--touch-policy always`: a touch at every unlock, so after a
+  power cut someone must touch it), then `--key-id 03`. A key that can be
+  exported is refused.
+- **PIN retries are protected.** fabric never uses a token's last PIN try,
+  and after one wrong PIN an unattended start does not try the token again
+  (a stale stored PIN costs one try, not the three a YubiKey allows).
+  `sudo fabricctl vault test <id>` logs in once and clears it.
+- The kill switch covers a token only when its USB serial matched at
+  enrolment (the method's detail says so).
+
+*Tested with SoftHSM2 (a software token). YubiKey, Nitrokey and smart cards
+are untested.* HSMs (KMIP) are shown in the web UI but not built yet.
 
 **First install.**
 - `init` produces the **recovery key(s)**. They are written once to
