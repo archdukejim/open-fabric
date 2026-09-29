@@ -274,13 +274,11 @@ def apply_deployment(start_services=True):
     
     deployed_vars_path = os.path.join(TARGET_FABRIC, "config/vars.yaml")
     if os.path.exists(deployed_vars_path):
-        old_vars = load_yaml(deployed_vars_path)
-        final_vars = {}
+        # Images come only from the vars given (setup keeps a host's pinned
+        # images and drops floating refs, design D21); re-adding the old
+        # rendered image_* here undid that.
         final_vars = fresh_vars
-        for k, v in old_vars.items():
-            if k.startswith('image_') and k not in custom_vars:
-                final_vars[k] = v
-                
+
         # Archive old vars
         archive_dir = os.path.join(TARGET_FABRIC, "archive")
         ensure_dir(archive_dir)

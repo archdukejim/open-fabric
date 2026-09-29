@@ -242,8 +242,12 @@ dns:
     - { name: rerun-test, ip: 10.77.0.99 }
 EOF
 docker cp "$OUT/change.yaml" "$NAME:/root/change.yaml"
+# an install from before pinning had floating refs and the old web image name in its vars
+in_box "python3 -c \"import yaml; p='/opt/fabric/config/vars.yaml'; v=yaml.safe_load(open(p)); v.update(image_nginx='nginx:latest', image_bind9='ubuntu/bind9:latest', image_webui='fabric/webui:local'); yaml.safe_dump(v, open(p, 'w'))\""
 in_box 'fabricctl setup --file /root/change.yaml --non-interactive --yes' > "$OUT/setup3.log" 2>&1
 check "re-run with a change completes" "grep -q 'fabric is ready' '$OUT/setup3.log'"
+check "upgrade: floating image refs and old names replaced by the validated pins" \
+    "in_box 'grep -E \"^image_(nginx|bind9|webui):\" /opt/fabric/config/vars.yaml' | tr '\n' ' ' | grep -q 'image_nginx: nginx:1.30.5@sha256:.*image_webui: fabric/web:local' && ! in_box 'grep -q ^image_bind9: /opt/fabric/config/vars.yaml'"
 check "new record served by the running bind9" \
     "in_box 'dig +short @$IP rerun-test.lan.test' | grep -qx 10.77.0.99"
 if ! in_box "dig +short @$IP rerun-test.lan.test" | grep -qx 10.77.0.99; then
