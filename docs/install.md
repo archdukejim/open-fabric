@@ -263,7 +263,19 @@ sudo fabricctl uninstall
 # Unattended: the export choice must be explicit
 sudo fabricctl uninstall --yes --export /root/fabric-export --purge-package
 sudo fabricctl uninstall --yes --no-export
+
+# Bring it back from an export (the same host or a new one, package installed)
+sudo fabricctl restore /root/fabric-export
 ```
+
+`fabricctl restore` puts the export back in place (owners and modes kept)
+and runs setup on it: the same CA (clients keep trusting it), the same
+directory users and devices, Keycloak with its TOTP enrolments, DNS with
+its TSIG keys, and OpenBao with its data — its vault key comes back with
+it, so the key-file unlock method works at once (a USB stick or security
+key must be plugged in). It refuses while fabric is installed and any
+folder that is not an export. The export's plaintext copy of fabric's
+secrets goes back into OpenBao and is shredded.
 
 `fabricctl uninstall` is the recommended way: the export goes only where you
 say, so nothing is left in `/var` or anywhere else. It removes every service,

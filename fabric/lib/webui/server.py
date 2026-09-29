@@ -409,7 +409,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(200, views.openbao(ctx, actions.vault_status(), view, slots["slots"], devices,
                                             slot_id=query.get("slot", ""), host=slots["host"], live=True,
                                             msg=query.get("msg", ""), err=query.get("err", ""),
-                                            add_live={"security-key": True, "usb": True, "hsm": False}))
+                                            add_live={"security-key": True, "usb": True, "hsm": True}))
 
     def vault_post(self, sess, parts, form):
         """Unlock-method changes: a fresh sign-in (step-up) and the host name
@@ -440,6 +440,13 @@ class Handler(BaseHTTPRequestHandler):
                 slot = actions.vault_add_security_key(sess["user"], module, serial, form.get("pin", ""), key_id,
                                                       form.get("label", ""))["id"]
                 msg = f"Security key added ({slot}): the token wrapped and unwrapped the vault key."
+            elif parts == ["slots", "add-hsm"]:
+                pems = {f: (form.get(f) or b"").decode(errors="replace") if isinstance(form.get(f), bytes)
+                        else str(form.get(f) or "") for f in ("ca_file", "cert_file", "key_file")}
+                slot = actions.vault_add_kmip(form.get("endpoint", ""), form.get("key_id", ""), pems["ca_file"],
+                                              pems["cert_file"], pems["key_file"], form.get("server_name", ""),
+                                              form.get("label", ""))["id"]
+                msg = f"HSM added ({slot}): the device wrapped and unwrapped the vault key."
             elif len(parts) == 2 and parts[0] == "slots" and parts[1].startswith("add-"):
                 raise actions.ValidationError("Adding this kind of unlock method arrives in the next update.")
             else:
@@ -566,9 +573,23 @@ class Handler(BaseHTTPRequestHandler):
                 "permissions": [k[5:] for k, val in form.items() if k.startswith("perm_") and val]}
 
     def dirsrv_post(self, sess, parts, form):
-        """Devices and device roles: each form maps to one fabric-agent call."""
+        """Devices, device roles and people: each form maps to one fabric-agent call."""
         user = sess["user"]
         kind, name, op = (parts + ["", "", ""])[:3]
+        if kind == "people":
+            try:
+                if name == "_new" and not op:
+                    uid, what = form.get("uid", ""), "created"
+                    password = actions.create_person(uid, form.get("first", ""), form.get("last", ""),
+                                                     form.get("email", ""))
+                elif name and op == "reset":
+                    uid, what = name, "reset"
+                    password = actions.reset_sign_in(uid)
+                else:
+                    return self.deny(404, "Not found.")
+            except actions.ValidationError as exc:
+                return self.redirect("/dirsrv?" + urllib.parse.urlencode({"view": "people", "err": str(exc)}))
+            return self.send(200, views.person_result(self.ctx(sess), uid, what, password))
         if kind not in ("devices", "roles") or not name:
             return self.deny(404, "Not found.")
         listing = {"view": kind}

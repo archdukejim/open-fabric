@@ -8,6 +8,12 @@ services:
         WEBUI_UID: "{{ service_users.webui.uid }}"
         WEBUI_GID: "{{ service_users.webui.gid }}"
     container_name: fabric-web
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
     user: "{{ service_users.webui.uid }}:{{ service_users.webui.gid }}"
     # Member of nginx's group so it can hand nginx its socket.
     group_add:

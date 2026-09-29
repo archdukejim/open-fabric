@@ -583,6 +583,7 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_postgres` | validated `postgres:18.x@sha256:…` | a new major is never automatic (data upgrade) |
 | `image_debian` | validated `debian:trixie-slim@sha256:…` | base of `fabric/bind9:local` (BIND 9.20 from Debian packages), `fabric/dirsrv:local` (389-DS) and `fabric/web:local` |
 | `image_dirsrv`, `image_webui` | `fabric/dirsrv:local`, `fabric/web:local` | names of the locally built images |
+| `image_fluentbit` | validated `fluent/fluent-bit:5.1.x@sha256:…` | optional log forwarding |
 | `image_prune` | `true` | after `fabricctl images update`, remove old images of fabric's repositories (never the rollback image or anything in use) |
 
 **Every image is pinned by digest** (amd64 + arm64); the defaults come from
@@ -827,3 +828,13 @@ links:
 
 **Effected Jinja Templates:**
 - `nginx/www/landing/index.html.j2`
+
+### Log forwarding (optional)
+| Variable | Default | Notes |
+|---|---|---|
+| `install_fluentbit` | `false` | Fluent Bit forwards the journal and OpenBao's audit log (operations.md → Log forwarding) |
+| `log_forwarding` | `{}` | `syslog: {host, port 6514, tls true, ca_file}`, `elastic: {url, user, index, ca_file}`, `hosts: {name: address}`, `buffer_limit: 256M` |
+| `ip_fluentbit` | `10.255.0.95` | On fabric_net (metrics for `fabricctl logs status`) |
+| `fluentbit_mem_limit` | `64m` | Container memory limit |
+
+The Elasticsearch password is not a setting: `sudo fabricctl logs set-password elastic` keeps it in OpenBao.

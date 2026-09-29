@@ -401,8 +401,11 @@ everything else.
 > `apps/`, declarative audit log, `fabricctl vault status`, web UI status tab,
 > doctor checks, backup/reinstall; `fabric-secrets.yml` imported into
 > `fabric/secrets` (verified, shredded, marker file; OpenBao locked → setup
-> stops, never regenerates). **Not yet:** Keycloak OIDC for people, rotated credentials, SSH CA, USB / KMIP /
-> PKCS#11 seals (next, in that order), the web UI's secrets browser.
+> stops, never regenerates). Since then built: unlock methods (key file,
+> USB sticks — tested on a Pi —, PKCS#11 security keys and KMIP HSMs, the
+> latter two against SoftHSM2 / PyKMIP only), Keycloak sign-in to OpenBao's
+> own UI per role bundle, break glass. **Not yet:** rotated credentials,
+> SSH CA.
 
 **OpenBao** (MPL-2.0, Linux Foundation fork of Vault; Vault-compatible API,
 CLI and clients) rather than HashiCorp Vault, whose BSL licence is not open
@@ -572,17 +575,18 @@ what *people* may do in fabric.
   (signature via the realm's keys, issuer, audience, expiry, roles). A
   compromised web UI container cannot act beyond the signed-in user.
 - **OpenBao** uses the same roles: each bundle maps to OpenBao policies
-  through the OIDC role's claims (built: Admin → `fabric-admin`; the other
-  bundles' OpenBao policies are still to come).
+  through the OIDC role's claims (built: Admin → `fabric-admin`, Auditor →
+  `fabric-auditor` via external identity groups; others not admitted).
 - **Built:** permission roles, bundles and their groups in Keycloak and
   389-DS, the agent's token check and route table, pages that follow the
-  permissions, token renewal (a removed role ends the session). The people
-  pages for Helpdesk (create users, reset sign-in) are still to come.
+  permissions, token renewal (a removed role ends the session), the
+  Helpdesk people pages (add a person, reset a sign-in; fabric-group
+  members only by an admin).
 - **The host CLI** stays root (`sudo fabricctl` = everything); RBAC covers
   the web UI and its agent API. Step-up sign-in (5 min) and the typed host
   name stay on dangerous changes whatever the role.
 
-## 7f. Log forwarding (decided, D20)
+## 7f. Log forwarding (decided, D20; built)
 
 Optional, off by default: send **all** logs to a syslog server and/or an
 Elastic-style aggregator (Elasticsearch, OpenSearch, anything that speaks

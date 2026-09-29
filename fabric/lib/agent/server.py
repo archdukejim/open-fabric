@@ -35,9 +35,11 @@ request. Root peers (the host itself) are not asked for a token.
   POST /v1/vault/slots/<id>/test | /v1/vault/slots/<id>/remove | /v1/vault/rotate   {actor}
   POST /v1/vault/slots/add-usb      {actor, disk, label}
   POST /v1/vault/slots/add-security-key {actor, module, token, pin, key_id, label}
+  POST /v1/vault/slots/add-hsm      {endpoint, key_id, ca, cert, key, server_name, label}
   POST /v1/devices {actor, name, fields} | /v1/devices/<name> {actor, fields} | /v1/devices/<name>/delete
   POST /v1/devices/<name>/certs      {actor, sha256, link}
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
+  POST /v1/people {uid, first, last, email} | /v1/people/<uid>/reset   (one-time password returned)
 """
 import argparse
 import json
@@ -55,6 +57,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.common.read_audit import read_audit  # noqa: E402
+from fabriclib.keycloak.create_person import create_person  # noqa: E402
+from fabriclib.keycloak.reset_sign_in import reset_sign_in  # noqa: E402
 from fabriclib.keycloak.verify_user_token import verify_user_token  # noqa: E402
 from fabriclib.rbac.required_permission import required_permission  # noqa: E402
 from fabriclib.rbac.user_permissions import user_permissions  # noqa: E402
@@ -79,6 +83,7 @@ from fabriclib.ldap.remove_role import remove_role  # noqa: E402
 from fabriclib.ldap.update_device import update_device  # noqa: E402
 from fabriclib.ldap.update_role import update_role  # noqa: E402
 from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
+from fabriclib.vault.add_kmip_slot import add_kmip_slot  # noqa: E402
 from fabriclib.vault.add_security_key_slot import add_security_key_slot  # noqa: E402
 from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
 from fabriclib.vault.detect_devices import detect_devices  # noqa: E402
@@ -129,7 +134,7 @@ class Handler(BaseHTTPRequestHandler):
     def authorize(self, method, route):
         """(status, error) if the call is refused, else None. Sets self.user
         to the token's user (None for root)."""
-        self.user = None
+        self.user, self.perms = None, None
         if self.peer_uid() == 0:
             return None
         auth = self.headers.get("Authorization", "")
@@ -142,7 +147,7 @@ class Handler(BaseHTTPRequestHandler):
             return 403, "not allowed"
         if need != "session" and need not in user_permissions(claims):
             return 403, f"you need the permission {need}"
-        self.user = claims["preferred_username"]
+        self.user, self.perms = claims["preferred_username"], user_permissions(claims)
         return None
 
     def body(self):
@@ -245,6 +250,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, self.vault(route[1:], actor, data))
             if route[:1] in (["devices"], ["roles"]):
                 return self.reply(200, self.directory(route, actor, data) or {})
+            if route == ["people"]:
+                return self.reply(200, {"password": create_person(load_vars(), actor, text(data, "uid"), text(data, "first"),
+                                                                  text(data, "last"), text(data, "email"))})
+            if len(route) == 3 and route[0] == "people" and route[2] == "reset":
+                privileged = self.perms is None or "system:admin" in self.perms     # root, or the admin bundle
+                return self.reply(200, {"password": reset_sign_in(load_vars(), actor, route[1], privileged)})
             if route == ["events"]:
                 action = data.get("action")
                 if action not in EVENT_ACTIONS:
@@ -283,6 +294,10 @@ class Handler(BaseHTTPRequestHandler):
         v = load_vars()
         if route == ["slots", "add-usb"]:
             return {"id": add_usb_slot(v, actor, text(data, "disk"), text(data, "label"))}
+        if route == ["slots", "add-hsm"]:
+            return {"id": add_kmip_slot(v, actor, text(data, "endpoint"), text(data, "key_id"), text(data, "ca"),
+                                        text(data, "cert"), text(data, "key"), text(data, "server_name"),
+                                        text(data, "label"))}
         if route == ["slots", "add-security-key"]:
             return {"id": add_security_key_slot(v, actor, text(data, "module"), text(data, "token"), text(data, "pin"),
                                                 text(data, "key_id") or "new", text(data, "label"))}

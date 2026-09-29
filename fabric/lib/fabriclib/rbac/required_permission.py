@@ -18,11 +18,12 @@ POST = {
     ("pki", "sign"): "pki:sign", ("pki", "issue"): "pki:issue", ("pki", "convert"): "pki:issue",
     ("tsig",): "tsig:manage", ("tsig", "*", "rotate"): "tsig:manage", ("tsig", "*", "delete"): "tsig:manage",
     ("vault", "rotate"): "vault:unlock", ("vault", "slots", "add-usb"): "vault:unlock",
-    ("vault", "slots", "add-security-key"): "vault:unlock",
+    ("vault", "slots", "add-security-key"): "vault:unlock", ("vault", "slots", "add-hsm"): "vault:unlock",
     ("vault", "slots", "*", "test"): "vault:unlock", ("vault", "slots", "*", "remove"): "vault:unlock",
     ("devices",): "devices:enroll", ("devices", "*"): "devices:admin", ("devices", "*", "delete"): "devices:admin",
     ("devices", "*", "certs"): "pki:link-device",
     ("roles",): "roles:admin", ("roles", "*"): "roles:admin", ("roles", "*", "delete"): "roles:admin",
+    ("people",): "people:create", ("people", "*", "reset"): "people:reset",
 }
 
 

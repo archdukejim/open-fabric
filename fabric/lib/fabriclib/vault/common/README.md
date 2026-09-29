@@ -11,6 +11,7 @@
 | `key_check_value.py` | Proof that an unwrapped key is the vault key, revealing nothing about it |
 | `obtain_key.py` | Try the methods for a key version; first verified one wins; a broken device never blocks the others |
 | `slot_type.py` | The `slots/<type>.py` module for a type name |
+| `kmip_session.py` | A KMIP client on a TLS connection fabric makes itself (server certificate verified; PyKMIP's own TLS does not verify it) |
 | `pkcs11_modules.py` | The PKCS#11 libraries fabric may load (allowed list from `openbao_pkcs11_modules`; they run as root) |
 | `load_pkcs11.py` | Load one library with PyKCS11 (clear error if python3-pykcs11 is missing) |
 | `find_token.py` | The token with a given serial in a library, or None (no login) |

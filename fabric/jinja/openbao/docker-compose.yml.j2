@@ -3,6 +3,12 @@ services:
     # Pinned by digest: an upstream push never changes what runs.
     image: "{{ image_openbao }}"
     container_name: openbao
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
     user: "{{ service_users.openbao.uid }}:{{ service_users.openbao.gid }}"
     # `bao server` directly (the image's entrypoint chowns and setcaps, which
     # a capability-less, read-only container must not need); docker-init reaps.

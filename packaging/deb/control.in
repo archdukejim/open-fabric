@@ -6,7 +6,7 @@ Priority: optional
 Maintainer: fabric <archdukejim@users.noreply.github.com>
 Homepage: https://github.com/archdukejim/fabric
 Depends: python3 (>= 3.10), python3-yaml, python3-jinja2, openssl, curl, ca-certificates, iptables, ufw, dnsutils
-Recommends: python3-pykcs11
+Recommends: python3-pykcs11, python3-pykmip
 Suggests: docker-ce, ykcs11, opensc-pkcs11, pcscd, softhsm2
 Description: install, secure and run a small network fabric
  fabricctl sets up and manages fabric on this host: authoritative DNS

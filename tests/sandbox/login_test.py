@@ -284,8 +284,15 @@ if os.environ.get("CAROL_PW"):
 # -- OpenBao's own UI with Keycloak single sign-on ---------------------------------------
 st, res = vault_login(ADMIN, read("initial-password.txt"))
 token = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) else None
-check("OpenBao UI: the admin signs in with Keycloak (TOTP) and gets the fabric-admin policy",
-      st == 200 and token and "fabric-admin" in res["auth"]["policies"], (st, str(res)[:300]))
+
+
+def policies(res):
+    auth = res.get("auth") or {} if isinstance(res, dict) else {}
+    return set(auth.get("policies") or []) | set(auth.get("identity_policies") or [])
+
+
+check("OpenBao UI: the admin signs in with Keycloak (TOTP) and gets the fabric-admin policy (bundle group)",
+      st == 200 and token and "fabric-admin" in policies(res), (st, str(res)[:300]))
 vb = Browser()
 if token:
     st, _, _ = vb.request("POST", f"https://{VAULT}/v1/apps/data/sandbox/probe", json_body={"data": {"v": "1"}},
@@ -296,5 +303,27 @@ if token:
 st, res = vault_login(OTHER, OTHER_PW)
 check(f"OpenBao UI: '{OTHER}' (no admin role) is refused", st in (400, 403) and not (
     isinstance(res, dict) and res.get("auth")), (st, str(res)[:300]))
+
+if os.environ.get("CAROL_PW"):
+    st, res = vault_login("carol", NEW_PW.get("carol", os.environ["CAROL_PW"]))
+    ctok = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) else None
+    check("OpenBao UI: carol (auditor bundle) gets fabric-auditor, not fabric-admin",
+          st == 200 and "fabric-auditor" in policies(res) and "fabric-admin" not in policies(res), (st, str(res)[:300]))
+    if ctok:
+        st1, _, page = vb.request("LIST", f"https://{VAULT}/v1/apps/metadata", token=ctok)
+        st2, _, _ = vb.request("GET", f"https://{VAULT}/v1/apps/data/sandbox/probe", token=ctok)
+        check("OpenBao UI: the auditor lists application secrets but cannot read one",
+              st1 == 200 and "sandbox" in page and st2 == 403, (st1, st2, page[:200]))
+
+# -- people (Directory -> People): add a person, reset a sign-in ---------------------------
+st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
+csrf = page.split('name="csrf" value="')[1].split('"')[0] if 'name="csrf"' in page else ""
+st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/_new",
+                        {"csrf": csrf, "uid": "dave", "first": "Dave", "last": "Doe", "email": "dave@lan.test"})
+check("people: the admin adds dave -> one-time password shown once", st == 200 and "shown only now" in page, (st, page[:300]))
+st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
+check("people: dave is in the directory (written by Keycloak), in users only", "dave@lan.test" in page, page[:200])
+st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/dave/reset", {"csrf": csrf})
+check("people: the admin resets dave's sign-in", st == 200 and "sign-in reset" in page, (st, page[:300]))
 
 sys.exit(1 if FAILED else 0)

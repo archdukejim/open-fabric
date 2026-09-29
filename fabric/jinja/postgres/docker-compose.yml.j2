@@ -2,6 +2,12 @@ services:
   postgres:
     image: {{ image_postgres }}
     container_name: postgres
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
     user: "{{ service_users.postgres.uid }}:{{ service_users.postgres.gid }}"
     read_only: true
     security_opt:

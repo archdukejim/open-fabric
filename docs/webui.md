@@ -160,7 +160,7 @@ people to them):
 | `network-operators` | `fabric-network-operator` | DNS records, zones, TSIG keys (DHCP later); read PKI and vault status; **no** device management |
 | `equipment-operators` | `fabric-equipment-operator` | devices, device roles, 802.1X, link certificates to devices |
 | `pki-operators` | `fabric-pki-operator` | sign CSRs, issue key pairs, convert, link certificates to devices |
-| `helpdesk` | `fabric-helpdesk` | realm users (create, reset sign-in — the pages come later), enrol devices; read-only elsewhere |
+| `helpdesk` | `fabric-helpdesk` | realm users: add a person, reset a sign-in (Directory → People); enrol devices; read-only elsewhere |
 
 Own bundles: create a composite role in Keycloak holding `fabric:*` roles and
 grant it to a group. The pages hide what a person cannot use; **fabric-agent
@@ -169,6 +169,23 @@ enforces it** on every call, from the token's roles
 refused), and writes the token's user to the audit log. A request crafted
 past the pages gets `403 Not allowed: you need the permission …`. The dev
 preview shows the pages as a bundle sees them: `devserver.py --as fabric-auditor`.
+
+**People (Directory → People).** *Add a person* creates the account in
+Keycloak (written to 389-DS), in the plain `users` group only, with a
+one-time password shown once; at the first sign-in they choose their own
+and set up TOTP. *Reset sign-in* gives a new one-time password, removes
+their TOTP (enrolled again) and ends their sessions. Someone in a fabric
+group (admins, auditors, operators, helpdesk) can only be reset by an
+admin: otherwise the helpdesk could take over an admin's single sign-on
+(OpenBao's UI needs no client certificate). Group membership — which
+bundle a person holds — is managed by admins in Keycloak.
+
+**OpenBao's own UI** follows the bundles too: `fabric-admin` gets the
+`fabric-admin` policy (application secrets, configuration read-only),
+`fabric-auditor` the `fabric-auditor` policy (which application secrets
+exist and their history, never a value). Other bundles cannot sign in there
+unless an admin maps them (`OIDC_BUNDLE_POLICIES` in
+`fabriclib/vault/constants.py`).
 
 ### Privilege separation
 

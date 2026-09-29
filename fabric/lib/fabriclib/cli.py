@@ -10,6 +10,8 @@
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
+  fabricctl logs status|set-password elastic
+                                 log forwarding (optional Fluent Bit): destinations, sent, errors
   fabricctl images status|update|rollback|prune
                                  container images: validated versions, update, roll back, clean up
   fabricctl secrets list|show <name>
@@ -20,6 +22,8 @@
                                  folder you choose first, and to remove the package too
                                  (unattended: --yes --export DIR|--no-export [--purge-package])
   fabricctl reinstall [--yes]    uninstall + setup, keeping config, secrets, the CA and certificates
+  fabricctl restore <folder> [--yes]
+                                 bring back a fabric exported by `uninstall --export` (or apt purge)
 """
 import json
 import os
@@ -31,6 +35,7 @@ sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
+from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
 from fabriclib.secrets.run_secrets_command import run_secrets_command  # noqa: E402
 from fabriclib.pki.mint_extra_cert import mint_extra_cert  # noqa: E402
@@ -39,6 +44,7 @@ from fabriclib.setup.backup_install import backup_install  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
 from fabriclib.setup.renew_service_certs import renew_service_certs  # noqa: E402
 from fabriclib.setup.restore_install import restore_install  # noqa: E402
+from fabriclib.setup.run_restore_command import run_restore_command  # noqa: E402
 from fabriclib.setup.run_uninstall_command import run_uninstall_command  # noqa: E402
 from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
@@ -66,6 +72,8 @@ def main(argv):
         return run_setup.main(["--doctor", *args])
     if cmd == "secrets":
         return run_secrets_command(args, SetupContext(deploy_base=_base(args)).secrets_file)
+    if cmd == "logs":
+        return run_logs_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "images":
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "vault":
@@ -97,6 +105,8 @@ def main(argv):
     if cmd == "extra-cert" and args:        # internal: fabricctl --mint-certs (certs.sh) -> one JSON entry
         print(mint_extra_cert(SetupContext(deploy_base=_base(args)).load_state().vars, json.loads(args[0])))
         return 0
+    if cmd == "restore":
+        return run_restore_command(args, _base(args), os.path.abspath(__file__))
     if cmd == "uninstall":
         return run_uninstall_command(args, _base(args))
     if cmd == "reinstall":

@@ -145,7 +145,7 @@ for e in lock.values():
 for key, val in v2.items():
     if key.startswith('image_') and isinstance(val, str):
         assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local'), f'{key} not pinned: {val}'
-for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao'):
+for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     for name, spec in dc['services'].items():
         ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
@@ -155,4 +155,20 @@ for df in glob.glob(os.path.join(REPO, 'fabric', 'jinja', '*', 'build', 'Dockerf
     assert not re.search(r'^ARG BASE_IMAGE=', text, re.M), f'{df}: BASE_IMAGE must have no default'
     assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')),         f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
 print('every image pinned by digest (lock, vars defaults, compose files, Dockerfiles)')
+
+# Fluent Bit (optional log forwarding, D20): verified TLS to every destination, no credential in the file
+fb_vars = {**v2, "hostname": "pi-core", "log_forwarding": {"syslog": {"host": "siem.lan", "port": 6514},
+                                                          "elastic": {"url": "https://es.lan:9200", "user": "fabric"}}}
+fb = yaml.safe_load(env.get_template('fluentbit/fluent-bit.yaml.j2').render(**fb_vars))
+outs = {o["name"]: o for o in fb["pipeline"]["outputs"]}
+assert set(outs) == {"syslog", "es"} and all(o["tls.verify"] in (True, "on") for o in outs.values()), outs
+assert outs["syslog"]["mode"] == "tls" and outs["syslog"]["syslog_format"] == "rfc5424", outs["syslog"]
+assert outs["es"]["host"] == "es.lan" and outs["es"]["port"] == 9200 and outs["es"]["http_passwd"] == "${LOG_ELASTIC_PASSWORD}"
+assert fb["service"]["storage.path"] == "/buffer" and any(i["name"] == "systemd" for i in fb["pipeline"]["inputs"])
+none = yaml.safe_load(env.get_template('fluentbit/fluent-bit.yaml.j2').render(**{**v2, "hostname": "h"}))
+assert [o["name"] for o in none["pipeline"]["outputs"]] == ["null"], none
+for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao'):
+    dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
+    assert all(sp.get("logging", {}).get("driver") == "journald" for sp in dc["services"].values()), svc
+print('Fluent Bit: verified TLS to syslog and Elasticsearch, password from the environment; containers log to the journal')
 print('all templates rendered')

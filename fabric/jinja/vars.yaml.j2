@@ -85,6 +85,7 @@ image_stepca: {{ image_stepca | default(images_lock.stepca) }}
 image_keycloak: {{ image_keycloak | default(images_lock.keycloak) }}
 image_postgres: {{ image_postgres | default(images_lock.postgres) }}
 image_openbao: {{ image_openbao | default(images_lock.openbao) }}
+image_fluentbit: {{ image_fluentbit | default(images_lock.fluentbit) }}
 {# Base of the locally built bind9, dirsrv and webui images (Debian packages). #}
 image_debian: {{ image_debian | default(images_lock.debian) }}
 {# Names of the locally built images (not pulled). #}
@@ -111,6 +112,14 @@ openbao_pkcs11_modules: {{ openbao_pkcs11_modules | default([], true) | to_json 
 openbao_recovery_shares: {{ openbao_recovery_shares | default(1) }}
 openbao_recovery_threshold: {{ openbao_recovery_threshold | default(1) }}
 install_keycloak: {{ install_keycloak | default(false) | bool }}
+# Log forwarding (optional, design D20): Fluent Bit sends the host journal (all fabric
+# containers and fabric's audit log) and OpenBao's audit log to syslog and/or Elasticsearch.
+install_fluentbit: {{ install_fluentbit | default(false) | bool }}
+ip_fluentbit: {{ ip_fluentbit | default('10.255.0.95') }}
+fluentbit_mem_limit: {{ fluentbit_mem_limit | default('64m') }}
+# syslog: {host, port (6514), tls (true), ca_file}; elastic: {url, index, user, ca_file}.
+# The Elasticsearch password lives in OpenBao: sudo fabricctl logs set-password elastic
+log_forwarding: {{ log_forwarding | default({}, true) | to_json }}
 # Web management UI (mTLS + Keycloak OIDC). Requires Keycloak.
 install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) }}
 webui_realm: {{ webui_realm | default(domain) }}
@@ -168,7 +177,8 @@ service_dirs:
   'keycloak': {'uid': 900, 'gid': 0},
   'postgres': {'uid': 901, 'gid': 901},
   'webui': {'uid': 912, 'gid': 912},
-  'openbao': {'uid': 913, 'gid': 913}
+  'openbao': {'uid': 913, 'gid': 913},
+  'fluentbit': {'uid': 914, 'gid': 914}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:

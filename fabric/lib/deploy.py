@@ -8,6 +8,7 @@ import subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 from fabriclib.images.needs_rebuild import needs_rebuild  # noqa: E402
+from fabriclib.logs.deploy_fluentbit import deploy_fluentbit  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
@@ -87,6 +88,10 @@ def zone_content_changed(src, dst):
 
 def install_zone_file(src, dst, uid, gid):
     shutil.copy2(src, dst)
+    # Fresh mtime: BIND reloads a zone file on thaw/reload only if it is newer
+    # than what it loaded; copy2 kept the render time, often older than BIND's
+    # own freeze-time write, so BIND kept serving the old zone (intermittent).
+    os.utime(dst, None)
     os.chown(dst, uid, gid)
     os.chmod(dst, 0o640)
     # A journal written against the old file no longer matches it: BIND
@@ -294,6 +299,11 @@ def apply_deployment(start_services=True):
     
     save_yaml(final_vars, os.path.join(render_tmp, "vars.yaml"))
     merged_context.update(final_vars)
+    try:                                   # Fluent Bit reads the journal through this group
+        import grp
+        merged_context.setdefault("journal_gid", grp.getgrnam("systemd-journal").gr_gid)
+    except KeyError:
+        pass
     
     # Load and render link-vars.yaml
     link_vars_path = os.environ.get("LINK_VARS_PATH", os.path.join(TARGET_FABRIC, "config/link-vars.yaml"))
@@ -360,6 +370,8 @@ def apply_deployment(start_services=True):
         {'service': 'openbao', 'compose': 'openbao', 'folder': 'openbao', 'requires': [],
          'condition': f"/usr/bin/python3 {DEPLOY_BASE_DIR}/fabric/lib/fabriclib/cli.py vault unlock",
          'post': [f"/usr/bin/python3 {DEPLOY_BASE_DIR}/fabric/lib/fabriclib/cli.py vault wipe-key"]},
+        # optional log forwarding (design D20)
+        {'service': 'fluentbit', 'compose': 'fluentbit', 'folder': 'fluentbit', 'requires': []},
     ]
 
     for svc_info in sys_svcs:
@@ -371,6 +383,8 @@ def apply_deployment(start_services=True):
         if svc_folder == 'dirsrv' and not final_vars.get('install_ldap'):
             continue
         if svc_folder == 'webui' and not final_vars.get('install_webui'):
+            continue
+        if svc_folder == 'fluentbit' and not final_vars.get('install_fluentbit'):
             continue
             
         render_file(f'{svc_folder}/docker-compose.yml.j2', f'{svc_folder}/docker-compose.yml')
@@ -607,6 +621,10 @@ def apply_deployment(start_services=True):
         ldap_seed_changed = copy_tree_with_perms(os.path.join(render_tmp, "dirsrv/seed"),
                                                  os.path.join(DEPLOY_BASE_DIR, "dirsrv/seed"),
                                                  0, ldap_gid, 0o640, 0o750)
+
+    # Fluent Bit (optional): its config, destination CAs, credentials, disk buffer
+    if final_vars.get('install_fluentbit') and deploy_fluentbit(final_vars, secrets, jinja_env):
+        services_to_restart.add('fluentbit')
 
     # webui container (config, build context) + fabric-agent host unit
     webui_changed = agent_unit_changed = False

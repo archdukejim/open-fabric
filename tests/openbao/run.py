@@ -9,6 +9,7 @@ and what happens when the seal key goes missing.
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -90,7 +91,9 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.vault.common.approle_login import approle_login  # noqa: E402
 from fabriclib.vault.common.bao_request import bao_request  # noqa: E402
 from fabriclib.vault.configure_openbao import configure_openbao  # noqa: E402
+from fabriclib.vault.add_kmip_slot import add_kmip_slot  # noqa: E402
 from fabriclib.vault.add_security_key_slot import add_security_key_slot  # noqa: E402
+from fabriclib.vault.common.kmip_session import kmip_session  # noqa: E402
 from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
 from fabriclib.vault.common.obtain_key import obtain_key  # noqa: E402
 from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens  # noqa: E402
@@ -214,6 +217,12 @@ check("people: configuration readable, not writable",
       bao_request(V, "GET", "sys/policies/acl/fabric-admin", token=person)[0] == 200
       and bao_request(V, "PUT", "sys/policies/acl/fabric-admin", token=person, body={"policy": ""})[0] == 403
       and bao_request(V, "POST", "sys/auth/userpass", token=person, body={"type": "userpass"})[0] == 403)
+auditor = bao_request(V, "POST", "auth/token/create", token=glass,
+                      body={"policies": ["fabric-auditor"], "ttl": "5m"})[1]["auth"]["client_token"]
+check("auditor bundle: application secrets listed (metadata), never read or written",
+      "team/" in bao_request(V, "LIST", "apps/metadata", token=auditor)[1].get("data", {}).get("keys", [])
+      and bao_request(V, "GET", "apps/data/team/db", token=auditor)[0] == 403
+      and bao_request(V, "POST", "apps/data/team/db", token=auditor, body={"data": {"pw": "y"}})[0] == 403)
 bao_request(V, "DELETE", "fabric/metadata/glass-probe", token=glass)
 check("break glass: the root token is revoked after use", revoke_token(V, glass))
 
@@ -546,6 +555,61 @@ if have_hsm:
     check("rotation: the token wraps the new key", res["kept"] == [tok] and test_slot(V, "tester", tok, source="test"))
     check("the token, now the only method, cannot be removed",
           refused(lambda: remove_slot(V, "tester", tok, source="test"), "last"))
+
+# ---------------------------------------------------------------- HSM / key manager (KMIP; PyKMIP server stands in)
+try:
+    from kmip import enums as kenums
+    have_kmip = bool(shutil.which("pykmip-server"))
+except ImportError:
+    have_kmip = False
+check("test prerequisites: python3-pykmip (client and pykmip-server) installed", have_kmip)
+if have_hsm and have_kmip:
+    KP = 15696
+    for name, san in (("kmip-server", "DNS:kmip.lan.test"), ("kmip-client", "DNS:fabric-test")):
+        sh(f"openssl req -newkey rsa:2048 -nodes -keyout {name}.key -out {name}.csr -subj '/CN={name}'")
+        open(f"{name}.ext", "w").write(f"subjectAltName={san}\nextendedKeyUsage=serverAuth,clientAuth\n")
+        sh(f"openssl x509 -req -in {name}.csr -CA root.crt -CAkey root.key -CAcreateserial -out {name}.crt "
+           f"-days 2 -extfile {name}.ext")
+    # one PEM for both settings: Debian's PyKMIP server swaps certfile and keyfile
+    open("kmip-server.pem", "w").write(open("kmip-server.crt").read() + open("kmip-server.key").read())
+    open("kmip.conf", "w").write(f"[server]\nhostname=127.0.0.1\nport={KP}\ncertificate_path={W}/kmip-server.pem\n"
+                                 f"key_path={W}/kmip-server.pem\nca_path={W}/root.crt\nauth_suite=TLS1.2\n"
+                                 f"enable_tls_client_auth=True\ndatabase_path={W}/kmip.db\nlogging_level=INFO\n")
+    kmip_srv = subprocess.Popen(["pykmip-server", "-f", f"{W}/kmip.conf", "-l", f"{W}/kmip.log"],
+                                stdout=open(f"{W}/kmip.out", "w"), stderr=subprocess.STDOUT)
+    for _ in range(60):
+        try:
+            socket.create_connection(("127.0.0.1", KP), 1).close()
+            break
+        except OSError:
+            time.sleep(0.5)
+    kargs = ("127.0.0.1", KP, "kmip.lan.test", f"{W}/root.crt", f"{W}/kmip-client.crt", f"{W}/kmip-client.key")
+    with kmip_session(*kargs) as kc:
+        kuid = kc.create(kenums.CryptographicAlgorithm.AES, 256)
+        kc.activate(kuid)
+    pem = {n: open(f"{W}/kmip-client.{n}").read() for n in ("crt", "key")}
+    check("KMIP: a device whose certificate is not from the given CA is refused (TLS verified)",
+          refused(lambda: add_kmip_slot(V, "tester", f"127.0.0.1:{KP}", kuid, open(f"{W}/other.crt").read(),
+                                        pem["crt"], pem["key"], "kmip.lan.test", source="test"), "TLS handshake"))
+    check("KMIP: a wrong key id is refused, nothing saved",
+          refused(lambda: add_kmip_slot(V, "tester", f"127.0.0.1:{KP}", "9999", open(f"{W}/root.crt").read(),
+                                        pem["crt"], pem["key"], "kmip.lan.test", source="test"), "refused")
+          and not any(sl["type"] == "kmip" for sl in read_slot_store(V)["slots"]))
+    hsm = add_kmip_slot(V, "tester", f"127.0.0.1:{KP}", kuid, open(f"{W}/root.crt").read(), pem["crt"], pem["key"],
+                        "kmip.lan.test", "test hsm", source="test")
+    kdir = f"{W}/keys/kmip-{hsm}"
+    check("KMIP: added after a wrap + unwrap through the device; its certificates and key root 0400",
+          all(oct(os.stat(f"{kdir}/{n}").st_mode & 0o777) == "0o400" for n in ("ca.crt", "client.crt", "client.key"))
+          and test_slot(V, "tester", hsm, source="test"))
+    remove_slot(V, "tester", tok, source="test")
+    check("OpenBao restarts from the HSM alone", start() and not vault_status(V)["sealed"])
+    res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+    check("rotation: the HSM wraps the new key", res["kept"] == [hsm] and test_slot(V, "tester", hsm, source="test"))
+    with kmip_session(*kargs) as kc:
+        kc.revoke(kenums.RevocationReasonCode.CESSATION_OF_OPERATION, kuid)
+    check("KMIP kill switch: key revoked on the device -> the method no longer unwraps, fabric-unlock refuses",
+          refused(lambda: test_slot(V, "tester", hsm, source="test"), "could not unwrap") and unlock_vault(V) is None)
+    kmip_srv.terminate()
 
 # ---------------------------------------------------------------- hardening
 insp = json.loads(sh("docker inspect openbao").stdout)[0]

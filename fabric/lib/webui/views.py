@@ -307,18 +307,41 @@ _TEMPLATES = {
 
 {% elif view == 'people' %}
 <section class="card"><h2>People <span class="muted">{{ people.users | length }}</span></h2>
-<p class="muted">Managed in Keycloak (sign-up, passwords, two-factor), which writes them here. Read-only on this page. <a href="{{ people.keycloak_url }}">Open the Keycloak admin console</a></p>
+<p class="muted">Accounts live in Keycloak, which writes them here. New people join the plain <code>users</code> group; fabric roles come from the fabric groups (admins, auditors, operators, helpdesk), which an administrator manages in <a href="{{ people.keycloak_url }}">the Keycloak admin console</a>.</p>
 {% if people.users %}
-<table><thead><tr><th></th><th>User</th><th>Name</th><th>E-mail</th><th>Groups</th></tr></thead><tbody>
+<table><thead><tr><th></th><th>User</th><th>Name</th><th>E-mail</th><th>Groups</th><th></th></tr></thead><tbody>
 {% for u in people.users %}<tr><td><span class="light {{ 'bad' if u.locked else 'ok' }}" title="{{ 'locked' if u.locked else 'active' }}"></span></td>
-<td>{{ u.uid }}</td><td>{{ u.name }}</td><td>{{ u.mail or '—' }}</td><td>{{ u.groups | join(', ') or '—' }}</td></tr>{% endfor %}
+<td>{{ u.uid }}</td><td>{{ u.name }}</td><td>{{ u.mail or '—' }}</td><td>{{ u.groups | join(', ') or '—' }}</td>
+<td class="num">{% if can('people:reset') %}<form method="post" action="/dirsrv/people/{{ u.uid | urlencode }}/reset"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost" title="new one-time password, TOTP enrolled again, sessions ended">Reset sign-in</button></form>{% endif %}</td></tr>{% endfor %}
 </tbody></table>{% else %}<p class="blank">No users.</p>{% endif %}
 </section>
+{% if can('people:create') %}<section class="card"><h2>Add a person</h2>
+<form method="post" action="/dirsrv/people/_new" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>User name<input name="uid" required pattern="[a-z][a-z0-9._-]{1,31}" placeholder="jsmith"></label>
+<label>E-mail<input name="email" type="email" required></label>
+<label>First name<input name="first" required maxlength="60"></label>
+<label>Last name<input name="last" required maxlength="60"></label>
+<div><button>Add</button></div>
+</form>
+<p class="muted small">They get a one-time password (shown once) and must choose their own and set up two-factor at the first sign-in. To use this web UI they also need a client certificate: <code>sudo fabricctl client-cert &lt;user&gt;</code>.</p>
+</section>{% endif %}
 <section class="card"><h2>Groups</h2>
 <table><thead><tr><th>Group</th><th>Members</th></tr></thead><tbody>
 {% for g in people.groups %}<tr><td>{{ g.name }}</td><td>{{ g.members }}</td></tr>{% endfor %}
 </tbody></table></section>
 {% endif %}
+{% endblock %}""",
+
+    "person_result": """{% extends "base" %}
+{% block body %}
+<h1>389-DS · Directory</h1>
+<p><a href="/dirsrv?view=people">← People</a></p>
+<section class="card"><h2>{{ uid }}: {{ 'created' if what == 'created' else 'sign-in reset' }}</h2>
+<p>One-time password — <strong>shown only now</strong>, stored nowhere:</p>
+<pre class="secret">{{ password }}</pre>
+<p class="muted">Give it to {{ uid }} over a safe channel. At the next sign-in they choose their own password and set up two-factor (TOTP){{ '; their previous sessions were ended' if what == 'reset' else '' }}.</p>
+</section>
 {% endblock %}""",
 
     "dirsrv_macros": """{% macro device_fields(d) %}
@@ -455,22 +478,21 @@ _TEMPLATES = {
 {% elif view == 'add-hsm' %}
 <p><a href="/openbao?view=unlock">← Unlock methods</a></p>
 <section class="card"><h2>Add an HSM or key manager (KMIP)</h2>
-<p class="muted">Any KMIP server that can AES-GCM encrypt with a key you created on it (CipherTrust, Fortanix, Entrust KeyControl, IBM GKLM, Cosmian, OVHcloud KMS, …). The vault key is encrypted by a key that never leaves the device, over mutual TLS. Revoking fabric's client on the device is the kill switch.</p>
+<p class="muted">Any KMIP server that can Encrypt/Decrypt (AES-256-CBC) with a key you created on it — CipherTrust, Fortanix, Entrust KeyControl, IBM GKLM, Cosmian, OVHcloud KMS, … The vault key is encrypted by a key that never leaves the device, over mutual TLS (the device's certificate verified against the CA you give). Revoking fabric's client, or disabling the key, on the device is the kill switch.</p>
+<p class="flash warn">Tested with the PyKMIP server only. Vendor HSMs and key managers are untested.</p>
 {% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-hsm" enctype="multipart/form-data" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">
 <label>Endpoint<input name="endpoint" required placeholder="kms.lan:5696"></label>
-<label>Key id (an active AES-256 key)<input name="key_id" required></label>
-<label>Algorithm<select name="alg"><option>AES_GCM</option><option>RSA_OAEP_SHA256</option></select></label>
+<label>Key id (an active AES-256 key on the device)<input name="key_id" required maxlength="128"></label>
+<label>TLS server name (if not the endpoint's host)<input name="server_name" placeholder="kms.lan"></label>
 <label>Label<input name="label" maxlength="60"></label>
-<label class="wide">Server CA certificate<input type="file" name="ca_file"></label>
-<fieldset class="wide"><legend>Client certificate</legend>
-<label class="check perm"><input type="radio" name="client" value="fabric" checked> Issue one from fabric's CA (download it and register it on the device)</label>
-<label class="check perm"><input type="radio" name="client" value="upload"> Upload one the device issued: <input type="file" name="client_file"></label>
-</fieldset>
+<label class="wide">Device's CA certificate (PEM)<input type="file" name="ca_file" required></label>
+<label class="wide">fabric's client certificate (PEM, registered on the device)<input type="file" name="cert_file" required></label>
+<label class="wide">Its private key (PEM)<input type="file" name="key_file" required></label>
 <label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
 <div><button{{ '' if add_live['hsm'] else ' disabled' }}>Test and add</button></div>
 </form>{% endif %}
-<p class="muted small">A trial encrypt/decrypt through the device runs before anything is saved.</p></section>
+<p class="muted small">No client certificate yet? Make one under Step-CA → New key + certificate (e.g. CN <code>fabric-{{ host }}</code>), register the certificate on the device, then upload both here. A wrap and unwrap through the device run before anything is saved; the certificates are kept root-only on this host.</p></section>
 
 {% elif view == 'rotate' %}
 <p><a href="/openbao?view=unlock">← Unlock methods</a></p>
@@ -754,6 +776,10 @@ def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host
                    slots=list(slots), devices=devices or {"tokens": [], "disks": []}, slot_types=SLOT_TYPES,
                    slot_id=slot_id, host=host, live=live, msg=msg, err=err,
                    add_live=add_live or {"security-key": False, "usb": False, "hsm": False})
+
+
+def person_result(ctx, uid, what, password):
+    return _render("person_result", ctx=ctx, tab="dirsrv", uid=uid, what=what, password=password)
 
 
 def dirsrv(ctx, view, data=None, people=None, device=None, role=None, msg="", err="", unavailable=""):

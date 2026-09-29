@@ -45,6 +45,13 @@ images:
     digest: sha256:71156a1c6623a5fa3f5e61b0c6a8ead0faf0df29a778339188443551995d1315
     track: "2.7.*"
     policy: auto
+  fluentbit:                         # optional: log forwarding (install_fluentbit)
+    var: image_fluentbit
+    repo: fluent/fluent-bit
+    tag: "5.1.2"
+    digest: sha256:d792375ca8e53be72fc25716c28f291f32c6fc6f4f31d12d0d14bc78cefe9226
+    track: "5.1.*"
+    policy: auto
   debian:                            # base of fabric/bind9:local, fabric/dirsrv:local and fabric/web:local
     var: image_debian
     repo: debian

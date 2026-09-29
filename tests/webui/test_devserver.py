@@ -98,8 +98,9 @@ try:
     page = req("GET", "/dirsrv?view=roles")[3]
     check("roles page lists roles with their grants", "quarantine" in page and "network:mab" in page)
     page = req("GET", "/dirsrv?view=people")[3]
-    check("people page is read-only with a Keycloak link", "jim@home.arpa" in page and "Keycloak admin console" in page
-          and "<form" not in page.split("<main>")[1].split("</main>")[0])
+    check("people page (admin): people, add form, reset buttons, Keycloak link for fabric groups",
+          "jim@home.arpa" in page and "Keycloak admin console" in page and "/dirsrv/people/_new" in page
+          and "Reset sign-in" in page)
     page = req("GET", "/stepca?view=issue&device=printer")[3]
     check("Step-CA generate form offers devices, prefilled from the device page",
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
@@ -132,6 +133,29 @@ finally:
     proc.terminate()
     proc.wait(timeout=5)
 
+PORT += 1                                   # people: the helpdesk bundle
+proc = subprocess.Popen([sys.executable, os.path.join(LIB, "webui", "devserver.py"), "--port", str(PORT),
+                         "--as", "fabric-helpdesk"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+try:
+    for _ in range(50):
+        try:
+            req("GET", "/")
+            break
+        except OSError:
+            time.sleep(0.2)
+    page = req("GET", "/dirsrv?view=people")[3]
+    check("helpdesk: add form and reset buttons", "/dirsrv/people/_new" in page and "Reset sign-in" in page)
+    st, _, _, page = req("POST", "/dirsrv/people/_new", {"csrf": "dev", "uid": "dana", "first": "Dana", "last": "Lee",
+                                                         "email": "dana@home.arpa"})
+    check("helpdesk: add a person -> one-time password shown once", st == 200 and "shown only now" in page and "dana" in page)
+    st, _, _, page = req("POST", "/dirsrv/people/sam/reset", {"csrf": "dev"})
+    check("helpdesk: reset a plain user's sign-in", st == 200 and "sign-in reset" in page)
+    st, loc, _, _ = req("POST", "/dirsrv/people/jim/reset", {"csrf": "dev"})
+    check("helpdesk: an admin's sign-in cannot be reset", st == 303 and "only%20an%20admin" in (loc or ""), loc)
+finally:
+    proc.terminate()
+    proc.wait(timeout=5)
+
 PORT += 1                                   # the preview as a role bundle sees it
 proc = subprocess.Popen([sys.executable, os.path.join(LIB, "webui", "devserver.py"), "--port", str(PORT),
                          "--as", "fabric-auditor"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -144,6 +168,9 @@ try:
             time.sleep(0.2)
     page = req("GET", "/bind9")[3]
     check("--as fabric-auditor: records shown, no add form", "nas" in page and "/add" not in page and "as fabric-auditor" in page)
+    page = req("GET", "/dirsrv?view=people")[3]
+    check("--as fabric-auditor: people listed, no add form or reset buttons",
+          "jim@home.arpa" in page and "/dirsrv/people/_new" not in page and "Reset sign-in" not in page)
 finally:
     proc.terminate()
     proc.wait(timeout=5)

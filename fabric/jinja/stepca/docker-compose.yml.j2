@@ -8,6 +8,12 @@ services:
       args:
         BASE_IMAGE: "{{ image_stepca }}"
     container_name: step-ca
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
     user: "{{ service_users.step.uid }}:{{ service_users.step.gid }}"
     read_only: true
     security_opt:

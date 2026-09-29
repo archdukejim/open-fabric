@@ -200,6 +200,21 @@ CAROL_P12_PW=$(in_box 'fabricctl client-cert carol' 2>&1 | sed -n 's/^.p12 passw
 check "third user carol in the auditors group, with a client cert" "grep -q created '$OUT/carol.log' && [ -n '$CAROL_P12_PW' ]"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
+cat > "$OUT/reset_guard.py" <<'PY'
+import sys, yaml
+sys.path.insert(0, "/opt/fabric/lib")
+from fabriclib.common.errors import ValidationError
+from fabriclib.keycloak.reset_sign_in import reset_sign_in
+v = yaml.safe_load(open("/opt/fabric/config/vars.yaml"))
+try:
+    reset_sign_in(v, "helpdesk-test", "carol", privileged=False, source="test")
+    print("RESET ALLOWED")
+except ValidationError as e:
+    print(e)
+PY
+docker cp "$OUT/reset_guard.py" "$NAME:/root/reset_guard.py"
+check "people: without the admin bundle, a fabric-group member's sign-in cannot be reset (carol, auditors)" \
+    "in_box 'python3 /root/reset_guard.py' | grep -q 'only an admin can reset'"
 check "sign-in: admin gets in; HTTP, missing/foreign certs, non-admins and borrowed certs are refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"
 
@@ -376,6 +391,11 @@ docker cp "$OUT/argv_check.py" "$NAME:/root/argv_check.py"
 check "no secret appears in any process's argv" "in_box 'python3 /root/argv_check.py' | grep -q 'LEAKS: none'"
 
 echo "--- fabricctl uninstall: export to a folder of your choice, remove fabric and the package"
+CA_FP=$(in_box 'openssl x509 -noout -fingerprint -sha256 -in /opt/stepca/data/certs/root_ca.crt')
+# a directory user made after the reinstall (which starts the directory fresh): only the export has her
+sed 's/webui_admin_group="users"), "bob", os.environ\["BOB_PW"\], "bob@lan.test"/webui_admin_group="users"), "erin", os.environ["BOB_PW"], "erin@lan.test"/' "$OUT/bob.py" > "$OUT/erin.py"
+docker cp "$OUT/erin.py" "$NAME:/root/erin.py"
+in_box "BOB_PW='$(openssl rand -base64 18)' python3 /root/erin.py" > "$OUT/erin.log" 2>&1
 in_box 'fabricctl uninstall --yes' > "$OUT/uninstall-refused.log" 2>&1
 check "unattended uninstall without an export choice is refused, nothing changed"     "grep -q 'choose --export DIR or --no-export' '$OUT/uninstall-refused.log' && in_box 'systemctl is-active fabric.target' | grep -qx active"
 in_box 'fabricctl uninstall --yes --export /opt/fabric/exported' > "$OUT/uninstall-refused2.log" 2>&1
@@ -387,6 +407,23 @@ check "the package was purged too, and nothing was written to /var/backups"     
 check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,fabric-agent}.service' >/dev/null 2>&1"
 check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id openbao' >/dev/null 2>&1"
 check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
+
+echo "--- fabricctl restore: the same fabric back from the export"
+in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > "$OUT/apt-restore.log" 2>&1
+in_box 'fabricctl restore /root/nope --yes' > "$OUT/restore-refused.log" 2>&1
+check "restore refuses a folder that is not a fabric export" "grep -q 'is not a fabric export' '$OUT/restore-refused.log'"
+in_box 'fabricctl restore /root/fabric-export --yes' > "$OUT/restore.log" 2>&1
+check "restore: setup completes on the exported data" "grep -q 'fabric is ready' '$OUT/restore.log'"
+check "restore: the same CA (clients keep trusting it)" \
+    "[ \"\$(in_box 'openssl x509 -noout -fingerprint -sha256 -in /opt/stepca/data/certs/root_ca.crt')\" = '$CA_FP' ]"
+check "restore: OpenBao unlocked with its own key, not re-initialised; fabric's secrets back in it" \
+    "! grep -q 'OpenBao initialised' '$OUT/restore.log' && in_box 'fabricctl secrets list' | grep -q ca_password && ! in_box 'test -e /opt/fabric/config/fabric-secrets.yml'"
+check "restore: the embedded TSIG key still updates DNS" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
+docker cp "$REPO/tests/sandbox/ldap_has_users.py" "$NAME:/root/ldap_has_users.py"
+check "restore: the directory is back (erin, added after the reinstall, exists again)" \
+    "[ \"\$(in_box 'python3 /root/ldap_has_users.py dc=lan,dc=test erin')\" = 1 ]"
+in_box 'fabricctl doctor' > "$OUT/doctor-restore.log" 2>&1
+check "restore: doctor passes" "! grep -q '✗' '$OUT/doctor-restore.log' && grep -q '✓' '$OUT/doctor-restore.log'"
 
 echo; echo "$PASS passed, $FAIL failed"
 if [ "${KEEP:-0}" != 1 ]; then

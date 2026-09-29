@@ -419,15 +419,16 @@ check("Step-CA still works without the directory (no device list)", st == 200 an
 st, hd, sc, body = req("GET", "/openbao", ALICE, cookie=session)
 check("OpenBao tab reports an unreachable vault instead of failing", st == 200 and "Unreachable" in body, (st, body[:300]))
 st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=session)
-check("unlock methods page renders from the host (changes shown as not yet available)",
-      st == 200 and "Add an unlock method" in body and "arrives next" in body, (st, body[:300]))
+check("unlock methods page renders from the host, every method type addable",
+      st == 200 and "Add an unlock method" in body and "arrives next" not in body, (st, body[:300]))
 st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "x"}, cookie=session)
 check("vault change: the host name must be typed", st == 303 and "Type+this+host" in hd.get("Location", ""), hd)
 st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "pi-core"}, cookie=session)
 check("vault change: confirmed and fresh -> reaches the agent (which refuses: this test host has no vault key)",
       st == 303 and "no+vault+key" in hd.get("Location", ""), hd)
 st, hd, *_ = req("POST", "/openbao/slots/add-hsm", POSTH, {"csrf": csrf, "confirm": "pi-core"}, cookie=session)
-check("adding a method type that is not built yet is refused", "next+update" in hd.get("Location", ""), hd)
+check("add HSM: the agent refuses an empty endpoint (validated before anything is touched)",
+      "endpoint" in hd.get("Location", "") and "err=" in hd.get("Location", ""), hd)
 st, hd, *_ = req("POST", "/openbao/slots/add-usb", POSTH, {"csrf": csrf, "confirm": "pi-core", "disk": "/dev/nope"},
                  cookie=session)
 check("add USB: the agent refuses a disk that does not exist", "not+a+disk" in hd.get("Location", ""), hd)
@@ -560,6 +561,11 @@ check("auditor token: may read zones", " 200 " in out, out)
 out = agent_call("POST", "/v1/zones/dynamic_zone_var/records", "carol", AUDITOR_ROLES,
                  {"actor": "carol", "type": "A", "name": "nope", "ip": "192.168.7.9"})
 check("auditor token: may not add a record (403, the permission named)", " 403 " in out and "dns:write" in out, out)
+out = agent_call("POST", "/v1/people", "carol", AUDITOR_ROLES, {"uid": "mallory", "first": "M", "last": "M",
+                                                                "email": "m@x.test"})
+check("auditor token: may not create people (403, people:create)", " 403 " in out and "people:create" in out, out)
+out = agent_call("POST", "/v1/people/alice/reset", "carol", AUDITOR_ROLES)
+check("auditor token: may not reset a sign-in (403, people:reset)", " 403 " in out and "people:reset" in out, out)
 out = agent_call("GET", "/v1/nope", "alice", ADMIN_ROLES)
 check("a route that is not in the permission table is refused even for the admin", " 403 " in out, out)
 out = agent_call("GET", "/v1/zones", "alice", ADMIN_ROLES, exp=-600)

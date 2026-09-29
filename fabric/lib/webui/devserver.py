@@ -351,6 +351,26 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/openbao/"):
                 return self.send(303, b"", location="/openbao?" + urllib.parse.urlencode(
                     {"view": "unlock", **self.state.vault_action(path.split("/")[2:], form)}))
+            if path.startswith("/dirsrv/people/"):
+                name, op = (path.split("/")[3:] + ["", ""])[:2]
+                users = self.state.data["people"]["users"]
+                if name == "_new":
+                    uid = form.get("uid", "")
+                    if not uid or any(u["uid"] == uid for u in users):
+                        return self.send(303, b"", location="/dirsrv?view=people&err=" + urllib.parse.quote(
+                            f"{uid or 'a user name'} is missing or already exists"))
+                    users.append({"uid": uid, "name": f"{form.get('first', '')} {form.get('last', '')}".strip(),
+                                  "mail": form.get("email", ""), "locked": False, "groups": ["users"]})
+                    self.state.log("PERSON_CREATE", f"user={uid} (dev preview)")
+                    return self.send(200, views.person_result(self.ctx, uid, "created", "dev-preview-not-real"))
+                target = next((u for u in users if u["uid"] == name), None)
+                if op != "reset" or not target:
+                    return self.send(404, views.error_page(404, "Not found."))
+                if set(target["groups"]) - {"users"} and "system:admin" not in self.ctx["perms"]:
+                    return self.send(303, b"", location="/dirsrv?view=people&err=" + urllib.parse.quote(
+                        f"{name} is in a fabric group: only an admin can reset their sign-in"))
+                self.state.log("PERSON_RESET", f"user={name} (dev preview)")
+                return self.send(200, views.person_result(self.ctx, name, "reset", "dev-preview-not-real"))
             if path.startswith("/dirsrv/") and list_devices:
                 kind, name, op = (path.split("/")[2:] + ["", "", ""])[:3]
                 d = self.state.data["directory"]

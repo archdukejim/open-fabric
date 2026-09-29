@@ -15,6 +15,8 @@ SERVICES = [
     {"name": "openbao", "unit": "openbao", "container": "openbao", "folder": "openbao", "var": "image_openbao",
      "build": None},
     {"name": "nginx", "unit": "nginx", "container": "nginx", "folder": "nginx", "var": "image_nginx", "build": None},
+    {"name": "fluentbit", "unit": "fluentbit", "container": "fluentbit", "folder": "fluentbit", "var": "image_fluentbit",
+     "build": None},
     {"name": "fabric-web", "unit": "fabric-web", "container": "fabric-web", "folder": "webui", "var": "image_debian",
      "build": "fabric/web:local"},
 ]

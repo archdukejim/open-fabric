@@ -18,6 +18,10 @@ path "sys/policies/acl/*"  { capabilities = ["create", "read", "update", "list"]
 path "auth/approle/role/*" { capabilities = ["create", "read", "update", "list"] }
 path "fabric/*"            { capabilities = ["create", "read", "update", "delete", "list"] }
 path "auth/oidc/*"         { capabilities = ["create", "read", "update", "list"] }
+path "identity/group"      { capabilities = ["create", "update"] }
+path "identity/group/*"    { capabilities = ["create", "read", "update", "list"] }
+path "identity/group-alias"   { capabilities = ["create", "update"] }
+path "identity/group-alias/*" { capabilities = ["create", "read", "update", "list"] }
 """,
     "fabric-agent": """
 path "sys/mounts" { capabilities = ["read"] }
@@ -40,7 +44,25 @@ path "sys/policies/acl/*"     { capabilities = ["read"] }
 path "sys/internal/ui/mounts" { capabilities = ["read"] }
 path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
 """,
+    # The auditor bundle: which application secrets exist and their history,
+    # never a value; the configuration read-only.
+    "fabric-auditor": """
+path "apps/metadata"          { capabilities = ["list"] }
+path "apps/metadata/*"        { capabilities = ["read", "list"] }
+path "fabric/metadata"        { capabilities = ["list"] }
+path "sys/mounts"             { capabilities = ["read"] }
+path "sys/auth"               { capabilities = ["read"] }
+path "sys/policies/acl"       { capabilities = ["list"] }
+path "sys/policies/acl/*"     { capabilities = ["read"] }
+path "sys/internal/ui/mounts" { capabilities = ["read"] }
+path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
+""",
 }
+
+# fabric role bundle (Keycloak `roles` claim) -> OpenBao policy, through an
+# external identity group per bundle. "admin" is the web UI admin role.
+# Bundles not listed here cannot sign in to OpenBao.
+OIDC_BUNDLE_POLICIES = {"admin": "fabric-admin", "fabric-auditor": "fabric-auditor"}
 
 # Sign-in for people: OpenBao's OIDC auth at auth/oidc, a Keycloak client of
 # its own, one role bound to the web UI admin role claim.

@@ -10,7 +10,7 @@ from fabriclib.setup.start_unit import start_unit
 # (systemd unit, container, enabled-if flag); order = start order
 ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv", "install_ldap"),
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
-         ("nginx", "nginx", None)]
+         ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit")]
 
 
 def run(ctx):

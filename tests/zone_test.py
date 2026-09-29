@@ -2,6 +2,7 @@
 import os
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fabric", "lib"))
 import deploy  # noqa: E402
@@ -69,7 +70,11 @@ with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
     print("changed zones detected:", names)
     ok &= sorted(names) == ["7.168.192.in-addr.arpa", "lan.test"]
     for zone, s, d in changed:
+        os.utime(s, (1, 1))              # a rendered file older than anything BIND loaded
         deploy.reload_zone(zone, s, d, uid, gid)
+    fresh = time.time() - os.path.getmtime(os.path.join(dst, "db.lan.test")) < 60
+    print("installed zone file has a fresh mtime (BIND reloads only newer files):", fresh)
+    ok &= fresh
     print("rndc calls:", calls)
     swaps = [c for c in calls if c in ("freeze lan.test", "thaw lan.test")]
     print("BIND's late write detected and the swap repeated:", swaps == ["freeze lan.test", "thaw lan.test"] * 2)

@@ -36,6 +36,8 @@ audit "file" "file" {
   description = "fabric: every request"
   options {
     file_path = "/openbao/logs/audit.log"
+    # group openbao may read it: the optional log forwarder (Fluent Bit) joins that group
+    mode      = "0640"
   }
 }
 

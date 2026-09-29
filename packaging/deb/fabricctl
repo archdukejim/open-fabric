@@ -11,7 +11,7 @@ SRC=/usr/lib/fabricctl/fabric
 INSTALL=/opt/fabric
 
 case "${1:-}" in
-    setup|reinstall|uninstall|-h|--help|help)
+    setup|reinstall|uninstall|restore|-h|--help|help)
         exec python3 "$SRC/lib/fabriclib/cli.py" "$@" ;;
     --version)
         if [ -f "$INSTALL/lib/manage.sh" ]; then exec bash "$INSTALL/lib/manage.sh" --version; fi

@@ -18,6 +18,7 @@ start, and it is wiped once OpenBao is unsealed.
 | `wipe_runtime_keys.py` | Overwrite and delete the key copies in RAM once OpenBao is unsealed |
 | `list_slots.py` | Unlock methods with type, device, presence, key version and what the type was tested against |
 | `test_slot.py` | Unwrap the key through one method and verify it (nothing written) |
+| `add_kmip_slot.py` | Make an HSM / key manager (KMIP) an unlock method: certificates checked, wrap + unwrap through the device verified, files root-only |
 | `add_security_key_slot.py` | Make a PKCS#11 token an unlock method: new (or existing, non-extractable) RSA key on it, wrap + unwrap verified, PIN root-only |
 | `list_pkcs11_tokens.py` | Tokens the allowed PKCS#11 libraries see, with PIN state (no login) |
 | `add_usb_slot.py` | Erase a whole, unmounted USB disk and make it an unlock method; key read back and verified before saving |
@@ -32,6 +33,6 @@ start, and it is wiped once OpenBao is unsealed.
 | `revoke_token.py` | Revoke a token (the initial root token after bootstrap) and confirm it is dead |
 | `vault_status.py` | Reachable, initialised, sealed, version, seal/storage type, unlock-method store state, engines, auth methods, secrets version (no values) |
 | `detect_devices.py` | Security keys (by USB vendor + serial), USB disks (model, serial, UUID) and, given the vars, PKCS#11 tokens; read-only |
-| `run_vault_command.py` | `fabricctl vault status / slots / test / remove / rotate / add-usb / tokens / add-key / break-glass / revoke-token / unlock / wipe-key / device-event` |
+| `run_vault_command.py` | `fabricctl vault status / slots / test / remove / rotate / add-usb / add-kmip / tokens / add-key / break-glass / revoke-token / unlock / wipe-key / device-event` |
 | `slots/` | One file per unlock-method type: `wrap`, `unwrap`, `present`, `forget` and what it was `TESTED` against |
 | `common/` | Helpers shared by the operations above (see its README) |

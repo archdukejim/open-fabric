@@ -4,6 +4,7 @@ import sys
 import time
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.vault.add_kmip_slot import add_kmip_slot
 from fabriclib.vault.add_security_key_slot import add_security_key_slot
 from fabriclib.vault.add_usb_slot import add_usb_slot
 from fabriclib.vault.generate_root_token import generate_root_token
@@ -24,6 +25,9 @@ USAGE = """usage: fabricctl vault status
        fabricctl vault remove <slot> --yes   remove a method (never the last)
        fabricctl vault rotate --yes          new vault key for every present method
        fabricctl vault add-usb <disk> [--label L] --yes   ERASE a USB stick and make it an unlock method
+       fabricctl vault add-kmip <host:port> --key-id ID --ca FILE --cert FILE --key FILE
+                                [--server-name NAME] [--label L] --yes
+                                             an HSM / key manager (KMIP) as an unlock method
        fabricctl vault tokens                security keys the allowed PKCS#11 libraries see
        fabricctl vault add-key <serial> [--module LIB] [--key-id new|HEX] [--label L] --yes
                                              make a security key an unlock method (PIN asked, or on stdin)
@@ -105,6 +109,20 @@ def run_vault_command(v, argv):
         if cmd == "add-usb" and args and "--yes" in args:
             label = args[args.index("--label") + 1] if "--label" in args else ""
             print(f"added {add_usb_slot(v, 'root', args[0], label, source='cli')}")
+            return 0
+        if cmd == "add-kmip" and args and "--yes" in args:
+            opt = {k: args[args.index(k) + 1] for k in ("--key-id", "--ca", "--cert", "--key", "--server-name",
+                                                        "--label") if k in args}
+            missing = [k for k in ("--key-id", "--ca", "--cert", "--key") if k not in opt]
+            if missing:
+                raise ValidationError(f"missing {', '.join(missing)}")
+            pems = {}
+            for k in ("--ca", "--cert", "--key"):
+                with open(opt[k]) as f:
+                    pems[k] = f.read()
+            print("added " + add_kmip_slot(v, "root", args[0], opt["--key-id"], pems["--ca"], pems["--cert"],
+                                           pems["--key"], opt.get("--server-name", ""), opt.get("--label", ""),
+                                           source="cli"))
             return 0
         if cmd == "tokens" and not args:
             for t in list_pkcs11_tokens(v):

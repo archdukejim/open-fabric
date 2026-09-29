@@ -57,6 +57,35 @@ Apply any manual changes made directly to `vars.yaml`. `fabricctl` leverages the
 sudo fabricctl --apply
 ```
 
+#### Log forwarding (optional: Fluent Bit)
+Off unless chosen in setup's Advanced plan or `install_fluentbit: true`.
+Fluent Bit (its own hardened container, pinned image) sends:
+
+- the **host journal** — every fabric container logs there (Docker's
+  journald driver, tagged with the container name; `docker logs` still
+  works) and so does fabric's own audit log (identifier `fabric-audit`);
+- **OpenBao's audit log** (secrets HMAC'd; the file is group-readable for
+  the collector only).
+
+Destinations, in `vars.yaml` (re-run setup to apply):
+
+```yaml
+install_fluentbit: true
+log_forwarding:
+  syslog:  {host: siem.lan, port: 6514}                          # RFC 5424 over TLS
+  elastic: {url: "https://es.lan:9200", user: fabric, index: fabric}
+  # ca_file: per destination, if its certificate is not from the fabric CA
+  # hosts: {siem.lan: 192.168.4.20}                              # names not in DNS
+```
+
+Every destination's certificate is verified (the fabric CA unless a
+`ca_file` is given). The Elasticsearch password lives in OpenBao:
+`sudo fabricctl logs set-password elastic` (asked, or on stdin). A disk
+buffer (`/opt/fluentbit/buffer`, 256 MB per destination) keeps records while a
+destination is down; they are delivered when it is back.
+`sudo fabricctl logs status` shows each destination's records sent,
+retries, errors and dropped. Local logs stay; forwarding is a copy.
+
 #### `fabricctl images`
 Every container image is pinned by digest (amd64 + arm64). The validated
 list is `fabric/images.lock.yaml` of the installed fabric. **A fabric
@@ -362,7 +391,28 @@ cannot be copied, unlike a stick.
   enrolment (the method's detail says so).
 
 *Tested with SoftHSM2 (a software token). YubiKey, Nitrokey and smart cards
-are untested.* HSMs (KMIP) are shown in the web UI but not built yet.
+are untested.*
+
+**HSMs and key managers (KMIP).** Any KMIP server (CipherTrust, Fortanix,
+Entrust KeyControl, IBM GKLM, Cosmian, …) with an active AES-256 key that
+fabric's client may use for Encrypt/Decrypt. The device encrypts the vault
+key (AES-256-CBC, a random IV per wrap; the result is checked against the
+key's check value); the key never leaves it. fabric connects with mutual
+TLS, the device's certificate verified against the CA you give.
+
+| Command | What |
+|---|---|
+| `sudo fabricctl vault add-kmip <host:port> --key-id ID --ca ca.pem --cert client.pem --key client.key --yes` | Add one (`--server-name` if the certificate names another host, `--label`) |
+
+- The client certificate: make one under Step-CA → New key + certificate,
+  register it on the device, give it here. The files are kept root-only in
+  `/etc/fabric/openbao/kmip-<id>/`.
+- **Kill switch:** revoke fabric's client, or disable the key, on the
+  device: the method stops unwrapping and fabric-unlock refuses.
+- Needs `python3-pykmip` (recommended by the package). fabric makes the TLS
+  connection itself: PyKMIP's own TLS code does not verify the server.
+
+*Tested with the PyKMIP server. Vendor HSMs are untested.*
 
 **First install.**
 - `init` produces the **recovery key(s)**. They are written once to
@@ -387,8 +437,10 @@ are untested.* HSMs (KMIP) are shown in the web UI but not built yet.
 
 **People sign in to OpenBao's own UI with Keycloak** (when Keycloak is
 installed): `https://vault.<domain>/ui` → method **OIDC** → Keycloak
-(password + TOTP, the same flow as the web UI). Only holders of the web UI
-admin role get in; they get the `fabric-admin` policy:
+(password + TOTP, the same flow as the web UI). The admin bundle gets the
+`fabric-admin` policy below; the auditor bundle gets `fabric-auditor`
+(application secrets listed with their history, never a value); other
+bundles are refused:
 
 | May | May not |
 |---|---|

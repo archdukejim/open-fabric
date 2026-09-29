@@ -16,6 +16,32 @@ PLAN = [
 ]
 
 
+def _ask_log_forwarding(ctx):
+    """Optional (off by default): Fluent Bit forwarding every log to syslog
+    and/or Elasticsearch/OpenSearch (design D20)."""
+    on = bool(ctx.vars.get("install_fluentbit"))
+    answer = input(f"\n  Optional: forward all logs (journal, audit logs) to syslog and/or Elasticsearch "
+                   f"(Fluent Bit)? [{'Y/n' if on else 'y/N'}] ").strip().lower()
+    on = answer.startswith("y") if answer else on
+    ctx.vars["install_fluentbit"] = on
+    if not on:
+        return
+    lf = dict(ctx.vars.get("log_forwarding") or {})
+    sl = dict(lf.get("syslog") or {})
+    target = input(f"    syslog server host[:port] over TLS (blank: none) [{sl.get('host', '')}] ").strip()
+    if target:
+        host, _, port = target.partition(":")
+        sl.update(host=host, port=int(port) if port.isdigit() else 6514)
+    es = dict(lf.get("elastic") or {})
+    url = input(f"    Elasticsearch/OpenSearch URL, https://host:port (blank: none) [{es.get('url', '')}] ").strip()
+    if url:
+        es["url"] = url
+        es["user"] = input(f"    its user [{es.get('user', 'fabric')}] ").strip() or es.get("user", "fabric")
+        print("    set its password after setup: sudo fabricctl logs set-password elastic   (kept in OpenBao)")
+    lf.update({k: val for k, val in (("syslog", sl), ("elastic", es)) if val})
+    ctx.vars["log_forwarding"] = lf
+
+
 def _get(data, dotted, default):
     node = data
     for part in dotted.split("."):
@@ -49,6 +75,12 @@ def choose_plan(ctx):
         if _get(ctx.vars, "install_webui", True):
             print(f"  ✓ Create the first web UI admin '{ctx.vars.get('webui_admin_user')}' with a client certificate; "
                   "login kit in ~/fabric-admin")
+        lf = ctx.vars.get("log_forwarding") or {}
+        dests = [d for d in ((lf.get("syslog") or {}).get("host"), (lf.get("elastic") or {}).get("url")) if d]
+        if ctx.vars.get("install_fluentbit"):
+            print(f"  ✓ Optional: forward all logs with Fluent Bit to {', '.join(dests) or '(no destination yet)'}")
+        else:
+            print("  · Optional, off: forward all logs to syslog / Elasticsearch (Fluent Bit) — choose it in Advanced")
 
     # Record the effective value of every item, so what was shown is what
     # gets rendered (template defaults differ, e.g. install_keycloak).
@@ -74,4 +106,5 @@ def choose_plan(ctx):
                 _set(ctx.vars, key, on)
             if not _get(ctx.vars, "install_keycloak", True):
                 _set(ctx.vars, "install_webui", False)
+            _ask_log_forwarding(ctx)
             show()

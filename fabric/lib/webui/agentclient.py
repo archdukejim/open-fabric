@@ -191,6 +191,13 @@ def vault_add_security_key(actor, module, token, pin, key_id, label):
                                                               "pin": pin, "key_id": key_id, "label": label}, timeout=120)
 
 
+def vault_add_kmip(endpoint, key_id, ca_pem, cert_pem, key_pem, server_name, label):
+    """The client key travels only in this request body over the agent socket."""
+    return _call("POST", "/v1/vault/slots/add-hsm",
+                 {"endpoint": endpoint, "key_id": key_id, "ca": ca_pem, "cert": cert_pem, "key": key_pem,
+                  "server_name": server_name, "label": label}, timeout=120)
+
+
 def vault_devices():
     return _call("GET", "/v1/vault/devices")
 
@@ -225,6 +232,16 @@ def save_role(actor, name, fields, new=False):
 
 def delete_role(actor, name):
     return _call("POST", f"/v1/roles/{_q(name)}/delete", {"actor": actor})
+
+
+def create_person(uid, first, last, email):
+    """Returns the one-time password (shown once)."""
+    return _call("POST", "/v1/people", {"uid": uid, "first": first, "last": last, "email": email})["password"]
+
+
+def reset_sign_in(uid):
+    """Returns the new one-time password (shown once)."""
+    return _call("POST", f"/v1/people/{_q(uid)}/reset", {})["password"]
 
 
 def audit(actor, action, detail):

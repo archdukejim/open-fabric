@@ -2,11 +2,11 @@ import os
 import subprocess
 
 SERVICES = ["nginx", "bind9", "stepca", "ldap", "postgres", "keycloak", "openbao", "kea", "freeradius",
-            "fabric-web", "fabric-agent"]
+            "fluentbit", "fabric-web", "fabric-agent"]
 # systemd unit -> its container (units without one run on the host)
 CONTAINERS = {"nginx": "nginx", "bind9": "bind9", "stepca": "step-ca", "ldap": "dirsrv", "postgres": "postgres",
               "keycloak": "keycloak", "openbao": "openbao", "kea": "kea", "freeradius": "freeradius",
-              "fabric-web": "fabric-web"}
+              "fluentbit": "fluentbit", "fabric-web": "fabric-web"}
 
 
 def _health(container):

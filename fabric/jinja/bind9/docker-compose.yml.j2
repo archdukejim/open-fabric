@@ -10,6 +10,12 @@ services:
         BIND_UID: "{{ service_users.bind.uid }}"
         BIND_GID: "{{ service_users.bind.gid }}"
     container_name: bind9
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
     user: "{{ service_users.bind.uid }}:{{ service_users.bind.gid }}"
     read_only: true
     security_opt:

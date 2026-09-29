@@ -31,10 +31,11 @@
 | `verify_install.py` | End-to-end checks (DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services) |
 | `retire_renamed_units.py` | Upgrade: stop and remove units/containers that were renamed (`webui` → `fabric-web`) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
+| `run_restore_command.py` | `fabricctl restore <export>`: put an export back and run setup on it (refused while installed) |
 | `run_uninstall_command.py` | `fabricctl uninstall`: asks about an export and the package first, then exports, uninstalls, optionally `apt purge` |
 | `export_install.py` | Export all of fabric's data (secrets from OpenBao, then every folder copied cold, vault key, README) to a folder you choose |
 | `check_export_dir.py` | Refuse an export folder the uninstall would delete, or one that is not new/empty |
 | `backup_install.py` | Keep config, secrets, CA, certificates and OpenBao (data + seal key) for a reinstall (owners preserved) |
-| `restore_install.py` | Put that backup back before setup runs |
+| `restore_install.py` | Put a reinstall backup or a full export back under the install root (owners preserved) |
 | `stage_source.py` | Reinstall from the installed copy: stage the code in `/var/tmp` so uninstall cannot delete what setup runs from |
 | `renew_service_certs.py` | `fabricctl certs [--force]`: day-2 renewal; restarts only services whose certs changed |

@@ -8,6 +8,12 @@ services:
       args:
         BASE_IMAGE: "{{ image_keycloak }}"
     container_name: keycloak
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
     user: "{{ service_users.keycloak.uid }}:{{ service_users.keycloak.gid }}"
     command: ["start", "--optimized"]
     read_only: true
