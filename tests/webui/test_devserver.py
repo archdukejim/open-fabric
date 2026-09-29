@@ -104,8 +104,24 @@ try:
     check("Step-CA generate form offers devices, prefilled from the device page",
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
     page = req("GET", "/openbao")[3]
-    check("OpenBao tab: unsealed, static seal, seal key state, engines", "Unsealed" in page and "static" in page
-          and "0400, openbao only" in page and "fabric/" in page)
+    check("OpenBao tab: unsealed, static seal, engines", "Unsealed" in page and "static" in page and "fabric/" in page)
+    page = req("GET", "/openbao?view=unlock")[3]
+    check("unlock methods: slots, kill-switch state, the key-file warning", "Kill switch off" in page
+          and "YubiKey 5 Nano" in page and "Remove the key file" in page)
+    page = req("GET", "/openbao?view=add-security-key")[3]
+    check("add security key: plugged-in tokens, enrolled one disabled", "23456799" in page
+          and "already an unlock method" in page and 'name="pin"' in page)
+    st, loc, _, _ = req("POST", "/openbao/slots/add-security-key", {"csrf": "dev", "serial": "23456799", "pin": "x",
+                                                                    "label": "safe key", "confirm": "wrong"})
+    check("vault changes need the host name typed", "confirm" in (loc or ""), loc)
+    req("POST", "/openbao/slots/add-security-key", {"csrf": "dev", "serial": "23456799", "pin": "x", "label": "safe key",
+                                                    "confirm": "pi-core"})
+    req("POST", "/openbao/slots/local/remove", {"csrf": "dev", "confirm": "pi-core"})
+    page = req("GET", "/openbao?view=unlock")[3]
+    check("add a second key, remove the key file: kill switch armed", "safe key" in page and "Kill switch armed" in page
+          and "/etc/fabric/openbao/unseal.key" not in page)
+    st, loc, _, _ = req("POST", "/openbao/rotate", {"csrf": "dev", "confirm": "pi-core"})
+    check("rotate: new key version on every present method", "fabric-2" in req("GET", "/openbao?view=unlock")[3])
     st, _, _, page = req("GET", "/preview/denied")
     check("preview of a refused sign-in", st == 403 and "fabric-admin" in page)
 finally:

@@ -11,6 +11,8 @@ dev switch, so this can never be turned on in a real install.
       fabric/webui:local /app/webui/devserver.py --bind 0.0.0.0   # from the image
 """
 import argparse
+import email.parser
+import email.policy
 import base64
 import copy
 import os
@@ -93,6 +95,18 @@ SAMPLE_VAULT = {"url": "https://vault.home.arpa/", "reachable": True, "initializ
                            {"path": "identity/", "type": "identity", "version": None, "description": "identity store"},
                            {"path": "sys/", "type": "system", "version": None, "description": "system endpoints"}],
                 "auth": ["approle/", "token/"]}
+SAMPLE_SLOTS = [
+    {"id": "local", "type": "local", "label": "Key file on this host", "device": "/etc/fabric/openbao/unseal.key",
+     "present": True, "key_id": "fabric-1", "added": "2026-09-28",
+     "detail": "always present: while this slot exists, removing a device cannot seal the vault"},
+    {"id": "s-yk1", "type": "security-key", "label": "Pi key", "device": "YubiKey 5 Nano · serial 23456781",
+     "present": True, "key_id": "fabric-1", "added": "2026-09-29", "detail": "PIV slot 9d, RSA-2048 · attested genuine"}]
+SAMPLE_DEVICES = {"tokens": [{"vendor": "Yubico", "product": "YubiKey OTP+FIDO+CCID", "serial": "23456781",
+                              "usb_id": "1050:0407", "port": "1-1.2"},
+                             {"vendor": "Yubico", "product": "YubiKey OTP+FIDO+CCID", "serial": "23456799",
+                              "usb_id": "1050:0407", "port": "1-1.3"}],
+                  "disks": [{"path": "/dev/sda", "model": "SanDisk Ultra Fit", "serial": "4C530001230912104582",
+                             "size_gb": 32.0, "uuids": ["9A1C-33F0"], "labels": ["USB"]}]}
 SAMPLE_CA = {"domain": "home.arpa", "certs_url": "http://certs.home.arpa/", "max_days": 1825,
              "root": {"subject": "CN=Fabric Root CA,O=Fabric", "not_after": "Sep  1 00:00:00 2046 GMT",
                       "key": "EC prime256v1", "sha256": _FP},
@@ -122,6 +136,7 @@ class DevState:
 
     def __init__(self):
         self.data = copy.deepcopy(SAMPLE)
+        self.data["slots"] = copy.deepcopy(SAMPLE_SLOTS)
         self.lock = threading.Lock()
 
     def zones(self):
@@ -190,6 +205,43 @@ class DevState:
             entry.update(f)
         self.log("DEVICE_SAVE" if kind == "devices" else "ROLE_SAVE", f"{name} (in memory)")
 
+    def vault_action(self, parts, form):
+        """Unlock-method flows in memory: {"msg": ...} or {"err": ...}."""
+        slots = self.data["slots"]
+        if form.get("confirm", "") != "pi-core":
+            return {"err": "Type this host's name (pi-core) to confirm."}
+        if parts[:1] == ["rotate"]:
+            n = max(int(sl["key_id"].split("-")[-1]) for sl in slots) + 1
+            kept = [sl for sl in slots if sl["present"]]
+            for sl in kept:
+                sl["key_id"] = f"fabric-{n}"
+            dropped = len(slots) - len(kept)
+            self.data["slots"] = kept
+            self.log("VAULT_ROTATE", f"new key fabric-{n} (dev preview)")
+            return {"msg": f"Vault key rotated to fabric-{n}." + (f" {dropped} method(s) without their device removed."
+                                                                  if dropped else "")}
+        if parts[:1] == ["slots"] and len(parts) == 3:        # /openbao/slots/<id>/<test|remove>
+            parts = parts[1:]
+        if len(parts) == 2 and parts[1] == "remove":
+            if len(slots) < 2:
+                return {"err": "The last unlock method cannot be removed."}
+            self.data["slots"] = [sl for sl in slots if sl["id"] != parts[0]]
+            self.log("VAULT_SLOT_REMOVE", f"{parts[0]} (dev preview)")
+            return {"msg": "Unlock method removed (dev preview: nothing changed)."}
+        if len(parts) == 2 and parts[1] == "test":
+            return {"msg": "Test passed: the method unwrapped the vault key (dev preview)."}
+        kind = {"add-security-key": "security-key", "add-usb": "usb", "add-hsm": "hsm"}.get(parts[-1])
+        if not kind:
+            return {"err": "Unknown action."}
+        device = {"security-key": f"YubiKey · serial {form.get('serial', '')}",
+                  "usb": f"SanDisk Ultra Fit · {form.get('disk', '')} · UUID 9A1C-33F0",
+                  "hsm": f"{form.get('endpoint', 'kms')} · key {form.get('key_id', '')}"}[kind]
+        slots.append({"id": f"s-{secrets.token_hex(3)}", "type": kind, "label": form.get("label") or kind,
+                      "device": device, "present": True, "key_id": slots[0]["key_id"] if slots else "fabric-1",
+                      "added": "today", "detail": "dev preview: nothing was written"})
+        self.log("VAULT_SLOT_ADD", f"{kind} (dev preview)")
+        return {"msg": f"{views.SLOT_TYPES[kind][0]} added and tested (dev preview: nothing was written)."}
+
     def log(self, action, detail):
         self.data["audit"].insert(0, f"[dev] User: dev (web) | Action: {action} | {detail}\n")
 
@@ -238,7 +290,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, views.stepca(self.ctx, view, SAMPLE_CA, issued=self.state.data["issued"],
                                                    devices=ov["devices"] if ov else [], device=query.get("device", "")))
             if path == "/openbao":
-                return self.send(200, views.openbao(self.ctx, SAMPLE_VAULT))
+                view = query.get("view") if query.get("view") in views.OPENBAO_VIEWS else "status"
+                return self.send(200, views.openbao(self.ctx, SAMPLE_VAULT, view, self.state.data["slots"],
+                                                    SAMPLE_DEVICES, slot_id=query.get("slot", ""), host="pi-core",
+                                                    live=True, msg=query.get("msg", ""), err=query.get("err", "")))
             if path == "/dirsrv":
                 view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
                 kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}
@@ -266,7 +321,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
         length = min(int(self.headers.get("Content-Length") or 0), 65536)
-        form = dict(urllib.parse.parse_qsl(self.rfile.read(length).decode(errors="replace")))
+        body = self.rfile.read(length)
+        ctype = self.headers.get("Content-Type", "")
+        if ctype.startswith("multipart/form-data"):          # file inputs (HSM, CSR uploads): text fields only
+            msg = email.parser.BytesParser(policy=email.policy.HTTP).parsebytes(
+                f"Content-Type: {ctype}\r\n\r\n".encode() + body)
+            form = {part.get_param("name", header="content-disposition"):
+                    (part.get_payload(decode=True) or b"").decode(errors="replace")
+                    for part in (msg.iter_parts() if msg.is_multipart() else []) if part.get_filename() is None}
+        else:
+            form = dict(urllib.parse.parse_qsl(body.decode(errors="replace")))
         with self.state.lock:
             if path == "/logout":
                 return self.send(303, b"", location="/")
@@ -275,6 +339,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, views.apply_result(self.ctx, True,
                                                          "DEV PREVIEW — nothing was rendered or reloaded.\n"
                                                          "On a real install this runs `fabricctl --apply`."))
+            if path.startswith("/openbao/"):
+                return self.send(303, b"", location="/openbao?" + urllib.parse.urlencode(
+                    {"view": "unlock", **self.state.vault_action(path.split("/")[2:], form)}))
             if path.startswith("/dirsrv/") and list_devices:
                 kind, name, op = (path.split("/")[2:] + ["", "", ""])[:3]
                 d = self.state.data["directory"]

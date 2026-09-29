@@ -380,6 +380,11 @@ check("Step-CA still works without the directory (no device list)", st == 200 an
 
 st, hd, sc, body = req("GET", "/openbao", ALICE, cookie=session)
 check("OpenBao tab reports an unreachable vault instead of failing", st == 200 and "Unreachable" in body, (st, body[:300]))
+st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=session)
+check("unlock methods page renders from the host (changes shown as not yet available)",
+      st == 200 and "Add an unlock method" in body and "arrives next" in body, (st, body[:300]))
+st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "x"}, cookie=session)
+check("unlock-method changes are refused until they exist", st == 303 and "next+update" in hd.get("Location", ""), hd)
 
 # ---- BIND9 tab: TSIG keys for a zone
 st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)

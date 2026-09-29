@@ -348,6 +348,14 @@ class Handler(BaseHTTPRequestHandler):
         issued = actions.list_issued() if view == "issued" else None
         return self.send(status, views.stepca(ctx, view, ca, issued=issued, devices=devices, **extra))
 
+    def openbao_page(self, ctx, query):
+        view = query.get("view") if query.get("view") in views.OPENBAO_VIEWS else "status"
+        slots = actions.vault_slots()
+        devices = actions.vault_devices() if view in ("add-security-key", "add-usb") else None
+        return self.send(200, views.openbao(ctx, actions.vault_status(), view, slots["slots"], devices,
+                                            slot_id=query.get("slot", ""), host=slots["host"], live=False,
+                                            msg=query.get("msg", ""), err=query.get("err", "")))
+
     def dirsrv_page(self, ctx, query, status=200):
         view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
         kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}
@@ -376,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/dirsrv":
             return self.dirsrv_page(ctx, query)
         if path == "/openbao":
-            return self.send(200, views.openbao(ctx, actions.vault_status()))
+            return self.openbao_page(ctx, query)
         if path.lstrip("/") in views.PLACEHOLDERS:
             return self.send(200, views.placeholder(ctx, path.lstrip("/")))
         if path == "/audit":
@@ -416,6 +424,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.apply_result(self.ctx(sess), ok, output))
         if path.startswith("/stepca/"):
             return self.stepca_post(sess, path[len("/stepca/"):], form)
+        if path.startswith("/openbao/"):
+            # Unlock-method changes are not available yet: the page shows them disabled.
+            return self.redirect("/openbao?" + urllib.parse.urlencode(
+                {"view": "unlock", "err": "Changing unlock methods arrives in the next update."}))
         if path.startswith("/dirsrv/"):
             return self.dirsrv_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[2:]], form)
         if path.startswith("/bind9/tsig/"):

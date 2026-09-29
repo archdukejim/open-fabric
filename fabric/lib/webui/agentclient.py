@@ -147,6 +147,14 @@ def vault_status():
     return _call("GET", "/v1/vault")
 
 
+def vault_slots():
+    return _call("GET", "/v1/vault/slots")
+
+
+def vault_devices():
+    return _call("GET", "/v1/vault/devices")
+
+
 def device_overview():
     return _call("GET", "/v1/devices")
 

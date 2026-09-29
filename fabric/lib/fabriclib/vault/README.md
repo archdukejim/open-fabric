@@ -13,5 +13,7 @@ revoked).
 | `configure_openbao.py` | Converge: AppRole auth, KV v2 `fabric/` + `apps/`, policies, AppRoles bound to fabric_net, their credentials (root 0400) |
 | `revoke_token.py` | Revoke a token (the initial root token after bootstrap) and confirm it is dead |
 | `vault_status.py` | Reachable, initialised, sealed, version, seal/storage type, seal-key file state, engines and auth methods (as fabric-agent); no secrets |
+| `list_slots.py` | Unlock methods (key slots) with type, device, presence and key version — today the local key file |
+| `detect_devices.py` | Security keys (by USB vendor + serial) and USB disks (model, serial, UUID) plugged into the host, read-only |
 | `run_vault_command.py` | `fabricctl vault status` |
 | `common/` | Helpers shared by the operations above (see its README) |
