@@ -127,10 +127,32 @@ fabricctl_<ver>_<arch>.deb
   (config) and `/var/lib/fabric` (state) per FHS; service data stays in
   `/opt/<service>` (or becomes `/var/lib/fabric/<service>`, decision D3).
   `fabricctl` moves an existing `/opt/fabric` on first run.
-- **Distribution:** a signed apt repository published from GitHub Actions to
-  GitHub Pages (`aptly`/`reprepro`, GPG key in repo secrets). Users add one
-  `sources.list.d` entry + keyring. Releases also attach the `.deb` for
-  manual `apt install ./fabricctl_*.deb`.
+- **Distribution (decided, D7): GitHub Releases + a signed APT repo on
+  GitHub Pages.**
+  - Each `v*` tag builds `fabricctl_<ver>_all.deb` (`package.yml`) and
+    attaches it to the GitHub Release; the Releases are the one store of
+    binaries (never committed to git).
+  - A workflow then rebuilds the repository with **reprepro** from all
+    Release assets and deploys **only** the repo (`dists/`, `pool/`,
+    `public.key`) to the `gh-pages` branch. Source, `conf/` and reprepro's
+    `db/` are never published.
+  - Suite `stable`, component `main`, architectures `amd64 arm64` (+ `all`,
+    which fabricctl is): one suite serves Ubuntu 24.04, Debian 13 and
+    Raspberry Pi OS.
+  - Signing: a dedicated repo-signing key (`SignWith: <key id>`, with expiry)
+    in the Actions secret `GPG_PRIVATE_KEY` (+ passphrase secret); its
+    revocation certificate is kept offline; `public.key` published next to
+    the repo.
+  - Users: `wget -qO- https://archdukejim.github.io/fabric/public.key | sudo
+    gpg --dearmor -o /usr/share/keyrings/fabric-archive-keyring.gpg`, then
+    `deb [signed-by=/usr/share/keyrings/fabric-archive-keyring.gpg]
+    https://archdukejim.github.io/fabric stable main` in
+    `/etc/apt/sources.list.d/fabric.list`, `apt update`, `apt install
+    fabricctl`. The Release `.deb` also works directly (`apt install
+    ./fabricctl_*.deb`, how the Pi is tested today).
+  - Offline sites: the same `dists/` + `pool/` tree can be mirrored to a
+    local path or web server (`deb [signed-by=…] file:/srv/fabric-apt stable
+    main`).
 - **Offline installs:** `fabricctl-images_<ver>_<arch>.deb` (or a tarball)
   carries `docker save` output; `fabricctl setup --offline` loads it.
 
@@ -548,7 +570,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D4 | Kea in a container (host networking) or native package | Container, for parity with the other services and easy pinning |
 | D5 | Lease backend: memfile or Postgres | memfile; Postgres only if HA or large lease counts |
 | D6 | Which switches/APs must 802.1X support (vendor affects VLAN attributes, CoA, RadSec) | Needs your inventory |
-| D7 | Apt repo hosting: GitHub Pages vs Cloudsmith/packagecloud | GitHub Pages (no third party, free, signed) |
+| D7 ✅ | Apt repo hosting | GitHub Releases for the `.deb` + reprepro-built signed repo on GitHub Pages (`gh-pages`), dedicated signing key in Actions secrets (§2 Distribution) |
 | D8 ✅ | Keep Ansible for remote install? | No: removed. `setup.sh` is a local bootstrap; remote = ssh + apt (phase 2) |
 | D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b) |
 | D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b) |
