@@ -377,8 +377,9 @@ everything else.
 > init (recovery keys to `~/fabric-admin`), root token revoked, AppRoles
 > `fabric-setup` / `fabric-agent` bound to fabric_net, KV v2 `fabric/` and
 > `apps/`, declarative audit log, `fabricctl vault status`, web UI status tab,
-> doctor checks, backup/reinstall. **Not yet:** importing `fabric-secrets.yml`,
-> Keycloak OIDC for people, rotated credentials, SSH CA, USB / KMIP /
+> doctor checks, backup/reinstall; `fabric-secrets.yml` imported into
+> `fabric/secrets` (verified, shredded, marker file; OpenBao locked → setup
+> stops, never regenerates). **Not yet:** Keycloak OIDC for people, rotated credentials, SSH CA, USB / KMIP /
 > PKCS#11 seals (next, in that order), the web UI's secrets browser.
 
 **OpenBao** (MPL-2.0, Linux Foundation fork of Vault; Vault-compatible API,

@@ -144,7 +144,7 @@ extra_certs:
 
 #### TSIG Keys (RFC2136 dynamic updates)
 
-TSIG keys let other systems update DNS over RFC2136 — typically a reverse proxy obtaining Let's Encrypt certificates with DNS-01, like nginx-proxy-manager's certbot `rfc2136` plugin. A key is a `tsig_keys` entry in the vars; its secret lives only in `fabric-secrets.yml` (`0600`). From them fabric renders the BIND key, its `update-policy` grants and an `rfc2136.ini` for the client; nothing edits the rendered BIND files by hand, so keys survive every apply and setup re-run.
+TSIG keys let other systems update DNS over RFC2136 — typically a reverse proxy obtaining Let's Encrypt certificates with DNS-01, like nginx-proxy-manager's certbot `rfc2136` plugin. A key is a `tsig_keys` entry in the vars; its secret lives only with fabric's secrets (in OpenBao; `fabricctl secrets show tsig/<name>`). From them fabric renders the BIND key, its `update-policy` grants and an `rfc2136.ini` for the client; nothing edits the rendered BIND files by hand, so keys survive every apply and setup re-run.
 
 ```yaml
 tsig_keys:
@@ -162,7 +162,7 @@ tsig_keys:
 | Field | Default | Meaning |
 |---|---|---|
 | `name` | — | Key name the client uses (`dns_rfc2136_name`) |
-| `secret` | generated once | Base64 secret. Given in the vars, it is moved into `fabric-secrets.yml` and removed from the vars files; it always wins over a stored one |
+| `secret` | generated once | Base64 secret. Given in the vars, it is moved into fabric's secrets (OpenBao) and removed from the vars files; it always wins over a stored one |
 | `algorithm` | `hmac-sha256` | `hmac-sha256/384/512/224`, `hmac-sha1`, `hmac-md5` |
 | `domain` | the fabric domain | Zone the key may update |
 | `records` | — | Hosts allowed a DNS-01 challenge: `grant <key> name _acme-challenge.<record>.<zone>. <types>` |
@@ -297,8 +297,32 @@ PKCS#11 token is planned (design §7c).
 
 | Mount | What |
 |---|---|
-| `fabric/` (KV v2) | fabric's own secrets (moving `fabric-secrets.yml` here comes later) |
+| `fabric/` (KV v2) | fabric's own secrets: the entry `fabric/secrets` (see below) |
 | `apps/` (KV v2) | secrets for your applications (Keycloak sign-in for people comes later) |
+
+**fabric's own secrets live in OpenBao.** The generated passwords (CA,
+rndc, LDAP role accounts, Keycloak, web UI OIDC) and every TSIG secret are
+written to the plaintext `/opt/fabric/config/fabric-secrets.yml` only
+during a fresh install. The `vault` step moves them into OpenBao (KV v2
+`fabric/secrets`): it writes them, reads them back, compares, and only then
+shreds the file and writes the marker `/opt/fabric/config/secrets.openbao`.
+
+- **From then on** setup, `fabricctl tsig` and the web UI read and change
+  them in OpenBao. Every change is a new KV version, so there is history,
+  and concurrent changes are refused (check-and-set).
+- **If OpenBao is locked,** anything that needs a secret stops with an
+  error. It never treats "no file" as "no secrets", which would generate
+  new passwords the running services don't know. Running services are not
+  affected.
+- **Do not create `fabric-secrets.yml` by hand:** while it exists it wins,
+  and the next setup imports it.
+- `fabricctl reinstall` exports a root-only copy into its backup, and the
+  reinstalled setup re-imports and shreds it.
+
+**What is still in plain files:** the configuration each service needs to
+run (rendered LDIF, compose files, `named.conf.keys`, `rfc2136.ini`, the
+web UI's OIDC config, Step-CA's password file). The planned protection for
+those is disk encryption (design §7d).
 
 **Boot independence.** No core service (DNS, LDAP, SSO, nginx, CA) needs
 OpenBao to start. The sandbox test stops OpenBao and restarts BIND9 and

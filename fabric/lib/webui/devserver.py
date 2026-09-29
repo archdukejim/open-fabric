@@ -94,7 +94,7 @@ SAMPLE_VAULT = {"url": "https://vault.home.arpa/", "reachable": True, "initializ
                            {"path": "fabric/", "type": "kv", "version": "2", "description": "fabric's own secrets"},
                            {"path": "identity/", "type": "identity", "version": None, "description": "identity store"},
                            {"path": "sys/", "type": "system", "version": None, "description": "system endpoints"}],
-                "auth": ["approle/", "token/"]}
+                "auth": ["approle/", "token/"], "secrets": {"version": 7, "updated": "2026-09-29T09:12:44"}}
 SAMPLE_SLOTS = [
     {"id": "local", "type": "local", "label": "Key file on this host", "device": "/etc/fabric/openbao/unseal.key",
      "present": True, "key_id": "fabric-1", "added": "2026-09-28",

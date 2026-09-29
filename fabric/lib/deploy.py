@@ -12,6 +12,8 @@ from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa:
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 from fabriclib.dns.rfc2136_settings import rfc2136_settings  # noqa: E402
+from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
+from fabriclib.secrets.save_secrets import save_secrets  # noqa: E402
 import filecmp
 import json
 import re
@@ -130,8 +132,14 @@ def apply_deployment(start_services=True):
     # 1. Load Custom Vars
     custom_vars = load_yaml(custom_vars_path)
     
-    # 2. Handle Secrets
-    secrets = load_yaml(secrets_path)
+    # 2. Handle Secrets (the 0600 file before the import into OpenBao, OpenBao after;
+    #    fabriclib/secrets refuses to pretend there are none when OpenBao is locked)
+    try:
+        secrets = load_secrets(secrets_path)
+    except ValidationError as e:
+        print(f"Error: {e}\nfabric's secrets are in OpenBao: unlock it (plug in an unlock device) and run again.")
+        sys.exit(1)
+    loaded_secrets = json.loads(json.dumps(secrets))
     changed_secrets = False
     
     if 'ca_password' not in secrets:
@@ -206,8 +214,12 @@ def apply_deployment(start_services=True):
             changed_secrets = True
             
     if changed_secrets:
-        save_yaml(secrets, secrets_path)
-        os.chmod(secrets_path, 0o600)
+        update = {k: val for k, val in secrets.items() if loaded_secrets.get(k) != val}
+        try:
+            save_secrets(update, secrets_path)
+        except ValidationError as e:
+            print(f"Error: {e}")
+            sys.exit(1)
         
     # 3. Render vars.yaml.j2
     jinja_dir = os.path.join(FABRIC_DIR, 'jinja')
@@ -434,7 +446,7 @@ def apply_deployment(start_services=True):
             os.chmod(setup_dst, 0o755)
     
     sec_dst = os.path.join(TARGET_FABRIC, "config/fabric-secrets.yml")
-    if os.path.realpath(secrets_path) != os.path.realpath(sec_dst):
+    if os.path.exists(secrets_path) and os.path.realpath(secrets_path) != os.path.realpath(sec_dst):
         shutil.copy2(secrets_path, sec_dst)
         os.chmod(sec_dst, 0o600)
 

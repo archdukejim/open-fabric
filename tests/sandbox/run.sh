@@ -115,14 +115,35 @@ in_box 'fabricctl doctor' > "$OUT/doctor-after-restart.log" 2>&1
 check "systemctl restart fabric.target: doctor passes" \
     "! grep -q '✗' '$OUT/doctor-after-restart.log' && grep -q '✓' '$OUT/doctor-after-restart.log'"
 
+cat > "$OUT/secrets_dump.py" <<'PY'
+import json, sys
+sys.path.insert(0, "/opt/fabric/lib")
+from fabriclib.secrets.load_secrets import load_secrets
+print(json.dumps(load_secrets("/opt/fabric/config/fabric-secrets.yml")))
+PY
+docker cp "$OUT/secrets_dump.py" "$NAME:/root/secrets_dump.py"
+secrets_json() { in_box 'python3 /root/secrets_dump.py'; }
+
+echo "--- fabric's secrets live in OpenBao, not on disk"
+check "no plaintext fabric-secrets.yml after setup" "! in_box 'test -e /opt/fabric/config/fabric-secrets.yml'"
+check "the marker says OpenBao is the source of truth" "in_box 'test -s /opt/fabric/config/secrets.openbao'"
+check "fabricctl vault status: secrets in OpenBao (fabric/secrets)" "in_box 'fabricctl vault status' | grep -q \"fabric's secrets: in OpenBao (fabric/secrets\""
+check "every generated secret is in OpenBao" \
+    "secrets_json | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(0 if all(s.get(k) for k in (\"ca_password\",\"rndc_secret\",\"ldap_admin_password\",\"keycloak_admin_password\",\"webui_oidc_secret\",\"ldap_device_admin_password\")) else 1)'"
+
+check "fabricctl secrets list: names only, no values" \
+    "in_box 'fabricctl secrets list' | grep -qx keycloak_admin_password && ! in_box 'fabricctl secrets list' | grep -qF \"\$(secrets_json | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"keycloak_admin_password\"])')\""
+check "fabricctl secrets show: the value, and the read is audited" \
+    "[ \"\$(in_box 'fabricctl secrets show tsig/npm')\" = '$TSIG_SECRET' ] && in_box 'grep -q \"SECRET_READ | name=tsig/npm\" /opt/fabric/archive/audit.log'"
+
 echo "--- RFC2136 with the embedded TSIG key (what nginx-proxy-manager does)"
 docker cp "$REPO/tests/sandbox/rfc2136_test.sh" "$NAME:/root/rfc2136_test.sh"
 rfc2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test npm '$TSIG_SECRET' npm" 2>&1 | tee -a "$OUT/rfc2136.log"; }
 rfc2136 > /dev/null
 check "RFC2136: embedded key updates _acme-challenge.npm, other names and wrong keys refused" \
     "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
-check "embedded secret kept exactly, and only in fabric-secrets.yml" \
-    "in_box \"grep -qF '$TSIG_SECRET' /opt/fabric/config/fabric-secrets.yml && ! grep -qF '$TSIG_SECRET' /opt/fabric/config/vars.yaml /opt/fabric/config/fabric.yaml\""
+check "embedded secret kept exactly (in OpenBao), never in vars or fabric.yaml" \
+    "secrets_json | grep -qF '$TSIG_SECRET' && in_box \"! grep -qF '$TSIG_SECRET' /opt/fabric/config/vars.yaml /opt/fabric/config/fabric.yaml\""
 check "rfc2136.ini for the key: host IP, port 53, 0600" \
     "in_box \"grep -qx 'dns_rfc2136_server = $IP' /opt/npm/rfc2136.ini && grep -qx 'dns_rfc2136_port = 53' /opt/npm/rfc2136.ini && [ \\\$(stat -c %a /opt/npm/rfc2136.ini) = 600 ]\""
 
@@ -196,7 +217,7 @@ check "RFC2136 key still works after the re-runs (secret unchanged)" "grep -q '4
 echo "--- fabricctl tsig / acl on the running install"
 ACLF=/opt/bind9/config/named.conf.acl
 t2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test $1 '$2' $3" 2>&1 | tail -1; }   # key secret host
-secret_of() { in_box "python3 -c \"import yaml;print(yaml.safe_load(open('/opt/fabric/config/fabric-secrets.yml'))['tsig_secrets']['$1'])\""; }
+secret_of() { secrets_json | python3 -c "import json,sys; print(json.load(sys.stdin)['tsig_secrets']['$1'])"; }
 check "vars file: npm key is in ACL npm-updaters" \
     "in_box \"sed -n '/acl \\\"npm-updaters\\\"/,/};/p' $ACLF\" | grep -q 'key \"npm\"'"
 
@@ -276,9 +297,20 @@ check "apt remove removes the command but not the running install" \
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > /dev/null 2>&1
 check "reinstalling the package gives the command back" "in_box 'fabricctl status' | grep -qE '^fabric.target +active'"
 
+echo "--- reinstall keeps fabric's secrets (backup exports them, setup re-imports and shreds)"
+in_box 'fabricctl reinstall --yes --non-interactive' > "$OUT/reinstall.log" 2>&1
+check "reinstall completes" "grep -q 'fabric is ready' '$OUT/reinstall.log'"
+check "reinstall re-imported the exported secrets into OpenBao and left no plaintext file" \
+    "grep -q 'restored secrets file matched OpenBao; shredded' '$OUT/reinstall.log' && ! in_box 'test -e /opt/fabric/config/fabric-secrets.yml'"
+check "after the reinstall the npm TSIG key still works" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
+in_box 'fabricctl doctor' > "$OUT/doctor-reinstall.log" 2>&1
+check "after the reinstall doctor passes" "! grep -q '✗' '$OUT/doctor-reinstall.log' && grep -q '✓' '$OUT/doctor-reinstall.log'"
+
 cat > "$OUT/argv_check.py" <<'PY'
-import glob, yaml
-secrets = yaml.safe_load(open("/opt/fabric/config/fabric-secrets.yml"))
+import glob, sys
+sys.path.insert(0, "/opt/fabric/lib")
+from fabriclib.secrets.load_secrets import load_secrets
+secrets = load_secrets("/opt/fabric/config/fabric-secrets.yml")
 values = [v for v in secrets.values() if isinstance(v, str) and len(v) >= 12]
 leaks = set()
 for path in glob.glob("/proc/[0-9]*/cmdline"):

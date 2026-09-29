@@ -93,6 +93,15 @@ from fabriclib.vault.ensure_unseal_key import ensure_unseal_key  # noqa: E402
 from fabriclib.vault.init_openbao import init_openbao  # noqa: E402
 from fabriclib.vault.revoke_token import revoke_token  # noqa: E402
 from fabriclib.vault.vault_status import vault_status  # noqa: E402
+from fabriclib.secrets.common.write_vault_secrets import write_vault_secrets  # noqa: E402
+from fabriclib.secrets.export_secrets import export_secrets  # noqa: E402
+from fabriclib.secrets.import_secrets import import_secrets  # noqa: E402
+from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
+from fabriclib.secrets.save_secrets import save_secrets  # noqa: E402
+from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao  # noqa: E402
+
+SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
+os.makedirs(os.path.dirname(SECRETS), exist_ok=True)
 
 # ---------------------------------------------------------------- seal key
 check("seal key created", ensure_unseal_key(V) == "created")
@@ -151,6 +160,56 @@ check("status: unsealed, static seal, raft, KV v2 fabric/ + apps/, approle, key 
       s["initialized"] and not s["sealed"] and s["seal_type"] == "static" and s["storage"] == "raft"
       and {"fabric/", "apps/"} <= {m["path"] for m in s["mounts"] if m["version"] == "2"} and "approle/" in s["auth"]
       and s["key"]["ok"], s)
+# ---------------------------------------------------------------- fabric's secrets into OpenBao
+ORIGINAL = {"ca_password": "Ca-pw-1", "rndc_secret": "cm5kYy1zZWNyZXQ=", "ldap_device_admin_password": "Da1",
+            "tsig_secrets": {"npm": "bnBtLXNlY3JldA=="}}
+with open(SECRETS, "w") as f:
+    yaml.safe_dump(ORIGINAL, f)
+os.chmod(SECRETS, 0o600)
+check("before the import: secrets come from the 0600 file", load_secrets(SECRETS, V) == ORIGINAL
+      and not secrets_in_openbao(SECRETS))
+check("import: written, read back, identical", import_secrets(V, SECRETS, setup_token) == "imported")
+check("import: the plaintext file is gone and the marker says OpenBao holds them",
+      not os.path.exists(SECRETS) and secrets_in_openbao(SECRETS))
+check("after the import: the same secrets come from OpenBao", load_secrets(SECRETS, V) == ORIGINAL)
+v1 = vault_status(V)["secrets"]["version"]
+save_secrets({"tsig_secrets": {"nas": "bmFzLXNlY3JldA=="}}, SECRETS, V)
+after = load_secrets(SECRETS, V)
+check("save: a TSIG key added in OpenBao, others untouched, new version",
+      after["tsig_secrets"] == {"npm": "bnBtLXNlY3JldA==", "nas": "bmFzLXNlY3JldA=="} and after["ca_password"] == "Ca-pw-1"
+      and vault_status(V)["secrets"]["version"] == v1 + 1)
+save_secrets({"tsig_secrets": {"npm": None}}, SECRETS, V)
+check("save: a TSIG key removed", "npm" not in load_secrets(SECRETS, V)["tsig_secrets"])
+ver = vault_status(V)["secrets"]["version"]
+save_secrets({"ca_password": "Ca-pw-1"}, SECRETS, V)
+check("save without a change writes no new version", vault_status(V)["secrets"]["version"] == ver)
+try:
+    write_vault_secrets(V, {"x": "y"}, ver - 1, setup_token)
+    cas = False
+except ValidationError as exc:
+    cas = "check-and-set" in str(exc) or "cas" in str(exc).lower()
+check("a write based on a stale version is refused (check-and-set)", cas)
+check("no plaintext file was recreated by any of this", not os.path.exists(SECRETS))
+check("fabric-agent sees the version, never the values",
+      bao_request(V, "GET", "fabric/data/secrets", token=approle_login(V, "agent-approle.json"))[0] == 403
+      and vault_status(V)["secrets"]["version"] == ver)
+open(SECRETS, "w").close()
+try:
+    import_secrets(V, SECRETS, setup_token)
+    empty_refused = False
+except ValidationError as exc:
+    empty_refused = "empty" in str(exc)
+check("an empty secrets file is never imported over the real ones", empty_refused)
+os.remove(SECRETS)
+check("...and OpenBao still holds them", load_secrets(SECRETS, V)["ca_password"] == "Ca-pw-1")
+backup = export_secrets(SECRETS, f"{W}/backup/fabric-secrets.yml", V)
+check("export for a reinstall: root-only copy", oct(os.stat(backup).st_mode & 0o777) == "0o600"
+      and yaml.safe_load(open(backup))["ca_password"] == "Ca-pw-1")
+shutil.copy2(backup, SECRETS)
+check("a restored file is used while present", load_secrets(SECRETS, V)["ca_password"] == "Ca-pw-1")
+check("...and re-imported: equal to OpenBao, shredded", import_secrets(V, SECRETS, setup_token) == "unchanged"
+      and not os.path.exists(SECRETS))
+
 audit = open(f"{W}/openbao/logs/audit.log").read()
 check("audit log records requests with secrets HMAC'd", '"path":"fabric/data/probe"' in audit and '"v":"1"' not in audit)
 
@@ -164,6 +223,13 @@ s = vault_status(V)
 gone = health(120)
 check("without the key file it stays sealed and reports unhealthy", s.get("sealed") is not False and gone == "unhealthy",
       (s, gone))
+try:
+    locked = load_secrets(SECRETS, V)
+    locked_ok = False
+except ValidationError:
+    locked = None
+    locked_ok = True
+check("OpenBao locked: reading fabric's secrets fails loudly (never an empty set)", locked_ok, locked)
 os.rename(f"{W}/keys/away.key", f"{W}/keys/unseal.key")
 os.rename(f"{W}/keys/unseal.key", f"{W}/keys/held.key")
 try:

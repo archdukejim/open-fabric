@@ -8,6 +8,7 @@ from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.setup.detect_network import detect_network
+from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.upgrade_vars import upgrade_vars
 
@@ -114,16 +115,11 @@ def collect_vars(ctx):
     except ValidationError as e:
         raise SetupError(str(e)) from None
     if embedded:
-        secrets = _load(ctx.secrets_file)
-        secrets.setdefault("tsig_secrets", {}).update(embedded)
-        old = os.umask(0o077)
         try:
-            with open(ctx.secrets_file, "w") as f:
-                yaml.safe_dump(secrets, f, sort_keys=False)
-        finally:
-            os.umask(old)
-        os.chmod(ctx.secrets_file, 0o600)
-        ok(f"TSIG secrets for {', '.join(sorted(embedded))} stored in {ctx.secrets_file}")
+            save_secrets({"tsig_secrets": embedded}, ctx.secrets_file)
+        except ValidationError as e:
+            raise SetupError(str(e)) from None
+        ok(f"TSIG secrets for {', '.join(sorted(embedded))} stored with fabric's secrets")
     path = os.path.join(ctx.config_dir, "fabric.yaml")
     with open(path, "w") as f:
         yaml.safe_dump(data, f, sort_keys=False)

@@ -75,7 +75,7 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   └── log             # Persistent: BIND9 log directory
 ├── fabric              # Managed/Persistent mix
 │   ├── archive         # Persistent: Automated snapshots and audit logs
-│   ├── fabric-secrets.yml # Persistent: Safely preserved secrets for TLS and DNS
+│   ├── secrets.openbao    # Marker: fabric's secrets are in OpenBao (fabric/secrets); fabric-secrets.yml exists only until the vault step
 │   ├── lib/            # Managed: Utility library with python engines and bash wrappers
 │   │   ├── deploy.py   # Managed: Python rendering and state-aware deployment engine
 │   │   ├── interactive.py # Managed: Python interactive categorical CLI engine
@@ -224,7 +224,7 @@ BIND9 runs as an **authoritative-only** server (recursion disabled). It serves:
 - Internal forward zones defined in the `dns:` block of `custom-vars.yaml` (`dynamic_zone_var` key resolved to `domain` at render time)
 - Each zone with `zone_authority: true` gets an NS A record pointing to `host_ip`
 - Reverse zones (PTR) generated at apply from A and AAAA records by `fabriclib/dns/reverse_zones.py`. There is one `/24` `in-addr.arpa` zone per IPv4 subnet and one `/64` `ip6.arpa` zone per ULA prefix, with one PTR per address. Only private addresses (RFC 1918, 100.64/10, ULA) get one; zones written by hand in `dns:` are left alone. See [operations.md](operations.md#reverse-dns)
-- RFC2136 updates, deny-by-default: per key `records` → only `_acme-challenge.<record>.<zone>`; `primary` → `subdomain _acme-challenge`; explicit `any_name` → `zonesub`; plus the grants of any ACL policy (`bind_acl_policies`) the key is a member of. Keys and secrets live in vars + `fabric-secrets.yml` (managed with `fabricctl tsig`)
+- RFC2136 updates, deny-by-default: per key `records` → only `_acme-challenge.<record>.<zone>`; `primary` → `subdomain _acme-challenge`; explicit `any_name` → `zonesub`; plus the grants of any ACL policy (`bind_acl_policies`) the key is a member of. Keys live in vars, their secrets with fabric's secrets in OpenBao (managed with `fabricctl tsig`)
 
 nginx fronts BIND9 on all public DNS ports:
 

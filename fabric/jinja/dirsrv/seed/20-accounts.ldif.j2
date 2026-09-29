@@ -1,4 +1,4 @@
-# Role and service accounts. Passwords come from fabric-secrets.yml and are
+# Role and service accounts. Passwords come from fabric's secrets (OpenBao) and are
 # re-applied on every deploy, so rotating a secret there rotates it here.
 {% set accounts = [
   ('super_admin', 'Directory super administrator', ldap_super_admin_password),

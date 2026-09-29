@@ -10,6 +10,8 @@
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
+  fabricctl secrets list|show <name>
+                                 fabric's own secrets (in OpenBao); `show` is audited
   fabricctl client-cert <user> [--days N]
                                  web UI client certificate (.p12) into ~/fabric-admin
   fabricctl uninstall [--yes]    remove fabric from this host
@@ -25,6 +27,7 @@ sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
+from fabriclib.secrets.run_secrets_command import run_secrets_command  # noqa: E402
 from fabriclib.pki.mint_extra_cert import mint_extra_cert  # noqa: E402
 from fabriclib.setup import run_setup  # noqa: E402
 from fabriclib.setup.backup_install import backup_install  # noqa: E402
@@ -55,6 +58,8 @@ def main(argv):
         return run_setup.main(args)
     if cmd == "doctor":
         return run_setup.main(["--doctor", *args])
+    if cmd == "secrets":
+        return run_secrets_command(args, SetupContext(deploy_base=_base(args)).secrets_file)
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":

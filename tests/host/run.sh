@@ -101,8 +101,10 @@ R 'fabricctl doctor' > "$OUT/doctor2.log" 2>&1
 check "fabricctl start: back, doctor passes" "! grep -q '✗' '$OUT/doctor2.log' && grep -q '✓' '$OUT/doctor2.log'"
 
 cat > "$OUT/argv_check.py" <<'PY'
-import glob, yaml
-secrets = yaml.safe_load(open("/opt/fabric/config/fabric-secrets.yml"))
+import glob, sys
+sys.path.insert(0, "/opt/fabric/lib")
+from fabriclib.secrets.load_secrets import load_secrets   # the file, or OpenBao once imported
+secrets = load_secrets("/opt/fabric/config/fabric-secrets.yml")
 leaks = set()
 for path in glob.glob("/proc/[0-9]*/cmdline"):
     try:

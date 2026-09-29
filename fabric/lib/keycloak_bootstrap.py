@@ -26,6 +26,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from webui.tlsclient import TLSClient  # noqa: E402
+from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
 
 CLIENT_ID = "fabric-webui"
 MFA_FLOW = "fabric-webui-mfa"
@@ -271,8 +272,7 @@ def main():
     args = ap.parse_args()
     with open(args.vars) as f:
         v = yaml.safe_load(f)
-    with open(args.secrets) as f:
-        s = yaml.safe_load(f)
+    s = load_secrets(args.secrets, v)      # the file, or OpenBao once imported
 
     ca = os.path.join(v["deploy_base_dir"], "stepca/data/certs/root_ca.crt")
     kc = Admin(TLSClient(v["ip_keycloak"], 8443, v["hostname_keycloak"], ca),

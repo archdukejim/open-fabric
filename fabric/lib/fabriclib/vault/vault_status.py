@@ -46,6 +46,10 @@ def vault_status(v):
                                     for k, m in (mounts.get("data") or mounts).items() if isinstance(m, dict)),
                                    key=lambda m: m["path"])
             out["auth"] = sorted(k for k, m in (auth.get("data") or auth).items() if isinstance(m, dict))
+            st, meta = bao_request(v, "GET", "fabric/metadata/secrets", token=token)
+            if st == 200:
+                d = meta.get("data") or {}
+                out["secrets"] = {"version": d.get("current_version"), "updated": (d.get("updated_time") or "")[:19]}
         except ValidationError as exc:
             out["error"] = str(exc)
     return out

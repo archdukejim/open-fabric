@@ -26,7 +26,7 @@
 | `mint_extra_certs.py` | `extra_certs` entries, when missing or due (part of the `certs` step) |
 | `start_services.py` | Start the stack in order; seed 389-DS; configure Keycloak; fabric-agent + web UI |
 | `start_unit.py` | Enable, start or restart one unit and wait until its container is healthy |
-| `setup_openbao.py` | `vault` step: seal key, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration |
+| `setup_openbao.py` | `vault` step: seal key, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration, move fabric's secrets file into OpenBao |
 | `create_admin.py` | First web UI admin: LDAP user in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
 | `verify_install.py` | End-to-end checks (DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |

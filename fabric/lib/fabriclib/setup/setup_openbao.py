@@ -3,6 +3,7 @@ import os
 from fabriclib.common.console import info, ok, warn
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.sudo_owner import sudo_owner
+from fabriclib.secrets.import_secrets import import_secrets
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.start_unit import start_unit
 from fabriclib.vault.common.approle_login import approle_login
@@ -76,6 +77,11 @@ def run(ctx):
                 raise SetupError("the initial root token could not be revoked")
             os.remove(bootstrap)
             ok("initial root token revoked (a new one needs the recovery keys)")
+        moved = import_secrets(v, ctx.secrets_file, approle_login(v, SETUP_CREDS))
+        if moved == "imported":
+            ok("fabric's secrets moved into OpenBao (fabric/secrets); the plaintext file was verified and shredded")
+        elif moved == "unchanged":
+            ok("restored secrets file matched OpenBao; shredded")
         status = vault_status(v)
     except ValidationError as exc:
         raise SetupError(f"OpenBao: {exc}")

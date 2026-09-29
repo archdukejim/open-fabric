@@ -3,10 +3,8 @@ import os
 import subprocess
 import textwrap
 
-import yaml
-
 from fabriclib.common.errors import ValidationError
-from fabriclib.common.paths import SECRETS_FILE
+from fabriclib.secrets.load_secrets import load_secrets
 
 # Runs inside the dirsrv container (python3-ldap), bound over LDAPI as the
 # least-privilege cn=device_admin — never Directory Manager — so the
@@ -54,11 +52,7 @@ def run_dirsrv(v, snippet, payload=None):
     `Refused`, `DEV`, `ROLES`, `USERS`, `GROUPS`) in the dirsrv container
     as cn=device_admin. Returns what the snippet passed to out(); a
     Refused(...) or LDAP refusal becomes a ValidationError."""
-    try:
-        with open(SECRETS_FILE) as f:
-            password = (yaml.safe_load(f) or {}).get("ldap_device_admin_password")
-    except FileNotFoundError:
-        password = None
+    password = load_secrets().get("ldap_device_admin_password")
     if not password:
         raise ValidationError("ldap_device_admin_password is missing: re-run `sudo fabricctl setup`")
     script = _PRELUDE + "try:\n" + textwrap.indent(textwrap.dedent(snippet), "    ") + _EPILOGUE

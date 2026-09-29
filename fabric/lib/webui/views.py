@@ -354,7 +354,8 @@ _TEMPLATES = {
 <dl class="kv">
 {% if s.reachable %}<dt>Version</dt><dd>OpenBao {{ s.version }}</dd>
 <dt>Seal</dt><dd>{{ s.seal_type }}{% if s.seal_type == 'static' %} — unlocked at start by one of its <a href="/openbao?view=unlock">unlock methods</a>{% endif %}</dd>
-<dt>Storage</dt><dd>{{ s.storage }}</dd>{% endif %}
+<dt>Storage</dt><dd>{{ s.storage }}</dd>
+<dt>fabric's secrets</dt><dd>{% if s.secrets %}in OpenBao — <code class="small">fabric/secrets</code>, version {{ s.secrets.version }}, updated {{ s.secrets.updated }}{% else %}<span class="warn-text">still in a file on disk</span> — moved in by the next <code>fabricctl setup</code>{% endif %}</dd>{% endif %}
 <dt>Address</dt><dd><a href="{{ s.url }}ui/">{{ s.url }}</a> <span class="muted">(OpenBao's own UI and API)</span></dd>
 </dl></section>
 {% if s.mounts %}

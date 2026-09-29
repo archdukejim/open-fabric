@@ -655,7 +655,7 @@ Toggle features and control system-level UNIX isolation mapping.
 | `webui_session_idle` | `900` | Session idle timeout (seconds) |
 | `webui_session_max` | `28800` | Absolute session lifetime (seconds) |
 
-`webui_realm`, `webui_admin_role` and `webui_admin_group` are rendered into `vars.yaml`; the session timeouts are read only by `webui/webui.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `webui_oidc_secret` is generated into `fabric-secrets.yml`.
+`webui_realm`, `webui_admin_role` and `webui_admin_group` are rendered into `vars.yaml`; the session timeouts are read only by `webui/webui.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `webui_oidc_secret` is generated with fabric's secrets (OpenBao).
 
 ### `service_users`
 **Description:** Dictionary mapping container names to UID/GID objects for setting permissions.
@@ -765,7 +765,7 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 | `dirsrv_errorlog_level` | `8192` | `dirsrv/docker-compose.yml.j2` |
 
 ### Role Accounts
-Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated into `fabric-secrets.yml` (there is no shared default password):
+Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated with fabric's secrets (OpenBao; `fabricctl secrets show <name>`; there is no shared default password):
 
 | Account | Secret |
 |---------|--------|

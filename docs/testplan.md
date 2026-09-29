@@ -47,7 +47,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Expected**: Configuration templates are re-rendered and only affected services are restarted or reloaded.
 
 ### 3.4 LDAP (389 Directory Server)
-- [ ] **Action**: `LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,ou=accounts,<base_dn>" -W` (password: `ldap_super_admin_password` from `fabric-secrets.yml`).
+- [ ] **Action**: `LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,ou=accounts,<base_dn>" -W` (password: `sudo fabricctl secrets show ldap_super_admin_password`).
 - [ ] **Expected**: Bind succeeds on 636, and on 389 with `-ZZ`; the same bind on 389 **without** `-ZZ` is refused.
 - [ ] **Action**: Anonymous `ldapsearch -ZZ -H ldap://ldap.<domain> -x -b <base_dn> "(uid=*)" uid uidNumber userPassword`.
 - [ ] **Expected**: POSIX attributes are returned; `userPassword` is never returned.
@@ -80,4 +80,4 @@ This document outlines the testing strategy for an AI agent to execute, validate
 
 ### 3.7 RFC2136 with an existing TSIG key
 - [ ] **Action**: give `tsig_keys: [{name: npm, records: [npm], secret: <existing>}]` in the vars; after setup, point nginx-proxy-manager (certbot `rfc2136`) at `host_ip:53` with that key (automated: `tests/sandbox/rfc2136_test.sh`).
-- [ ] **Expected**: the certificate is issued; `nsupdate` with the key sets `_acme-challenge.npm.<domain>` TXT; other names and wrong secrets are refused; the secret is only in `fabric-secrets.yml`; a setup re-run keeps it.
+- [ ] **Expected**: the certificate is issued; `nsupdate` with the key sets `_acme-challenge.npm.<domain>` TXT; other names and wrong secrets are refused; the secret is only in fabric's secrets (`fabricctl secrets show tsig/npm`); a setup re-run keeps it.

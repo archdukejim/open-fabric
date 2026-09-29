@@ -41,7 +41,7 @@ Settings are read in this order, later wins:
 2. `--file <vars.yaml>`, or, on a fresh install only, `custom-vars.yaml` in the checkout
 3. answers to prompts
 
-The merged result is saved as `/opt/fabric/config/fabric.yaml`. Secrets (CA password, TSIG secrets, Directory Manager and per-role LDAP passwords, Keycloak credentials, the web UI's OIDC client secret) are generated on the first run into `/opt/fabric/config/fabric-secrets.yml` (`0600`) and kept on every re-run. They never appear on a command line.
+The merged result is saved as `/opt/fabric/config/fabric.yaml`. Secrets (CA password, TSIG secrets, Directory Manager and per-role LDAP passwords, Keycloak credentials, the web UI's OIDC client secret) are generated on the first run into `/opt/fabric/config/fabric-secrets.yml` (`0600`); the `vault` step then moves them into OpenBao (`fabric/secrets`) and shreds the file. They are kept on every re-run and never appear on a command line. Read one with `sudo fabricctl secrets show <name>`.
 
 Minimum `custom-vars.yaml`:
 
@@ -222,7 +222,7 @@ systemctl status webui           # one service (units: bind9 stepca nginx ldap p
 
 The install lives under `/opt` (or `--deploy-base`):
 
-*   `/opt/fabric/`: Contains `config/` (`fabric.yaml` — your settings, `vars.yaml` — the fully rendered variables, `fabric-secrets.yml`, `link-vars.yaml`), the deployed `lib/` and the `fabricctl` entry point (`/usr/local/bin/fabricctl`).
+*   `/opt/fabric/`: Contains `config/` (`fabric.yaml` — your settings, `vars.yaml` — the fully rendered variables, `secrets.openbao` — the marker saying fabric's secrets are in OpenBao, `link-vars.yaml`), the deployed `lib/` and the `fabricctl` entry point (`/usr/local/bin/fabricctl`).
 *   `/opt/bind9/`: Core DNS service. Contains `config/` (`named.conf.*`), `data/` (`db.<zone>` zone data and journals), `log/`, `cache/` and `ssl/` (DoT certificate).
 *   `/opt/nginx/`: Core reverse proxy. Contains `config/` (`nginx.conf`), `www/` (HTML documentation, scripts, portal assets) and `certs/` (service certificates, `client-ca/` bundle for the web UI).
 *   `/opt/stepca/`: Core PKI. Contains `data/` (Internal DB, CA keys in `secrets/`, public CA certs in `certs/`) and `templates/`.
@@ -241,7 +241,7 @@ fabric has no in-place upgrade from pre-fabric (core-template) installs: rebuild
 
 - **DNS records and zone:** copy the `domain` and the `dns:` block into your vars file.
 - **TSIG keys** (RFC2136 clients such as nginx-proxy-manager): add each key to `tsig_keys` with its existing `secret` — see [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates). Clients keep their configuration.
-- **Root CA:** bring your root and intermediate (with its key) as [BYOC](#generate-pki-optional-before-install), so every client that trusts the old root trusts the new host. Step-CA reads the intermediate key with `ca_password` from `/opt/fabric/config/fabric-secrets.yml`: if your key is encrypted, create that file (`0600`) with `ca_password: <the old CA password>` before running setup.
+- **Root CA:** bring your root and intermediate (with its key) as [BYOC](#generate-pki-optional-before-install), so every client that trusts the old root trusts the new host. Step-CA reads the intermediate key with `ca_password` from `/opt/fabric/config/fabric-secrets.yml`: if your key is encrypted, create that file (`0600`) with `ca_password: <the old CA password>` before the **first** setup (it is then moved into OpenBao with the others).
 
 LDAP and Keycloak start empty; setup creates the first admin.
 

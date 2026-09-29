@@ -18,6 +18,9 @@ def run_vault_command(v, argv):
     print(f"seal key: {s['key']['path']} — {s['key']['detail']}")
     for m in s.get("mounts", []):
         print(f"  {m['path']:<12} {m['type']}{' v' + m['version'] if m['version'] else ''}  {m['description']}")
+    if s.get("secrets"):
+        print(f"fabric's secrets: in OpenBao (fabric/secrets, version {s['secrets']['version']}, "
+              f"updated {s['secrets']['updated']})")
     if s.get("auth"):
         print(f"  auth: {', '.join(s['auth'])}")
     if s.get("error"):

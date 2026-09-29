@@ -9,7 +9,7 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 *   **Host IP**: Ensure `host_ip` is correctly set in `custom-vars.yaml`. Mismatched IPs will cause Nginx (and other containers) to fail when binding ports.
 
 ### Secrets and Credentials
-*   **Locating Passwords**: All generated credentials are safely stored on the target machine in `/opt/fabric/config/fabric-secrets.yml`. You can view them by running `cat /opt/fabric/config/fabric-secrets.yml`.
+*   **Locating Passwords**: All generated credentials are fabric's secrets, kept in OpenBao (`fabric/secrets`) once setup has finished. List them with `sudo fabricctl secrets list` and print one with `sudo fabricctl secrets show keycloak_admin_password` (every read is audited).
 *   **LDAP Service Account**: Keycloak uses a dedicated, isolated service account password (`ldap_keycloak_password`) generated automatically by the installer. Every other LDAP role account also has its own generated password (`ldap_super_admin_password`, `ldap_group_admin_password`, `ldap_user_creator_password`, `ldap_user_modifier_password`); there is no shared default password.
 *   **webui Client Secret**: `webui_oidc_secret` is the client secret of the `fabric-webui` OIDC client.
 *   **Keycloak Admin**: The admin credentials (`keycloak_admin_user`, `keycloak_admin_password`) and the PostgreSQL database password (`keycloak_db_password`) are also generated automatically by the installer.
@@ -35,7 +35,7 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 ## Phase 3: LDAP Federation Configuration
 
 ### Automated Configuration (`keycloak_bootstrap.py`)
-The `start` setup step (and `fabricctl --keycloak-sync`) runs `fabric/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from `fabric-secrets.yml` — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
+The `start` setup step (and `fabricctl --keycloak-sync`) runs `fabric/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from fabric's secrets (OpenBao) — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
 
 ```bash
 sudo fabricctl --keycloak-sync

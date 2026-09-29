@@ -5,6 +5,7 @@ import sys
 import yaml
 
 from fabriclib.common.console import ok
+from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
 from fabriclib.common.paths import LIB_DIR
 
 CLI_WRAPPER = """#!/bin/bash
@@ -44,10 +45,12 @@ def run(ctx):
     with open(fabric_yaml, "w") as f:           # persist plan choices made after collect_vars
         yaml.safe_dump(ctx.vars, f, sort_keys=False)
 
-    # Secrets are created in the install, never in a git checkout.
-    if not os.path.exists(ctx.secrets_file):
-        open(ctx.secrets_file, "a").close()
-    os.chmod(ctx.secrets_file, 0o600)
+    # Secrets are created in the install, never in a git checkout. Once they
+    # live in OpenBao no file is created: an empty one would read as "none".
+    if not secrets_in_openbao(ctx.secrets_file):
+        if not os.path.exists(ctx.secrets_file):
+            open(ctx.secrets_file, "a").close()
+        os.chmod(ctx.secrets_file, 0o600)
 
     os.environ.update({
         "DEPLOY_BASE_DIR": ctx.deploy_base,

@@ -3,6 +3,8 @@ import subprocess
 import time
 
 from fabriclib.common.console import ok
+from fabriclib.secrets.export_secrets import export_secrets
+from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
 
 KEEP = ["fabric/config", "stepca/data", "nginx/certs", "bind9/ssl", "keycloak/certs", "postgres/certs",
         "dirsrv/data/tls", "openbao/data", "openbao/certs"]
@@ -23,6 +25,10 @@ def backup_install(ctx):
             parent = os.path.join(dest, os.path.dirname(rel))
             os.makedirs(parent, exist_ok=True)
             subprocess.run(["cp", "-a", src, parent], check=True)
+    if secrets_in_openbao(ctx.secrets_file):
+        # The reinstall starts before OpenBao runs; setup reads this copy,
+        # and its vault step re-imports it into OpenBao and shreds it.
+        export_secrets(ctx.secrets_file, os.path.join(dest, "fabric", "config", "fabric-secrets.yml"))
     key_dir = ctx.load_state().vars.get("openbao_key_dir")
     if key_dir and os.path.isdir(key_dir):
         parent = os.path.join(dest, ROOT_DIR, os.path.dirname(key_dir).lstrip("/"))

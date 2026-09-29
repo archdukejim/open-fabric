@@ -21,5 +21,6 @@ path "fabric/*"            { capabilities = ["create", "read", "update", "delete
 path "sys/mounts" { capabilities = ["read"] }
 path "sys/auth"   { capabilities = ["read"] }
 path "apps/metadata/*" { capabilities = ["list"] }
+path "fabric/metadata/secrets" { capabilities = ["read"] }
 """,
 }
