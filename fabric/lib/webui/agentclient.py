@@ -143,6 +143,10 @@ def delete_tsig_key(actor, name):
     return _call("POST", f"/v1/tsig/{_q(name)}/delete", {"actor": actor})
 
 
+def vault_status():
+    return _call("GET", "/v1/vault")
+
+
 def device_overview():
     return _call("GET", "/v1/devices")
 

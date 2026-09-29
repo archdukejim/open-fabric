@@ -74,7 +74,7 @@ Default plan (each item is a setting under `security:` / `updates:` /
 | Docker daemon | Hardened `daemon.json` (`no-new-privileges`, `icc: false`, `userland-proxy: false`, `live-restore`) | Stock daemon config |
 | userns-remap | **On** (container root → unprivileged host uid; fabricctl shifts bind-mount ownership) | Off |
 | Rootless Docker | Off | On, with stated limits: Kea DHCP unavailable, DNS/RADIUS source-IP ACLs need the slower slirp4netns/pasta port driver |
-| OpenBao unseal | Local key file | USB kill switch, Thales k160 (KMIP), PKCS#11 token, or manual Shamir |
+| OpenBao unseal | Local key file | USB kill switch, any KMIP key manager, any PKCS#11 HSM, or manual Shamir |
 | Image updates | On: signed stable channel, weekly, health-checked with rollback | Off, candidate channel, or offline-only |
 | Web UI access | mTLS + Keycloak OIDC + TOTP | TOTP optional |
 
@@ -372,6 +372,15 @@ everything else.
 
 ## 7c. Secrets: OpenBao
 
+> **Status (iteration 1, built):** container, Raft, TLS, `vault.<domain>`,
+> static-seal auto-unseal from `/etc/fabric/openbao/unseal.key`, one-time
+> init (recovery keys to `~/fabric-admin`), root token revoked, AppRoles
+> `fabric-setup` / `fabric-agent` bound to fabric_net, KV v2 `fabric/` and
+> `apps/`, declarative audit log, `fabricctl vault status`, web UI status tab,
+> doctor checks, backup/reinstall. **Not yet:** importing `fabric-secrets.yml`,
+> Keycloak OIDC for people, rotated credentials, SSH CA, USB / KMIP /
+> PKCS#11 seals (next, in that order), the web UI's secrets browser.
+
 **OpenBao** (MPL-2.0, Linux Foundation fork of Vault; Vault-compatible API,
 CLI and clients) rather than HashiCorp Vault, whose BSL licence is not open
 source. Multi-arch images; ~150 MB at 4 GB (fits the §7a budget).
@@ -387,48 +396,71 @@ source. Multi-arch images; ~150 MB at 4 GB (fits the §7a budget).
   whoever holds the SD card (or USB stick) holds the vault. Recovery shares
   and the initial root token are shown once at `init`; the root token is
   revoked after bootstrap.
-- **Seal modes and commands** (all native to OpenBao ≥ 2.3; switching modes
-  is an OpenBao *seal migration*: the old seal is kept with
-  `disabled = "true"`, OpenBao restarts, and `bao operator unseal -migrate`
-  runs with the **recovery keys** shown at `init` — `fabricctl` walks
-  through it and refuses to start without them):
+- **Unlock methods = key slots (decided, D17).** OpenBao keeps one seal:
+  the built-in `static` seal with one 32-byte key **K**. fabric decides how
+  K reaches it, the way LUKS does for disks: K is stored *wrapped* in one or
+  more **slots**, and **any one enabled slot unlocks** (a later option can
+  require several together: k-of-n across slots).
 
-  | Mode | Command | Unseal source | At boot |
+  | Slot | K is… | Present when | Tested against |
   |---|---|---|---|
-  | Local file (default) | — | `static` seal, key in `/etc/fabric/openbao/unseal.key` | Automatic |
-  | **USB kill switch** | `fabricctl vault key-to-usb /dev/sdX [--backup /dev/sdY]` | `static` seal, key only on a USB stick (label `FABRIC-KEY`) | Automatic if the stick is present, sealed if not |
-  | **Thales CipherTrust k160** (or any KMIP server) | `fabricctl vault seal-kmip --endpoint k160.lan:5696 --ca … --client-cert … --client-key … --key-id …` | `kmip` seal — the root key is wrapped by a key that never leaves the k160 (FIPS 140-2 token) | Automatic while the k160 is reachable and authorises this client |
-  | PKCS#11 token (SafeNet eToken, YubiHSM 2, Nitrokey HSM) | `fabricctl vault seal-pkcs11 --lib … --token-label … --key-label …` | `pkcs11` seal via the vendor library (built into a thin local image layer) | Automatic while the token is plugged in |
+  | Local file | in `/etc/fabric/openbao/` (openbao user, 0400) | always (no kill switch while this slot exists) | real image |
+  | USB stick (one slot per stick) | on the stick; the stick is recognised by filesystem UUID + USB serial and unknown sticks are refused | the stick is plugged into the host | loop device |
+  | Security key (PKCS#11: YubiKey, Nitrokey, SmartCard-HSM, …) | encrypted by a non-exportable key inside the token (AES-GCM or RSA-OAEP); PIN root-only on the host; optional touch | the token is plugged in | SoftHSM2 |
+  | HSM / key manager (KMIP: CipherTrust, Fortanix, Entrust, IBM, Cosmian, OVH, …) | encrypted by an active AES key on the device, over mutual TLS | the device is reachable and authorises this client | PyKMIP |
 
-  Every mode can move to every other (`fabricctl vault seal-usb`,
-  `seal-local`, `seal-kmip`, `seal-pkcs11`).
+  Keypad-encrypted USB drives (Apricorn, IronKey, iStorage, …) are USB
+  stick slots: unlocked by PIN on the drive, then read like any stick.
+  Examples of devices are not a support list: fabric supports interfaces
+  (plain storage, PKCS#11, KMIP). Vendor specifics (licensing, login rules,
+  enabled algorithms) are the device's; the UI says which simulator a slot
+  type was tested against.
 
-- **USB kill switch details:**
-  - `key-to-usb` writes a fresh 32-byte key (with key id + checksum) to the
-    stick, verifies it, rotates OpenBao onto it (static seal supports
-    `previous_key` → `current_key` rotation), then **shreds** the on-disk
-    copy. `--backup` writes the same key to a second stick for the safe.
-  - A udev rule + systemd units: **insert** → mount read-only at
-    `/run/fabric/key` (tmpfs mount point, never under `/opt`) and start/
-    unseal OpenBao; **remove** → `bao operator seal` immediately (the root
-    key is wiped from memory) and unmount. Pulling the stick is the kill
-    switch; the data on the SD card stays encrypted and useless without it.
-  - The container mounts the key directory with `rslave` propagation, so a
-    stick inserted after start is visible without recreating the container.
-  - Limits, stated in the command's output: someone holding both the Pi and
-    the stick can unseal; a stick left in the Pi is the same as the local
-    file mode.
+  - **fabric-unlock** (host unit, before `openbao`; re-run by udev on
+    insert): tries every slot, writes K to `/run/fabric/key/unseal.key`
+    (tmpfs, openbao user, 0400). OpenBao's static seal reads it and
+    unseals; the file is then wiped. No slot present → OpenBao stays sealed
+    (unhealthy) while every core service keeps running. Last slot device
+    removed → `bao operator seal` immediately (kill switch), unless a
+    local-file slot exists, which the UI states.
+  - **HSM work happens on the host**, not in the OpenBao container: no
+    vendor libraries, plugins or device passthrough in the container, which
+    stays capability-free and read-only (and the Alpine/musl vs glibc
+    vendor-library problem disappears).
+  - **Trade-off, stated in the docs:** unlike OpenBao's native HSM seals,
+    K exists briefly in host RAM while unsealing. Root on the running host
+    could take it, and could equally read the unsealed vault from memory.
+  - **Web UI** (OpenBao tab → Unlock methods) and `fabricctl vault slot …`:
+    list slots (type, label, device id, added, Test); **add** a slot (only
+    while unlocked); **remove** (never the last one); **rotate K** (new key,
+    re-wrapped into every remaining slot, OpenBao moved over with the static
+    seal's `previous_key` → `current_key` rotation). Rotation is the answer
+    to a lost stick or token: its slot stops working without being needed.
+    Every change is audited and needs the host name typed as confirmation.
+  - With auto-unseal, OpenBao's recovery keys cannot decrypt the vault:
+    losing every slot loses the data. The UI warns while only one
+    removable slot exists and recommends a second (a backup stick in the
+    safe, or a second token with the same imported key).
+  - Security keys: K is imported into (or wrapped by) the token's key.
+    Tokens that allow import (YubiKey PIV/OpenPGP, SmartCard-HSM) can hold
+    the same key in two tokens; otherwise the backup is another slot type.
+  - Cloud KMS (AWS/Azure/GCP) would be another slot type, but it needs the
+    internet to unseal (against the offline requirement): not offered
+    unless asked for.
+  - Build order: slot store + fabric-unlock + local-file slot (replacing
+    today's direct key file), USB stick slots, security keys, KMIP.
 
-- **Thales CipherTrust k160 details:**
-  - The k160 is a network appliance (KMIP on TCP 5696, mutual TLS).
-    `seal-kmip` needs: endpoint, the k160's CA, a KMIP client certificate
-    registered on the k160 (the command can issue one from fabric's Step-CA
-    for upload, or use one issued by the k160), and the id of an AES-256
-    key with encrypt/decrypt usage (or `--create-key`).
-  - It test-wraps and unwraps a value through the k160 before migrating, so
-    a misconfiguration never leaves OpenBao unsealable.
-  - Revoking the client on the k160 is the "official" kill switch: at the
-    next restart OpenBao stays sealed. Core services keep running (below).
+- **USB stick slots — details:**
+  - The stick is plugged into the fabric host. The UI lists removable USB
+    block devices; the admin picks one and types the host name to confirm
+    (it is wiped). fabric writes K (key id + checksum), verifies it, records
+    the stick's UUID and serial, and tests the slot.
+  - Mounted read-only at `/run/fabric/key-usb/<uuid>` only while
+    fabric-unlock reads it (tmpfs mount point, never under `/opt`).
+  - Limits, stated in the UI: a plain stick can be copied by anyone who
+    holds it for a moment (rotate if one goes missing); someone holding
+    the host and a slot device together can unseal; a stick left in the
+    host is the same as the local file.
 
 - **Boot independence:** no core service (DNS, DHCP, LDAP, SSO, nginx) reads
   OpenBao to *start*. fabricctl renders secrets into each service's config at
@@ -484,13 +516,13 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabricd`, `fabric-admins` group, no docker group) and the Fabric UI container; one repo, two artifacts (§1a) |
 | D15 ✅ | Setup UX | Default change list → Proceed / Advanced; everything settable in `vars.yaml`; `--non-interactive` (§1b) |
 | D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
+| D17 ✅ | How OpenBao is unlocked | Key slots (local file, USB sticks, PKCS#11 security keys, KMIP HSMs); any one enabled slot unlocks; handled on the host by fabric-unlock; vendor-neutral (§7c) |
 | D16 ✅ | Where Kea registers DHCP hostnames | A separate dynamic subzone per DHCP scope (`dhcp.<domain>`, per-VLAN subzones with 802.1X); never the rendered zones (§5) |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 
 ## References
 
 - OpenBao, [seal types](https://openbao.org/docs/configuration/seal/), [static seal](https://openbao.org/docs/configuration/seal/static/), [KMIP seal](https://openbao.org/docs/configuration/seal/kmip/), [PKCS#11 seal](https://openbao.org/docs/configuration/seal/pkcs11/), [2.3.x release notes](https://openbao.org/community/release-notes/2-3-0/)
-- Thales, [CipherTrust k160](https://www.thalestct.com/ciphertrust-data-security-platform/ciphertrust-manager/ciphertrust-k160/)
 - ISC, [Kea 3.0, our first LTS version](https://www.isc.org/blogs/kea-3-0/)
 - ISC, [Most Kea hooks open-sourced](https://www.isc.org/blogs/kea-hooks-opensourced/)
 - ISC KB, [Upgrading to Kea 3.0.0](https://kb.isc.org/docs/things-to-be-aware-of-when-upgrading-to-kea-300)

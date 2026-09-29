@@ -20,8 +20,6 @@ PLACEHOLDERS = {
     "kea": ("Kea DHCP", "Subnets and pools, reservations, active leases, and DHCP-driven DNS updates into BIND9."),
     "freeradius": ("FreeRADIUS 802.1X", "Network access: EAP-TLS device certificates, MAC authentication, "
                                        "VLAN assignment, switches and access points (NAS clients)."),
-    "openbao": ("OpenBao", "Seal status and unseal methods (key file, USB key, KMIP, PKCS#11), secrets engines, "
-                           "fabric's own secrets, dynamic credentials and the SSH certificate authority."),
 }
 # BIND9 tab sections: (view, label)
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
@@ -331,6 +329,32 @@ _TEMPLATES = {
 </fieldset>
 {% endmacro %}""",
 
+    "openbao": """{% extends "base" %}{% block body %}
+<h1>OpenBao · Secrets</h1>
+{% set light = 'bad' if not s.reachable or s.sealed or not s.initialized else ('warn' if not s.key.ok else 'ok') %}
+<section class="card"><h2><span class="light {{ light }}"></span>
+{% if not s.reachable %}Unreachable{% elif not s.initialized %}Not initialised{% elif s.sealed %}Sealed{% else %}Unsealed{% endif %}</h2>
+{% if s.error %}<p class="flash bad">{{ s.error }}</p>{% endif %}
+<dl class="kv">
+{% if s.reachable %}<dt>Version</dt><dd>OpenBao {{ s.version }}</dd>
+<dt>Seal</dt><dd>{{ s.seal_type }}{% if s.seal_type == 'static' %} — unseals itself from a key file at start{% endif %}</dd>
+<dt>Storage</dt><dd>{{ s.storage }}</dd>{% endif %}
+<dt>Seal key</dt><dd><code class="small">{{ s.key.path }}</code> <span class="{{ '' if s.key.ok else 'bad-text' }}">— {{ s.key.detail }}</span></dd>
+<dt>Address</dt><dd><a href="{{ s.url }}ui/">{{ s.url }}</a> <span class="muted">(OpenBao's own UI and API)</span></dd>
+</dl>
+<p class="muted">Whoever holds this host's disk and the seal key holds the vault. Back up the key with the data; keep the recovery keys offline. Moving the key to a USB stick, a KMIP appliance or a PKCS#11 token comes later.</p>
+</section>
+{% if s.mounts %}
+<section class="card"><h2>Secret engines</h2>
+<table><thead><tr><th>Path</th><th>Type</th><th>What for</th></tr></thead><tbody>
+{% for m in s.mounts %}<tr><td><code>{{ m.path }}</code></td><td>{{ m.type }}{% if m.version %} v{{ m.version }}{% endif %}</td><td class="muted">{{ m.description }}</td></tr>{% endfor %}
+</tbody></table>
+<p class="muted">Sign-in methods: {{ s.auth | join(', ') or '—' }}. fabric-setup and fabric-agent use AppRoles bound to this host; the initial root token was revoked.</p></section>
+{% endif %}
+<section class="card blank-card"><h2>Browse and edit secrets</h2><p class="blank">Left intentionally blank.</p>
+<p class="muted">Next: <code>apps/</code> secrets with Keycloak sign-in for people, fabric's own secrets moved in from <code>fabric-secrets.yml</code>, rotated database and LDAP credentials, and the SSH certificate authority.</p></section>
+{% endblock %}""",
+
     "stepca": """{% extends "base" %}
 {% macro device_select() %}{% if devices %}<label>For device (optional — links the certificate to it)<select name="device"><option value="">—</option>{% for d in devices %}<option{{ ' selected' if d.name == device }}>{{ d.name }}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
 {% block body %}
@@ -538,6 +562,11 @@ def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err="", devi
     return _render("stepca", ctx=ctx, tab="stepca", view=view, menu=STEPCA_MENU, ca=ca, issued=issued,
                    review=review, inspected=inspected, err=err, key_types=KEY_TYPES, devices=devices or [],
                    device=device)
+
+
+def openbao(ctx, status):
+    """status: vault_status() (never contains secrets)."""
+    return _render("openbao", ctx=ctx, tab="openbao", s=status)
 
 
 def dirsrv(ctx, view, data=None, people=None, device=None, role=None, msg="", err="", unavailable=""):

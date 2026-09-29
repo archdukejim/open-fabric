@@ -45,6 +45,7 @@ ip_ldap: {{ ip_ldap | default('10.255.0.50') }}
 ip_keycloak: {{ ip_keycloak | default('10.255.0.60') }}
 ip_postgres: {{ ip_postgres | default('10.255.0.70') }}
 ip_webui: {{ ip_webui | default('10.255.0.80') }}
+ip_openbao: {{ ip_openbao | default('10.255.0.90') }}
 
 # ============================================================
 # SERVICE HOSTNAMES
@@ -56,6 +57,7 @@ cname_ldap: {{ cname_ldap | default('ldap') }}
 cname_sso: {{ cname_sso | default('sso') }}
 cname_mgr: {{ cname_mgr | default('fabric') }}
 cname_certs: {{ cname_certs | default('certs') }}
+cname_openbao: {{ cname_openbao | default('vault') }}
 {# The web UI's address: any host name (default fabric.<domain>). Outside the
    domain, fabric issues its certificate but you point DNS at this host. #}
 webui_hostname: {{ webui_hostname | default('', true) }}
@@ -70,6 +72,7 @@ hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~
 hostname_mgr: {{ _hostname_mgr }}
 {# CA certificates for every system (certs.<domain>); ca.<domain> is Step-CA's API. #}
 hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
+hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower }}
 
 # ============================================================
 # DOCKER IMAGES
@@ -83,10 +86,18 @@ image_keycloak: {{ image_keycloak | default('keycloak/keycloak:latest') }}
 image_postgres: {{ image_postgres | default('postgres:latest') }}
 {# Built locally from fabric/jinja/webui/build (Debian + python3-jinja2). #}
 image_webui: {{ image_webui | default('fabric/webui:local') }}
+image_openbao: {{ image_openbao | default('openbao/openbao:2.7.0@sha256:71156a1c6623a5fa3f5e61b0c6a8ead0faf0df29a778339188443551995d1315') }}
 {# image_* keys set explicitly by the admin; kept across upgrades (others follow the release). #}
 image_pins: {{ image_pins | default([], true) | to_json }}
 
 install_ldap: {{ install_ldap | default(true) | bool }}
+# OpenBao (secrets) is core. Its seal key: a 32-byte file readable by the openbao user only.
+openbao_key_dir: {{ openbao_key_dir | default('/etc/fabric/openbao') }}
+openbao_seal_key_id: {{ openbao_seal_key_id | default('fabric-1') }}
+openbao_mem_limit: {{ openbao_mem_limit | default('256m') }}
+# Recovery keys shown once at init (needed for a new root token or a seal migration).
+openbao_recovery_shares: {{ openbao_recovery_shares | default(1) }}
+openbao_recovery_threshold: {{ openbao_recovery_threshold | default(1) }}
 install_keycloak: {{ install_keycloak | default(false) | bool }}
 # Web management UI (mTLS + Keycloak OIDC). Requires Keycloak.
 install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) }}
@@ -116,7 +127,8 @@ postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/o
 {# Optional containers are derived from the install_* flags on every render, so
    strip them from any value read back from a previously rendered vars.yaml. #}
 {% set _optional_containers = ['dirsrv', 'keycloak', 'postgres', 'webui'] %}
-{% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9'])) | reject('in', _optional_containers) | list %}
+{% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9', 'openbao'])) | reject('in', _optional_containers) | list %}
+{% if 'openbao' not in _containers %}{% set _ = _containers.append('openbao') %}{% endif %}
 {% if install_ldap | default(true) | bool %}{% set _ = _containers.append('dirsrv') %}{% endif %}
 {% if install_keycloak | default(false) | bool %}{% set _ = _containers.extend(['keycloak', 'postgres']) %}{% endif %}
 {% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) %}{% set _ = _containers.append('webui') %}{% endif %}
@@ -129,7 +141,8 @@ project_containers:
   { 'folder': 'dirsrv', 'owner': 'ldap' },
   { 'folder': 'keycloak', 'owner': 'keycloak' },
   { 'folder': 'postgres', 'owner': 'postgres' },
-  { 'folder': 'webui', 'owner': 'root' }
+  { 'folder': 'webui', 'owner': 'root' },
+  { 'folder': 'openbao', 'owner': 'openbao' }
 ] %}
 {# Built-in folders always come from the defaults above; user-added folders are kept. #}
 {% set _default_folders = default_service_dirs | map(attribute='folder') | list %}
@@ -142,7 +155,8 @@ service_dirs:
   'step': {'uid': 135, 'gid': 135},
   'keycloak': {'uid': 900, 'gid': 0},
   'postgres': {'uid': 901, 'gid': 901},
-  'webui': {'uid': 912, 'gid': 912}
+  'webui': {'uid': 912, 'gid': 912},
+  'openbao': {'uid': 913, 'gid': 913}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:
@@ -220,7 +234,8 @@ bind_acl_policies:
   { 'canonical': hostname, 'name': cname_ca | default('ca') },
   { 'canonical': hostname, 'name': cname_dns | default('dns') },
   { 'canonical': hostname, 'name': cname_ldap | default('ldap') },
-  { 'canonical': hostname, 'name': cname_sso | default('sso') }
+  { 'canonical': hostname, 'name': cname_sso | default('sso') },
+  { 'canonical': hostname, 'name': cname_openbao | default('vault') }
 ] %}
 {% if (cname_certs | default('certs')) != hostname %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_certs | default('certs') }) %}

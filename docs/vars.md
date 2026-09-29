@@ -712,6 +712,18 @@ service_dirs:
 ```
 Built-in folders always come from these defaults; user-added folders are kept.
 
+### OpenBao (core)
+
+| Variable | Default | What |
+|---|---|---|
+| `image_openbao` | `openbao/openbao:2.7.0@sha256:71156a1c…` | Pinned by tag **and** digest (amd64 + arm64) |
+| `ip_openbao` | `10.255.0.90` | Address on fabric_net |
+| `cname_openbao` / `hostname_openbao` | `vault` / `vault.<domain>` | Published through nginx; CNAME added to the zone |
+| `openbao_key_dir` | `/etc/fabric/openbao` | Seal key (`unseal.key`, openbao user, 0400) and AppRole credentials (root, 0400) |
+| `openbao_seal_key_id` | `fabric-1` | Static-seal key id (change only when rotating the key) |
+| `openbao_recovery_shares` / `openbao_recovery_threshold` | `1` / `1` | Recovery keys created at the first init |
+| `openbao_mem_limit` | `256m` | Container memory limit |
+
 ## 6. 389 Directory Server (LDAP) Specifics
 If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabric/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 

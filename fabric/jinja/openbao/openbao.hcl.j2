@@ -1,0 +1,38 @@
+# OpenBao — rendered by fabricctl (fabric/jinja/openbao/openbao.hcl.j2).
+ui            = true
+cluster_name  = "fabric"
+api_addr      = "https://{{ hostname_openbao }}"
+cluster_addr  = "https://{{ ip_openbao }}:8201"
+# Integrated Raft storage: no mlock needed (and none possible without IPC_LOCK).
+disable_mlock = true
+log_level     = "info"
+
+storage "raft" {
+  path    = "/openbao/data"
+  node_id = "fabric-1"
+}
+
+listener "tcp" {
+  address         = "0.0.0.0:8200"
+  cluster_address = "0.0.0.0:8201"
+  tls_cert_file   = "/openbao/certs/fullchain.pem"
+  tls_key_file    = "/openbao/certs/privkey.pem"
+  tls_min_version = "tls12"
+}
+
+# Every request is logged, secrets HMAC'd (OpenBao 2.x: audit devices are
+# declared here, not enabled through the API).
+audit "file" "file" {
+  description = "fabric: every request"
+  options {
+    file_path = "/openbao/logs/audit.log"
+  }
+}
+
+# Auto-unseal from a local key file (fabricctl setup creates it, 0400).
+# Whoever holds this file and the disk holds the vault. Rotation: add
+# previous_key_id/previous_key and a new current key.
+seal "static" {
+  current_key_id = "{{ openbao_seal_key_id }}"
+  current_key    = "file:///openbao/seal/unseal.key"
+}

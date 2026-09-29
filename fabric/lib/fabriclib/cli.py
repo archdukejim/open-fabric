@@ -9,6 +9,7 @@
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
+  fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
   fabricctl client-cert <user> [--days N]
                                  web UI client certificate (.p12) into ~/fabric-admin
   fabricctl uninstall [--yes]    remove fabric from this host
@@ -32,6 +33,7 @@ from fabriclib.setup.renew_service_certs import renew_service_certs  # noqa: E40
 from fabriclib.setup.restore_install import restore_install  # noqa: E402
 from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
+from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
 
 
@@ -53,6 +55,8 @@ def main(argv):
         return run_setup.main(args)
     if cmd == "doctor":
         return run_setup.main(["--doctor", *args])
+    if cmd == "vault":
+        return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":
         renew_service_certs(SetupContext(deploy_base=_base(args)), force="--force" in args)
         return 0

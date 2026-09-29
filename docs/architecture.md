@@ -133,6 +133,7 @@ graph TB
         LDAP["dirsrv (389-DS) :10.255.0.50\n:3389 StartTLS · :3636 LDAPS"]
         KC["keycloak :10.255.0.60"]
         WEB["webui :10.255.0.80\nunprivileged, no ports"]
+        BAO["openbao :10.255.0.90\nstatic seal · raft"]
     end
 
     AGENT["fabric-agent (host systemd, root)\nunix socket only"]
@@ -147,6 +148,8 @@ graph TB
     WEB -->|"unix socket · fixed JSON API"| AGENT
     KC -->|"LDAPS :3636"| LDAP
     NGINX -->|"HTTPS :443 → :9000"| STEPCA
+    NGINX -->|"vault.<domain> → :8200 (TLS verified)"| BAO
+    AGENT -->|"AppRole · status"| BAO
     BIND9 -.->|"internal DNS"| STEPCA
 ```
 
@@ -167,6 +170,7 @@ Where an upstream image fights these settings, a thin **local build layer** (`fa
 | `postgres` | `postgres` 901 | — | volume: data; tmpfs: `/var/run/postgresql`, `/tmp` |
 | `keycloak` | 900:0 | Yes: pre-built (`kc.sh build`) so it starts with `start --optimized` — no re-augmentation at boot (read-only root, faster on a Pi) | volume: `/opt/keycloak/data`; tmpfs: `/tmp` |
 | `webui` | `webui` 912 | Yes: Debian + python3-jinja2 + app | tmpfs: `/tmp`; its socket dir |
+| `openbao` | `openbao` 913 | — (pinned upstream image; `bao server` runs directly instead of the root-oriented entrypoint, `init: true` reaps) | volumes: data (Raft), logs (audit); seal key read-only; tmpfs: `/tmp` |
 
 Low ports need no capability: Docker sets `net.ipv4.ip_unprivileged_port_start=0` inside each container's network namespace.
 

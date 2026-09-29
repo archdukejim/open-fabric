@@ -141,6 +141,8 @@ os.makedirs(f"{W}/fabric/config")
 open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
 open(f"{W}/fabric/config/vars.yaml", "w").write(
     f"deploy_base_dir: {W}\nhost_ip: 192.168.7.53\nhostname_certs: certs.lan.test\n"
+    f"hostname_openbao: vault.lan.test\nip_openbao: 10.254.8.99\nopenbao_key_dir: {W}/nokeys\n"
+    "service_users: {openbao: {uid: 913, gid: 913}}\n"
     "domain: lan.test\ndns:\n  dynamic_zone_var:\n    zone_authority: true\n    A:\n    - {name: pi-core, ip: 192.168.7.53}\n"
     "    CNAME:\n    - {name: calibre, canonical: nas25-apps}\n")
 UID = 912
@@ -288,7 +290,7 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("overview tab renders service health", st == 200 and "Overview" in body and "services healthy" in body, st)
-for tab in ("kea", "freeradius", "openbao"):
+for tab in ("kea", "freeradius"):
     st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
     check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
@@ -375,6 +377,9 @@ st, hd, sc, body = req("GET", "/dirsrv", ALICE, cookie=session)
 check("389-DS tab reports an unreachable directory instead of failing", st == 200 and "could not be read" in body, (st, body[:300]))
 st, hd, sc, body = req("GET", "/stepca?view=issue", ALICE, cookie=session)
 check("Step-CA still works without the directory (no device list)", st == 200 and 'select name="device"' not in body, st)
+
+st, hd, sc, body = req("GET", "/openbao", ALICE, cookie=session)
+check("OpenBao tab reports an unreachable vault instead of failing", st == 200 and "Unreachable" in body, (st, body[:300]))
 
 # ---- BIND9 tab: TSIG keys for a zone
 st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)

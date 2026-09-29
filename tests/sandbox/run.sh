@@ -102,7 +102,7 @@ check "fabricctl status: target active, containers healthy" \
     "grep -qE '^fabric.target +active' '$OUT/status.log' && [ \"\$(grep -c ' healthy' '$OUT/status.log')\" -ge 7 ]"
 in_box 'fabricctl stop' > "$OUT/stop.log" 2>&1
 check "fabricctl stop: every service stopped" \
-    "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak webui fabric-agent' | grep -qx active"
+    "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak openbao webui fabric-agent' | grep -qx active"
 check "fabricctl stop: DNS no longer answers" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 in_box 'fabricctl start' > "$OUT/start.log" 2>&1
 sleep 20
@@ -132,6 +132,23 @@ check "kit: .p12, passwords and root CA in ~/fabric-admin" \
 check "kit: secrets are 0600" \
     "[ \"\$(in_box 'stat -c %a /root/fabric-admin/fabricadmin.p12 /root/fabric-admin/p12-password.txt /root/fabric-admin/initial-password.txt' | sort -u)\" = 600 ]"
 
+echo "--- OpenBao (core): static-seal auto-unseal, recovery keys once, AppRoles, TLS via nginx"
+check "fabricctl vault status: unsealed, static seal, raft" "in_box 'fabricctl vault status' | grep -q 'unsealed  (static seal, raft storage)'"
+check "recovery key written once into ~/fabric-admin, 0600" \
+    "[ \"\$(in_box 'stat -c %a /root/fabric-admin/openbao-recovery-keys.txt')\" = 600 ]"
+check "seal key: 0400, owned by the openbao user" "[ \"\$(in_box 'stat -c %a:%U /etc/fabric/openbao/unseal.key')\" = 400:openbao ]"
+check "the initial root token is revoked and not kept on disk" "! in_box 'test -e /etc/fabric/openbao/bootstrap-root-token'"
+check "AppRole credentials: root-only 0400" \
+    "[ \"\$(in_box 'stat -c %a:%U /etc/fabric/openbao/setup-approle.json /etc/fabric/openbao/agent-approle.json' | sort -u)\" = 400:root ]"
+check "https://vault.lan.test through nginx, TLS verified against the fabric CA" \
+    "in_box 'curl -s --cacert /opt/stepca/data/certs/root_ca.crt --resolve vault.lan.test:443:$IP https://vault.lan.test/v1/sys/health' | grep -q '\"sealed\":false'"
+in_box 'docker restart openbao' > /dev/null 2>&1; sleep 15
+check "OpenBao unseals itself after a restart (nobody enters a key)" "in_box 'fabricctl vault status' > /dev/null"
+in_box 'systemctl stop openbao; systemctl restart bind9 nginx' > /dev/null 2>&1; sleep 10
+check "core services start and serve while OpenBao is down" \
+    "in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP && ! in_box 'systemctl is-active --quiet openbao'"
+in_box 'systemctl start openbao' > /dev/null 2>&1; sleep 10
+
 echo "--- restricted sign-in: HTTPS + client cert from this CA + Keycloak OIDC/TOTP + fabric-admin role"
 # A real directory user who is NOT in admins, with their own valid client certificate.
 BOB_PW=$(openssl rand -base64 18)
@@ -155,6 +172,8 @@ echo "--- setup again (must converge without changes)"
 in_box 'fabricctl setup --non-interactive --yes' 2>&1 | tee "$OUT/setup2.log"
 check "re-run completes" "grep -q 'fabric is ready' '$OUT/setup2.log'"
 check "re-run re-issues no certificates" "! grep -q ': issued' '$OUT/setup2.log'"
+check "re-run neither re-initialises nor changes OpenBao" \
+    "! grep -q 'OpenBao initialised' '$OUT/setup2.log' && grep -q 'OpenBao configured (no changes)' '$OUT/setup2.log'"
 check "re-run keeps the admin and their certificate" \
     "grep -q \"admin 'fabricadmin' exists\" '$OUT/setup2.log' && grep -q 'is current' '$OUT/setup2.log'"
 

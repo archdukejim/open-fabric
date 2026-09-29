@@ -18,6 +18,8 @@ def _targets(ctx):
         (v["hostname_stepca"], [], [nginx(v["hostname_stepca"])], ["nginx"]),
         (v["hostname_landing"], [], [nginx(v["hostname_landing"])], ["nginx"]),
         (v["hostname_certs"], [], [nginx(v["hostname_certs"])], ["nginx"]),
+        (v["hostname_openbao"], ["openbao"], [nginx(v["hostname_openbao"]), (p("openbao", "certs"), "openbao")],
+         ["nginx", "openbao"]),
     ]
     if v.get("install_ldap", True):
         t.append((v["hostname_ldap"], [], [("dirsrv-tls", "ldap")], ["ldap"]))

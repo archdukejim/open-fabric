@@ -44,7 +44,7 @@ try:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
     check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services healthy" in page, st)
-    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "freeradius", "openbao"))
+    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("kea", "freeradius"))
     check("every service tab renders (placeholders)", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
     st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")
@@ -103,6 +103,9 @@ try:
     page = req("GET", "/stepca?view=issue&device=printer")[3]
     check("Step-CA generate form offers devices, prefilled from the device page",
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
+    page = req("GET", "/openbao")[3]
+    check("OpenBao tab: unsealed, static seal, seal key state, engines", "Unsealed" in page and "static" in page
+          and "0400, openbao only" in page and "fabric/" in page)
     st, _, _, page = req("GET", "/preview/denied")
     check("preview of a refused sign-in", st == 403 and "fabric-admin" in page)
 finally:

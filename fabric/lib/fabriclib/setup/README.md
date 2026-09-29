@@ -25,10 +25,12 @@
 | `mint_service_certs.py` | Issue/renew service certificates (only what is missing, expiring or wrong) |
 | `mint_extra_certs.py` | `extra_certs` entries, when missing or due (part of the `certs` step) |
 | `start_services.py` | Start the stack in order; seed 389-DS; configure Keycloak; fabric-agent + web UI |
+| `start_unit.py` | Enable, start or restart one unit and wait until its container is healthy |
+| `setup_openbao.py` | `vault` step: seal key, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration |
 | `create_admin.py` | First web UI admin: LDAP user in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
 | `verify_install.py` | End-to-end checks (DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
-| `backup_install.py` | Keep config, secrets, CA and certificates for a reinstall (owners preserved) |
+| `backup_install.py` | Keep config, secrets, CA, certificates and OpenBao (data + seal key) for a reinstall (owners preserved) |
 | `restore_install.py` | Put that backup back before setup runs |
 | `stage_source.py` | Reinstall from the installed copy: stage the code in `/var/tmp` so uninstall cannot delete what setup runs from |
 | `renew_service_certs.py` | `fabricctl certs [--force]`: day-2 renewal; restarts only services whose certs changed |

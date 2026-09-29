@@ -83,6 +83,16 @@ SAMPLE = {
                 "sans": ["printer.home.arpa"], "not_after": "Oct 15 08:00:00 2026 GMT", "status": "expires soon"}],
 }
 _FP = ":".join(["AB", "12", "CD", "34"] * 8)
+SAMPLE_VAULT = {"url": "https://vault.home.arpa/", "reachable": True, "initialized": True, "sealed": False,
+                "version": "2.7.0", "seal_type": "static", "storage": "raft", "recovery_seal": True,
+                "key": {"path": "/etc/fabric/openbao/unseal.key", "present": True, "ok": True,
+                        "detail": "32 bytes, 0400, openbao only"},
+                "mounts": [{"path": "apps/", "type": "kv", "version": "2", "description": "secrets for your applications"},
+                           {"path": "cubbyhole/", "type": "cubbyhole", "version": None, "description": "per-token private secret storage"},
+                           {"path": "fabric/", "type": "kv", "version": "2", "description": "fabric's own secrets"},
+                           {"path": "identity/", "type": "identity", "version": None, "description": "identity store"},
+                           {"path": "sys/", "type": "system", "version": None, "description": "system endpoints"}],
+                "auth": ["approle/", "token/"]}
 SAMPLE_CA = {"domain": "home.arpa", "certs_url": "http://certs.home.arpa/", "max_days": 1825,
              "root": {"subject": "CN=Fabric Root CA,O=Fabric", "not_after": "Sep  1 00:00:00 2046 GMT",
                       "key": "EC prime256v1", "sha256": _FP},
@@ -227,6 +237,8 @@ class Handler(BaseHTTPRequestHandler):
                 ov = self.state.overview()
                 return self.send(200, views.stepca(self.ctx, view, SAMPLE_CA, issued=self.state.data["issued"],
                                                    devices=ov["devices"] if ov else [], device=query.get("device", "")))
+            if path == "/openbao":
+                return self.send(200, views.openbao(self.ctx, SAMPLE_VAULT))
             if path == "/dirsrv":
                 view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
                 kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}

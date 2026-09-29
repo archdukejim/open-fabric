@@ -264,6 +264,62 @@ gets its reverse record at apply, in a zone fabric creates:
   `.in-addr.arpa` / `.ip6.arpa`) replaces the generated one for that range.
 - Change or delete the forward record and apply: the PTR follows.
 
+## OpenBao (secrets)
+
+OpenBao is a core service: installed by `fabricctl setup` (step `vault`),
+at `https://vault.<domain>` (API and OpenBao's own UI), container `openbao`
+on fabric_net (`ip_openbao`, default `10.255.0.90`), Raft storage in
+`/opt/openbao/data`, TLS from Step-CA, every request in
+`/opt/openbao/logs/audit.log` (secrets HMAC'd).
+
+**Unsealing.** OpenBao uses the *static* seal. It unseals itself at start
+from `/etc/fabric/openbao/unseal.key`: 32 random bytes, `0400`, readable
+only by the `openbao` service user (913). A power cut needs no human.
+The trade-off: whoever holds this disk and that key holds the vault.
+Moving the key to a USB stick (a kill switch), a KMIP appliance or a
+PKCS#11 token is planned (design §7c).
+
+**First install.**
+- `init` produces the **recovery key(s)**. They are written once to
+  `~/fabric-admin/openbao-recovery-keys.txt` (0600) of the account that ran
+  `sudo`. Store them offline and delete the file. They are needed for a new
+  root token (`bao operator generate-root`) and for moving the seal, never
+  to start OpenBao.
+- The initial root token configures OpenBao once and is then **revoked**.
+  From then on fabric uses two AppRoles. Their credentials are in
+  `/etc/fabric/openbao/*-approle.json` (root, 0400), and their tokens and
+  secret IDs work only from fabric_net, i.e. this host:
+
+| AppRole | Used by | May |
+|---|---|---|
+| `fabric-setup` | `fabricctl setup` | engines, auth methods, policies, AppRoles; `fabric/*` |
+| `fabric-agent` | fabric-agent (web UI) | list engines and auth methods; list `apps/` keys — no secret values |
+
+| Mount | What |
+|---|---|
+| `fabric/` (KV v2) | fabric's own secrets (moving `fabric-secrets.yml` here comes later) |
+| `apps/` (KV v2) | secrets for your applications (Keycloak sign-in for people comes later) |
+
+**Boot independence.** No core service (DNS, LDAP, SSO, nginx, CA) needs
+OpenBao to start. The sandbox test stops OpenBao and restarts BIND9 and
+nginx to prove it.
+
+**Commands.**
+- `sudo fabricctl vault status`: sealed?, version, seal key state, engines.
+  Exits 0 only when unsealed.
+- `fabricctl doctor` checks that OpenBao is unsealed, the seal key's
+  permissions, both KV mounts, and `vault.<domain>` through nginx.
+
+**Backups.** Data without the key is unreadable; the key without the data
+is useless. `fabricctl reinstall` keeps both. For your own backups, copy
+`/opt/openbao/data` together with `/etc/fabric/openbao/`, and keep them
+apart from the recovery keys. `fabricctl uninstall` deletes both.
+
+**If it stays sealed.** The key file is missing or wrong: `docker logs
+openbao`, then restore `/etc/fabric/openbao/unseal.key` from your backup.
+Setup never generates a new key next to existing data, because a new key
+cannot open the old vault.
+
 ## Resource Utilization
 
 The following chart outlines the memory footprint and CPU impact of the deployed applications. When `host_ram_capacity` is set to a value between 3 and 4, the infrastructure automatically enforces Docker Compose memory constraints (389-DS: `256M` at 3 GB, `384M` at 4 GB; webui: `96M`) to prevent these services from exceeding the host's physical memory boundaries.

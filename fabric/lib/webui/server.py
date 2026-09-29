@@ -375,6 +375,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.stepca_page(ctx, query.get("view", "ca"), device=query.get("device", ""))
         if path == "/dirsrv":
             return self.dirsrv_page(ctx, query)
+        if path == "/openbao":
+            return self.send(200, views.openbao(ctx, actions.vault_status()))
         if path.lstrip("/") in views.PLACEHOLDERS:
             return self.send(200, views.placeholder(ctx, path.lstrip("/")))
         if path == "/audit":

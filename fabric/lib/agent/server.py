@@ -24,7 +24,7 @@ top of the socket's 0660 root:<webui gid> permissions.
   POST /v1/pki/convert                  {actor, cert, key}
   POST /v1/tsig                         {actor, name, zone, scope, hosts, types, secret}
   POST /v1/tsig/<name>/rotate | /v1/tsig/<name>/delete   {actor}
-  GET  /v1/devices | /v1/people
+  GET  /v1/devices | /v1/people | /v1/vault
   POST /v1/devices {actor, name, fields} | /v1/devices/<name> {actor, fields} | /v1/devices/<name>/delete
   POST /v1/devices/<name>/certs      {actor, sha256, link}
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
@@ -66,6 +66,7 @@ from fabriclib.ldap.remove_role import remove_role  # noqa: E402
 from fabriclib.ldap.update_device import update_device  # noqa: E402
 from fabriclib.ldap.update_role import update_role  # noqa: E402
 from fabriclib.pki.ca_summary import ca_summary  # noqa: E402
+from fabriclib.vault.vault_status import vault_status  # noqa: E402
 from fabriclib.pki.convert_cert import convert_cert  # noqa: E402
 from fabriclib.pki.describe_csr import describe_csr  # noqa: E402
 from fabriclib.pki.inspect_pem import inspect_pem  # noqa: E402
@@ -158,6 +159,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, device_overview(load_vars()))
                 if route == ["people"]:
                     return self.reply(200, list_people(load_vars()))
+                if route == ["vault"]:
+                    return self.reply(200, vault_status(load_vars()))
                 return self.reply(404, {"error": "not found"})
 
             data = self.body()

@@ -5,10 +5,10 @@ import subprocess
 
 from fabriclib.common.console import info, ok, warn
 
-UNITS = ["webui", "fabric-agent", "nginx", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
+UNITS = ["webui", "fabric-agent", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
 TARGET = "/etc/systemd/system/fabric.target"
-CONTAINERS = ["webui", "nginx", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
-DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui"]
+CONTAINERS = ["webui", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
+DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openbao"]
 LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:local", "fabric/keycloak:local",
                 "fabric/webui:local"]
 
@@ -50,6 +50,10 @@ def uninstall(ctx):
     for path in glob.glob(ctx.path("acme_*")):
         shutil.rmtree(path, ignore_errors=True)
     ok(f"removed fabric directories under {ctx.deploy_base}")
+    key_dir = v.get("openbao_key_dir")
+    if key_dir and os.path.isdir(key_dir):
+        shutil.rmtree(key_dir)
+        ok(f"removed the OpenBao seal key ({key_dir}): its vault data is gone too")
 
     for name in (v.get("service_users") or {}):
         if subprocess.run(["id", name], capture_output=True).returncode == 0:

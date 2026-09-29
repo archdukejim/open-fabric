@@ -316,6 +316,7 @@ def apply_deployment(start_services=True):
         {'service': 'postgres', 'compose': 'postgres', 'folder': 'postgres', 'requires': []},
         {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']},
         {'service': 'webui', 'compose': 'webui', 'folder': 'webui', 'requires': ['fabric-agent']},
+        {'service': 'openbao', 'compose': 'openbao', 'folder': 'openbao', 'requires': []},
     ]
 
     for svc_info in sys_svcs:
@@ -376,6 +377,9 @@ def apply_deployment(start_services=True):
     if final_vars.get('install_webui'):
         render_file('webui/webui.json.j2', 'webui/webui.json')
         render_file('systemd/fabric-agent.service.j2', 'systemd/fabric-agent.service')
+
+    # OpenBao
+    render_file('openbao/openbao.hcl.j2', 'openbao/config/openbao.hcl')
 
     # Step-CA
     render_file('stepca/leaf.tpl.j2', 'stepca/templates/certs/leaf.tpl')
@@ -512,6 +516,14 @@ def apply_deployment(start_services=True):
             
         if needs_restart:
             services_to_restart.add(svc_name)
+    # OpenBao: config (read-only in the container), Raft data, audit log, TLS
+    bao_uid, bao_gid = get_service_user(final_vars, 'openbao')
+    for d in ('config', 'data', 'logs', 'certs'):
+        ensure_dir(os.path.join(DEPLOY_BASE_DIR, 'openbao', d), 0o750, bao_uid, bao_gid)
+    if copy_tree_with_perms(os.path.join(render_tmp, 'openbao/config'), os.path.join(DEPLOY_BASE_DIR, 'openbao/config'),
+                            bao_uid, bao_gid, 0o640, 0o750):
+        services_to_restart.add('openbao')
+
     # fabric.target groups every fabric unit (systemctl start/stop/restart fabric.target)
     target_src = os.path.join(jinja_dir, "systemd", "fabric.target")
     target_dst = "/etc/systemd/system/fabric.target"

@@ -24,7 +24,7 @@ PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 
 down_all() {
-    for s in dirsrv keycloak postgres stepca bind9; do
+    for s in openbao dirsrv keycloak postgres stepca bind9; do
         [ -f "$W/rendered/$s/docker-compose.yml" ] && docker compose -f "$W/rendered/$s/docker-compose.yml" down -v >/dev/null 2>&1
     done
     docker network rm fabric_net >/dev/null 2>&1
@@ -37,7 +37,7 @@ rm -rf "$W"; mkdir -p "$BASE"
 
 # ---- render with test-safe values ------------------------------------
 export FABRIC_TEST_VARS="{\"deploy_base_dir\": \"$BASE\", \"host_ip\": \"127.0.0.1\", \"bind_dns_port\": 10053,
-  \"host_ram_capacity\": 4, \"hostname\": \"pi-core\", \"stepca_port\": 9000}"
+  \"host_ram_capacity\": 4, \"hostname\": \"pi-core\", \"stepca_port\": 9000, \"openbao_key_dir\": \"$W/keys\"}"
 python3 "$REPO/tests/render.py" "$W/rendered" >/dev/null || { echo "FAIL render"; exit 1; }
 R="$W/rendered"
 docker network create --subnet 10.255.0.0/24 fabric_net >/dev/null
@@ -63,6 +63,7 @@ leaf dns "dns.$DOMAIN" "ns.$DOMAIN"
 leaf pg postgres "postgres.$DOMAIN"
 leaf kc "sso.$DOMAIN"
 leaf ldap "ldap.$DOMAIN"
+leaf bao "vault.$DOMAIN" openbao
 
 # ---- assertions ----------------------------------------------------------
 hardened() {  # container, expect_readonly(1/0)
@@ -185,6 +186,18 @@ seed() {
     docker exec dirsrv sh -c 'python3 /seed/seed.py /seed/*.ldif'
 }
 check "dirsrv seeds on a read-only root" "seed | tee '$W/seed.log' | grep -q 'seed: '"
+
+# ---- openbao -------------------------------------------------------------------
+echo "--- openbao"
+mkdir -p "$BASE/openbao"/{config,data,logs,certs} "$W/keys"
+cp "$R/openbao/openbao.hcl" "$BASE/openbao/config/"
+cp bao.chain "$BASE/openbao/certs/fullchain.pem"; cp bao.key "$BASE/openbao/certs/privkey.pem"; cp root.crt "$BASE/openbao/certs/root_ca.crt"
+head -c 32 /dev/urandom > "$W/keys/unseal.key"
+chown -R 913:913 "$BASE/openbao" "$W/keys"; chmod 700 "$W/keys"; chmod 400 "$W/keys/unseal.key" "$BASE/openbao/certs/privkey.pem"
+check "openbao (pinned image) starts; uninitialised counts as healthy" "up openbao && wait_healthy openbao"
+check "openbao hardened: $(hardened openbao 1 | tr -d '\n')" "hardened openbao 1 >/dev/null"
+check "openbao serves TLS with its cert" \
+    "curl -s --cacert root.crt --resolve vault.$DOMAIN:8200:10.255.0.90 https://vault.$DOMAIN:8200/v1/sys/seal-status | grep -q '\"type\":\"static\"'"
 
 echo; echo "$PASS passed, $FAIL failed"
 [ "${KEEP:-0}" = 1 ] || { down_all; docker rmi fabric/bind9:local fabric/stepca:local fabric/keycloak:local fabric/dirsrv:local >/dev/null 2>&1; }

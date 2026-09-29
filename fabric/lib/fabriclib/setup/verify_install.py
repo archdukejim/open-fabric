@@ -7,6 +7,7 @@ from fabriclib.common.dns_query import dns_query
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.keycloak.user_has_role import user_has_role
 from fabriclib.setup.errors import SetupError
+from fabriclib.vault.vault_status import vault_status
 
 
 def _curl(url, host, ip, port, root_ca, client_cert=False):
@@ -109,7 +110,17 @@ def checks(ctx):
                 add(f"client certificate for {admin} (CN, chain)", res.returncode == 0 and f"CN={admin}" in subj,
                     (res.stdout + res.stderr).strip()[-200:])
 
-    for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "fabric-agent", "webui", "fabric-firewall"):
+    bao = vault_status(v)
+    add("OpenBao unsealed (static seal, raft)", bao.get("initialized") and bao.get("sealed") is False
+        and bao.get("seal_type") == "static", bao.get("error", ""))
+    add("OpenBao seal key: 32 bytes, 0400, openbao only", bao["key"]["ok"], bao["key"]["detail"])
+    add("OpenBao KV v2 fabric/ and apps/ (read as fabric-agent)",
+        {"fabric/", "apps/"} <= {m["path"] for m in bao.get("mounts", [])}, bao.get("error", ""))
+    code = _curl(f"https://{v['hostname_openbao']}/v1/sys/health", v["hostname_openbao"], v["ip_nginx"], 443, root_ca)
+    add(f"https://{v['hostname_openbao']} (OpenBao via nginx, TLS verified)", code == (0, "200"), code)
+
+    for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "fabric-agent", "webui",
+                 "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()
             add(f"service {unit}", active == "active", active)

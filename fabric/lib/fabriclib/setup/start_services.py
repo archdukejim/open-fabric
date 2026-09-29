@@ -3,27 +3,13 @@ import subprocess
 import time
 
 from fabriclib.common.console import info, ok
-from fabriclib.common.wait_healthy import wait_healthy
 from fabriclib.setup.errors import SetupError
+from fabriclib.setup.start_unit import start_unit
 
 # (systemd unit, container, enabled-if flag); order = start order
 ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv", "install_ldap"),
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None)]
-
-
-def _start(unit, container, restart):
-    # Always (re-)enable: links the unit into multi-user.target and fabric.target.
-    subprocess.run(["systemctl", "enable", unit], check=True, capture_output=True)
-    active = subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0
-    if active and not restart:
-        return "running"
-    subprocess.run(["systemctl", "restart" if active else "start", unit], check=True)
-    healthy, why = wait_healthy(container, timeout=900)
-    if not healthy:
-        logs = subprocess.run(["docker", "logs", "--tail", "40", container], capture_output=True, text=True)
-        raise SetupError(f"{container} did not become healthy ({why}):\n{logs.stdout}{logs.stderr}")
-    return "restarted" if active else "started"
 
 
 def run(ctx):
@@ -36,7 +22,7 @@ def run(ctx):
         if flag and not v.get(flag, flag == "install_ldap"):
             continue
         info(f"{unit}…")
-        ok(f"{unit}: {_start(unit, container, unit in ctx.restart_services)}")
+        ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
 
     if v.get("install_ldap", True):
         res = subprocess.run(["bash", os.path.join(lib, "dirsrv.sh"), "seed"], capture_output=True, text=True)
@@ -61,7 +47,7 @@ def run(ctx):
         if "fabric-agent" in ctx.restart_services:
             subprocess.run(["systemctl", "restart", "fabric-agent"], check=True)
         ok(f"fabric-agent: {'restarted' if 'fabric-agent' in ctx.restart_services else 'running'}")
-        ok(f"webui: {_start('webui', 'webui', 'webui' in ctx.restart_services)}")
+        ok(f"webui: {start_unit('webui', 'webui', 'webui' in ctx.restart_services)}")
 
     # Everything is up: activate the target now (it is enabled for boot), so
     # `fabricctl stop|restart` / `systemctl ... fabric.target` reach every unit.

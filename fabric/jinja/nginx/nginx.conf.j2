@@ -238,6 +238,29 @@ http {
 {{ cert_file_types() }}        }
     }
 
+    # OpenBao API + UI (TLS to the backend verified against the fabric root CA)
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_openbao }};
+
+        ssl_certificate /etc/nginx/certs/{{ hostname_openbao }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_openbao }}/privkey.pem;
+        client_max_body_size 1m;
+
+        location / {
+            set $openbao_backend "https://openbao:8200";
+            proxy_pass $openbao_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_ssl_verify on;
+            proxy_ssl_trusted_certificate /etc/nginx/certs/{{ hostname_openbao }}/root_ca.crt;
+            proxy_ssl_name {{ hostname_openbao }};
+            proxy_ssl_server_name on;
+        }
+    }
+
 {% if install_keycloak | default(false) | bool %}
     # Keycloak Web UI / API
     server {
