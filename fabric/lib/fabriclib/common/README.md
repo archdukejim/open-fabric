@@ -4,6 +4,8 @@
 |---|---|
 | `paths.py` | Well-known paths derived from the install location (`FABRIC_DIR`, `VARS_FILE`, `AUDIT_FILE`, …) |
 | `read_images_lock.py` | The validated, digest-pinned images (`fabric/images.lock.yaml`) with their refs |
+| `read_packages_lock.py` | The pinned packages built into fabric's own images (`packages:` in `images.lock.yaml`: Kea from ISC's repository, key fingerprint, version) |
+| `jinja_env.py` | The Jinja environment deploy and the tests render with (Ansible-style filters, `images_lock` / `packages_lock` globals) |
 | `errors.py` | `ValidationError` — input rejected; message is safe to show to users |
 | `load_vars.py` | Read `vars.yaml` (empty dict if missing) |
 | `save_vars.py` | Write `vars.yaml`, empty strings stored as null |
@@ -16,3 +18,4 @@
 | `dns_query.py` | A-record lookup against one DNS server (stdlib; no `dig` needed) |
 | `sudo_owner.py` | Login, home, uid and gid of the account that ran `sudo` (files handed to the admin) |
 | `set_tsig_secrets.py` | Set or remove TSIG secrets in `fabric-secrets.yml` (kept `0600`) |
+| `write_file_if_changed.py` | Write a file atomically with its mode and owner, only if its content changed (Kea, FreeRADIUS configs) |

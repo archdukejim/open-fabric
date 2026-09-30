@@ -7,6 +7,7 @@
   ('user_modifier_admin', 'User modification service', ldap_user_modifier_password),
   ('keycloak_admin', 'Keycloak federation service', ldap_keycloak_password),
   ('device_admin', 'Device and device-role management (fabric-agent)', ldap_device_admin_password),
+  ('radius_reader', 'FreeRADIUS: reads devices and device roles (802.1X)', ldap_radius_password),
 ] %}
 {% for name, desc, pw in accounts %}
 

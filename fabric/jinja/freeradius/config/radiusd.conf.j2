@@ -1,0 +1,62 @@
+# FreeRADIUS main configuration, written by fabric (design §6). fabric's own
+# minimal tree: only the modules and virtual servers below are loaded.
+prefix = /usr
+exec_prefix = /usr
+sysconfdir = /etc
+localstatedir = /var
+sbindir = /usr/sbin
+logdir = /var/log/freeradius
+raddbdir = /etc/freeradius/fabric
+radacctdir = ${logdir}/radacct
+name = freeradius
+confdir = ${raddbdir}
+modconfdir = ${confdir}/mods-config
+certdir = /etc/freeradius/certs
+cadir = ${certdir}
+run_dir = /run/freeradius
+db_dir = ${run_dir}
+libdir = /usr/lib/freeradius
+dictdir = /usr/share/freeradius
+pidfile = ${run_dir}/${name}.pid
+
+max_request_time = 30
+cleanup_delay = 5
+max_requests = 4096
+hostname_lookups = no
+
+log {
+	destination = stdout
+	colourise = no
+	file = /dev/null
+	stripped_names = no
+	# "Login OK" / "Login incorrect" lines (never passwords): the Kea-like auth log.
+	auth = yes
+	auth_badpass = no
+	auth_goodpass = no
+}
+
+security {
+	allow_core_dumps = no
+	max_attributes = 200
+	reject_delay = 1
+	status_server = yes
+}
+
+thread pool {
+	start_servers = 2
+	max_servers = 8
+	min_spare_servers = 1
+	max_spare_servers = 4
+	max_requests_per_server = 0
+	auto_limit_acct = no
+}
+
+modules {
+	$INCLUDE ${confdir}/mods/
+}
+
+instantiate {
+}
+
+$INCLUDE ${confdir}/clients.conf
+$INCLUDE ${confdir}/sites/

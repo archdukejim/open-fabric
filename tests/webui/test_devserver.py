@@ -44,14 +44,23 @@ try:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
     check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services healthy" in page, st)
-    tabs_ok = all(req("GET", f"/{t}")[3].count("Left intentionally blank") == 1 for t in ("freeradius",))
+    tabs_ok = all(req("GET", f"/{t}")[0] == 200 for t in ("", "bind9", "kea", "stepca", "dirsrv", "freeradius",
+                                                          "openbao"))
+    page = req("GET", "/freeradius")[3]
+    check("FreeRADIUS tab: server, RADIUS clients, recent decisions, add form",
+          "radius.home.arpa" in page and "switch1" in page and "not required" in page and "jims-laptop" in page
+          and "device disabled" in page and 'action="/freeradius/clients"' in page)
+    st, _, _, page = req("POST", "/freeradius/clients", {"csrf": "dev", "name": "switch2", "address": "192.168.1.9",
+                                                         "message_authenticator": "1"})
+    check("FreeRADIUS tab: add client -> secret shown once, then listed",
+          st == 200 and "shown only now" in page and "switch2" in req("GET", "/freeradius")[3], st)
     page = req("GET", "/kea")[3]
     check("Kea tab: subnets, reservations, leases, reserve form", "192.168.1.0/24" in page and "printer" in page
           and "laptop1.dhcp.home.arpa" in page and 'action="/kea/reservations"' in page)
     st, loc, _, _ = req("POST", "/kea/reservations", {"csrf": "dev", "mac": "02:00:00:00:00:99", "ip": "192.168.1.30",
                                                       "hostname": "nas"})
     check("Kea tab: reserve -> listed", st == 303 and "192.168.1.30" in req("GET", "/kea")[3], loc)
-    check("every service tab renders (placeholders)", tabs_ok)
+    check("every service tab renders", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
     st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")
     check("BIND9 tab shows records and the add form", st == 200 and "nas" in page and "192.168.1.10" in page, st)

@@ -38,6 +38,15 @@ except ImportError:
     BUNDLES, FABRIC_PERMISSIONS = {}, {p: "" for p in views.PREVIEW_PERMS}
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
+SAMPLE_RADIUS = {"enabled": True, "server_name": "radius.home.arpa", "host_ip": "192.168.1.2",
+                 "clients": [{"name": "switch1", "address": "192.168.1.3", "message_authenticator": True},
+                             {"name": "ap-hall", "address": "192.168.1.4", "message_authenticator": False}],
+                 "log": [{"time": "2026-09-29T20:14:02", "decision": "ACCEPT", "method": "eap-tls",
+                          "device": "jims-laptop", "vlan": "20", "mac": "02:11:22:33:44:55", "nas": "switch1",
+                          "reason": ""},
+                         {"time": "2026-09-29T20:12:40", "decision": "REJECT", "method": "mab", "device": "cam-front",
+                          "vlan": "-", "mac": "02:aa:bb:cc:dd:01", "nas": "switch1", "reason": "device disabled"}],
+                 "log_error": ""}
 SAMPLE_DHCP = {"enabled": True, "interfaces": ["eth0"], "lease_time": 86400, "ddns_zone": "dhcp.home.arpa",
                "subnets": [{"subnet": "192.168.1.0/24", "pools": ["192.168.1.100 - 192.168.1.199"],
                             "routers": "192.168.1.1",
@@ -328,8 +337,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200, views.dirsrv(self.ctx, view, data=data, **kw))
             if path == "/kea":
                 return self.send(200, views.kea(self.ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
-            if path.lstrip("/") in views.PLACEHOLDERS:
-                return self.send(200, views.placeholder(self.ctx, path.lstrip("/")))
+            if path == "/freeradius":
+                return self.send(200, views.freeradius(self.ctx, SAMPLE_RADIUS, query.get("msg", ""),
+                                                       query.get("err", "")))
             if path == "/audit":
                 return self.send(200, views.audit(self.ctx, self.state.data["audit"]))
             if path == "/preview/denied":       # what a refused sign-in looks like
@@ -360,6 +370,19 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/openbao/"):
                 return self.send(303, b"", location="/openbao?" + urllib.parse.urlencode(
                     {"view": "unlock", **self.state.vault_action(path.split("/")[2:], form)}))
+            if path.startswith("/freeradius/clients"):
+                parts = [urllib.parse.unquote(p) for p in path.split("/")[3:]]
+                clients = SAMPLE_RADIUS["clients"]
+                if len(parts) == 2 and parts[1] == "delete":
+                    clients[:] = [c for c in clients if c["name"] != parts[0]]
+                    return self.send(303, b"", location="/freeradius?" + urllib.parse.urlencode(
+                        {"msg": f"RADIUS client {parts[0]} removed (dev preview)."}))
+                name = parts[0] if parts else form.get("name", "").lower()
+                if not parts:
+                    clients.append({"name": name, "address": form.get("address", ""),
+                                    "message_authenticator": form.get("message_authenticator") == "1"})
+                return self.send(200, views.radius_secret(self.ctx, name, "dev-preview-not-a-real-secret",
+                                                          "added" if not parts else "rotated", "192.168.1.2"))
             if path.startswith("/kea/reservations"):
                 rs = SAMPLE_DHCP["subnets"][0]["reservations"]
                 parts = path.split("/")[3:]

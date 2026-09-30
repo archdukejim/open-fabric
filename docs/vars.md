@@ -839,6 +839,17 @@ links:
 
 The Elasticsearch password is not a setting: `sudo fabricctl logs set-password elastic` keeps it in OpenBao.
 
+### 802.1X (optional)
+| Variable | Default | Notes |
+|---|---|---|
+| `install_freeradius` | `false` | FreeRADIUS 3.2: EAP-TLS and MAB decided from the directory (operations.md → 802.1X); needs `install_ldap` |
+| `radius_clients` | `[]` | `[{name, address (IP or network), message_authenticator (true)}]`; overlapping addresses refused |
+| `hostname_radius` | `radius.<domain>` | Name on the EAP-TLS server certificate (`cname_radius` changes the first label) |
+| `ip_freeradius` | `10.255.0.98` | On fabric_net (reaches 389-DS) |
+| `freeradius_mem_limit` | `128m` | Container memory limit |
+
+Shared secrets are not settings: they live in OpenBao (`radius_secrets`); `fabricctl radius add-client` / `rotate-secret` show them once.
+
 ### DHCP (optional)
 | Variable | Default | Notes |
 |---|---|---|

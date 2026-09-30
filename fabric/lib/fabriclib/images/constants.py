@@ -17,6 +17,8 @@ SERVICES = [
     {"name": "nginx", "unit": "nginx", "container": "nginx", "folder": "nginx", "var": "image_nginx", "build": None},
     {"name": "kea", "unit": "kea", "container": "kea-dhcp4", "folder": "kea", "var": "image_debian",
      "build": "fabric/kea:local"},
+    {"name": "freeradius", "unit": "freeradius", "container": "freeradius", "folder": "freeradius",
+     "var": "image_debian", "build": "fabric/freeradius:local"},
     {"name": "fluentbit", "unit": "fluentbit", "container": "fluentbit", "folder": "fluentbit", "var": "image_fluentbit",
      "build": None},
     {"name": "fabric-web", "unit": "fabric-web", "container": "fabric-web", "folder": "webui", "var": "image_debian",

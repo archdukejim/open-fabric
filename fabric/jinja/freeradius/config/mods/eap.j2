@@ -1,0 +1,43 @@
+# EAP: only EAP-TLS (design §6). Every client certificate must chain to the
+# fabric CA; which device it belongs to, and whether that device may join,
+# is decided by fabric_policy in the fabric-check-eap-tls virtual server.
+eap {
+	default_eap_type = tls
+	timer_expire = 60
+	ignore_unknown_eap_types = no
+	max_sessions = ${max_requests}
+
+	tls-config tls-fabric {
+		certificate_file = ${certdir}/server.pem
+		private_key_file = ${certdir}/server.key
+		ca_file = ${certdir}/ca.pem
+		cipher_list = "DEFAULT"
+		cipher_server_preference = yes
+		tls_min_version = "1.2"
+		tls_max_version = "1.2"
+		ecdh_curve = ""
+		fragment_size = 1024
+		include_length = yes
+		check_crl = no
+		# No session resumption: every connection is checked against the
+		# directory, so a disabled device or an unlinked certificate is out
+		# at its next authentication.
+		cache {
+			enable = no
+		}
+		# The certificate exists as a file only while this runs: record its
+		# SHA-256 fingerprint (what devices are linked by) under its serial.
+		verify {
+			tmpdir = ${run_dir}/verify
+			client = "/usr/bin/python3 /etc/freeradius/python/record_fingerprint.py %{TLS-Client-Cert-Filename}"
+		}
+		ocsp {
+			enable = no
+		}
+	}
+
+	tls {
+		tls = tls-fabric
+		virtual_server = fabric-check-eap-tls
+	}
+}

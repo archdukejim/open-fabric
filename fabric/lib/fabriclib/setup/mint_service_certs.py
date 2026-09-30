@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from fabriclib.common.console import ok
+from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.pki.install_cert import install_cert
 from fabriclib.pki.mint_cert import mint_cert
 from fabriclib.pki.needs_renewal import needs_renewal
@@ -29,6 +30,9 @@ def _targets(ctx):
         t.append(("postgres", [f"postgres.{v['domain']}"], [(p("postgres", "certs"), "postgres")], ["postgres"]))
     if v.get("install_webui"):
         t.append((v["hostname_mgr"], [], [nginx(v["hostname_mgr"])], ["nginx"]))
+    if v.get("install_freeradius"):
+        # the EAP-TLS server certificate supplicants check (server.pem, server.key)
+        t.append((v["hostname_radius"], [], [(p("freeradius", "certs"), "freeradius:eap")], ["freeradius"]))
     return t
 
 
@@ -59,7 +63,7 @@ def run(ctx):
     for cn, sans, dests, services in _targets(ctx):
         first = dests[0][0]
         check = ctx.path("dirsrv", "data", "tls", "server.crt") if first == "dirsrv-tls" \
-            else os.path.join(first, "fullchain.pem")
+            else os.path.join(first, "server.pem" if dests[0][1] == "freeradius:eap" else "fullchain.pem")
         if not ctx.force_certs and not needs_renewal(check, [cn, *sans], (root_ca, intermediate)):
             ok(f"{cn}: current")
             continue
@@ -67,6 +71,8 @@ def run(ctx):
         for dest, user in dests:
             if dest == "dirsrv-tls":
                 _install_dirsrv_tls(ctx, crt, key, root_ca, intermediate)
+            elif user == "freeradius:eap":
+                install_cert(crt, key, root_ca, dest, *ctx.uid("freeradius"), names=("server.pem", "server.key", None))
             else:
                 install_cert(crt, key, root_ca, dest, *ctx.uid(user))
         os.remove(key)
@@ -85,5 +91,14 @@ def run(ctx):
         os.chown(bundle, uid, gid)
         os.chmod(bundle, 0o644)
         ok("web UI client-certificate CA bundle")
+    if ctx.vars.get("install_freeradius"):
+        # EAP-TLS accepts client certificates from the fabric CA only; the same
+        # bundle verifies 389-DS for the policy's directory lookups
+        uid, gid = ctx.uid("freeradius")
+        bundle = "".join(open(src).read() for src in (root_ca, intermediate))
+        os.makedirs(ctx.path("freeradius", "certs"), mode=0o750, exist_ok=True)
+        if write_file_if_changed(ctx.path("freeradius", "certs", "ca.pem"), bundle, 0o644, uid, gid):
+            restart.add("freeradius")
+            ok("FreeRADIUS CA bundle")
     ctx.restart_services.update(restart)
     mint_extra_certs(ctx)

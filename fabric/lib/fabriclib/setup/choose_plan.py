@@ -71,6 +71,22 @@ def _ask_dhcp(ctx):
     ctx.vars["dhcp"] = d
 
 
+def _ask_radius(ctx):
+    """Optional (off by default): FreeRADIUS 802.1X. Devices and their roles
+    live in the directory; switches are added later (fabricctl radius
+    add-client, or the FreeRADIUS tab)."""
+    on = bool(ctx.vars.get("install_freeradius"))
+    answer = input(f"\n  Optional: 802.1X with FreeRADIUS (devices join by certificate or MAC, VLAN per role)? "
+                   f"[{'Y/n' if on else 'y/N'}] ").strip().lower()
+    on = answer.startswith("y") if answer else on
+    if on and ctx.vars.get("install_ldap") is False:
+        print(f"    {YELLOW}802.1X checks every device in the directory: it needs 389-DS (install_ldap).{NC}")
+        on = False
+    ctx.vars["install_freeradius"] = on
+    if on:
+        print("    Add your switches and access points afterwards: sudo fabricctl radius add-client <name> <address>")
+
+
 def _get(data, dotted, default):
     node = data
     for part in dotted.split("."):
@@ -111,6 +127,11 @@ def choose_plan(ctx):
             print(f"  ✓ Optional: DHCP with Kea 3.0 on {subnets or '(no subnet yet)'}; hostnames in dhcp.<domain>")
         else:
             print("  · Optional, off: DHCP with Kea (hostnames registered in DNS) — choose it in Advanced")
+        if ctx.vars.get("install_freeradius"):
+            n = len(ctx.vars.get("radius_clients") or [])
+            print(f"  ✓ Optional: 802.1X with FreeRADIUS ({n} RADIUS client{'s' if n != 1 else ''})")
+        else:
+            print("  · Optional, off: 802.1X with FreeRADIUS — choose it in Advanced")
         if ctx.vars.get("install_fluentbit"):
             print(f"  ✓ Optional: forward all logs with Fluent Bit to {', '.join(dests) or '(no destination yet)'}")
         else:
@@ -141,5 +162,6 @@ def choose_plan(ctx):
             if not _get(ctx.vars, "install_keycloak", True):
                 _set(ctx.vars, "install_webui", False)
             _ask_dhcp(ctx)
+            _ask_radius(ctx)
             _ask_log_forwarding(ctx)
             show()

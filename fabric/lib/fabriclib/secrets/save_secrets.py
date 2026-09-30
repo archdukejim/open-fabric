@@ -12,7 +12,7 @@ from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
 def save_secrets(update, path=SECRETS_FILE, v=None):
     """Apply `update` to fabric's secrets where they live (see load_secrets):
     top-level keys are set, a None value removes a key, and `tsig_secrets`
-    is merged key by key (a None secret removes that key). OpenBao gets a new
+    and `radius_secrets` are merged key by key (a None secret removes that key). OpenBao gets a new
     version only if something changed (check-and-set against the version
     read). Returns the full, updated secrets."""
     in_vault = secrets_in_openbao(path) and not os.path.exists(path)
@@ -26,14 +26,14 @@ def save_secrets(update, path=SECRETS_FILE, v=None):
                 current = yaml.safe_load(f) or {}
     new = dict(current)
     for key, value in update.items():
-        if key == "tsig_secrets" and isinstance(value, dict):
-            tsig = dict(new.get("tsig_secrets") or {})
+        if key in ("tsig_secrets", "radius_secrets") and isinstance(value, dict):
+            merged = dict(new.get(key) or {})
             for name, secret in value.items():
                 if secret is None:
-                    tsig.pop(name, None)
+                    merged.pop(name, None)
                 else:
-                    tsig[name] = secret
-            new["tsig_secrets"] = tsig
+                    merged[name] = secret
+            new[key] = merged
         elif value is None:
             new.pop(key, None)
         else:

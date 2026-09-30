@@ -11,7 +11,7 @@ from fabriclib.setup.start_unit import start_unit
 ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv", "install_ldap"),
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit"),
-         ("kea", "kea-dhcp4", "install_kea")]
+         ("kea", "kea-dhcp4", "install_kea"), ("freeradius", "freeradius", "install_freeradius")]
 
 
 def run(ctx):

@@ -11,6 +11,7 @@ Use `fabricctl` (the global wrapper powered by the interactive Python engine) fo
   - [`--apply`](#--apply)
   - [Log forwarding (optional: Fluent Bit)](#log-forwarding-optional-fluent-bit)
   - [DHCP (optional: Kea)](#dhcp-optional-kea)
+  - [802.1X (optional: FreeRADIUS)](#8021x-optional-freeradius)
   - [`fabricctl images`](#fabricctl-images) (was `--update-containers`)
   - [`--version`](#--version)
   - [`--client-cert <user>`](#--client-cert-user)
@@ -139,6 +140,49 @@ A reservation is saved to `vars.yaml` and applied at once (`--no-apply` to
 batch); the client gets the address at its next renewal. Leases live in
 `/opt/kea/leases` (memfile) and survive restarts and upgrades. The firewall
 opens UDP 67 on the DHCP interfaces only.
+
+#### 802.1X (optional: FreeRADIUS)
+Off unless chosen in setup's Advanced plan or `install_freeradius: true`
+(needs the directory, `install_ldap`). FreeRADIUS 3.2 answers your
+switches and access points on UDP 1812 (accounting 1813, acknowledged and
+not stored) at the host IP.
+
+**Who may join** is decided per device in the directory (389-DS tab →
+Devices and Roles), on every request:
+
+- **EAP-TLS** — the device presents a certificate from the fabric CA that is
+  *linked* to it (issued or signed for the device on the Step-CA tab, or
+  linked on its page), and one of its roles grants `network:eap-tls`.
+  Supplicants should check the server certificate `radius.<domain>`
+  against the fabric root CA.
+- **MAB** (printers, cameras, IoT without a supplicant) — the switch sends
+  the device's MAC; one of its roles grants `network:mab`. A MAC can be
+  copied, so give MAB roles a restricted VLAN.
+- **VLAN** — from the device's role with the lowest priority number that
+  sets one (none: the switch port's default).
+- **Refused**: a disabled device, an unlinked certificate, a certificate
+  from another CA, a role without the permission, and everything while the
+  directory cannot be asked (fail closed). Disabling a device or unlinking a
+  certificate takes effect at its next authentication.
+
+RADIUS clients (the switches and access points that ask):
+
+```bash
+sudo fabricctl radius add-client switch1 192.168.4.2        # prints its shared secret once
+sudo fabricctl radius add-client aps 192.168.10.0/24 --secret-prompt   # keep a secret they already have
+sudo fabricctl radius rotate-secret switch1
+sudo fabricctl radius remove-client switch1
+sudo fabricctl radius status                                 # server name, clients
+sudo fabricctl radius log                                    # recent decisions: accepted / refused and why
+```
+
+Or in `vars.yaml` (re-run setup): `radius_clients: [{name: switch1, address:
+192.168.4.2}]`. Secrets live in OpenBao (`radius_secrets`); a `secret:`
+written in the vars file is moved there. Every client must send a
+Message-Authenticator (BlastRADIUS, CVE-2024-3596); set
+`message_authenticator: false` only for a device that cannot, and it shows
+on the FreeRADIUS tab. Clients outside the LAN are let through the
+firewall to the RADIUS ports only.
 
 #### `fabricctl images`
 Every container image is pinned by digest (amd64 + arm64). The validated

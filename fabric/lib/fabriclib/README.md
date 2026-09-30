@@ -14,6 +14,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [security/](security/) | Firewall for Docker-published ports |
 | [rbac/](rbac/) | Access control for people: permissions, bundles, what each fabric-agent route needs |
 | [dhcp/](dhcp/) | Optional DHCP (Kea 3.0): `dhcp:` checks, config, DDNS zone, reservations, leases, `fabricctl dhcp` |
+| [radius/](radius/) | Optional 802.1X (FreeRADIUS): RADIUS clients and their secrets, config, decisions log, `fabricctl radius` |
 | [logs/](logs/) | Optional log forwarding (Fluent Bit): config, credentials, status |
 | [images/](images/) | Container images: status against the validated list, update (health-gated, rollback), prune |
 

@@ -73,6 +73,7 @@ hostname_mgr: {{ _hostname_mgr }}
 {# CA certificates for every system (certs.<domain>); ca.<domain> is Step-CA's API. #}
 hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
 hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower }}
+hostname_radius: {{ ((cname_radius | default('radius')) ~ '.' ~ domain) | lower }}
 
 # ============================================================
 # DOCKER IMAGES
@@ -92,6 +93,7 @@ image_debian: {{ image_debian | default(images_lock.debian) }}
 image_dirsrv: {{ image_dirsrv | default('fabric/dirsrv:local') }}
 image_webui: {{ image_webui | default('fabric/web:local') }}
 image_kea: {{ image_kea | default('fabric/kea:local') }}
+image_freeradius: {{ image_freeradius | default('fabric/freeradius:local') }}
 {# image_* keys the admin set explicitly: `fabricctl images update` leaves them alone. #}
 image_pins: {{ image_pins | default([], true) | to_json }}
 # After `fabricctl images update`: remove old images of fabric's repositories (never the rollback one).
@@ -124,6 +126,14 @@ kea_mem_limit: {{ kea_mem_limit | default('128m') }}
 # interfaces: host interfaces to serve; subnets: [{subnet, pools: ["a - b"], routers,
 # reservations: [{mac, ip, hostname}]}]; ddns (true), ddns_subdomain (dhcp), lease_time (s), dns
 dhcp: {{ dhcp | default({}, true) | to_json }}
+# 802.1X (optional, design §6): FreeRADIUS 3.2 checks each device against 389-DS
+# (EAP-TLS by linked certificate, MAB by MAC) and returns its role's VLAN.
+install_freeradius: {{ install_freeradius | default(false) | bool }}
+ip_freeradius: {{ ip_freeradius | default('10.255.0.98') }}
+freeradius_mem_limit: {{ freeradius_mem_limit | default('128m') }}
+# The switches and access points that ask: [{name, address (IP or CIDR), message_authenticator (true)}].
+# Each one's shared secret is generated and kept in OpenBao (fabricctl secrets show radius_secrets).
+radius_clients: {{ radius_clients | default([], true) | to_json }}
 ip_fluentbit: {{ ip_fluentbit | default('10.255.0.95') }}
 fluentbit_mem_limit: {{ fluentbit_mem_limit | default('64m') }}
 # syslog: {host, port (6514), tls (true), ca_file}; elastic: {url, index, user, ca_file}.
@@ -188,7 +198,8 @@ service_dirs:
   'webui': {'uid': 912, 'gid': 912},
   'openbao': {'uid': 913, 'gid': 913},
   'fluentbit': {'uid': 914, 'gid': 914},
-  'kea': {'uid': 915, 'gid': 915}
+  'kea': {'uid': 915, 'gid': 915},
+  'freeradius': {'uid': 916, 'gid': 916}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:

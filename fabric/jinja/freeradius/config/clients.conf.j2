@@ -1,0 +1,13 @@
+# RADIUS clients (switches, access points): vars.yaml radius_clients.
+# Secrets come from OpenBao (radius_secrets); this file is root:freerad 0640.
+# require_message_authenticator: refuse Access-Requests without one
+# (BlastRADIUS, CVE-2024-3596); limit_proxy_state likewise.
+{% for c in radius_clients | default([]) %}
+client {{ c.name }} {
+	ipaddr = {{ c.address }}
+	secret = "{{ radius_secrets[c.name] }}"
+	shortname = {{ c.name }}
+	require_message_authenticator = {{ 'yes' if c.message_authenticator | default(true) else 'no' }}
+	limit_proxy_state = yes
+}
+{% endfor %}

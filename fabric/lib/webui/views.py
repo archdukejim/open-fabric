@@ -16,10 +16,6 @@ TABS = [
     ("freeradius", "/freeradius", "FreeRADIUS · 802.1X", True),
     ("openbao", "/openbao", "OpenBao · Secrets", False),
 ]
-PLACEHOLDERS = {
-    "freeradius": ("FreeRADIUS 802.1X", "Network access: EAP-TLS device certificates, MAC authentication, "
-                                       "VLAN assignment, switches and access points (NAS clients)."),
-}
 # BIND9 tab sections: (view, label)
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
 # OpenBao tab sections and unlock-method (key slot) types
@@ -341,6 +337,61 @@ _TEMPLATES = {
 <p>One-time password — <strong>shown only now</strong>, stored nowhere:</p>
 <pre class="secret">{{ password }}</pre>
 <p class="muted">Give it to {{ uid }} over a safe channel. At the next sign-in they choose their own password and set up two-factor (TOTP){{ '; their previous sessions were ended' if what == 'reset' else '' }}.</p>
+</section>
+{% endblock %}""",
+
+    "freeradius": """{% extends "base" %}
+{% block body %}
+<h1>FreeRADIUS · 802.1X <span class="opt">optional</span></h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+{% if not r.enabled %}
+<section class="card"><h2>802.1X is off</h2>
+<p class="muted">FreeRADIUS 3.2 lets switches and access points ask fabric which devices may join: by their certificate (EAP-TLS) or, for printers and IoT, by MAC (MAB). Each device is checked against the directory (Devices and Roles on the 389-DS tab) and put on its role's VLAN. Turn it on in <code>vars.yaml</code> and re-run setup:</p>
+<pre>install_freeradius: true
+radius_clients:
+  - { name: switch1, address: 192.168.4.2 }</pre></section>
+{% else %}
+<section class="card"><h2>Server</h2>
+<p>Switches and access points send RADIUS to <code>{{ r.host_ip }}</code> UDP 1812 (accounting 1813). Supplicants check the server certificate <code>{{ r.server_name }}</code>, issued by the fabric CA.</p>
+<p class="muted">Who may join is decided per device on the 389-DS tab: a role with <code>network:eap-tls</code> (certificate linked to the device) or <code>network:mab</code> (the device's MAC), and optionally a VLAN. A disabled device, or an unlinked certificate, is refused at its next authentication.</p>
+</section>
+<section class="card"><h2>RADIUS clients <span class="muted">switches and access points</span></h2>
+{% if r.clients %}<table><thead><tr><th>Name</th><th>Address</th><th>Message-Authenticator</th><th></th></tr></thead><tbody>
+{% for c in r.clients %}<tr><td>{{ c.name }}</td><td><code>{{ c.address }}</code></td>
+<td>{% if c.message_authenticator %}required{% else %}<span class="pill warn">not required</span>{% endif %}</td>
+<td>{% if can('radius:admin') %}<div class="row-actions"><form method="post" action="/freeradius/clients/{{ c.name | urlencode }}/rotate"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost">New secret</button></form>
+<form method="post" action="/freeradius/clients/{{ c.name | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Remove</button></form></div>{% endif %}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="blank">No RADIUS clients yet: nothing can ask.</p>{% endif %}
+{% if can('radius:admin') %}<form method="post" action="/freeradius/clients" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Name<input name="name" required pattern="[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?" placeholder="switch1"></label>
+<label>Address (IP or network)<input name="address" required placeholder="192.168.4.2"></label>
+<label class="wide">Existing secret (optional — a device that already has one)<input name="secret" type="password" autocomplete="off" placeholder="leave empty to generate"></label>
+<label class="check"><input type="checkbox" name="message_authenticator" value="1" checked> Require Message-Authenticator (BlastRADIUS protection; turn off only for devices that cannot send it)</label>
+<div><button>Add client</button></div>
+</form>
+<p class="muted small">Saved and applied at once; the shared secret is shown once and kept in OpenBao.</p>{% endif %}
+</section>
+<section class="card"><h2>Recent decisions <span class="muted">{{ r.log | length }}</span></h2>
+{% if r.log_error %}<p class="flash warn">{{ r.log_error }}</p>{% endif %}
+{% if r.log %}<table><thead><tr><th>Time</th><th></th><th>Method</th><th>Device</th><th>VLAN</th><th>MAC</th><th>Via</th><th>Why</th></tr></thead><tbody>
+{% for e in r.log %}<tr><td>{{ e.time }}</td><td>{% if e.decision == 'ACCEPT' %}<span class="light ok"></span> accepted{% else %}<span class="light bad"></span> refused{% endif %}</td>
+<td>{{ e.method }}</td><td>{{ e.device }}</td><td>{{ e.vlan }}</td><td><code>{{ e.mac }}</code></td><td>{{ e.nas }}</td><td class="muted">{{ e.reason }}</td></tr>{% endfor %}
+</tbody></table>{% elif not r.log_error %}<p class="blank">No authentications yet.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}""",
+
+    "radius_secret": """{% extends "base" %}
+{% block body %}
+<h1>FreeRADIUS · 802.1X</h1>
+<p><a href="/freeradius">← RADIUS clients</a></p>
+<section class="card"><h2>{{ client }}: {{ 'added' if action == 'added' else 'new shared secret' }}</h2>
+<p>Shared secret — <strong>shown only now</strong>, kept in OpenBao:</p>
+<pre class="secret">{{ secret }}</pre>
+<p class="muted">Enter it on {{ client }} as its RADIUS server secret for {{ host_ip }} (auth 1812, accounting 1813).{% if action != 'added' %} Until then FreeRADIUS does not answer it.{% endif %}</p>
+{% if not applied %}<p class="flash bad">Saved, but applying failed: {{ output }}</p>{% endif %}
 </section>
 {% endblock %}""",
 
@@ -770,14 +821,6 @@ sudo umount /mnt</pre>
 <p><a href="/bind9?view=tsig">Back to TSIG keys</a></p>
 {% endblock %}""",
 
-    "placeholder": """{% extends "base" %}{% block body %}
-<h1>{{ title }}{% if optional %} <span class="pill">optional</span>{% endif %}</h1>
-<section class="card blank-card">
-<p class="blank">Left intentionally blank.</p>
-<p class="muted">{{ about }}</p>
-{% if optional %}<p class="muted">Optional feature: it can be added to or removed from a running fabric.</p>{% endif %}
-</section>
-{% endblock %}""",
 
     "apply": """{% extends "base" %}{% block body %}
 <h1>Apply {{ 'succeeded' if ok else 'failed' }}</h1>
@@ -794,6 +837,7 @@ _env.loader = jinja2.DictLoader(_TEMPLATES)
 # every permission a page asks about (the dev preview's fallback when it runs without fabriclib)
 PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write", "pki:read", "pki:issue", "pki:sign",
                  "pki:link-device", "devices:read", "devices:enroll", "devices:admin", "roles:admin", "radius:read",
+                 "radius:admin",
                  "people:read", "vault:status", "vault:unlock", "audit:read"]
 # tab -> the permission(s) that show it (any of them)
 TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dhcp:read",), "stepca": ("pki:read",),
@@ -860,6 +904,15 @@ def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host
                    add_live=add_live or {"security-key": False, "usb": False, "hsm": False})
 
 
+def freeradius(ctx, overview, msg="", err=""):
+    return _render("freeradius", ctx=ctx, tab="freeradius", r=overview, msg=msg, err=err)
+
+
+def radius_secret(ctx, name, secret, action, host_ip, applied=True, output=""):
+    return _render("radius_secret", ctx=ctx, tab="freeradius", client=name, secret=secret, action=action,
+                   host_ip=host_ip, applied=applied, output=output[-300:])
+
+
 def kea(ctx, overview, msg="", err=""):
     return _render("kea", ctx=ctx, tab="kea", d=overview, msg=msg, err=err)
 
@@ -902,12 +955,6 @@ def pki_result(ctx, kind, r):
 def tsig_result(ctx, name, secret, ini, action):
     return _render("tsig_result", ctx=ctx, tab="bind9", key_name=name, secret=secret, ini=ini, ini_b64=_b64(ini),
                    action=action)
-
-
-def placeholder(ctx, tab):
-    title, about = PLACEHOLDERS[tab]
-    optional = next(opt for tid, _, _, opt in TABS if tid == tab)
-    return _render("placeholder", ctx=ctx, tab=tab, title=title, about=about, optional=optional)
 
 
 def apply_result(ctx, ok, output):

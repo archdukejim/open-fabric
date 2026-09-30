@@ -17,7 +17,8 @@ env = jinja_env(os.path.join(REPO, 'fabric', 'jinja'))
 secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
                ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
-               ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1', ldap_device_admin_password='Da1',
+               ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1', ldap_device_admin_password='Da1', ldap_radius_password='Rr1',
+               radius_secrets={'switch1': 'Sw1tchSecretSw1tchSecret', 'ap-old': 'OldApSecretOldApSecret'},
                webui_oidc_secret='OidcSecret1',
                tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA==',
                              'dev1': 'ZGV2MS1zZWNyZXQ=', 'lonely': 'bG9uZWx5LXNlY3JldA=='})
@@ -228,6 +229,40 @@ assert kc["kea-ddns"]["user"] == "915:915" and not kc["kea-ddns"].get("cap_add")
 assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
 print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, two capabilities only')
 
+# FreeRADIUS (802.1X): clients with their secrets, BlastRADIUS protection unless relaxed per client,
+# EAP-TLS only with the fabric CA, no session resumption, the policy module, a hardened container
+sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
+rclients, rembedded = normalize_radius_clients([{"name": "Switch1", "address": "192.168.7.2"},
+                                                {"name": "ap-old", "address": "192.168.7.16/28",
+                                                 "message_authenticator": False, "secret": "OldApSecretOldApSecret"}])
+assert rclients[0] == {"name": "switch1", "address": "192.168.7.2", "message_authenticator": True}, rclients
+assert rembedded == {"ap-old": "OldApSecretOldApSecret"} and "secret" not in rclients[1], "secret must leave vars"
+for bad in ([{"name": "a", "address": "0.0.0.0/0"}], [{"name": "a", "address": "10.0.0.1"}, {"name": "b", "address": "10.0.0.0/24"}],
+            [{"name": "a", "address": "10.0.0.1"}, {"name": "a", "address": "10.0.0.2"}], [{"name": "a b", "address": "10.0.0.1"}],
+            [{"name": "a", "address": "10.0.0.1", "secret": "has $ {dollar} x"}], [{"name": "a", "address": "10.0.0.1", "secret": "short"}]):
+    try:
+        normalize_radius_clients(bad)
+        raise AssertionError(f"accepted: {bad}")
+    except ValidationError:
+        pass
+rv_ = {**v2, "install_freeradius": True, "radius_clients": rclients, "radius_secrets": secrets["radius_secrets"]}
+clients_conf = env.get_template("freeradius/config/clients.conf.j2").render(**rv_)
+assert 'secret = "Sw1tchSecretSw1tchSecret"' in clients_conf and "ipaddr = 192.168.7.16/28" in clients_conf
+assert clients_conf.count("require_message_authenticator = yes") == 1 and "require_message_authenticator = no" in clients_conf
+eap = env.get_template("freeradius/config/mods/eap.j2").render(**rv_)
+assert "default_eap_type = tls" in eap and "ca_file = ${certdir}/ca.pem" in eap and "enable = no" in eap \
+    and "virtual_server = fabric-check-eap-tls" in eap and "peap" not in eap.lower() and "md5" not in eap.lower()
+frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
+assert frj["uri"] == "ldaps://ldap.lan.j-j.family:3636" and frj["bind_dn"].startswith("cn=radius_reader,")
+fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
+assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "916:916", fc
+assert fc["ports"] == ["192.168.7.53:1812:1812/udp", "192.168.7.53:1813:1813/udp"], fc["ports"]
+accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
+assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts
+print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS only, policy lookup, no capabilities")
+
 # each systemd unit waits for its health check by container name: that name
 # must be a container_name in its compose template (else start hangs 10 min)
 for container, folder in re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'",
@@ -236,3 +271,12 @@ for container, folder in re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'"
     assert re.search(rf"^\s+container_name: {re.escape(container)}\s*$", text, re.M), (folder, container)
 print('every unit waits on a container its compose file defines')
 print('all templates rendered')
+
+# every fabricctl module imports (a syntax error there only shows in a full install otherwise)
+import importlib  # noqa: E402
+import pkgutil  # noqa: E402
+import fabriclib  # noqa: E402
+for mod in pkgutil.walk_packages(fabriclib.__path__, "fabriclib."):
+    if not mod.name.endswith(".cli"):
+        importlib.import_module(mod.name)
+print('every fabriclib module imports')

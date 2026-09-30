@@ -1,17 +1,7 @@
 import os
 
+from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.dhcp.ensure_ddns_zone import ensure_ddns_zone
-
-
-def _write(path, text, mode, uid=0, gid=0):
-    if os.path.exists(path) and open(path).read() == text:
-        return False
-    fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-    with os.fdopen(fd, "w") as f:
-        f.write(text)
-    os.chown(path + ".tmp", uid, gid)
-    os.replace(path + ".tmp", path)
-    return True
 
 
 def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
@@ -31,7 +21,7 @@ def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
     changed = False
     for name in ("kea-dhcp4.conf", "kea-dhcp-ddns.conf"):
         text = jinja_env.get_template(f"kea/{name}.j2").render(**ctx)
-        changed |= _write(os.path.join(base, "config", name), text, 0o640, 0, kgid)
+        changed |= write_file_if_changed(os.path.join(base, "config", name), text, 0o640, 0, kgid)
     if (v.get("dhcp") or {}).get("ddns", True):
         ensure_ddns_zone(v, bind_uid, bind_gid)
     return changed

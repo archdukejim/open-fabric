@@ -247,6 +247,24 @@ def remove_reservation(mac):
     return _call("POST", f"/v1/dhcp/reservations/{_q(mac)}/delete", {}, timeout=300)
 
 
+def radius_overview():
+    return _call("GET", "/v1/radius")
+
+
+def add_radius_client(name, address, message_authenticator=True, secret=""):
+    """Saved and applied at once; the secret comes back once."""
+    return _call("POST", "/v1/radius/clients", {"name": name, "address": address, "secret": secret,
+                                                "message_authenticator": message_authenticator}, timeout=300)
+
+
+def rotate_radius_secret(name, secret=""):
+    return _call("POST", f"/v1/radius/clients/{_q(name)}/rotate", {"secret": secret}, timeout=300)
+
+
+def remove_radius_client(name):
+    return _call("POST", f"/v1/radius/clients/{_q(name)}/delete", {}, timeout=300)
+
+
 def create_person(uid, first, last, email):
     """Returns the one-time password (shown once)."""
     return _call("POST", "/v1/people", {"uid": uid, "first": first, "last": last, "email": email})["password"]

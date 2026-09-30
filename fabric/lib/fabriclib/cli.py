@@ -11,6 +11,8 @@
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
   fabricctl dhcp status|leases|reserve|unreserve
                                  DHCP (optional Kea): subnets, leases, reservations
+  fabricctl radius status|log|add-client|rotate-secret|remove-client
+                                 802.1X (optional FreeRADIUS): RADIUS clients, decisions
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
   fabricctl logs status|set-password elastic
                                  log forwarding (optional Fluent Bit): destinations, sent, errors
@@ -36,6 +38,7 @@ import sys
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
+from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
@@ -77,6 +80,8 @@ def main(argv):
         return run_secrets_command(args, SetupContext(deploy_base=_base(args)).secrets_file)
     if cmd == "logs":
         return run_logs_command(SetupContext(deploy_base=_base(args)).load_state(), args)
+    if cmd == "radius":
+        return run_radius_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "dhcp":
         return run_dhcp_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "images":

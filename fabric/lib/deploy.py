@@ -11,6 +11,8 @@ from fabriclib.images.needs_rebuild import needs_rebuild  # noqa: E402
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit  # noqa: E402
 from fabriclib.dhcp.deploy_kea import deploy_kea  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
+from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
+from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
@@ -206,6 +208,7 @@ def apply_deployment(start_services=True):
         
     for name in ('ldap_super_admin_password', 'ldap_group_admin_password',
                  'ldap_user_creator_password', 'ldap_user_modifier_password', 'ldap_device_admin_password',
+                 'ldap_radius_password',
                  'webui_oidc_secret', 'openbao_oidc_secret'):
         if name not in secrets:
             # Alphanumeric: safe inside LDIF and JSON without quoting.
@@ -252,9 +255,38 @@ def apply_deployment(start_services=True):
         if kname and kname not in secrets['tsig_secrets']:
             secrets['tsig_secrets'][kname] = generate_secret_b64(32)
             changed_secrets = True
+
+    # RADIUS clients (802.1X): like TSIG keys, a `secret` in the vars file (a
+    # switch that already has one) moves into OpenBao; otherwise one is
+    # generated once. A removed client's secret is deleted.
+    try:
+        radius_clients, radius_embedded = normalize_radius_clients(custom_vars.get('radius_clients'))
+    except ValidationError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
+    custom_vars['radius_clients'] = radius_clients
+    if custom_vars.get('install_freeradius') and custom_vars.get('install_ldap') is False:
+        print("Error: 802.1X (install_freeradius) checks every device in the directory: it needs install_ldap")
+        sys.exit(1)
+    radius_secrets = dict(secrets.get('radius_secrets') or {})
+    radius_changes = {}
+    for c in radius_clients:
+        secret = radius_embedded.get(c['name']) or radius_secrets.get(c['name'])
+        if not secret:              # alphanumeric: every switch CLI takes it as typed
+            secret = run_cmd("openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32").stdout.strip()
+        if radius_secrets.get(c['name']) != secret:
+            radius_secrets[c['name']] = radius_changes[c['name']] = secret
+    for name in [n for n in radius_secrets if n not in {c['name'] for c in radius_clients}]:
+        radius_secrets.pop(name)
+        radius_changes[name] = None
+    secrets['radius_secrets'] = radius_secrets
+    if radius_changes:
+        changed_secrets = True
             
     if changed_secrets:
         update = {k: val for k, val in secrets.items() if loaded_secrets.get(k) != val}
+        if 'radius_secrets' in update:          # merged key by key: removals must be explicit
+            update['radius_secrets'] = radius_changes
         try:
             save_secrets(update, secrets_path)
         except ValidationError as e:
@@ -384,6 +416,8 @@ def apply_deployment(start_services=True):
         {'service': 'fluentbit', 'compose': 'fluentbit', 'folder': 'fluentbit', 'requires': []},
         # optional DHCP (design §5): kea-dhcp4 on the host network + kea-ddns
         {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
+        # optional 802.1X (design §6): asks 389-DS about every device
+        {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': ['ldap']},
     ]
 
     for svc_info in sys_svcs:
@@ -399,6 +433,8 @@ def apply_deployment(start_services=True):
         if svc_folder == 'fluentbit' and not final_vars.get('install_fluentbit'):
             continue
         if svc_folder == 'kea' and not final_vars.get('install_kea'):
+            continue
+        if svc_folder == 'freeradius' and not final_vars.get('install_freeradius'):
             continue
             
         render_file(f'{svc_folder}/docker-compose.yml.j2', f'{svc_folder}/docker-compose.yml')
@@ -644,6 +680,10 @@ def apply_deployment(start_services=True):
         k_uid, k_gid = get_service_user(final_vars, 'bind')
         if deploy_kea(final_vars, secrets, jinja_env, k_uid, k_gid):
             services_to_restart.add('kea')
+    # FreeRADIUS (optional): config with the client secrets, fabric's policy code, CA bundle
+    if final_vars.get('install_freeradius'):
+        if deploy_freeradius(final_vars, secrets, jinja_env):
+            services_to_restart.add('freeradius')
 
     # webui container (config, build context) + fabric-agent host unit
     webui_changed = agent_unit_changed = False

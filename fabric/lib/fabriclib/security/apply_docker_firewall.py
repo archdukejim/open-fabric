@@ -13,19 +13,23 @@ import sys
 import yaml
 
 
-def _rules(allowed_cidrs):
+def _rules(allowed_cidrs, radius_sources=()):
     rules = [["-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "RETURN"],
              # traffic originating from containers (fabric_net or any other bridge)
              ["-i", "docker0", "-j", "RETURN"],
              ["-i", "br-+", "-j", "RETURN"]]
     rules += [["-s", cidr, "-j", "RETURN"] for cidr in allowed_cidrs]
+    # RADIUS clients (switches, APs) may sit outside the LAN: RADIUS ports only
+    rules += [["-s", src, "-p", "udp", "-m", "multiport", "--dports", "1812,1813", "-j", "RETURN"]
+              for src in radius_sources]
     rules.append(["-m", "conntrack", "--ctstate", "NEW", "-j", "DROP"])
     return rules
 
 
 def apply_docker_firewall(vars_file):
     """Flush and rebuild DOCKER-USER: only the LAN (and security.firewall_allow)
-    may open new connections to published container ports."""
+    may open new connections to published container ports; RADIUS clients
+    (802.1X) only to FreeRADIUS's ports."""
     with open(vars_file) as f:
         v = yaml.safe_load(f) or {}
     security = v.get("security") or {}
@@ -37,7 +41,9 @@ def apply_docker_firewall(vars_file):
     if subprocess.run(["iptables", "-L", "DOCKER-USER", "-n"], capture_output=True).returncode != 0:
         subprocess.run(["iptables", "-N", "DOCKER-USER"], check=True)
     subprocess.run(["iptables", "-F", "DOCKER-USER"], check=True)
-    for rule in _rules(allowed):
+    radius = [c["address"] for c in v.get("radius_clients") or []
+              if v.get("install_freeradius") and ":" not in str(c.get("address", ""))]
+    for rule in _rules(allowed, radius):
         subprocess.run(["iptables", "-A", "DOCKER-USER", *rule], check=True)
     return f"published ports limited to {', '.join(allowed)}"
 

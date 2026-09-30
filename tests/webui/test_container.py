@@ -331,9 +331,10 @@ check("overview tab renders service health", st == 200 and "Overview" in body an
 st, hd, sc, body = req("GET", "/kea", ALICE, cookie=session)
 check("Kea tab: DHCP off on this host, how to turn it on", st == 200 and "DHCP is off" in body and "install_kea" in body,
       (st, body[:300]))
-for tab in ("freeradius",):
-    st, hd, sc, body = req("GET", f"/{tab}", ALICE, cookie=session)
-    check(f"{tab} tab renders its placeholder", st == 200 and "Left intentionally blank" in body and 'class="tab active"' in body, st)
+st, hd, sc, body = req("GET", "/freeradius", ALICE, cookie=session)
+check("FreeRADIUS tab: 802.1X off on this host, how to turn it on",
+      st == 200 and "802.1X is off" in body and "install_freeradius" in body and 'class="tab active"' in body,
+      (st, body[:300]))
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("footer shows real version", "fabricctl 9.9.9" in body, body[-300:])
 st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
@@ -569,6 +570,12 @@ out = agent_call("POST", "/v1/people", "carol", AUDITOR_ROLES, {"uid": "mallory"
 check("auditor token: may not create people (403, people:create)", " 403 " in out and "people:create" in out, out)
 out = agent_call("POST", "/v1/people/alice/reset", "carol", AUDITOR_ROLES)
 check("auditor token: may not reset a sign-in (403, people:reset)", " 403 " in out and "people:reset" in out, out)
+out = agent_call("POST", "/v1/radius/clients", "carol", AUDITOR_ROLES, {"name": "evil", "address": "192.168.7.66"})
+check("auditor token: may not add a RADIUS client (403, radius:admin)", " 403 " in out and "radius:admin" in out, out)
+out = agent_call("POST", "/v1/radius/clients", "carol", bundle_roles("fabric-network-operator"),
+                 {"name": "evil", "address": "192.168.7.66"})
+check("network operator token: may not add a RADIUS client either (802.1X is equipment operators')",
+      " 403 " in out and "radius:admin" in out, out)
 out = agent_call("GET", "/v1/nope", "alice", ADMIN_ROLES)
 check("a route that is not in the permission table is refused even for the admin", " 403 " in out, out)
 out = agent_call("GET", "/v1/zones", "alice", ADMIN_ROLES, exp=-600)

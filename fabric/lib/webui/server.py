@@ -486,8 +486,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.openbao_page(ctx, query)
         if path == "/kea":
             return self.send(200, views.kea(ctx, actions.dhcp_overview(), query.get("msg", ""), query.get("err", "")))
-        if path.lstrip("/") in views.PLACEHOLDERS:
-            return self.send(200, views.placeholder(ctx, path.lstrip("/")))
+        if path == "/freeradius":
+            return self.send(200, views.freeradius(ctx, actions.radius_overview(), query.get("msg", ""),
+                                                   query.get("err", "")))
         if path == "/audit":
             return self.send(200, views.audit(ctx, actions.read_audit()))
         return self.deny(404, "Not found.")
@@ -546,9 +547,38 @@ class Handler(BaseHTTPRequestHandler):
             except actions.ValidationError as exc:
                 return self.redirect("/kea?" + urllib.parse.urlencode({"err": str(exc)}))
             return self.redirect("/kea?" + urllib.parse.urlencode({"msg": msg}))
+        if path.startswith("/freeradius/clients"):
+            return self.radius_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[3:]], form)
         if path.startswith("/bind9/tsig/"):
             return self.tsig_post(sess, urllib.parse.unquote(path[len("/bind9/tsig/"):]), form)
         return self.deny(404, "Not found.")
+
+    def radius_post(self, sess, parts, form):
+        """RADIUS clients: add, new secret, remove — saved and applied at
+        once; a secret is shown once on its own page, never in a URL."""
+        try:
+            if not parts:
+                name = form.get("name", "").strip().lower()
+                res = actions.add_radius_client(name, form.get("address", ""),
+                                                form.get("message_authenticator") == "1", form.get("secret", ""))
+                action = "added"
+            elif len(parts) == 2 and parts[1] == "rotate":
+                name, action = parts[0], "rotated"
+                res = actions.rotate_radius_secret(name)
+            elif len(parts) == 2 and parts[1] == "delete":
+                res = actions.remove_radius_client(parts[0])
+                msg = f"RADIUS client {parts[0]} removed."
+                if not res.get("applied"):
+                    return self.redirect("/freeradius?" + urllib.parse.urlencode(
+                        {"err": msg + " Saved, but applying failed: " + res.get("output", "")[-300:]}))
+                return self.redirect("/freeradius?" + urllib.parse.urlencode({"msg": msg}))
+            else:
+                return self.deny(404, "Not found.")
+        except actions.ValidationError as exc:
+            return self.redirect("/freeradius?" + urllib.parse.urlencode({"err": str(exc)}))
+        host_ip = (actions.radius_overview() or {}).get("host_ip", "")
+        return self.send(200, views.radius_secret(self.ctx(sess), name, res.get("secret", ""), action, host_ip,
+                                                  bool(res.get("applied")), res.get("output", "")))
 
     def stepca_post(self, sess, op, form):
         """Manual PKI: each form maps to one fabric-agent operation."""
