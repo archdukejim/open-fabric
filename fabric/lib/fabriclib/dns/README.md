@@ -1,6 +1,6 @@
 # fabriclib/dns
 
-DNS zones and records as stored in `vars.yaml` (`dns:`), used by fabricd
+DNS zones and records as stored in `vars.yaml` (`dns:`), used by fabric-agent
 (web UI) and the `fabricctl --interactive` editor alike. Publishing happens
 through apply (`deploy.py`), which reloads only changed zones.
 

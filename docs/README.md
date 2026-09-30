@@ -4,7 +4,7 @@
 |---|---|
 | `install.md` | Install, upgrade, reinstall, uninstall / export / restore |
 | `operations.md` | Day-2: `fabricctl` commands, OpenBao and its unlock methods, secrets, images, log forwarding |
-| `webui.md` | Fabric — web control: tabs, security model, who may do what (RBAC), first sign-in |
+| `webui.md` | Open Fabric — web control: tabs, security model, who may do what (RBAC), first sign-in |
 | `vars.md` | Every setting in `vars.yaml` |
 | `architecture.md` | How the pieces fit: containers, networks, files, units |
 | `keycloak.md` | Keycloak and the directory behind it |

@@ -54,11 +54,11 @@ SERVICES = {
 _BASE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Fabric · web control{% endblock %}</title>
+<title>{% block title %}Open Fabric · web control{% endblock %}</title>
 <link rel="stylesheet" href="/static/app.css"></head>
 <body>
 <header>
-  <a class="brand" href="/">Fabric <span class="subtitle">web control</span></a>
+  <a class="brand" href="/">Open Fabric <span class="subtitle">web control</span></a>
   {% if ctx %}
   <div class="who">
     <a href="/audit">Audit log</a>

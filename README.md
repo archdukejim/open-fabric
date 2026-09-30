@@ -1,4 +1,4 @@
-# fabric
+# Open Fabric
 
 > A simple, lightweight, open-source configuration for a network fabric: authoritative DNS, internal PKI, directory, SSO and a secure management web UI — installed on the host it runs on (amd64 or arm64, Raspberry Pi included), secure by default.
 
@@ -64,7 +64,7 @@ Comprehensive documentation is provided in the `docs/` directory to help you und
 - [**Keycloak Deployment**](docs/keycloak.md) — Configuration nuances, architecture, and gotchas for the Keycloak and LDAP integration.
 - [**Operations**](docs/operations.md) — Live configuration changes via the `fabricctl` interactive editor (DNS records, TSIG keys), lifecycle commands (`setup`, `doctor`, `certs`, `tsig`, `client-cert`, `reinstall`, `uninstall`), TSIG keys for RFC2136 clients.
 - [**webui Management UI**](docs/webui.md) — Browser front end for `fabricctl`: security model, client certificates, first login, troubleshooting.
-- [**Roadmap: `fabricctl` apt package, Kea DHCP, 802.1X**](docs/design/fabricctl-package.md) — `apt install fabricctl`, the `fabricd` privilege model, signed image channels and offline bundles, OpenBao, DHCP and 802.1X.
+- [**Roadmap: `fabricctl` apt package, Kea DHCP, 802.1X**](docs/design/fabricctl-package.md) — `apt install fabricctl`, the `fabric-agent` privilege model, signed image channels and offline bundles, OpenBao, DHCP and 802.1X.
 - [**Architecture and Reference**](docs/architecture.md) — In-depth execution flow, directory structures, PKI chains, and template rendering logic.
 - [**AI Test Plan**](docs/testplan.md) — Automated testing scripts and procedures.
 - [**Subordinate CA Setup**](docs/subordinate.md) — How to configure this stack as a downstream CA.

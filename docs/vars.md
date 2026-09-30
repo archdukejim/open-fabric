@@ -644,7 +644,7 @@ Toggle features and control system-level UNIX isolation mapping.
 - `vars.yaml.j2`
 
 ### `install_webui`
-**Description:** Deploys the webui management UI (unprivileged container `fabric-web`, shown as "Fabric — web control", + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `fabric` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
+**Description:** Deploys the webui management UI (unprivileged container `fabric-web`, shown as "Open Fabric — web control", + privileged host service `fabric-agent`, nginx vhost `hostname_mgr`, `fabric` CNAME, service cert). Forced to `false` unless `install_keycloak` is `true`. See [webui.md](webui.md).
 
 **Default Value:** `true` (effective only with Keycloak)
 
@@ -814,7 +814,7 @@ ldap_organizational_units:
 ```
 
 ## 7. Landing Page Links (`link-vars.yaml`)
-The `link-vars.yaml` file (or `link-vars-template.yaml`) defines the dynamic list of quick links shown on the Fabric Landing Portal. It is managed interactively via `fabricctl` under the **Landing Page Links** menu.
+The `link-vars.yaml` file (or `link-vars-template.yaml`) defines the dynamic list of quick links shown on the landing portal. It is managed interactively via `fabricctl` under the **Landing Page Links** menu.
 
 ### `links`
 **Description:** A list of dictionaries containing `name` and `link` keys for each quick link to display on the landing page. The `link` values can use Jinja variables like `{{ domain }}` or `{{ hostname_keycloak }}` which will be evaluated natively during deployment.

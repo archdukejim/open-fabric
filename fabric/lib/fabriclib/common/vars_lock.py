@@ -7,7 +7,7 @@ from fabriclib.common.paths import VARS_LOCK_FILE
 
 @contextmanager
 def vars_lock(path=VARS_LOCK_FILE):
-    """Exclusive lock for read-modify-write of vars.yaml (CLI, fabricd, web UI)."""
+    """Exclusive lock for read-modify-write of vars.yaml (CLI, fabric-agent, web UI)."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)

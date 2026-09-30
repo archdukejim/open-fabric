@@ -1,6 +1,6 @@
-# Fabric — web control
+# Open Fabric — web control
 
-**Fabric** (subtitle *web control*) is the browser front end for `fabricctl`. It runs as an unprivileged container (`fabric-web`, systemd service `fabric-web`; the code lives in `fabric/lib/webui/`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
+**Open Fabric** (subtitle *web control*) is the browser front end for `fabricctl`. It runs as an unprivileged container (`fabric-web`, systemd service `fabric-web`; the code lives in `fabric/lib/webui/`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
 
 ### Table of Contents
 - [Features](#features)

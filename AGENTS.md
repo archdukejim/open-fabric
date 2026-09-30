@@ -8,10 +8,10 @@ file is about *how* we build.
 ## 1. What we are building
 
 - **fabricctl** — the control. Native apt package on the host: `fabricctl`
-  CLI + root `fabricd` daemon + systemd timers. Installs, configures,
+  CLI + root `fabric-agent` daemon + systemd timers. Installs, configures,
   updates and secures the whole stack. Works fully without the web UI.
-- **Fabric** — the control-plane web UI, its own unprivileged container.
-  Every action is a request to `fabricd`; it holds no power of its own.
+- **Open Fabric** (web control) — the control-plane web UI, its own unprivileged container.
+  Every action is a request to `fabric-agent`; it holds no power of its own.
 - One repo, two artifacts. Targets: **arm64 and amd64**; reference hardware
   is a **4 GB Raspberry Pi on Ubuntu Server 24.04**.
 
@@ -28,13 +28,13 @@ The repo must stay easy to navigate. For all of our own code:
   folder's `common/` (or the top-level `common/` if cross-domain) — still one
   helper per file.
 - **Group files by domain in folders** (`dns/`, `dhcp/`, `pki/`, `ldap/`,
-  `keycloak/`, `vault/`, `images/`, `security/`, `setup/`, `fabricd/`,
+  `keycloak/`, `vault/`, `images/`, `security/`, `setup/`, `agent/`,
   `webui/`, `common/`). Prefer a new folder over a crowded one.
 - Python domain code lives in **`fabric/lib/fabriclib/<domain>/`** and is
   imported as `fabriclib.<domain>.<file>` — namespaced so it can never
   collide with system packages (e.g. dnspython is also `dns`).
 - **Entry points only route.** CLI dispatchers (`fabricctl`), API routers
-  (`fabricd`) and web handlers parse input and call one function file; no
+  (`fabric-agent`) and web handlers parse input and call one function file; no
   business logic in them.
 - **Every folder has a `README.md`**: one line per file saying what it does.
   Update it in the same change that adds, renames or removes a file.
@@ -63,11 +63,11 @@ The repo must stay easy to navigate. For all of our own code:
 ## 4. Security defaults (never weaken silently)
 
 - Secure by default; every relaxation is an explicit setting, shown in
-  `fabricctl status` and the Fabric dashboard.
+  `fabricctl status` and the Open Fabric web UI.
 - Containers: non-root, `cap_drop: ALL` (+ only what is needed),
   `no-new-privileges`, read-only root where possible. Nothing mounts the
   Docker socket. Nobody is added to the `docker` group.
-- Privileged work happens only in `fabricd`, through a fixed, validated API
+- Privileged work happens only in `fabric-agent`, through a fixed, validated API
   — never "run this command".
 - Secrets never on a command line (`argv` is world-readable); pass them via
   files (0400/0600) or environment. No hard-coded or shared default

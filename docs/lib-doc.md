@@ -25,7 +25,7 @@ split as they are touched (see [stale-code register](maintenance/stale-code.md) 
 | Path | What |
 |---|---|
 | `agent/server.py` | `fabric-agent`: root, sandboxed, unix socket only (`/opt/webui/agent/agent.sock`, `0660 root:<webui gid>`, SO_PEERCRED: webui uid + root). Routes a fixed `/v1` API straight to `fabriclib` functions; everything else `404`. See [webui.md](webui.md#privilege-separation). |
-| `webui/` | The Fabric web UI, baked into the unprivileged `webui` image: `server.py` (security gates, sessions, CSRF), `oidc.py` (code flow + PKCE, full ID-token verification), `tlsclient.py` (CA-pinned HTTPS), `agentclient.py` (fabric-agent client), `views.py` (autoescaped templates, strict CSP). See [webui.md](webui.md). |
+| `webui/` | The Open Fabric web UI, baked into the unprivileged `webui` image: `server.py` (security gates, sessions, CSRF), `oidc.py` (code flow + PKCE, full ID-token verification), `tlsclient.py` (CA-pinned HTTPS), `agentclient.py` (fabric-agent client), `views.py` (autoescaped templates, strict CSP). See [webui.md](webui.md). |
 | `keycloak_bootstrap.py` | Idempotent Keycloak setup over the admin API (realm, 389-DS federation, group mapper, `fabric-admin` role, `fabric-webui` client, TOTP flow). `fabricctl --keycloak-sync`, the `start` setup step. |
 | `dirsrv.sh` | 389-DS: wait for health; seed (creates the backend if missing, applies `/seed/*.ldif` idempotently, restarts on `cn=config` change). |
 

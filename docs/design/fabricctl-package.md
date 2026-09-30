@@ -26,29 +26,29 @@ free in Debian trixie and Ubuntu 24.04.
 Scope beyond the installer: add **Kea DHCP** and **802.1X (FreeRADIUS)**, and
 grow the web UI to manage every service.
 
-## 1a. Two products: fabricctl and Fabric
+## 1a. Two products: fabricctl and Open Fabric
 
-| | **fabricctl** — the control | **Fabric** — the control-plane UI |
+| | **fabricctl** — the control | **Open Fabric** (web control) — the control-plane UI |
 |---|---|---|
 | What | Native apt package on the host | Web app in its own unprivileged container |
 | Role | The integration point: installs, configures, updates and secures the whole stack — containers, host firewall, Docker daemon, image updates, OpenBao seals and hardware tokens | Configuration and control plane in the browser: status, DNS/DHCP/users/secrets, triggering operations. Holds no power of its own |
 | Stands alone? | **Yes** — everything is possible from the CLI | No — every action is a request to fabricctl's daemon |
-| Artifact | `fabricctl` .deb: `fabricctl` CLI + `fabricd` daemon + systemd timers | `fabric` container image, installed, pinned (via the channel) and updated by fabricctl |
+| Artifact | `fabricctl` .deb: `fabricctl` CLI + `fabric-agent` daemon + systemd timers | `fabric` container image, installed, pinned (via the channel) and updated by fabricctl |
 
 One repo (`archdukejim/fabric`) builds and tests both; each fabricctl
-version declares the Fabric image it expects.
+version declares the web UI image it expects.
 
 **Privilege model (decided):**
 
-- **`fabricd`** — root, sandboxed systemd service; the *only* component that
+- **`fabric-agent`** — root, sandboxed systemd service; the *only* component that
   touches Docker, nftables, systemd, udev and OpenBao seal configuration.
   It exposes a fixed, validated operation API (today's `fabric-agent`,
   generalised) — never "run this command".
-- **`fabricctl` CLI** runs as the invoking user and talks to `fabricd` over
+- **`fabricctl` CLI** runs as the invoking user and talks to `fabric-agent` over
   a socket restricted to the **`fabric-admins`** group. Membership grants
   fabric's operations, not a root shell. **Nobody is added to the `docker`
   group** (that group is root-equivalent).
-- **Fabric UI** reaches `fabricd` over its own socket, identified by its
+- **Open Fabric web UI** reaches `fabric-agent` over its own socket, identified by its
   container uid (SO_PEERCRED); operations are further filtered by the
   user's Keycloak role.
 - Every operation is audited with the real actor: Unix user for the CLI,
@@ -85,7 +85,7 @@ and fails on anything missing — for automation and re-provisioning.
 
 Every setting can be changed later (`fabricctl security …`,
 `fabricctl vault seal-…`, `fabricctl updates …`, or editing `fabric.yaml` +
-`fabricctl apply`). `fabricctl status` and the Fabric dashboard show a
+`fabricctl apply`). `fabricctl status` and the Open Fabric web UI show a
 **security posture** summary that lists every relaxed default as a warning.
 
 ## 2. What exists to build on
@@ -143,10 +143,10 @@ fabricctl_<ver>_<arch>.deb
     in the Actions secret `GPG_PRIVATE_KEY` (+ passphrase secret); its
     revocation certificate is kept offline; `public.key` published next to
     the repo.
-  - Users: `wget -qO- https://archdukejim.github.io/fabric/public.key | sudo
+  - Users: `wget -qO- https://archdukejim.github.io/open-fabric/public.key | sudo
     gpg --dearmor -o /usr/share/keyrings/fabric-archive-keyring.gpg`, then
     `deb [signed-by=/usr/share/keyrings/fabric-archive-keyring.gpg]
-    https://archdukejim.github.io/fabric stable main` in
+    https://archdukejim.github.io/open-fabric stable main` in
     `/etc/apt/sources.list.d/fabric.list`, `apt update`, `apt install
     fabricctl`. The Release `.deb` also works directly (`apt install
     ./fabricctl_*.deb`, how the Pi is tested today).
@@ -366,7 +366,7 @@ The tested set of image versions is published **separately from fabric
 releases**, so a Pi running an older fabric still gets newly tested images.
 
 **The channel file** — `stable.json` (and `candidate.json`), served from
-GitHub Pages (`https://archdukejim.github.io/fabric/channels/stable.json`):
+GitHub Pages (`https://archdukejim.github.io/open-fabric/channels/stable.json`):
 
 ```json
 {
@@ -658,7 +658,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b) |
 | D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b) |
 | D11 ✅ | Docker privilege | Harden all containers + daemon; userns-remap on by default; rootless opt-in with stated limits (§1b, §7a) |
-| D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabricd`, `fabric-admins` group, no docker group) and the Fabric UI container; one repo, two artifacts (§1a) |
+| D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabric-agent` — deliberately not `fabricd`, FRRouting's OpenFabric daemon — `fabric-admins` group, no docker group) and the Open Fabric web UI container; one repo, two artifacts (§1a) |
 | D15 ✅ | Setup UX | Default change list → Proceed / Advanced; everything settable in `vars.yaml`; `--non-interactive` (§1b) |
 | D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
 | D18 ✅ | Disk encryption | Done by people themselves: fabric ships a manual guide (web UI + docs/disk-encryption.md) for LUKS2 with the same YubiKey (FIDO2) or USB stick; no `fabricctl disk` (§7d, revised 2026-09-29) |
@@ -667,6 +667,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
 | D20 ✅ | Central logging | Fluent Bit as an optional stack component (`install_fluentbit`, chosen at setup, hot-addable): forwards all logs to syslog (RFC 5424, TLS) and/or Elasticsearch/OpenSearch, disk-buffered, credentials in OpenBao (§7f) |
 | D21 | Image updates (validation pipeline and host side) | Daily watcher → regression on amd64 + arm64 incl. an upgrade test → pass: PR auto-merged, signed list published; fail: GitHub issue. Hosts fetch the list automatically unless offline, apply only on command (or opt-in auto-apply), prune old fabric images ([image-updates.md](image-updates.md)) |
+| D24 ✅ | Names | The repository is `open-fabric` and the web UI is shown as "Open Fabric" (subtitle *web control*). Everything else keeps its name: the package and command `fabricctl`, `/opt/fabric`, `/etc/fabric`, `fabric.target` and the `fabric-*` units, `fabriclib`, the Keycloak `fabric:*` roles, OpenBao's `fabric/` path, the image names — renaming those would need migration code on every install for no user benefit. The root daemon is `fabric-agent`, never `fabricd` (FRRouting's OpenFabric daemon). The repository is renamed before the image channel and APT repository are published on GitHub Pages (Pages URLs do not redirect) |
 | D23 ✅ | How FreeRADIUS decides | fabric's own policy (python3 module) asks 389-DS on every request, as the read-only `cn=radius_reader`, over verified LDAPS: nothing is cached or exported, so a disabled device or an unlinked certificate is refused at its next authentication. EAP-TLS devices are found by the SHA-256 fingerprint of the presented certificate (recorded during verification, keyed by serial, since FreeRADIUS exposes no fingerprint); MAB by MAC. People (EAP-TTLS/PAP) are checked by binding as the person, then by membership of a mapped group (`radius_people`). The directory unreachable means Reject (fail closed) |
 | D22 ✅ | Which upstream line | LTS or extended-support wherever the project has one (BIND 9.20 ESV, Kea 3.0 LTS, Postgres majors, nginx stable, Debian stable, Ubuntu LTS). Projects without one (OpenBao, Keycloak, Step-CA, Fluent Bit) support only their latest release: follow it, patch releases automatically, never a major by itself (D21). A distro package that lags the upstream LTS (Kea: Debian 2.6 vs 3.0) comes from the upstream's signed repository instead |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
