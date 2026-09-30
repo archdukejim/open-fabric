@@ -54,6 +54,19 @@ try:
                                                          "message_authenticator": "1"})
     check("FreeRADIUS tab: add client -> secret shown once, then listed",
           st == 200 and "shown only now" in page and "switch2" in req("GET", "/freeradius")[3], st)
+    page = req("GET", "/freeradius?view=switches")[3]
+    check("FreeRADIUS tab: Connect a switch — this server's IP, ports, UniFi steps, keep uplinks open",
+          "192.168.1.2" in page and "1812" in page and "UniFi" in page and "Force Authorized" in page
+          and 'class="section active"' in page)
+    page = req("GET", "/freeradius?view=windows")[3]
+    check("FreeRADIUS tab: Connect Windows — both scripts downloadable, groups listed plainly",
+          'download="fabric-8021x-tls.ps1"' in page and 'download="fabric-8021x-ttls.ps1"' in page
+          and "&lt;/code&gt;" not in page and "<code>staff</code>" in page)
+    st, _, _, _ = req("POST", "/freeradius/people", {"csrf": "dev", "group": "contractors", "vlan": "70"})
+    page = req("GET", "/freeradius")[3]
+    check("FreeRADIUS tab: people section (mapped groups), map a group -> listed; a person's login in the log",
+          st == 303 and "contractors" in page and "staff" in page and 'action="/freeradius/people"' in page
+          and "alice" in page, st)
     page = req("GET", "/kea")[3]
     check("Kea tab: subnets, reservations, leases, reserve form", "192.168.1.0/24" in page and "printer" in page
           and "laptop1.dhcp.home.arpa" in page and 'action="/kea/reservations"' in page)

@@ -270,8 +270,15 @@ thin bootstrap into `fabricctl setup`.
 > required per client (BlastRADIUS), `fabricctl radius`, the FreeRADIUS tab
 > (clients, recent decisions), setup Advanced option.
 >
-> **Long-term targets (later passes, all planned):** EAP-TTLS/PAP for
-> people against 389-DS; RadSec (RADIUS over TLS, TCP 2083) with Step-CA
+> **Built (second pass): people by password.** EAP-TTLS/PAP inside a TLS
+> tunnel to `radius.<domain>`; the password is checked by binding to 389-DS
+> as the person (the directory's lockout counts network logins). Only
+> members of groups mapped in `radius_people` may join, each mapping with
+> an optional VLAN and a priority (lowest wins), managed with `fabricctl
+> radius map-group` and on the FreeRADIUS tab. No TTLS at all while no group
+> is mapped. Network logins have no second factor.
+>
+> **Long-term targets (later passes, all planned):** RadSec (RADIUS over TLS, TCP 2083) with Step-CA
 > certificates; CoA / Disconnect from the UI when a device is disabled;
 > SCEP enrolment; per-VLAN DHCP subnets and DDNS subzones; MAB keyed off
 > Kea reservations. Revocation today is unlinking the certificate or
@@ -630,7 +637,7 @@ the web UI (destinations, last delivery, backlog) and in `fabricctl status`.
 | 1 ✅ | Native installer `fabricctl setup` (all playbooks ported); Ansible removed | — |
 | 2 | `.deb` build + signed apt repo in CI (amd64 + arm64 test runs); `setup.sh` becomes a wrapper | 1 |
 | 3 ✅ | Kea DHCP + DDNS + reservations (CLI + UI) | 2 |
-| 4 (first pass ✅) | FreeRADIUS 802.1X: EAP-TLS, MAB, dynamic VLANs ✅; people (EAP-TTLS), RadSec, CoA, SCEP later | 3 (MAB uses reservations) |
+| 4 (two passes ✅) | FreeRADIUS 802.1X: EAP-TLS, MAB, dynamic VLANs ✅; people by password (EAP-TTLS) ✅; RadSec, CoA, SCEP later | 3 (MAB uses reservations) |
 | 5 | Web UI: PKI, directory, roles, health | 3, 4 |
 
 Each phase ships on its own and is tested the same way as 1.5.0: real
@@ -660,7 +667,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
 | D20 ✅ | Central logging | Fluent Bit as an optional stack component (`install_fluentbit`, chosen at setup, hot-addable): forwards all logs to syslog (RFC 5424, TLS) and/or Elasticsearch/OpenSearch, disk-buffered, credentials in OpenBao (§7f) |
 | D21 | Image updates (validation pipeline and host side) | Daily watcher → regression on amd64 + arm64 incl. an upgrade test → pass: PR auto-merged, signed list published; fail: GitHub issue. Hosts fetch the list automatically unless offline, apply only on command (or opt-in auto-apply), prune old fabric images ([image-updates.md](image-updates.md)) |
-| D23 ✅ | How FreeRADIUS decides | fabric's own policy (python3 module) asks 389-DS on every request, as the read-only `cn=radius_reader`, over verified LDAPS: nothing is cached or exported, so a disabled device or an unlinked certificate is refused at its next authentication. EAP-TLS devices are found by the SHA-256 fingerprint of the presented certificate (recorded during verification, keyed by serial, since FreeRADIUS exposes no fingerprint); MAB by MAC. The directory unreachable means Reject (fail closed) |
+| D23 ✅ | How FreeRADIUS decides | fabric's own policy (python3 module) asks 389-DS on every request, as the read-only `cn=radius_reader`, over verified LDAPS: nothing is cached or exported, so a disabled device or an unlinked certificate is refused at its next authentication. EAP-TLS devices are found by the SHA-256 fingerprint of the presented certificate (recorded during verification, keyed by serial, since FreeRADIUS exposes no fingerprint); MAB by MAC. People (EAP-TTLS/PAP) are checked by binding as the person, then by membership of a mapped group (`radius_people`). The directory unreachable means Reject (fail closed) |
 | D22 ✅ | Which upstream line | LTS or extended-support wherever the project has one (BIND 9.20 ESV, Kea 3.0 LTS, Postgres majors, nginx stable, Debian stable, Ubuntu LTS). Projects without one (OpenBao, Keycloak, Step-CA, Fluent Bit) support only their latest release: follow it, patch releases automatically, never a major by itself (D21). A distro package that lags the upstream LTS (Kea: Debian 2.6 vs 3.0) comes from the upstream's signed repository instead |
 | D13 | Channel signing key custody and soak period before `candidate` → `stable` | Ed25519 key in a protected GitHub environment; 7-day soak |
 

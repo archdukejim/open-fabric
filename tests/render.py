@@ -253,7 +253,24 @@ assert 'secret = "Sw1tchSecretSw1tchSecret"' in clients_conf and "ipaddr = 192.1
 assert clients_conf.count("require_message_authenticator = yes") == 1 and "require_message_authenticator = no" in clients_conf
 eap = env.get_template("freeradius/config/mods/eap.j2").render(**rv_)
 assert "default_eap_type = tls" in eap and "ca_file = ${certdir}/ca.pem" in eap and "enable = no" in eap \
-    and "virtual_server = fabric-check-eap-tls" in eap and "peap" not in eap.lower() and "md5" not in eap.lower()
+    and "virtual_server = fabric-check-eap-tls" in eap and not re.search(r"^\s*(peap|mschapv2|md5|leap|gtc)\s*\{", eap, re.M)
+assert "ttls {" in eap, "the default network groups are mapped: EAP-TTLS on"
+eap_none = env.get_template("freeradius/config/mods/eap.j2").render(**{**rv_, "radius_people": []})
+assert "ttls {" not in eap_none, "no password logins while no group is mapped"
+from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
+people = normalize_radius_people([{"group": "guests", "vlan": "50", "priority": 60}, {"group": "staff", "vlan": 20}])
+assert people[0]["group"] == "guests" and people[1] == {"group": "staff", "vlan": 20, "priority": 100}, people
+for bad in ([{"group": "staff", "vlan": 5000}], [{"group": "staff"}, {"group": "STAFF"}], [{"group": ""}],
+            [{"group": "x", "priority": "high"}]):
+    try:
+        normalize_radius_people(bad)
+        raise AssertionError(f"accepted: {bad}")
+    except ValidationError:
+        pass
+eap_p = env.get_template("freeradius/config/mods/eap.j2").render(**{**rv_, "radius_people": people})
+assert "ttls {" in eap_p and "virtual_server = fabric-inner-tunnel" in eap_p and "use_tunneled_reply = yes" in eap_p
+frj_p = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**{**rv_, "radius_people": people}))
+assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
 assert frj["uri"] == "ldaps://ldap.lan.j-j.family:3636" and frj["bind_dn"].startswith("cn=radius_reader,")
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
@@ -261,7 +278,14 @@ assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] a
 assert fc["ports"] == ["192.168.7.53:1812:1812/udp", "192.168.7.53:1813:1813/udp"], fc["ports"]
 accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
 assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts
-print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS only, policy lookup, no capabilities")
+assert v2["radius_people"] == [{"group": "network-staff", "vlan": None, "priority": 50},
+                               {"group": "network-guests", "vlan": None, "priority": 100}], v2["radius_people"]
+kept_empty = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1, "radius_people": []}))
+assert kept_empty["radius_people"] == [], "an empty mapping must stay empty (no defaults brought back)"
+tree = env.get_template("dirsrv/seed/10-tree.ldif.j2").render(**{**v2, **secrets})
+assert "dn: cn=network-staff,ou=groups," in tree and "dn: cn=network-guests,ou=groups," in tree
+assert not any(g.get("bundle") for g in v2["ldap_groups"] if g["name"] in ("network-staff", "network-guests")),     "the network groups grant no fabric web access"
+print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS, EAP-TTLS only for mapped groups, policy lookup, no capabilities")
 
 # each systemd unit waits for its health check by container name: that name
 # must be a container_name in its compose template (else start hangs 10 min)
@@ -280,3 +304,31 @@ for mod in pkgutil.walk_packages(fabriclib.__path__, "fabriclib."):
     if not mod.name.endswith(".cli"):
         importlib.import_module(mod.name)
 print('every fabriclib module imports')
+
+# 802.1X guides: the Windows scripts carry the root CA, pin the server by name and root thumbprint,
+# and hold a well-formed LAN profile; PowerShell here-strings close at column 0; CRLF; public data only
+import re as _re  # noqa: E402
+import subprocess as _sp  # noqa: E402
+import tempfile as _tf  # noqa: E402
+import xml.etree.ElementTree as _ET  # noqa: E402
+from fabriclib.radius.radius_guides import radius_guides  # noqa: E402
+with _tf.TemporaryDirectory() as _d:
+    _sp.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{_d}/k", "-out", f"{_d}/c",
+             "-days", "1", "-subj", "/CN=Guide Root"], check=True, capture_output=True)
+    _pem = open(f"{_d}/c").read()
+    _sha1 = _sp.run(["openssl", "x509", "-in", f"{_d}/c", "-noout", "-fingerprint", "-sha1"],
+                    capture_output=True, text=True, check=True).stdout.split("=", 1)[1].strip().lower().replace(":", " ")
+_g = radius_guides({**v2, "radius_clients": rclients}, root_pem=_pem)
+for _m, _mode in (("tls", "machine"), ("ttls", "user")):
+    _s = _g["windows"][_m]["script"]
+    assert "\r\n" in _s and "\n" not in _s.replace("\r\n", ""), "CRLF line ends for Windows"
+    _t = _s.replace("\r\n", "\n")
+    assert _pem.strip() in _t and _g["server_name"] in _t and _sha1 in _t, (_m, _sha1)
+    assert _t.count("@'\n") == 2 and _t.count("\n'@") == 2, "here-strings must open and close on their own lines"
+    _xml = _t.split("Set-Content -Path $xml -Encoding Ascii -Value @'\n", 1)[1].split("'@", 1)[0]
+    _root = _ET.fromstring(_xml.split("?>", 1)[1])
+    assert _root.tag.endswith("LANProfile") and f"<authMode>{_mode}</authMode>" in _xml
+    assert "Rr1" not in _t and "Sw1tchSecret" not in _t and "PRIVATE KEY" not in _t, "public data only"
+assert "-Pfx" in _g["windows"]["tls"]["script"] and "<Type xmlns=\"http://www.microsoft.com/provisioning/EapCommon\">21<" \
+    in _g["windows"]["ttls"]["script"] and "<PAPAuthentication />" in _g["windows"]["ttls"]["script"]
+print("802.1X guides: Windows scripts (CA, pinned server, well-formed profiles, CRLF, public data only)")

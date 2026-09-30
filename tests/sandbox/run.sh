@@ -110,12 +110,17 @@ echo "--- 802.1X: FreeRADIUS answers a switch from the directory"
 in_box 'fabricctl radius add-client sbxswitch 10.77.0.1' > "$OUT/radius-add.log" 2>&1
 RADIUS_SECRET=$(grep -A1 'shown once' "$OUT/radius-add.log" | tail -1)
 docker cp "$REPO/tests/sandbox/radius_device.py" "$NAME:/root/radius_device.py"
+docker cp "$REPO/tests/sandbox/list_roles.py" "$NAME:/root/list_roles.py"
+check "setup created the six default device roles, once (marker)"     "in_box 'test -f /opt/fabric/config/.default-device-roles' && [ \"\$(in_box 'python3 /root/list_roles.py' | sort | tr '\n' ' ')\" = 'iot network-gear phones-tablets printers servers workstations ' ]"
+check "the network groups exist and are mapped for password logins (no VLAN yet)"     "in_box 'fabricctl radius status' | grep -q 'group network-staff' && in_box 'fabricctl radius status' | grep -q 'group network-guests'"
 check "radius: add-client applied; the secret is shown once and kept in OpenBao, not in vars"     "grep -q 'applied' '$OUT/radius-add.log' && [ \${#RADIUS_SECRET} -eq 32 ] && ! in_box \"grep -qF '$RADIUS_SECRET' /opt/fabric/config/vars.yaml\""
 check "radius: a device with network:mab (made like the 389-DS tab does)"     "in_box 'python3 /root/radius_device.py 02:00:00:00:88:01' | grep -qx ok"
 check "radius: the switch's MAB request for it -> Access-Accept on its role's VLAN"     "echo '$RADIUS_SECRET' | python3 '$REPO/tests/sandbox/radius_mab.py' $IP 02:00:00:00:88:01 | grep -qx 'Access-Accept vlan=30'"
 check "radius: an unknown MAC -> Access-Reject"     "echo '$RADIUS_SECRET' | python3 '$REPO/tests/sandbox/radius_mab.py' $IP 02:00:00:00:88:99 | grep -qx 'Access-Reject'"
 check "radius: a wrong shared secret gets no answer"     "echo 'NotTheSecretNotTheSecret' | python3 '$REPO/tests/sandbox/radius_mab.py' $IP 02:00:00:00:88:01 | grep -qx 'no reply'"
 check "radius: fabricctl radius log shows both decisions"     "in_box 'fabricctl radius log' | grep -q 'ACCEPT mab .*sbxprinter .*vlan 30' && in_box 'fabricctl radius log' | grep -q 'REJECT mab'"
+in_box 'fabricctl radius map-group auditors --vlan 40' > "$OUT/radius-map.log" 2>&1
+check "radius: map-group applied; FreeRADIUS back up with EAP-TTLS on; status lists the group"     "grep -q applied '$OUT/radius-map.log' && in_box 'systemctl is-active freeradius' | grep -qx active && in_box 'grep -q \"ttls {\" /opt/freeradius/config/mods/eap' && in_box 'fabricctl radius status' | grep -q 'group auditors .*vlan 40'"
 check "kea: fabricctl images status covers the Kea image" "in_box 'fabricctl images status' | grep -qE '^kea '"
 
 echo "--- certs.<domain>: CA certificates for every system; web UI at fabric.<domain>"

@@ -261,6 +261,18 @@ def rotate_radius_secret(name, secret=""):
     return _call("POST", f"/v1/radius/clients/{_q(name)}/rotate", {"secret": secret}, timeout=300)
 
 
+def radius_guides():
+    return _call("GET", "/v1/radius/guides")
+
+
+def map_radius_group(group, vlan="", priority=""):
+    return _call("POST", "/v1/radius/people", {"group": group, "vlan": vlan, "priority": priority}, timeout=300)
+
+
+def unmap_radius_group(group):
+    return _call("POST", f"/v1/radius/people/{_q(group)}/delete", {}, timeout=300)
+
+
 def remove_radius_client(name):
     return _call("POST", f"/v1/radius/clients/{_q(name)}/delete", {}, timeout=300)
 

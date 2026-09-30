@@ -1,0 +1,10 @@
+# Inside EAP-TTLS: a person's user name and password (PAP), decided by
+# fabric_policy against 389-DS. Only reachable through the TLS tunnel.
+server fabric-inner-tunnel {
+	authorize {
+		update request {
+			&Tmp-String-0 := "fabric-people"
+		}
+		fabric_policy
+	}
+}

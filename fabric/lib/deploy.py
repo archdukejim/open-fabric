@@ -13,6 +13,7 @@ from fabriclib.dhcp.deploy_kea import deploy_kea  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
+from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
@@ -265,6 +266,12 @@ def apply_deployment(start_services=True):
         print(f"Error: {e}")
         sys.exit(1)
     custom_vars['radius_clients'] = radius_clients
+    try:                            # unset: vars.yaml.j2's default (the two network groups) applies
+        if custom_vars.get('radius_people') is not None:
+            custom_vars['radius_people'] = normalize_radius_people(custom_vars['radius_people'])
+    except ValidationError as e:
+        print(f"Error: {e}")
+        sys.exit(1)
     if custom_vars.get('install_freeradius') and custom_vars.get('install_ldap') is False:
         print("Error: 802.1X (install_freeradius) checks every device in the directory: it needs install_ldap")
         sys.exit(1)

@@ -1,6 +1,9 @@
-# EAP: only EAP-TLS (design §6). Every client certificate must chain to the
-# fabric CA; which device it belongs to, and whether that device may join,
-# is decided by fabric_policy in the fabric-check-eap-tls virtual server.
+# EAP (design §6): EAP-TLS for devices — every client certificate must
+# chain to the fabric CA; which device it belongs to, and whether it may
+# join, is decided by fabric_policy in fabric-check-eap-tls. EAP-TTLS/PAP
+# for people — user name and password inside a TLS tunnel to this server's
+# certificate, checked against 389-DS in fabric-inner-tunnel. No PEAP /
+# MSCHAPv2: it needs NT hashes, which the directory does not keep.
 eap {
 	default_eap_type = tls
 	timer_expire = 60
@@ -40,4 +43,16 @@ eap {
 		tls = tls-fabric
 		virtual_server = fabric-check-eap-tls
 	}
+
+{% if radius_people | default([]) %}
+	ttls {
+		tls = tls-fabric
+		# the inner reply (the VLAN) goes into the outer Access-Accept
+		use_tunneled_reply = yes
+		# the calling MAC and the switch, for the decision log
+		copy_request_to_tunnel = yes
+		require_client_cert = no
+		virtual_server = fabric-inner-tunnel
+	}
+{% endif %}
 }

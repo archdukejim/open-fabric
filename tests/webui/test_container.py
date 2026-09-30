@@ -574,6 +574,9 @@ out = agent_call("POST", "/v1/radius/clients", "carol", AUDITOR_ROLES, {"name": 
 check("auditor token: may not add a RADIUS client (403, radius:admin)", " 403 " in out and "radius:admin" in out, out)
 out = agent_call("POST", "/v1/radius/clients", "carol", bundle_roles("fabric-network-operator"),
                  {"name": "evil", "address": "192.168.7.66"})
+out2 = agent_call("POST", "/v1/radius/people", "carol", AUDITOR_ROLES, {"group": "admins"})
+check("auditor token: may not map a group for network logins (403, radius:admin)",
+      " 403 " in out2 and "radius:admin" in out2, out2)
 check("network operator token: may not add a RADIUS client either (802.1X is equipment operators')",
       " 403 " in out and "radius:admin" in out, out)
 out = agent_call("GET", "/v1/nope", "alice", ADMIN_ROLES)

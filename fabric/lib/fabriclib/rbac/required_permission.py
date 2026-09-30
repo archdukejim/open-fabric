@@ -6,7 +6,7 @@ GET = {
     ("zones",): "dns:read", ("zones", "*"): "dns:read", ("reverse-zones",): "dns:read", ("tsig",): "dns:read",
     ("audit",): "audit:read",
     ("dhcp",): "dhcp:read",
-    ("radius",): "radius:read",
+    ("radius",): "radius:read", ("radius", "guides"): "radius:read",
     ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read",
     ("devices",): "devices:read",
     ("people",): "people:read",
@@ -29,6 +29,7 @@ POST = {
     ("dhcp", "reservations"): "dhcp:write", ("dhcp", "reservations", "*", "delete"): "dhcp:write",
     ("radius", "clients"): "radius:admin", ("radius", "clients", "*", "rotate"): "radius:admin",
     ("radius", "clients", "*", "delete"): "radius:admin",
+    ("radius", "people"): "radius:admin", ("radius", "people", "*", "delete"): "radius:admin",
 }
 
 

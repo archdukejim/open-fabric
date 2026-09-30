@@ -158,11 +158,24 @@ Devices and Roles), on every request:
 - **MAB** (printers, cameras, IoT without a supplicant) — the switch sends
   the device's MAC; one of its roles grants `network:mab`. A MAC can be
   copied, so give MAB roles a restricted VLAN.
-- **VLAN** — from the device's role with the lowest priority number that
-  sets one (none: the switch port's default).
+- **People by password (EAP-TTLS)** — a person's user name and password,
+  inside a TLS tunnel to `radius.<domain>`, checked against the directory.
+  Only members of the groups you map may join, each group with an optional
+  VLAN. Mapped at first: the directory groups `network-staff` and
+  `network-guests`, both empty and without a VLAN — nobody can join by
+  password until someone is added to one (in Keycloak). Give
+  `network-guests` its guest VLAN before using it:
+  `fabricctl radius map-group network-guests --vlan 50 --priority 100`.
+- **Default device roles** — a new install starts with `workstations`,
+  `phones-tablets`, `servers` (EAP-TLS), `printers`, `iot` (MAB) and
+  `network-gear` (SCEP), without VLANs and without devices. They are created
+  once: edit or delete them like any role; setup never brings one back.
+- **VLAN** — from the device's role (or the person's mapped group) with the
+  lowest priority number that sets one (none: the switch port's default).
 - **Refused**: a disabled device, an unlinked certificate, a certificate
-  from another CA, a role without the permission, and everything while the
-  directory cannot be asked (fail closed). Disabling a device or unlinking a
+  from another CA, a role without the permission, a wrong password or a
+  locked account, a person in no mapped group, a password sent outside the
+  tunnel, and everything while the directory cannot be asked (fail closed). Disabling a device or unlinking a
   certificate takes effect at its next authentication.
 
 RADIUS clients (the switches and access points that ask):
@@ -172,6 +185,9 @@ sudo fabricctl radius add-client switch1 192.168.4.2        # prints its shared 
 sudo fabricctl radius add-client aps 192.168.10.0/24 --secret-prompt   # keep a secret they already have
 sudo fabricctl radius rotate-secret switch1
 sudo fabricctl radius remove-client switch1
+sudo fabricctl radius map-group staff --vlan 20              # staff may join by password, on VLAN 20
+sudo fabricctl radius map-group guests --vlan 50 --priority 60
+sudo fabricctl radius unmap-group guests
 sudo fabricctl radius status                                 # server name, clients
 sudo fabricctl radius log                                    # recent decisions: accepted / refused and why
 ```
@@ -183,6 +199,20 @@ Message-Authenticator (BlastRADIUS, CVE-2024-3596); set
 `message_authenticator: false` only for a device that cannot, and it shows
 on the FreeRADIUS tab. Clients outside the LAN are let through the
 firewall to the RADIUS ports only.
+
+Step-by-step setup for switches (UniFi included) and Windows PCs, with
+this install's values filled in and a generated Windows setup script per
+method, is on the FreeRADIUS tab: **Connect a switch** and **Connect
+Windows**.
+
+Password logins, things to know: the directory's lockout counts them (5
+wrong passwords lock the account for 15 minutes — someone at any port can
+lock a person out by guessing), and there is no second factor. Map only
+the groups that need it; devices are better served by certificates.
+Supplicants must be set to check the server certificate (`radius.<domain>`,
+fabric root CA) — otherwise a rogue access point could collect passwords.
+Windows needs a profile for EAP-TTLS (it offers PEAP by default, which
+fabric does not use: MSCHAPv2 needs NT hashes the directory does not keep).
 
 #### `fabricctl images`
 Every container image is pinned by digest (amd64 + arm64). The validated

@@ -41,8 +41,9 @@ request. Root peers (the host itself) are not asked for a token.
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
   POST /v1/people {uid, first, last, email} | /v1/people/<uid>/reset   (one-time password returned)
   GET  /v1/dhcp | POST /v1/dhcp/reservations {mac, ip, hostname} | /v1/dhcp/reservations/<mac>/delete
-  GET  /v1/radius | POST /v1/radius/clients {name, address, message_authenticator, secret?}
+  GET  /v1/radius | /v1/radius/guides (setup guides, Windows scripts) | POST /v1/radius/clients {name, address, message_authenticator, secret?}
        | /v1/radius/clients/<name>/rotate {secret?} | /v1/radius/clients/<name>/delete   (secret returned once)
+       | /v1/radius/people {group, vlan, priority} | /v1/radius/people/<group>/delete
 """
 import argparse
 import json
@@ -65,9 +66,12 @@ from fabriclib.dhcp.add_reservation import add_reservation  # noqa: E402
 from fabriclib.dhcp.dhcp_overview import dhcp_overview  # noqa: E402
 from fabriclib.dhcp.remove_reservation import remove_reservation  # noqa: E402
 from fabriclib.radius.add_radius_client import add_radius_client  # noqa: E402
+from fabriclib.radius.map_radius_group import map_radius_group  # noqa: E402
+from fabriclib.radius.radius_guides import radius_guides  # noqa: E402
 from fabriclib.radius.radius_overview import radius_overview  # noqa: E402
 from fabriclib.radius.remove_radius_client import remove_radius_client  # noqa: E402
 from fabriclib.radius.rotate_radius_secret import rotate_radius_secret  # noqa: E402
+from fabriclib.radius.unmap_radius_group import unmap_radius_group  # noqa: E402
 from fabriclib.keycloak.reset_sign_in import reset_sign_in  # noqa: E402
 from fabriclib.keycloak.verify_user_token import verify_user_token  # noqa: E402
 from fabriclib.rbac.required_permission import required_permission  # noqa: E402
@@ -221,6 +225,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, dhcp_overview(load_vars()))
                 if route == ["radius"]:
                     return self.reply(200, radius_overview(load_vars()))
+                if route == ["radius", "guides"]:
+                    return self.reply(200, radius_guides(load_vars()))
                 if route == ["vault"]:
                     return self.reply(200, vault_status(load_vars()))
                 if route == ["vault", "slots"]:
@@ -278,6 +284,15 @@ class Handler(BaseHTTPRequestHandler):
                                            text(data, "secret") or None, source="web")
                 ok, output = apply_changes(actor, source="web")
                 return self.reply(200, {"secret": secret, "applied": ok, "output": output[-2000:]})
+            if route == ["radius", "people"]:
+                saved = map_radius_group(actor, text(data, "group"), text(data, "vlan") or None,
+                                         text(data, "priority") or 100, source="web")
+                ok, output = apply_changes(actor, source="web")
+                return self.reply(200, {"mapping": saved, "applied": ok, "output": output[-2000:]})
+            if len(route) == 4 and route[:2] == ["radius", "people"] and route[3] == "delete":
+                unmap_radius_group(actor, route[2], source="web")
+                ok, output = apply_changes(actor, source="web")
+                return self.reply(200, {"applied": ok, "output": output[-2000:]})
             if len(route) == 4 and route[:2] == ["radius", "clients"] and route[3] in ("rotate", "delete"):
                 secret = None
                 if route[3] == "rotate":

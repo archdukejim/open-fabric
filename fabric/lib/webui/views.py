@@ -17,6 +17,7 @@ TABS = [
     ("openbao", "/openbao", "OpenBao · Secrets", False),
 ]
 # BIND9 tab sections: (view, label)
+FREERADIUS_SECTIONS = [("overview", "Overview"), ("switches", "Connect a switch"), ("windows", "Connect Windows")]
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
 # OpenBao tab sections and unlock-method (key slot) types
 OPENBAO_SECTIONS = [("status", "Status"), ("unlock", "Unlock methods"), ("secrets", "Secrets"),
@@ -352,9 +353,27 @@ _TEMPLATES = {
 radius_clients:
   - { name: switch1, address: 192.168.4.2 }</pre></section>
 {% else %}
+<nav class="sections">
+{% for id, label in sections %}<a href="/freeradius{{ '' if id == 'overview' else '?view=' ~ id }}" class="section{{ ' active' if id == view }}">{{ label }}</a>{% endfor %}
+</nav>
+{% if view == 'overview' %}
 <section class="card"><h2>Server</h2>
 <p>Switches and access points send RADIUS to <code>{{ r.host_ip }}</code> UDP 1812 (accounting 1813). Supplicants check the server certificate <code>{{ r.server_name }}</code>, issued by the fabric CA.</p>
-<p class="muted">Who may join is decided per device on the 389-DS tab: a role with <code>network:eap-tls</code> (certificate linked to the device) or <code>network:mab</code> (the device's MAC), and optionally a VLAN. A disabled device, or an unlinked certificate, is refused at its next authentication.</p>
+<p class="muted">Devices: decided per device on the 389-DS tab — a role with <code>network:eap-tls</code> (certificate linked to the device) or <code>network:mab</code> (the device's MAC), and optionally a VLAN. A disabled device, or an unlinked certificate, is refused at its next authentication. People: by user name and password (EAP-TTLS), only members of the groups below.</p>
+</section>
+<section class="card"><h2>People <span class="muted">join by password (EAP-TTLS)</span></h2>
+{% if r.people %}<table><thead><tr><th>Group</th><th>VLAN</th><th>Priority</th><th></th></tr></thead><tbody>
+{% for m in r.people %}<tr><td>{{ m.group }}</td><td>{{ m.vlan or 'port default' }}</td><td class="num">{{ m.priority }}</td>
+<td>{% if can('radius:admin') %}<div class="row-actions"><form method="post" action="/freeradius/people/{{ m.group | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Remove</button></form></div>{% endif %}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="blank">No group mapped: nobody can join by password.</p>{% endif %}
+{% if can('radius:admin') %}<form method="post" action="/freeradius/people" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Directory group<input name="group" required placeholder="staff"></label>
+<label>VLAN (optional)<input name="vlan" inputmode="numeric" placeholder="20"></label>
+<label>Priority (lower wins)<input name="priority" inputmode="numeric" placeholder="100"></label>
+<div><button>Map group</button></div>
+</form>
+<p class="muted small">The password is checked against the directory, so its lockout counts network logins too (5 wrong passwords lock the account for 15 minutes). Network logins have no second factor: map only groups that need it.</p>{% endif %}
 </section>
 <section class="card"><h2>RADIUS clients <span class="muted">switches and access points</span></h2>
 {% if r.clients %}<table><thead><tr><th>Name</th><th>Address</th><th>Message-Authenticator</th><th></th></tr></thead><tbody>
@@ -375,11 +394,71 @@ radius_clients:
 </section>
 <section class="card"><h2>Recent decisions <span class="muted">{{ r.log | length }}</span></h2>
 {% if r.log_error %}<p class="flash warn">{{ r.log_error }}</p>{% endif %}
-{% if r.log %}<table><thead><tr><th>Time</th><th></th><th>Method</th><th>Device</th><th>VLAN</th><th>MAC</th><th>Via</th><th>Why</th></tr></thead><tbody>
+{% if r.log %}<table><thead><tr><th>Time</th><th></th><th>Method</th><th>Who</th><th>VLAN</th><th>MAC</th><th>Via</th><th>Why</th></tr></thead><tbody>
 {% for e in r.log %}<tr><td>{{ e.time }}</td><td>{% if e.decision == 'ACCEPT' %}<span class="light ok"></span> accepted{% else %}<span class="light bad"></span> refused{% endif %}</td>
-<td>{{ e.method }}</td><td>{{ e.device }}</td><td>{{ e.vlan }}</td><td><code>{{ e.mac }}</code></td><td>{{ e.nas }}</td><td class="muted">{{ e.reason }}</td></tr>{% endfor %}
+<td>{{ e.method }}</td><td>{% if e.person %}<span class="muted">person</span> {% endif %}{{ e.device }}</td><td>{{ e.vlan }}</td><td><code>{{ e.mac }}</code></td><td>{{ e.nas }}</td><td class="muted">{{ e.reason }}</td></tr>{% endfor %}
 </tbody></table>{% elif not r.log_error %}<p class="blank">No authentications yet.</p>{% endif %}
 </section>
+{% elif view == 'switches' %}
+<section class="card"><h2>Any switch or access point</h2>
+<p>Give the switch these RADIUS settings (the names differ by vendor):</p>
+<dl class="kv">
+<dt>RADIUS server</dt><dd><code>{{ g.host_ip }}</code></dd>
+<dt>Authentication port</dt><dd><code>1812</code> (UDP)</dd>
+<dt>Accounting port</dt><dd><code>1813</code> (optional; acknowledged, not stored)</dd>
+<dt>Shared secret</dt><dd>the one shown when you added the switch on <a href="/freeradius">Overview</a> → RADIUS clients (lost it? <strong>New secret</strong>)</dd>
+<dt>Dynamic VLAN</dt><dd>turn on "RADIUS-assigned VLAN" (fabric sends <code>Tunnel-Private-Group-Id</code>)</dd>
+</dl>
+<p>Per port, choose how the device on it proves who it is:</p>
+<ul>
+<li><strong>802.1X</strong> — laptops, desktops, phones: a certificate (EAP-TLS, device roles on the 389-DS tab) or a person's password (EAP-TTLS, mapped groups).</li>
+<li><strong>MAC authentication (MAB)</strong> — printers, cameras, IoT without 802.1X: the device's MAC must belong to a device whose role grants <code>network:mab</code>.</li>
+<li><strong>Always open</strong> — uplinks, access points, <strong>the port this fabric host is on</strong>, and the port of the switch's own controller. Closing those locks the network (and you) out.</li>
+</ul>
+<p class="muted">Every VLAN a device role or mapped group names must exist on the switch with the same number.</p>
+</section>
+<section class="card"><h2>UniFi (UniFi Network application)</h2>
+<p class="flash warn">Untested with fabric yet: labels can differ between UniFi Network versions.</p>
+<ol class="steps">
+<li><strong>In fabric:</strong> <a href="/freeradius">Overview</a> → RADIUS clients → add the switch by its management IP (UniFi → Devices → the switch → its IP). Keep the shared secret.</li>
+<li><strong>UniFi → Settings → Profiles → RADIUS → Create New:</strong> name <code>fabric</code>; Authentication server <code>{{ g.host_ip }}</code>, port <code>1812</code>, the shared secret; Accounting server (optional) <code>{{ g.host_ip }}</code>, port <code>1813</code>, the same secret; turn on <em>Wired networks</em> and <em>RADIUS assigned VLAN</em> (wired).</li>
+<li><strong>UniFi → Settings → Networks:</strong> create the VLANs fabric's roles and groups use, same numbers.</li>
+<li><strong>UniFi → Devices → the switch → Settings → Services → 802.1X Control:</strong> on, RADIUS profile <code>fabric</code>. Fallback VLAN: leave empty (refused devices get no network) or a guest VLAN.</li>
+<li><strong>UniFi → the switch → Ports:</strong> per port, <em>802.1X Control</em> — <code>Auto</code> for 802.1X devices, <code>MAC-based</code> for printers and IoT, <code>Force Authorized</code> for uplinks, access points, the fabric host and the UniFi console.</li>
+<li><strong>Check:</strong> plug a device in; <a href="/freeradius">Overview</a> → Recent decisions shows accepted / refused and why.</li>
+</ol>
+<p class="muted">MAB devices never show up in Recent decisions? The switch may not send a Message-Authenticator, and fabric drops such requests (BlastRADIUS protection). Remove the switch and add it again with "Require Message-Authenticator" off, only for that switch.</p>
+</section>
+{% elif view == 'windows' %}
+<section class="card"><h2>Windows: this PC joins with its certificate (EAP-TLS)</h2>
+<p>For fabric's own PCs: the port opens with the computer's certificate, before anyone signs in.</p>
+<ol class="steps">
+<li><strong>389-DS → Devices → Add:</strong> the PC by name, in the <code>workstations</code> role (or any role with <code>network:eap-tls</code>).</li>
+<li><strong>Step-CA → New key + certificate:</strong> CN = the PC's name, for that device (it is linked automatically). Download the <code>.p12</code> and keep its password.</li>
+<li>Copy the <code>.p12</code> and this script to the PC: <a class="btn" href="data:application/octet-stream;base64,{{ g.windows.tls.b64 }}" download="{{ g.windows.tls.filename }}">{{ g.windows.tls.filename }}</a></li>
+<li>In PowerShell <em>as Administrator</em>: <pre>powershell -ExecutionPolicy Bypass -File .\\{{ g.windows.tls.filename }} -Pfx .\\&lt;pc&gt;.p12</pre></li>
+<li>Plug the PC into an 802.1X port. Recent decisions shows <code>ACCEPT eap-tls</code> and its VLAN.</li>
+</ol>
+</section>
+<section class="card"><h2>Windows: people sign in with their user name and password (EAP-TTLS)</h2>
+<p>For PCs anyone may use: whoever sits down signs in to the network with their directory account. Only members of {% if g.people %}{% for grp in g.people %}<code>{{ grp }}</code>{{ ', ' if not loop.last }}{% endfor %}{% else %}a mapped group (none yet){% endif %} get in.</p>
+<ol class="steps">
+<li>Put the person in a mapped group (Keycloak → Groups, e.g. <code>network-staff</code>).</li>
+<li>Run this script on the PC, in PowerShell <em>as Administrator</em>: <a class="btn" href="data:application/octet-stream;base64,{{ g.windows.ttls.b64 }}" download="{{ g.windows.ttls.filename }}">{{ g.windows.ttls.filename }}</a>
+<pre>powershell -ExecutionPolicy Bypass -File .\\{{ g.windows.ttls.filename }}</pre></li>
+<li>Plug the PC into an 802.1X port: Windows asks for the user name and password.</li>
+</ol>
+<p class="muted">Five wrong passwords lock the account for 15 minutes (the directory's lockout). There is no second factor for network logins.</p>
+</section>
+<section class="card"><h2>What the scripts do</h2>
+<ul>
+<li>Turn on <em>Wired AutoConfig</em> (<code>dot3svc</code>), the Windows service for wired 802.1X — off by default.</li>
+<li>Trust the fabric root CA and pin the server: Windows only talks to <code>{{ g.server_name }}</code> with a certificate from this CA, without asking the user (a fake access point cannot collect passwords).</li>
+<li>Import the PC's certificate into the computer's store (EAP-TLS), and add the 802.1X profile to the wired adapter (<code>-Interface</code>, default <code>Ethernet</code>).</li>
+</ul>
+<p class="muted">Made for this network (public data only: the root CA and names). Untested on Windows by the fabric project until the hardware test. Not working? <code>netsh lan show interfaces</code> on the PC, and Recent decisions here.</p>
+</section>
+{% endif %}
 {% endif %}
 {% endblock %}""",
 
@@ -904,8 +983,13 @@ def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host
                    add_live=add_live or {"security-key": False, "usb": False, "hsm": False})
 
 
-def freeradius(ctx, overview, msg="", err=""):
-    return _render("freeradius", ctx=ctx, tab="freeradius", r=overview, msg=msg, err=err)
+def freeradius(ctx, overview, msg="", err="", view="overview", guides=None):
+    """view: overview, or a setup guide (switches, windows) filled in from guides (radius_guides())."""
+    g = dict(guides or {})
+    if g.get("windows"):
+        g["windows"] = {m: dict(w, b64=_b64(w["script"])) for m, w in g["windows"].items()}
+    return _render("freeradius", ctx=ctx, tab="freeradius", r=overview, msg=msg, err=err, g=g,
+                   view=view if view in dict(FREERADIUS_SECTIONS) else "overview", sections=FREERADIUS_SECTIONS)
 
 
 def radius_secret(ctx, name, secret, action, host_ip, applied=True, output=""):
@@ -1039,6 +1123,7 @@ button.ghost{background:transparent;color:var(--accent);padding:2px 10px}
 .section:hover{color:var(--text)}.section.active{color:var(--text);border-bottom-color:var(--accent);font-weight:600}
 .picker{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px}
 .small{font-size:12px}
+.steps li{margin:8px 0}.steps pre{margin-top:6px}
 label.perm{flex-basis:100%}
 button:disabled,.btn.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
 .danger-link{color:var(--bad);border-color:var(--bad)}

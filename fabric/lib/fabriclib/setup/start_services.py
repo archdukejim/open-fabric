@@ -3,6 +3,7 @@ import subprocess
 import time
 
 from fabriclib.common.console import info, ok
+from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
@@ -33,6 +34,9 @@ def run(ctx):
         if res.returncode != 0:
             raise SetupError(f"389-DS seeding failed:\n{res.stdout}{res.stderr}")
         ok("389-DS seeded (" + (res.stdout.strip().splitlines() or ["?"])[-1] + ")")
+        added = ensure_default_device_roles(v, ctx.path("fabric", "config", ".default-device-roles"))
+        if added:
+            ok("default device roles: " + ", ".join(added))
 
     if v.get("install_keycloak"):
         for attempt in range(6):

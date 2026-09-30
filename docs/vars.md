@@ -844,6 +844,7 @@ The Elasticsearch password is not a setting: `sudo fabricctl logs set-password e
 |---|---|---|
 | `install_freeradius` | `false` | FreeRADIUS 3.2: EAP-TLS and MAB decided from the directory (operations.md → 802.1X); needs `install_ldap` |
 | `radius_clients` | `[]` | `[{name, address (IP or network), message_authenticator (true)}]`; overlapping addresses refused |
+| `radius_people` | `network-staff` (priority 50), `network-guests` (100), no VLANs | Groups whose members may join by password (EAP-TTLS): `[{group, vlan (optional), priority (100; lower wins)}]`. `[]`: no password logins (stays empty) |
 | `hostname_radius` | `radius.<domain>` | Name on the EAP-TLS server certificate (`cname_radius` changes the first label) |
 | `ip_freeradius` | `10.255.0.98` | On fabric_net (reaches 389-DS) |
 | `freeradius_mem_limit` | `128m` | Container memory limit |

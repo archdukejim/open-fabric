@@ -7,7 +7,7 @@ least-privilege `cn=device_admin`, so the directory's ACIs limit them.
 
 | File | What |
 |---|---|
-| `constants.py` | Device types, the permission vocabulary (what it grants, what enforces it), name rules |
+| `constants.py` | Device types, the permission vocabulary (what it grants, what enforces it), name rules, the default device roles |
 | `device_overview.py` | Devices (with effective access), roles and the vocabulary from one directory read |
 | `list_devices.py` | Devices with their roles, effective permissions and VLAN |
 | `list_roles.py` | Device roles by priority, with their member devices |
@@ -21,4 +21,5 @@ least-privilege `cn=device_admin`, so the directory's ACIs limit them.
 | `remove_role.py` | Delete a role — refused while devices are in it (audited) |
 | `list_people.py` | Users and groups, read-only (managed in Keycloak), and the Keycloak console URL |
 | `common/` | Helpers shared by the operations above (see its README) |
+| `ensure_default_device_roles.py` | Create the default device roles once (a marker file keeps a deleted one from coming back) |
 | `ensure_admin_user.py` | Create a user under `ou=users,ou=accounts` if missing (never changes an existing one) and add it to the web UI admin group |

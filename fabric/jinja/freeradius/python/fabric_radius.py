@@ -1,10 +1,13 @@
 """fabric's 802.1X policy, called by FreeRADIUS's python3 module
 (mods/fabric_policy).
 
-authorize() runs in two places:
+authorize() runs in three places:
   - fabric-check-eap-tls, after the client certificate chained to the
     fabric CA: the device linked to that certificate's fingerprint must be
     enabled and hold network:eap-tls;
+  - fabric-inner-tunnel, inside EAP-TTLS: a person's user name and password
+    (PAP), checked by binding to 389-DS; they must be in a group mapped for
+    802.1X (radius_people);
   - the main server for anything that is not EAP: MAB, the switch asking
     for a MAC (User-Name = the MAC); the device with that MAC must be
     enabled and hold network:mab.
@@ -18,6 +21,7 @@ import re
 
 import radiusd
 
+from check_person import check_person
 from lookup_device import lookup_device
 from normalize_mac import normalize_mac
 
@@ -49,6 +53,19 @@ def _decide(method, attribute, value, permission, where):
     return radiusd.RLM_MODULE_OK, _reply(found["vlan"]), (("Auth-Type", ":=", "Accept"),)
 
 
+def _decide_person(uid, password, where):
+    try:
+        found = check_person(uid, password)
+    except Exception as exc:          # directory down: never let anyone in
+        _log("REJECT", "eap-ttls", person=uid, reason="directory_error:" + type(exc).__name__, **where)
+        return radiusd.RLM_MODULE_REJECT
+    if not found["allowed"]:
+        _log("REJECT", "eap-ttls", person=found["person"], reason=found["reason"], **where)
+        return radiusd.RLM_MODULE_REJECT
+    _log("ACCEPT", "eap-ttls", person=found["person"], group=found["group"], vlan=found["vlan"] or "-", **where)
+    return radiusd.RLM_MODULE_OK, _reply(found["vlan"]), (("Auth-Type", ":=", "Accept"),)
+
+
 def instantiate(p):
     return radiusd.RLM_MODULE_OK
 
@@ -56,9 +73,12 @@ def instantiate(p):
 def authorize(p):
     req = {}
     for attr, value in p or ():
-        req.setdefault(attr, str(value).strip('"'))
+        req.setdefault(attr, str(value))
     where = {"mac": normalize_mac(req.get("Calling-Station-Id")) or req.get("Calling-Station-Id", "-"),
              "nas": req.get("NAS-Identifier") or req.get("NAS-IP-Address") or "-"}
+
+    if req.get("Tmp-String-0") == "fabric-people":               # fabric-inner-tunnel (EAP-TTLS)
+        return _decide_person(req.get("User-Name", ""), req.get("User-Password", ""), where)
 
     serial = req.get("TLS-Client-Cert-Serial")
     if serial is not None:                                   # fabric-check-eap-tls

@@ -35,4 +35,7 @@ objectClass: groupOfNames
 objectClass: posixGroup
 cn: {{ grp.name }}
 gidNumber: {{ grp.gidNumber }}
+{% if grp.description is defined %}
+description: {{ grp.description }}
+{% endif %}
 {% endfor %}

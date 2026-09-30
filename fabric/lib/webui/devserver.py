@@ -41,12 +41,24 @@ RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE_RADIUS = {"enabled": True, "server_name": "radius.home.arpa", "host_ip": "192.168.1.2",
                  "clients": [{"name": "switch1", "address": "192.168.1.3", "message_authenticator": True},
                              {"name": "ap-hall", "address": "192.168.1.4", "message_authenticator": False}],
+                 "people": [{"group": "staff", "vlan": 20, "priority": 50},
+                            {"group": "guests", "vlan": 50, "priority": 60}],
                  "log": [{"time": "2026-09-29T20:14:02", "decision": "ACCEPT", "method": "eap-tls",
                           "device": "jims-laptop", "vlan": "20", "mac": "02:11:22:33:44:55", "nas": "switch1",
                           "reason": ""},
+                         {"time": "2026-09-29T20:13:10", "decision": "ACCEPT", "method": "eap-ttls", "device": "alice",
+                          "person": True, "vlan": "20", "mac": "02:11:22:33:44:66", "nas": "ap-hall", "reason": ""},
                          {"time": "2026-09-29T20:12:40", "decision": "REJECT", "method": "mab", "device": "cam-front",
                           "vlan": "-", "mac": "02:aa:bb:cc:dd:01", "nas": "switch1", "reason": "device disabled"}],
                  "log_error": ""}
+def sample_radius_guides():
+    """The guides as fabric-agent fills them in, with the dev preview's own throwaway CA."""
+    from fabriclib.radius.radius_guides import radius_guides
+    return radius_guides({"host_ip": "192.168.1.2", "hostname_radius": "radius.home.arpa", "domain": "home.arpa",
+                          "hostname_certs": "certs.home.arpa", "radius_clients": SAMPLE_RADIUS["clients"],
+                          "radius_people": SAMPLE_RADIUS["people"]}, root_pem=SAMPLE_ROOT_PEM)
+
+
 SAMPLE_DHCP = {"enabled": True, "interfaces": ["eth0"], "lease_time": 86400, "ddns_zone": "dhcp.home.arpa",
                "subnets": [{"subnet": "192.168.1.0/24", "pools": ["192.168.1.100 - 192.168.1.199"],
                             "routers": "192.168.1.1",
@@ -137,6 +149,9 @@ SAMPLE_CA = {"domain": "home.arpa", "certs_url": "http://certs.home.arpa/", "max
              "intermediate": {"subject": "CN=Fabric Intermediate CA,O=Fabric", "not_after": "Sep  1 00:00:00 2036 GMT",
                               "key": "EC prime256v1", "sha256": _FP}}
 SAMPLE_PEM = "-----BEGIN CERTIFICATE-----\nDEV PREVIEW — sample, not a real certificate\n-----END CERTIFICATE-----\n"
+# decodes (the Windows scripts hash it) but is no certificate: the preview's scripts are samples only
+SAMPLE_ROOT_PEM = ("-----BEGIN CERTIFICATE-----\nREVWIFBSRVZJRVcgc2FtcGxlIHJvb3QgQ0EgLSBub3QgYSByZWFsIGNlcnRpZmljYXRl\n"
+                   "-----END CERTIFICATE-----\n")
 SAMPLE_KEY = "-----BEGIN PRIVATE KEY-----\nDEV PREVIEW — sample, not a real key\n-----END PRIVATE KEY-----\n"
 SAMPLE_INFO = {"subject": "CN=device.home.arpa,OU=IT,O=Fabric", "issuer": "CN=Fabric Intermediate CA,O=Fabric",
                "sans": ["device.home.arpa", "192.168.1.50"], "key": "RSA 2048", "serial": "0x1A2B3C4D5E",
@@ -338,8 +353,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/kea":
                 return self.send(200, views.kea(self.ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
             if path == "/freeradius":
+                view = query.get("view", "overview")
+                guides = sample_radius_guides() if view in ("switches", "windows") else None
                 return self.send(200, views.freeradius(self.ctx, SAMPLE_RADIUS, query.get("msg", ""),
-                                                       query.get("err", "")))
+                                                       query.get("err", ""), view, guides))
             if path == "/audit":
                 return self.send(200, views.audit(self.ctx, self.state.data["audit"]))
             if path == "/preview/denied":       # what a refused sign-in looks like
@@ -370,6 +387,17 @@ class Handler(BaseHTTPRequestHandler):
             if path.startswith("/openbao/"):
                 return self.send(303, b"", location="/openbao?" + urllib.parse.urlencode(
                     {"view": "unlock", **self.state.vault_action(path.split("/")[2:], form)}))
+            if path.startswith("/freeradius/people"):
+                parts = [urllib.parse.unquote(p) for p in path.split("/")[3:]]
+                people = SAMPLE_RADIUS["people"]
+                if parts:
+                    people[:] = [m for m in people if m["group"] != parts[0]]
+                    msg = f"Members of {parts[0]} may no longer join by password (dev preview)."
+                else:
+                    people.append({"group": form.get("group", ""), "vlan": int(form["vlan"]) if form.get("vlan") else None,
+                                   "priority": int(form.get("priority") or 100)})
+                    msg = f"Members of {form.get('group', '')} may join by password (dev preview)."
+                return self.send(303, b"", location="/freeradius?" + urllib.parse.urlencode({"msg": msg}))
             if path.startswith("/freeradius/clients"):
                 parts = [urllib.parse.unquote(p) for p in path.split("/")[3:]]
                 clients = SAMPLE_RADIUS["clients"]

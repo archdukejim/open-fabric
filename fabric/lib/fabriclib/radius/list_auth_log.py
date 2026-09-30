@@ -9,7 +9,8 @@ INCORRECT_RE = re.compile(r"Login incorrect(?: \((.*?)\))?: \[(.*?)\] \(from cli
 
 def list_auth_log(limit=100):
     """Recent 802.1X decisions from FreeRADIUS's journal, newest first:
-    [{time, decision, method, device, vlan, mac, nas, reason}]. fabric's
+    [{time, decision, method, device (or the person), person (bool), vlan,
+    mac, nas, reason}]. fabric's
     policy logs every decision it makes; a request refused before it (a
     certificate that does not chain to the fabric CA, a broken EAP exchange)
     shows FreeRADIUS's own reason. Never secrets: FreeRADIUS logs no
@@ -28,7 +29,8 @@ def list_auth_log(limit=100):
         if m:
             kv = dict(p.split("=", 1) for p in m.group(3).split() if "=" in p)
             entry = {"time": when.isoformat(timespec="seconds"), "decision": m.group(1), "method": m.group(2),
-                     "device": kv.get("device", "-"), "vlan": kv.get("vlan", "-"), "mac": kv.get("mac", "-"),
+                     "device": kv.get("device") or kv.get("person", "-"),
+                     "person": "person" in kv, "vlan": kv.get("vlan", "-"), "mac": kv.get("mac", "-"),
                      "nas": kv.get("nas", "-"), "reason": kv.get("reason", "").replace("_", " ")}
             entries.append(entry)
             last_fabric = (when, entry)

@@ -487,8 +487,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/kea":
             return self.send(200, views.kea(ctx, actions.dhcp_overview(), query.get("msg", ""), query.get("err", "")))
         if path == "/freeradius":
+            view = query.get("view", "overview")
+            guides = actions.radius_guides() if view in ("switches", "windows") else None
             return self.send(200, views.freeradius(ctx, actions.radius_overview(), query.get("msg", ""),
-                                                   query.get("err", "")))
+                                                   query.get("err", ""), view, guides))
         if path == "/audit":
             return self.send(200, views.audit(ctx, actions.read_audit()))
         return self.deny(404, "Not found.")
@@ -549,6 +551,24 @@ class Handler(BaseHTTPRequestHandler):
             return self.redirect("/kea?" + urllib.parse.urlencode({"msg": msg}))
         if path.startswith("/freeradius/clients"):
             return self.radius_post(sess, [urllib.parse.unquote(p) for p in path.split("/")[3:]], form)
+        if path.startswith("/freeradius/people"):
+            parts = [urllib.parse.unquote(p) for p in path.split("/")[3:]]
+            try:
+                if not parts:
+                    res = actions.map_radius_group(form.get("group", ""), form.get("vlan", ""), form.get("priority", ""))
+                    m = res["mapping"]
+                    msg = f"Members of {m['group']} may join by password" + (f" on VLAN {m['vlan']}." if m["vlan"] else ".")
+                elif len(parts) == 2 and parts[1] == "delete":
+                    res = actions.unmap_radius_group(parts[0])
+                    msg = f"Members of {parts[0]} may no longer join by password."
+                else:
+                    return self.deny(404, "Not found.")
+                if not res.get("applied"):
+                    return self.redirect("/freeradius?" + urllib.parse.urlencode(
+                        {"err": msg + " Saved, but applying failed: " + res.get("output", "")[-300:]}))
+            except actions.ValidationError as exc:
+                return self.redirect("/freeradius?" + urllib.parse.urlencode({"err": str(exc)}))
+            return self.redirect("/freeradius?" + urllib.parse.urlencode({"msg": msg}))
         if path.startswith("/bind9/tsig/"):
             return self.tsig_post(sess, urllib.parse.unquote(path[len("/bind9/tsig/"):]), form)
         return self.deny(404, "Not found.")

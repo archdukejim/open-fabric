@@ -8,7 +8,11 @@ fabric's own directory functions:
   wins); refused: a disabled device, an unlinked certificate, a role without
   the permission, a certificate from another CA; unlinking takes effect at
   once. MAB (radclient): a device's MAC with network:mab is accepted with its
-  VLAN, without it refused. Refused before any policy: an unknown RADIUS
+  VLAN, without it refused. EAP-TTLS/PAP (people, eapol_test): members of a
+  mapped group are accepted with the group's VLAN (lowest priority wins),
+  refused: a wrong password, a locked account (the directory's lockout), a
+  person in no mapped group, an unknown name, and a password sent outside
+  the tunnel. Refused before any policy: an unknown RADIUS
   client, a wrong secret, a request without Message-Authenticator. The
   directory down -> refused (fail closed). Container hardening.
 
@@ -35,6 +39,9 @@ from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.pki.install_cert import install_cert  # noqa: E402
 from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
+from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
+from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles  # noqa: E402
+from fabriclib.ldap.list_roles import list_roles  # noqa: E402
 import fabriclib.ldap.add_device as add_device_mod  # noqa: E402
 import fabriclib.ldap.add_role as add_role_mod  # noqa: E402
 import fabriclib.ldap.common.run_dirsrv as run_dirsrv_mod  # noqa: E402
@@ -173,24 +180,67 @@ if "RESTART_REQUIRED" in seed():
     until(lambda: sh("docker inspect -f {{.State.Health.Status}} rt-ds", ok=False).stdout.strip() == "healthy", 240)
     seed()
 
+# setup's default device roles: created once; a deleted one is not brought back
+marker = f"{W}/default-device-roles"
+added = ensure_default_device_roles(V, marker, container="rt-ds")
+roles = {r["name"]: r for r in list_roles(V)}
+check("default device roles created (six, no VLANs), MAB ones only network:mab",
+      sorted(added) == ["iot", "network-gear", "phones-tablets", "printers", "servers", "workstations"]
+      and all(not r["vlan"] for r in roles.values()) and roles["printers"]["permissions"] == ["network:mab"]
+      and "network:eap-tls" in roles["workstations"]["permissions"], (added, roles))
+sh(["docker", "exec", "-i", "rt-ds", "python3", "-"], input=f"""
+import ldap
+c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
+c.simple_bind_s("cn=super_admin,ou=admins,ou=accounts,{BASE}", "Sa1")
+c.delete_s("cn=iot,ou=device-roles,{BASE}")
+""")
+again = ensure_default_device_roles(V, marker, container="rt-ds")
+check("...a default role the admin deleted is not brought back on the next setup",
+      again == [] and "iot" not in {r["name"] for r in list_roles(V)}, again)
+
 # roles and devices, made by fabric's own directory functions
 add_role_mod.add_role(V, "test", "staff", {"permissions": ["network:eap-tls"], "vlan": "20", "priority": 50})
 add_role_mod.add_role(V, "test", "quarantine", {"permissions": ["network:eap-tls"], "vlan": "99", "priority": 10})
-add_role_mod.add_role(V, "test", "printers", {"permissions": ["network:mab"], "vlan": "30", "priority": 50})
+add_role_mod.add_role(V, "test", "mab-printers", {"permissions": ["network:mab"], "vlan": "30", "priority": 50})
 add_role_mod.add_role(V, "test", "dns-only", {"permissions": ["dns:dhcp-register"], "priority": 50})
 add_device_mod.add_device(V, "test", "laptop1", {"type": "laptop", "roles": ["staff"]})
 add_device_mod.add_device(V, "test", "laptop2", {"type": "laptop", "roles": ["staff"], "enabled": False})
 add_device_mod.add_device(V, "test", "laptop3", {"type": "laptop", "roles": ["staff", "quarantine"]})
-add_device_mod.add_device(V, "test", "printer1", {"type": "printer", "roles": ["printers"],
+add_device_mod.add_device(V, "test", "printer1", {"type": "printer", "roles": ["mab-printers"],
                                                   "macs": ["02:00:00:00:30:01"]})
 add_device_mod.add_device(V, "test", "cam1", {"type": "camera", "roles": ["dns-only"], "macs": ["02:00:00:00:30:02"]})
 for d in ("laptop1", "laptop2", "laptop3", "cam1"):          # printer1's certificate stays unlinked
     link_mod.link_device_cert(V, "test", d, FP[d])
 
+# people and groups (as Keycloak writes them to 389-DS), made as the directory's super admin
+PW = "Correct-Horse-9"
+PEOPLE = {"alice": ["staff"], "gina": ["staff", "guests"], "sam": ["contractors"], "nora": ["sales"],
+          "lockme": ["staff"]}
+seed_people = f"""
+import ldap, ldap.modlist
+c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
+c.simple_bind_s("cn=super_admin,ou=admins,ou=accounts,{BASE}", "Sa1")
+people = {PEOPLE!r}
+for uid in people:
+    c.add_s("uid=%s,ou=users,ou=accounts,{BASE}" % uid, ldap.modlist.addModlist({{
+        "objectClass": [b"top", b"person", b"organizationalPerson", b"inetOrgPerson"],
+        "uid": [uid.encode()], "cn": [uid.encode()], "sn": [uid.encode()], "userPassword": [b"{PW}"]}}))
+for group in sorted({{g for gs in people.values() for g in gs}}):
+    members = [("uid=%s,ou=users,ou=accounts,{BASE}" % u).encode() for u, gs in people.items() if group in gs]
+    c.add_s("cn=%s,ou=groups,{BASE}" % group, ldap.modlist.addModlist({{
+        "objectClass": [b"top", b"groupOfNames"], "cn": [group.encode()], "member": members}}))
+print("seeded")
+"""
+check("people and groups in the directory", "seeded" in sh(["docker", "exec", "-i", "rt-ds", "python3", "-"],
+                                                           input=seed_people, ok=False).stdout)
+
 # ------------------------------------------------------------------ FreeRADIUS from fabric's templates
 clients, embedded = normalize_radius_clients([{"name": "switch1", "address": SWITCH_IP, "secret": SECRET}])
+people_map = normalize_radius_people([{"group": "staff", "vlan": 20, "priority": 50},
+                                      {"group": "guests", "vlan": 50, "priority": 60},
+                                      {"group": "contractors", "priority": 70}])
 rv = {"deploy_base_dir": W, "ldap_base_dn": BASE, "hostname_ldap": f"ldap.{DOMAIN}", "radius_clients": clients,
-      "service_users": {"freeradius": {"uid": 916, "gid": 916}}}
+      "radius_people": people_map, "service_users": {"freeradius": {"uid": 916, "gid": 916}}}
 deploy_freeradius(rv, {"radius_secrets": embedded, "ldap_radius_password": "Rr1"},
                   jinja_env(os.path.join(REPO, "fabric", "jinja")))
 install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt", f"{W}/freeradius/certs", 916, 916,
@@ -306,6 +356,47 @@ check("EAP-TLS: unlinking the certificate refuses it at the next authentication"
       and f"sha256={FP['laptop1']}" in logs().rsplit("REJECT method=eap-tls", 1)[-1], logs()[-400:])
 link_mod.link_device_cert(V, "test", "laptop1", FP["laptop1"])
 
+# ------------------------------------------------------------------ EAP-TTLS (people)
+def eap_ttls(user, password, mac="02:00:00:00:20:01"):
+    """(accepted, VLAN or None, output) for one EAP-TTLS/PAP login."""
+    conf = (f'network={{\n key_mgmt=IEEE8021X\n eap=TTLS\n identity="{user}"\n anonymous_identity="anonymous"\n'
+            f' password="{password}"\n phase2="auth=PAP"\n ca_cert="/pki/root.crt"\n'
+            f' domain_suffix_match="radius.{DOMAIN}"\n eapol_flags=0\n}}\n')
+    res = sh(["docker", "exec", "-i", "rt-switch", "sh", "-c",
+              f"cat > /tmp/ttls.conf && eapol_test -c /tmp/ttls.conf -a {RADIUS_IP} -s '{SECRET}' -M {mac} -t 10 -r 0"],
+             ok=False, input=conf)
+    text = res.stdout + res.stderr
+    vlan = re.search(r"Attribute 81 \(Tunnel-Private-Group-Id\).*?\n\s*Value: ([0-9a-fA-F]+)", text)
+    return res.returncode == 0 and "SUCCESS" in text, bytes.fromhex(vlan.group(1)).decode() if vlan else None, text
+
+
+ok, vlan, out = eap_ttls("alice", PW)
+check("EAP-TTLS: a member of a mapped group, right password -> accepted on the group's VLAN (20)",
+      ok and vlan == "20" and "ACCEPT method=eap-ttls person=alice group=staff vlan=20" in logs(),
+      out[-800:] + logs()[-600:])
+ok, vlan, out = eap_ttls("gina", PW)
+check("EAP-TTLS: in two mapped groups -> the lowest priority number wins (staff, 20)", ok and vlan == "20",
+      (vlan, logs()[-300:]))
+ok, vlan, out = eap_ttls("sam", PW)
+check("EAP-TTLS: a mapped group without a VLAN -> accepted on the port's default", ok and vlan is None,
+      (vlan, logs()[-300:]))
+ok, _, out = eap_ttls("alice", "wrong-password")
+check("EAP-TTLS: a wrong password is refused", not ok and "person=alice reason=wrong_password_or_account_locked"
+      in logs(), logs()[-400:])
+ok, _, out = eap_ttls("nora", PW)
+check("EAP-TTLS: a person in no mapped group is refused",
+      not ok and "person=nora reason=in_no_group_mapped_for_802.1X" in logs(), logs()[-400:])
+ok, _, out = eap_ttls("nobody", PW)
+check("EAP-TTLS: an unknown name is refused", not ok and "person=nobody reason=no_such_person" in logs(),
+      logs()[-400:])
+for _ in range(5):
+    eap_ttls("lockme", "wrong-password")
+ok, _, out = eap_ttls("lockme", PW)
+check("EAP-TTLS: after 5 wrong passwords the directory locks the account: the right one is refused too", not ok,
+      logs()[-400:])
+code, _, out = mab("02:00:00:00:30:01", user="alice")
+check("a person's password sent outside the TLS tunnel (plain PAP) is refused", code == "Access-Reject", out[-300:])
+
 # ------------------------------------------------------------------ MAB
 code, vlan, out = mab("02-00-00-00-30-01")
 check("MAB: a MAC whose device has network:mab -> Access-Accept on its VLAN (30)",
@@ -342,7 +433,8 @@ h = json.loads(sh("docker inspect rt-radius").stdout)[0]
 check("container: uid 916, no capabilities, read-only, no-new-privileges",
       h["Config"]["User"] == "916:916" and h["HostConfig"]["CapDrop"] == ["ALL"] and not h["HostConfig"].get("CapAdd")
       and h["HostConfig"]["ReadonlyRootfs"] and "no-new-privileges:true" in h["HostConfig"]["SecurityOpt"])
-check("no RADIUS secret in the logs", SECRET not in logs())
+check("no RADIUS secret and no person's password in the logs",
+      SECRET not in logs() and PW not in logs() and "wrong-password" not in logs())
 
 cleanup()
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")

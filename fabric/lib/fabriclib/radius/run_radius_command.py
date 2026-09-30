@@ -4,16 +4,20 @@ import sys
 from fabriclib.common.errors import ValidationError
 from fabriclib.radius.add_radius_client import add_radius_client
 from fabriclib.radius.list_auth_log import list_auth_log
+from fabriclib.radius.map_radius_group import map_radius_group
 from fabriclib.radius.radius_overview import radius_overview
 from fabriclib.radius.remove_radius_client import remove_radius_client
 from fabriclib.radius.rotate_radius_secret import rotate_radius_secret
+from fabriclib.radius.unmap_radius_group import unmap_radius_group
 from fabriclib.system.apply_changes import apply_changes
 
-USAGE = """usage: fabricctl radius status                     server name, RADIUS clients
+USAGE = """usage: fabricctl radius status                     server name, RADIUS clients, groups that may join by password
        fabricctl radius log [-n N]                 recent 802.1X decisions (accepted, refused and why)
        fabricctl radius add-client <name> <address> [--secret-prompt] [--no-message-authenticator] [--no-apply]
        fabricctl radius rotate-secret <name> [--secret-prompt] [--no-apply]
        fabricctl radius remove-client <name> [--no-apply]
+       fabricctl radius map-group <group> [--vlan N] [--priority N] [--no-apply]   members may join by password
+       fabricctl radius unmap-group <group> [--no-apply]
   A new secret is shown once; --secret-prompt keeps one the switch already has (typed, hidden)."""
 
 
@@ -33,7 +37,8 @@ def _secret(args):
 def run_radius_command(v, argv):
     """`fabricctl radius …` — the FreeRADIUS tab's operations, without the web UI."""
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
-    pos = [a for a in args if not a.startswith("-")]
+    pos = [a for i, a in enumerate(args) if not a.startswith("-")
+           and (i == 0 or args[i - 1] not in ("--vlan", "--priority", "-n"))]
     try:
         if cmd == "status" and not pos:
             o = radius_overview(v, log_limit=0)
@@ -46,6 +51,11 @@ def run_radius_command(v, argv):
                       f"{'Message-Authenticator required' if c['message_authenticator'] else 'Message-Authenticator NOT required'}")
             if not o["clients"]:
                 print("  no RADIUS clients yet: fabricctl radius add-client <name> <address>")
+            print("people who may join by password (EAP-TTLS):")
+            for m in o["people"] or []:
+                print(f"  group {m['group']:<20} vlan {m['vlan'] or '-':<5} priority {m['priority']}")
+            if not o["people"]:
+                print("  nobody: fabricctl radius map-group <group> [--vlan N]")
             return 0
         if cmd == "log":
             n = int(args[args.index("-n") + 1]) if "-n" in args else 50
@@ -60,6 +70,15 @@ def run_radius_command(v, argv):
         if cmd == "rotate-secret" and len(pos) == 1:
             secret = rotate_radius_secret("root", pos[0], _secret(args))
             print(f"new shared secret for {pos[0].lower()} (shown once; give the device the same):\n{secret}")
+            return _apply(args)
+        if cmd == "map-group" and len(pos) == 1:
+            opt = {k: args[args.index(f"--{k}") + 1] for k in ("vlan", "priority") if f"--{k}" in args}
+            m = map_radius_group("root", pos[0], opt.get("vlan"), opt.get("priority", 100))
+            print(f"members of {m['group']} may join by password" + (f" on VLAN {m['vlan']}" if m["vlan"] else ""))
+            return _apply(args)
+        if cmd == "unmap-group" and len(pos) == 1:
+            unmap_radius_group("root", pos[0])
+            print(f"members of {pos[0]} may no longer join by password")
             return _apply(args)
         if cmd == "remove-client" and len(pos) == 1:
             remove_radius_client("root", pos[0])
