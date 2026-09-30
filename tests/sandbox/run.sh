@@ -3,8 +3,11 @@
 # End-to-end test of the product as users get it, in a disposable
 # systemd + Docker sandbox (Ubuntu 24.04, no git checkout inside):
 #   apt install ./fabricctl_<v>_all.deb -> fabricctl setup --file vars.yaml
-#   -> doctor, systemd control (fabric.target), real sign-in incl. refusals,
-#   RFC2136/TSIG/ACLs, re-runs, package upgrade, apt remove
+#   -> doctor, DHCP (Kea), 802.1X (FreeRADIUS), the certificate page,
+#   systemd control (fabric.target), secrets and unlock in OpenBao, real
+#   sign-in incl. refusals, image update/rollback/prune, RFC2136/TSIG/ACLs,
+#   re-runs, package upgrade and remove, reinstall, uninstall with export,
+#   restore from the export
 #
 #   sudo tests/sandbox/run.sh            (KEEP=1 leaves the sandbox running)
 #
@@ -418,7 +421,6 @@ import glob, sys
 sys.path.insert(0, "/opt/fabric/lib")
 from fabriclib.secrets.load_secrets import load_secrets
 secrets = load_secrets("/opt/fabric/config/fabric-secrets.yml")
-values = [v for v in secrets.values() if isinstance(v, str) and len(v) >= 12]
 leaks = set()
 for path in glob.glob("/proc/[0-9]*/cmdline"):
     try:

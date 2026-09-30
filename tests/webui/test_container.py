@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""End-to-end test of core-web against a mock Keycloak. Run in WSL/Linux:
+"""End-to-end test of the web UI container against a mock Keycloak and the
+real fabric-agent (Linux, root):
     sudo python3 tests/webui/test_container.py
 Builds a throwaway PKI with openssl, starts a TLS mock Keycloak that signs
-real RS256 ID tokens, starts core-web on a unix socket and drives it the way
-nginx would (forwarded client-certificate headers)."""
+real RS256 ID tokens, starts fabric-agent from the installed tree and the
+web UI image on a unix socket, and drives it the way nginx would (forwarded
+client-certificate headers)."""
 import base64
 import hashlib
 import http.client
@@ -592,11 +594,9 @@ check("the audit log names the token's user, not the actor the request claims",
 subprocess.run("docker rm -f cwebui >/dev/null; docker network rm cwnet >/dev/null; docker rmi fabric/webui:test >/dev/null",
                shell=True)
 agent.terminate()
-srv = agent
-srv.terminate()
 kc.shutdown()
 failed = [n for n, ok in results if not ok]
 print(f"\n{len(results) - len(failed)}/{len(results)} passed")
 if failed:
-    print(srv.stdout.read()[-3000:]); print(subprocess.run(['docker','logs','cwebui'],capture_output=True,text=True).stdout[-2000:])
+    print(agent.stdout.read()[-3000:]); print(subprocess.run(['docker','logs','cwebui'],capture_output=True,text=True).stdout[-2000:])
 sys.exit(1 if failed else 0)

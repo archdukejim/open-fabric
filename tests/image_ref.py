@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Print the validated, digest-pinned ref of one image from
-fabric/images.lock.yaml, so every suite tests exactly what fabric runs:
+fabricctl/images.lock.yaml, so every suite tests exactly what fabric runs:
 
     docker run "$(python3 tests/image_ref.py nginx)" …
 """

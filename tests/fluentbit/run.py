@@ -161,7 +161,7 @@ def write_audit(marker):
 
 time.sleep(3)
 write_audit("mark-one")
-check("delivered to syslog over verified TLS (RFC 5424)", until(lambda: any("mark-one" in x for x in SYSLOG)),
+check("delivered to syslog over verified TLS", until(lambda: any("mark-one" in x for x in SYSLOG)),
       SYSLOG[-2:] + [sh("docker logs fluentbit", ok=False).stderr[-600:]])
 check("delivered to Elasticsearch over verified TLS, with the password from OpenBao",
       until(lambda: any("mark-one" in x for x in BULK))
@@ -169,7 +169,7 @@ check("delivered to Elasticsearch over verified TLS, with the password from Open
 
 insp = json.loads(sh("docker inspect fluentbit").stdout)[0]
 hc = insp["HostConfig"]
-check("hardened: uid 914, no capabilities, no-new-privileges, read-only root, memory limit, groups 913 + journal",
+check("hardened: uid 914, no capabilities, no-new-privileges, read-only root, memory limit, group 913 (OpenBao's logs)",
       insp["Config"]["User"] == "914:914" and hc["CapDrop"] == ["ALL"] and not hc.get("CapAdd")
       and "no-new-privileges:true" in hc["SecurityOpt"] and hc["ReadonlyRootfs"]
       and hc["Memory"] == 64 * 1024 * 1024 and "913" in [str(g) for g in hc.get("GroupAdd") or []], hc)

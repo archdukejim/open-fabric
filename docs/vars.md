@@ -4,6 +4,8 @@ This document details all available configuration variables that can be defined 
 
 The `custom-vars.yaml` file acts as the single source of truth for rendering the infrastructure environment. While only a handful of variables are required (and included in the default `fabricctl/examples/vars.yaml`), you may optionally define any of the variables below to override the backend system defaults.
 
+Every setting and its default is defined in `fabricctl/jinja/vars.yaml.j2`, which is rendered into `vars.yaml` on every apply. **Immutable** settings are ones the interactive `fabricctl` menu refuses to change after install (they are baked into the CA or the file layout); most of them only take effect when Step-CA is first initialised.
+
 ---
 
 ## 1. Global Options
@@ -12,15 +14,21 @@ These variables define top-level identity and basic settings.
 ### `domain`
 **Description:** The base domain for the local network (e.g. `lan.example.com`). **Required.**
 
-**Default Value:** *(Mandatory - Template: `example.com`)*
+**Default Value:** *(Mandatory - Template: `example.com`; `fabricctl setup` suggests `home.arpa` when it is missing)*
+
+**Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
+- `bind9/config/named.conf.zones.j2`
 - `bind9/data/reverse-zone.j2`
 - `bind9/data/zone.j2`
-- `docs/testplan.md.j2`
+- `dirsrv/seed/10-tree.ldif.j2`
+- `kea/docker-compose.yml.j2`, `kea/kea-dhcp4.conf.j2`, `kea/kea-dhcp-ddns.conf.j2`
+- `nginx/nginx.conf.j2`
 - `nginx/www/certs/index.html.j2`
 - `nginx/www/certs/install-certs.sh.j2`
-- `vars.yaml.j2`
+- `nginx/www/ldap/index.html.j2`, `nginx/www/ldap/install-ldap.sh.j2`
+- `vars.yaml.j2` (every `hostname_*`, `ldap_base_dn`, `webui_realm`)
 
 ### `domain_file`
 **Description:** The domain name formatted for use as a filename (dots replaced with underscores).
@@ -30,22 +38,23 @@ These variables define top-level identity and basic settings.
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
 - `nginx/www/certs/index.html.j2`
-- `nginx/www/certs/install-all-ubuntu.sh.j2`
-- `nginx/www/certs/install-certs.sh.j2`
+- `nginx/www/certs/install-*.sh.j2` (all five install scripts)
+- `nginx/www/ldap/index.html.j2`, `nginx/www/ldap/install-ldap.sh.j2`
 - `vars.yaml.j2`
 
 ### `hostname`
-**Description:** The hostname of the Docker host server. **Required.**
+**Description:** The hostname of the Docker host server: a single label, no dots. It gets an A record (`host_ip`) in the zone and is the target of every service CNAME. **Required.**
 
 **Default Value:** *(Mandatory - Template: `fabric`)*
 
 **Effected Jinja Templates:**
-- `vars.yaml.j2`
+- `fluentbit/fluent-bit.yaml.j2` (the `fabric_host` field on forwarded records)
+- `vars.yaml.j2` (default A and CNAME records in `dns`)
 
 ### `friendly_name`
-**Description:** A friendly display name for organizations or the CA.
+**Description:** A friendly display name for organizations or the CA. Also the default of `ca_name` and `cert_org`.
 
-**Default Value:** `"Example Org"`
+**Default Value:** `"Example Org"` (`fabricctl setup` asks for it, suggesting `"Home Network"`, when it is empty)
 
 **Effected Jinja Templates:**
 - `nginx/www/certs/index.html.j2`
@@ -54,51 +63,55 @@ These variables define top-level identity and basic settings.
 - `nginx/www/certs/install-firefox-ubuntu.sh.j2`
 - `nginx/www/certs/install-python-ubuntu.sh.j2`
 - `nginx/www/landing/index.html.j2`
+- `nginx/www/ldap/index.html.j2`
 - `nginx/www/manual/index.html.j2`
+- `nginx/www/shared/base.html.j2`
 - `vars.yaml.j2`
+
+The footer settings below are all read by `nginx/www/shared/base.html.j2` (the footer of every nginx web page). Their default is empty (rendered as `null`); an empty value is not shown.
 
 ### `service_mark`
 **Description:** Text to display with the Service Mark (`℠`) symbol in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `trademark`
 **Description:** Text to display with the Trademark (`™`) symbol in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `copyright`
 **Description:** Copyright holder/year to display with the Copyright (`©`) symbol in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `contact_email`
 **Description:** Contact email address displayed in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `contact_phone`
 **Description:** Contact phone number displayed in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `address_line1`
 **Description:** Primary address line displayed in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `address_line2`
 **Description:** Secondary address line (e.g., Suite, City, State) displayed in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `care_of`
-**Description:** Attribution text displayed with the Care Of (`℅`) symbol in the footer. Replaces the legacy `vendor` variable.
+**Description:** Attribution text displayed with the Care Of (`℅`) symbol in the footer.
 
-**Default Value:** `""`
+**Default Value:** *(empty)*
 
 ### `system_timezone`
-**Description:** The timezone for the server/containers.
+**Description:** Intended as the timezone for the server/containers. **Not applied:** it is rendered into `vars.yaml`, but no template or code reads it; containers and the host keep their own timezone.
 
 **Default Value:** `"America/New_York"`
 
@@ -106,24 +119,17 @@ These variables define top-level identity and basic settings.
 - `vars.yaml.j2`
 
 ### `deploy_base_dir`
-**Description:** The base directory on the host where project data and configs will be deployed.
+**Description:** The base directory on the host where project data and configs will be deployed. `fabricctl setup` overwrites it with the install base it runs against on every run.
 
 **Default Value:** `"/opt"`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `bind9/docker-compose.yml.j2`
-- `webui/docker-compose.yml.j2`
-- `dirsrv/docker-compose.yml.j2`
-- `docs/testplan.md.j2`
-- `keycloak/docker-compose.yml.j2`
-- `nginx/docker-compose.yml.j2`
-- `postgres/docker-compose.yml.j2`
-- `stepca/docker-compose.yml.j2`
+- every `<service>/docker-compose.yml.j2` (bind9, dirsrv, fluentbit, freeradius, kea, keycloak, nginx, openbao, postgres, stepca, webui)
 - `systemd/fabric-agent.service.j2`
 - `systemd/wrapper.service.j2`
-- `vars.yaml.j2`
+- `vars.yaml.j2` (`compose_file`, `keycloak_data_dir`, `postgres_data_dir`)
 
 ## 2. Networking & DNS
 > [!WARNING]
@@ -132,70 +138,78 @@ These variables define top-level identity and basic settings.
 These settings dictate how containers route traffic and how the BIND9 DNS server handles resolution.
 
 ### `host_ip`
-**Description:** The primary IP address of the Docker host. **Required.**
+**Description:** The primary IP address of the Docker host (IPv4). Published ports bind to it, and it is the address of `hostname` in the zone. **Required.**
 
 **Default Value:** *(Mandatory - Template: `192.168.1.100`)*
 
 **Effected Jinja Templates:**
 - `bind9/data/zone.j2`
-- `docs/testplan.md.j2`
+- `bind9/docker-compose.yml.j2`
+- `freeradius/docker-compose.yml.j2`
+- `kea/kea-dhcp4.conf.j2` (default DNS server handed to clients)
 - `nginx/docker-compose.yml.j2`
+- `nginx/nginx.conf.j2`
+- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `lan_cidr`
-**Description:** The subnet representing your local LAN clients.
+**Description:** The subnet representing your local LAN clients (IPv4 network). It is in the `dns-resolvers` ACL, it is the network the host firewall allows (SSH and Docker-published ports; see `security`), and the default DHCP subnet offered by `fabricctl setup`. **Required.**
 
 **Default Value:** *(Mandatory - Template: `192.168.1.0/24`)*
 
 **Effected Jinja Templates:**
-- `docs/testplan.md.j2`
-- `vars.yaml.j2`
+- `vars.yaml.j2` (`bind_acls`)
+- read by `fabriclib/setup/configure_firewall.py`, `fabriclib/security/apply_docker_firewall.py`, `fabriclib/dns/builtin_acls.py`
 
 ### `lan_gateway`
-**Description:** The default gateway router IP for your LAN.
+**Description:** The default gateway router IP for your LAN (IPv4). Used only as the default router when `fabricctl setup` asks for the DHCP subnet. **Required.**
 
 **Default Value:** *(Mandatory - Template: `192.168.1.1`)*
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
+- read by `fabriclib/setup/choose_plan.py`
 
 ### `fabric_subnet`
-**Description:** The internal Docker bridge subnet for the fabric services.
+**Description:** The internal Docker bridge subnet for the fabric services (`fabric_net`, created by setup; an existing network is not changed). It is in the `acme-updaters` and `dns-resolvers` ACLs, and the fabric-agent service and OpenBao accept connections from it. The `ip_*` addresses must lie inside it.
 
 **Default Value:** `10.255.0.0/24`
 
 **Effected Jinja Templates:**
-- `vars.yaml.j2`
+- `systemd/fabric-agent.service.j2`
+- `vars.yaml.j2` (`bind_acls`)
+- read by `fabriclib/setup/configure_network.py`, `fabriclib/vault/configure_openbao.py`
 
 ### `use_host_dns`
-**Description:** If `true`, the host's existing `resolv.conf` is used during deployment. If `false`, systemd-resolved is reconfigured to use `dns_server`.
+**Description:** If `true`, the host's resolver is left as it is. If `false`, setup writes a systemd-resolved drop-in that uses `dns_server` with the stub listener off (this frees port 53 on the host) and points `/etc/resolv.conf` at it.
 
 **Default Value:** `true`
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
+- read by `fabriclib/setup/configure_network.py`
 
 ### `dns_server`
-**Description:** External upstream DNS server to forward queries to (e.g., `8.8.8.8`).
+**Description:** Upstream DNS server for the **host's** resolver, used only when `use_host_dns` is `false`. BIND9 does not forward to it (BIND9 is authoritative only, `recursion no`).
 
 **Default Value:** `"8.8.8.8"`
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
+- read by `fabriclib/setup/configure_network.py`
 
 ### `bind_dns_port`
-**Description:** The port BIND9 listens on for standard DNS (UDP/TCP).
+**Description:** The host port (on `host_ip`, UDP and TCP) published to BIND9's port 53. Also the port given to RFC2136 clients in TSIG key settings, and checked by setup's final verification.
 
-**Default Value:** `5353`
+**Default Value:** `53`
 
 **Effected Jinja Templates:**
-- `bind9/config/named.conf.options.j2`
 - `bind9/docker-compose.yml.j2`
-- `docs/testplan.md.j2`
 - `vars.yaml.j2`
+- read by `fabriclib/dns/rfc2136_settings.py`, `fabriclib/setup/verify_install.py`
 
 ### `bind9_doh_port`
-**Description:** The port BIND9 listens on for DNS-over-HTTPS.
+**Description:** The port BIND9 listens on for DNS-over-HTTPS inside `fabric_net` (plain HTTP; nginx terminates TLS on `hostname_bind9` and proxies to it). Not published on the host.
 
 **Default Value:** `8053`
 
@@ -239,14 +253,19 @@ dns:
 These variables define how the internal Certificate Authority generates and signs certificates.
 
 ### `ca_name`
-**Description:** The Common Name (CN) of the Root CA.
+**Description:** The name of the CA: passed to `step ca init --name` at the first Step-CA initialisation (Step-CA derives the root and intermediate CNs from it), and shown on the web pages.
 
 **Default Value:** `friendly_name` + `" CA"`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
+- `nginx/www/certs/index.html.j2`, `nginx/www/certs/install-{chrome,firefox,python}-ubuntu.sh.j2`
+- `nginx/www/landing/index.html.j2`, `nginx/www/ldap/index.html.j2`, `nginx/www/manual/index.html.j2`, `nginx/www/shared/base.html.j2`
 - `vars.yaml.j2`
+- read by `fabriclib/setup/init_pki.py`
+
+The subject fields `cert_country`, `cert_province`, `cert_city`, `cert_org` and `cert_ou` go into the Step-CA certificate templates (`leaf.tpl`, `subca.tpl`), which are used for ACME certificates, CSRs signed from the web UI, and key pairs or sub-CAs minted by fabric. Setup's own service certificates are issued without a template. The templates are re-rendered on every apply, so a change affects new certificates only.
 
 ### `cert_country`
 **Description:** The country field (C) for the certificates.
@@ -256,7 +275,6 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -269,7 +287,6 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -282,7 +299,6 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
@@ -308,24 +324,22 @@ These variables define how the internal Certificate Authority generates and sign
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `stepca/leaf.tpl.j2`
 - `stepca/subca.tpl.j2`
 - `vars.yaml.j2`
 
 ### `cert_root_ca_days`
-**Description:** The validity lifetime (in days) of the Root CA.
+**Description:** Intended as the validity lifetime (in days) of the Root CA. **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
 **Default Value:** `1825` (5 years)
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_root_digest`
-**Description:** The signature hash algorithm for the Root CA.
+**Description:** Intended as the signature hash algorithm for the Root CA. **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
 **Default Value:** `"sha512"`
 
@@ -335,40 +349,37 @@ These variables define how the internal Certificate Authority generates and sign
 - `vars.yaml.j2`
 
 ### `cert_root_key_type`
-**Description:** The key type for the Root CA (e.g., rsa, ecdsa, ed25519).
+**Description:** Intended as the key type for the Root CA (e.g., rsa, ecdsa, ed25519). **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
 **Default Value:** `"rsa"`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_root_key_param`
-**Description:** The key parameter for the Root CA (e.g., 4096).
+**Description:** Intended as the key parameter for the Root CA (e.g., 4096). **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
-**Default Value:** `"4096"`
+**Default Value:** `4096`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_intermediate_days`
-**Description:** The validity lifetime (in days) of the Intermediate CA.
+**Description:** Intended as the validity lifetime (in days) of the Intermediate CA. **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
 **Default Value:** `1095` (3 years)
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_intermediate_digest`
-**Description:** The signature hash algorithm for the Intermediate CA.
+**Description:** Intended as the signature hash algorithm for the Intermediate CA. **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
 **Default Value:** `"sha512"`
 
@@ -378,34 +389,35 @@ These variables define how the internal Certificate Authority generates and sign
 - `vars.yaml.j2`
 
 ### `cert_intermediate_key_type`
-**Description:** The key type for the Intermediate CA.
+**Description:** Intended as the key type for the Intermediate CA. **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
 **Default Value:** `"rsa"`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_intermediate_key_param`
-**Description:** The key parameter for the Intermediate CA.
+**Description:** Intended as the key parameter for the Intermediate CA. **Not applied:** `step ca init` runs with Step-CA's own defaults; fabric does not pass this setting, and nothing else reads it.
 
-**Default Value:** `"4096"`
+**Default Value:** `4096`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
 
 ### `cert_service_days`
-**Description:** The maximum validity lifetime (in days) of leaf certificates.
+**Description:** The validity (in days) of the service certificates `fabricctl setup` mints for nginx, BIND9, 389-DS and the other services, and the default of `stepca_cert_max_lifetime_hours`.
 
 **Default Value:** `365` (1 year)
 
+**Immutable:** Yes 🔒
+
 **Effected Jinja Templates:**
-- `vars.yaml.j2`
+- `vars.yaml.j2` (`stepca_cert_max_lifetime_hours`)
+- read by `fabriclib/pki/mint_cert.py`
 
 ### `pki_manual_max_days`
 **Description:** The longest validity (in days) of a certificate issued by hand from the web UI's Step-CA tab — a signed CSR or a generated key pair. Requests above it are refused.
@@ -414,20 +426,25 @@ These variables define how the internal Certificate Authority generates and sign
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
+- read by `fabriclib/pki/common/valid_days.py`, `fabriclib/pki/ca_summary.py`
 
 ### `cert_acme_lifetime_hours`
-**Description:** The default validity of certificates requested via ACME.
+**Description:** The default and maximum validity of certificates requested via ACME (the `acme` provisioner in Step-CA's `ca.json`). Written only at the first Step-CA initialisation.
 
 **Default Value:** `"720h"` (30 days)
 
+**Immutable:** Yes 🔒
+
 **Effected Jinja Templates:**
-- `nginx/www/certs/index.html.j2`
 - `vars.yaml.j2`
+- read by `fabriclib/setup/init_pki.py`
 
 ### `stepca_port`
-**Description:** The port Step-CA listens on.
+**Description:** The port Step-CA listens on inside `fabric_net` (nginx publishes Step-CA as `hostname_stepca` on 443).
 
 **Default Value:** `9000`
+
+**Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
@@ -435,34 +452,42 @@ These variables define how the internal Certificate Authority generates and sign
 - `vars.yaml.j2`
 
 ### `stepca_cert_allow_subordinate_ca`
-**Description:** Whether Step-CA allows signing subordinate CA certs.
+**Description:** Whether Step-CA's JWK provisioner may issue the basicConstraints extension, i.e. sign subordinate CA certificates. Written only at the first Step-CA initialisation.
 
 **Default Value:** `true`
 
+**Immutable:** Yes 🔒
+
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
+- read by `fabriclib/setup/init_pki.py`
 
 ### `stepca_cert_max_lifetime_hours`
-**Description:** The max lifetime Step-CA will issue a certificate for.
+**Description:** The longest lifetime Step-CA will issue a certificate for (`maxTLSCertDuration` for the whole authority). Written only at the first Step-CA initialisation.
 
-**Default Value:** `cert_service_days * 24h`
+**Default Value:** `cert_service_days` × 24, in hours (`"8760h"`)
+
+**Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
+- read by `fabriclib/setup/init_pki.py`
 
 
 ### Bring Your Own Certificates (BYOC)
 If you already possess a securely offline-generated Root and Intermediate CA, you can import them instead of letting Step-CA mint its own.
 
 ### `byoc`
-**Description:** Set to `true` to enable importing your own CAs.
+**Description:** Set to `true` to import your own root and intermediate at the first Step-CA initialisation (setup stops if any of the three files is missing).
 
 **Default Value:** `false`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
+- `stepca/docker-compose.yml.j2`
 - `vars.yaml.j2`
+- read by `fabriclib/setup/init_pki.py`
 
 ### `ca_crt_path`
 **Description:** Absolute path to your existing Root CA certificate.
@@ -485,9 +510,9 @@ If you already possess a securely offline-generated Root and Intermediate CA, yo
 - `vars.yaml.j2`
 
 ### `ica_key_path`
-**Description:** Absolute path to your existing Intermediate CA private key.
+**Description:** Absolute path to your existing Intermediate CA private key. Only written to `vars.yaml` when set.
 
-**Default Value:** *(None)*
+**Default Value:** *(None)* — then `ica_crt_path` with its extension replaced by `.key`
 
 **Immutable:** Yes 🔒
 
@@ -497,7 +522,7 @@ Allows deep customization of the container orchestration, including overriding i
 
 ### General Orchestration
 ### `compose_file`
-**Description:** Path to the generated `docker-compose.yml` file.
+**Description:** Intended as the path of a combined `docker-compose.yml`. **Not used:** each service has its own compose file under `<deploy_base_dir>/<service>/`, and nothing reads this setting.
 
 **Default Value:** `deploy_base_dir` + `"/fabric/docker-compose.yml"`
 
@@ -505,9 +530,9 @@ Allows deep customization of the container orchestration, including overriding i
 - `vars.yaml.j2`
 
 ### `project_containers`
-**Description:** List of containers to include in deployment.
+**Description:** List of containers in the deployment. **Informational only:** it is rendered into `vars.yaml`, but nothing reads it; which services are deployed follows the `install_*` flags. It does not list `kea`, `freeradius` or `fluentbit`.
 
-**Default Value:** `['nginx', 'step-ca', 'bind9']` plus `dirsrv` (if `install_ldap`), `keycloak`, `postgres` (if `install_keycloak`) and `webui` (if `install_webui` and `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render.
+**Default Value:** `['nginx', 'step-ca', 'bind9', 'openbao']` plus `dirsrv` (if `install_ldap`), `keycloak`, `postgres` (if `install_keycloak`) and `fabric-web` (if `install_webui` and `install_keycloak`). The optional entries are re-derived from the `install_*` flags on every render, and `openbao` is always added.
 
 **Effected Jinja Templates:**
 - `vars.yaml.j2`
@@ -533,7 +558,7 @@ Allows deep customization of the container orchestration, including overriding i
 ### `nginx_backend_stepca`
 **Description:** Upstream target for Nginx Step-CA proxy.
 
-**Default Value:** `"https://step-ca:9000"`
+**Default Value:** `"https://step-ca:"` + `stepca_port` (`"https://step-ca:9000"`)
 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
@@ -547,6 +572,7 @@ Allows deep customization of the container orchestration, including overriding i
 **Effected Jinja Templates:**
 - `keycloak/docker-compose.yml.j2`
 - `vars.yaml.j2`
+- read by `deploy.py` (creates it), `fabriclib/setup/export_install.py`, `fabriclib/setup/uninstall.py`
 
 ### `postgres_data_dir`
 **Description:** Directory where the Postgres database persists its data.
@@ -556,11 +582,17 @@ Allows deep customization of the container orchestration, including overriding i
 **Effected Jinja Templates:**
 - `postgres/docker-compose.yml.j2`
 - `vars.yaml.j2`
+- read by `deploy.py` (creates it), `fabriclib/setup/export_install.py`, `fabriclib/setup/uninstall.py`
 
 ### `host_ram_capacity`
-**Description:** Host RAM limit in GB (min 3) to enforce memory ceilings and staggered boots. `0` disables limits. At 3/4 GB the 389-DS container is limited to `256M`/`384M` (with `DS_MEMORY_PERCENTAGE=10`).
+**Description:** Host RAM in GB, used to set memory ceilings and staggered boots. `0` disables them; `1` and `2` are refused by apply (the minimum is 3). At 3/4 GB, for example, the 389-DS container is limited to `256M`/`384M` (with `DS_MEMORY_PERCENTAGE=10`). OpenBao, Kea, FreeRADIUS and Fluent Bit use their own `*_mem_limit` settings instead.
 
 **Default Value:** `0`
+
+**Effected Jinja Templates:**
+- `bind9`, `dirsrv`, `keycloak`, `nginx`, `postgres`, `stepca` and `webui` `docker-compose.yml.j2`
+- `systemd/wrapper.service.j2`
+- read by `deploy.py` (validation)
 
 
 ### Internal IP Assignments
@@ -581,9 +613,12 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_stepca` | validated `smallstep/step-ca:0.30.x@sha256:…` | base of `fabric/stepca:local` |
 | `image_keycloak` | validated `keycloak/keycloak:26.x@sha256:…` | base of the pre-built layer `fabric/keycloak:local` (`kc.sh build`, `start --optimized`) |
 | `image_postgres` | validated `postgres:18.x@sha256:…` | a new major is never automatic (data upgrade) |
-| `image_debian` | validated `debian:trixie-slim@sha256:…` | base of `fabric/bind9:local` (BIND 9.20 from Debian packages), `fabric/dirsrv:local` (389-DS) and `fabric/web:local` |
+| `image_debian` | validated `debian:trixie-slim@sha256:…` | base of `fabric/bind9:local` (BIND 9.20 from Debian packages), `fabric/dirsrv:local` (389-DS), `fabric/web:local`, `fabric/kea:local` and `fabric/freeradius:local` |
 | `image_dirsrv`, `image_webui` | `fabric/dirsrv:local`, `fabric/web:local` | names of the locally built images |
+| `image_kea` | `fabric/kea:local` | name of the locally built Kea image (optional DHCP) |
+| `image_freeradius` | `fabric/freeradius:local` | name of the locally built FreeRADIUS image (optional 802.1X) |
 | `image_fluentbit` | validated `fluent/fluent-bit:5.1.x@sha256:…` | optional log forwarding |
+| `image_pins` | `[]` | `image_*` keys the admin set explicitly; maintained by `fabricctl setup` |
 | `image_prune` | `true` | after `fabricctl images update`, remove old images of fabric's repositories (never the rollback image or anything in use) |
 
 **Every image is pinned by digest** (amd64 + arm64); the defaults come from
@@ -606,7 +641,9 @@ Allows overriding the default short hostnames (CNAMEs) automatically assigned to
 | `cname_sso` | `"sso"` |
 | `cname_mgr` | `"fabric"` (label of the default web UI name; CNAME added only when webui is enabled and it differs from `hostname`) |
 | `cname_certs` | `"certs"` (CA certificate page) |
-| `webui_hostname` | *(empty)* — any host name for the web UI; overrides `cname_mgr` |
+| `webui_hostname` | *(empty)* — any host name for the web UI; overrides `cname_mgr`. Outside `domain`, fabric issues its certificate but you point DNS at this host |
+
+`cname_openbao` is listed under OpenBao below. `cname_radius` (default `"radius"`) can be set too, but it is not written to `vars.yaml`: it only builds `hostname_radius` (see 802.1X).
 
 ### Internal Subdomain Routing (Nginx)
 By default, the fully qualified hostnames are constructed using the CNAMEs above appended with the base `domain`.
@@ -621,26 +658,44 @@ By default, the fully qualified hostnames are constructed using the CNAMEs above
 | `hostname_mgr`| `webui_hostname`, else `cname_mgr + "." + domain` — computed on every render (webui vhost; `redirect_uri` is `https://<hostname_mgr>/oidc/callback`) |
 | `hostname_certs`| `cname_certs + "." + domain` — CA certificates for every system (`ca.<domain>` is Step-CA's API) |
 
+`hostname_certs`, `hostname_openbao`, `hostname_radius` and `hostname_mgr` are always computed from their CNAME settings (and `webui_hostname`); setting them directly has no effect. The other `hostname_*` values can be overridden.
+
 ## 5. Security Contexts & Features
 Toggle features and control system-level UNIX isolation mapping.
 
+### `security`
+**Description:** Host hardening applied by `fabricctl setup`. A dictionary; the keys you set are merged over the defaults (unknown keys are kept). `fabricctl setup` lists each item in its plan and, under Advanced, states what turning it off costs.
+
+| Key | Default | What it does |
+|---|---|---|
+| `firewall` | `true` | UFW: deny incoming, allow outgoing, SSH (22/tcp) only from `lan_cidr` and `firewall_allow` (existing UFW rules are kept); with `install_kea`, UDP 67 on each of `dhcp.interfaces`. Also rebuilds the `DOCKER-USER` iptables chain so Docker-published ports accept new connections only from the same networks (and, with `install_freeradius`, from the IPv4 `radius_clients` on UDP 1812/1813); `fabric-firewall.service` re-applies it at boot. Setup refuses to enable it when your SSH session comes from outside those networks. `false`: `DOCKER-USER` is opened, `fabric-firewall` disabled, UFW left as it is. |
+| `firewall_allow` | `[]` | Extra source networks (CIDRs, e.g. a VPN) allowed next to `lan_cidr`. |
+| `docker_daemon_hardening` | `true` | Merges into `/etc/docker/daemon.json`: `no-new-privileges`, no inter-container traffic on the default bridge (`icc: false`), no userland proxy, `live-restore`, `json-file` logs capped at 3 × 10 MB. Docker is restarted only when the file changed. `false`: nothing is written, but settings written earlier are not removed. |
+
+**Default Value:** `{firewall: true, firewall_allow: [], docker_daemon_hardening: true}`
+
+**Effected Jinja Templates:**
+- `vars.yaml.j2`
+- read by `fabriclib/setup/configure_firewall.py`, `fabriclib/security/apply_docker_firewall.py`, `fabriclib/setup/harden_docker.py`, `fabriclib/setup/choose_plan.py`
+
 ### `install_ldap`
-**Description:** Toggles whether the 389 Directory Server (`dirsrv`) container and the nginx LDAP/LDAPS stream listeners are deployed.
+**Description:** Toggles whether the 389 Directory Server (`dirsrv`) container and the nginx LDAP/LDAPS stream listeners are deployed. The first web UI admin and 802.1X (`install_freeradius`) need it.
 
 **Default Value:** `true`
 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
+- `dirsrv/*` (rendered only when enabled)
 - `vars.yaml.j2`
 
 ### `install_keycloak`
-**Description:** Toggles whether Keycloak (and PostgreSQL) are deployed.
+**Description:** Toggles whether Keycloak (and PostgreSQL) are deployed. The web UI needs it.
 
-**Default Value:** `false`
+**Default Value:** `false` in `vars.yaml.j2`; `fabricctl setup` treats a missing value as `true` and writes that into the settings.
 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
-- `nginx/www/landing/index.html.j2`
+- `openbao/docker-compose.yml.j2`
 - `vars.yaml.j2`
 
 ### `install_webui`
@@ -659,11 +714,14 @@ Toggle features and control system-level UNIX isolation mapping.
 |----------|---------------|-------------|
 | `webui_realm` | `domain` | Keycloak realm used for login and created/configured by `keycloak_bootstrap.py` |
 | `webui_admin_role` | `"fabric-admin"` | Realm role required to use webui |
-| `webui_admin_group` | `"admins"` | LDAP/Keycloak group granted `webui_admin_role` |
+| `webui_admin_group` | `"admins"` | LDAP/Keycloak group granted `webui_admin_role`; the first admin is put in it |
+| `webui_admin_user` | `"fabricadmin"` | Username of the first web UI admin, created by `fabricctl setup` in 389-DS with a client certificate (kit in `~/fabric-admin` of the user who ran setup). Setup chooses it once: the `sudo` user's name if valid, else `fabricadmin`; `admin` and `root` are refused |
+| `webui_admin_email` | *(empty)* → `<webui_admin_user>@<domain>` | Email address of that first admin |
+| `webui_client_cert_days` | `365` | Validity (days) of the first admin's client certificate |
 | `webui_session_idle` | `900` | Session idle timeout (seconds) |
 | `webui_session_max` | `28800` | Absolute session lifetime (seconds) |
 
-`webui_realm`, `webui_admin_role` and `webui_admin_group` are rendered into `vars.yaml`; the session timeouts are read only by `webui/webui.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `webui_oidc_secret` is generated with fabric's secrets (OpenBao).
+`webui_realm`, `webui_admin_role`, `webui_admin_group`, `webui_admin_user`, `webui_admin_email` and `webui_client_cert_days` are rendered into `vars.yaml` (the last three are read by `fabriclib/setup/create_admin.py`); the session timeouts are read only by `webui/webui.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `webui_oidc_secret` is generated with fabric's secrets (OpenBao).
 
 ### `service_users`
 **Description:** Dictionary mapping container names to UID/GID objects for setting permissions.
@@ -673,19 +731,15 @@ Toggle features and control system-level UNIX isolation mapping.
 **Merge behaviour:** user entries are merged over the defaults (not a replacement), so a `vars.yaml` rendered by an older release still gains new accounts such as `webui`.
 
 **Effected Jinja Templates:**
-- `bind9/docker-compose.yml.j2`
-- `keycloak/docker-compose.yml.j2`
-- `nginx/docker-compose.yml.j2`
+- every `<service>/docker-compose.yml.j2` (bind9, dirsrv, fluentbit, freeradius, kea, keycloak, nginx, openbao, postgres, stepca, webui)
 - `nginx/nginx.conf.j2`
-- `postgres/docker-compose.yml.j2`
-- `stepca/docker-compose.yml.j2`
 - `systemd/fabric-agent.service.j2`
 - `webui/docker-compose.yml.j2`
 - `webui/webui.json.j2`
 - `vars.yaml.j2`
 
 ### `service_dirs`
-**Description:** List defining data directories and their owning users to create.
+**Description:** List of data directories and their owning users. **Informational only:** it is rendered into `vars.yaml`, but nothing reads it; `deploy.py` creates each service's folders itself.
 
 **Default Value:** *(See default configuration below)*
 
@@ -705,6 +759,10 @@ service_users:
   keycloak: { uid: 900, gid: 0 }
   postgres: { uid: 901, gid: 901 }
   webui:    { uid: 912, gid: 912 }   # webui container user; also the fabric-agent socket group
+  openbao:    { uid: 913, gid: 913 }
+  fluentbit:  { uid: 914, gid: 914 }
+  kea:        { uid: 915, gid: 915 }
+  freeradius: { uid: 916, gid: 916 }
 ```
 
 **`service_dirs` Default:**
@@ -716,7 +774,8 @@ service_dirs:
   - { folder: dirsrv,   owner: ldap }
   - { folder: keycloak, owner: keycloak }
   - { folder: postgres, owner: postgres }
-  - { folder: webui,  owner: root }
+  - { folder: webui,    owner: root }
+  - { folder: openbao,  owner: openbao }
 ```
 Built-in folders always come from these defaults; user-added folders are kept.
 
@@ -739,15 +798,25 @@ Built-in folders always come from these defaults; user-added folders are kept.
 If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabricctl/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 
 ### `ldap_base_dn`
-**Description:** Base distinguished name (389-DS suffix), automatically computed from `domain`.
+**Description:** Base distinguished name (389-DS suffix), always computed from `domain` (it cannot be set).
 
-**Default Value:** `dc=lan,dc=example,dc=com`
+**Default Value:** one `dc=` per label of `domain`, e.g. `dc=lan,dc=example,dc=com` for `lan.example.com`
 
 **Effected Jinja Templates:**
 - `dirsrv/docker-compose.yml.j2`
 - `dirsrv/seed/10-tree.ldif.j2`
 - `dirsrv/seed/20-accounts.ldif.j2`
 - `dirsrv/seed/30-aci.ldif.j2`
+- `freeradius/config/fabric-radius.json.j2`
+- `nginx/www/ldap/index.html.j2`, `nginx/www/ldap/install-ldap.sh.j2`
+
+### `ldap_domain_components`
+**Description:** The labels of `domain` as a list, always computed (it cannot be set). The first one is the `dc:` attribute of the suffix entry.
+
+**Default Value:** e.g. `[lan, example, com]` for `lan.example.com`
+
+**Effected Jinja Templates:**
+- `dirsrv/seed/10-tree.ldif.j2`
 
 ### `ldap_groups`
 **Description:** Defines the security groups to pre-provision in LDAP (created as `groupOfNames` + `posixGroup` under `ou=groups`).
@@ -758,6 +827,11 @@ Defaults also include one group per fabric role bundle (design D19): `auditors`,
 `network-operators`, `equipment-operators`, `pki-operators`, `helpdesk`. A
 group with a `bundle:` key has that Keycloak composite role granted to it
 (`keycloak_bootstrap.py`); add people to the group to give them the bundle.
+The defaults also include `network-staff` (1120) and `network-guests` (1121),
+the groups `radius_people` lets join by password (802.1X).
+
+Your entries are merged with the defaults by `name`: an entry with a default's
+name replaces it, and defaults cannot be removed.
 
 **Effected Jinja Templates:**
 - `dirsrv/seed/10-tree.ldif.j2`
@@ -765,9 +839,9 @@ group with a `bundle:` key has that Keycloak composite role granted to it
 - `keycloak_bootstrap.py` (bundle grants)
 
 ### `ldap_organizational_units`
-**Description:** Defines the tree structure/OUs to pre-provision.
+**Description:** Defines the tree structure/OUs to pre-provision. Merged with the defaults by `name`, like `ldap_groups`.
 
-**Default Value:** `[{name: accounts, description: User Accounts}, ...]`
+**Default Value:** `[{name: accounts, description: User Accounts}, ...]` — `accounts`, `groups`, `admins` and `users` (under `accounts`), `hosts`, `devices` and `device-roles` (fabric device RBAC)
 
 **Effected Jinja Templates:**
 - `dirsrv/seed/10-tree.ldif.j2`
@@ -814,7 +888,7 @@ ldap_organizational_units:
 ```
 
 ## 7. Landing Page Links (`link-vars.yaml`)
-The `link-vars.yaml` file (or `link-vars-template.yaml`) defines the dynamic list of quick links shown on the landing portal. It is managed interactively via `fabricctl` under the **Landing Page Links** menu.
+The `link-vars.yaml` file (`<deploy_base_dir>/fabric/config/link-vars.yaml`; until it exists, the shipped `fabricctl/link-vars-template.yaml`) defines the dynamic list of quick links shown on the landing portal. It is managed interactively via `fabricctl` under the **Landing Page Links** menu.
 
 ### `links`
 **Description:** A list of dictionaries containing `name` and `link` keys for each quick link to display on the landing page. The `link` values can use Jinja variables like `{{ domain }}` or `{{ hostname_keycloak }}` which will be evaluated natively during deployment.

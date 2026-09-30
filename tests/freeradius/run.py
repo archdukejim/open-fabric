@@ -247,7 +247,7 @@ install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt"
              names=("server.pem", "server.key", None))
 with open(f"{W}/freeradius/certs/ca.pem", "w") as f:       # as setup's certificate step writes it
     f.write(open(f"{W}/pki/root.crt").read() + open(f"{W}/pki/int.crt").read())
-check("config: client secret root:freerad 0640, never world-readable",
+check("config: clients.conf holds the client secret, mode 0640 (never world-readable)",
       oct(os.stat(f"{W}/freeradius/config/clients.conf").st_mode & 0o777) == "0o640"
       and SECRET in open(f"{W}/freeradius/config/clients.conf").read())
 

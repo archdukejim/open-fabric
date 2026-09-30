@@ -4,5 +4,5 @@ End-to-end test on a real host over SSH (e.g. the reference Raspberry Pi), insta
 
 | File | What |
 |---|---|
-| `run.sh` | Package install, setup, doctor, `fabric.target`, certificate page, RFC2136, restricted sign-in, re-run, stop/start (reuses the check scripts in `tests/sandbox/`) |
+| `run.sh` | Package install, setup, doctor, `fabric.target`, certificate page, RFC2136, restricted sign-in, login kit permissions, re-run, stop/start, no secret in any process's argv, `apt purge` with `CLEANUP=1` (reuses the check scripts in `tests/sandbox/`) |
 | `reset_user.py` | Put a directory user back to first sign-in (password, no TOTP, new password required) so the suite also runs on a host that was used before |

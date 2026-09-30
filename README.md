@@ -17,18 +17,22 @@
 
 ## Synopsis
 
-**fabric** provisions the core services of a small network — the pieces every LAN needs and nobody wants to hand-wire — with one command: `sudo installers/deb/install-from-checkout.sh` (which runs `fabricctl setup`). Managed day-to-day with `fabricctl` or the web UI. It stands up:
+**fabric** provisions the core services of a small network — the pieces every LAN needs and nobody wants to hand-wire. Install the `fabricctl` package and run `sudo fabricctl setup` (from a git checkout: `sudo installers/deb/install-from-checkout.sh`, which builds the package, installs it and runs `fabricctl setup`). Managed day-to-day with `fabricctl` or the Open Fabric web UI. It stands up:
 
-| Service | Container | Default CNAMEs | Purpose |
-|---------|-----------|----------------|---------|
-| **BIND9** | `bind9` | `dns` | Authoritative DNS + DNS-over-HTTPS + DNS-over-TLS |
-| **nginx** | `nginx` | *(various)* | Reverse proxy — DNS/DoT/DoH/HTTPS; TCP passthrough for LDAP/LDAPS |
-| **Step-CA** | `step-ca` | `ca`, `certificates` | Internal PKI — root CA → intermediate → ACME |
-| **389 Directory Server** | `dirsrv` | `ldap` | Directory services (terminates its own TLS; StartTLS/LDAPS only) |
-| **Keycloak** | `keycloak`, `postgres` | `sso` | Identity and Access Management (IAM) and SSO, integrated with LDAP |
-| **webui** | `webui` + host service `fabric-agent` | `mgr` | Management web UI — mTLS client cert + Keycloak OIDC/TOTP (requires Keycloak); unprivileged container, host actions via `fabric-agent` |
+| Service | Container | Default names | Purpose |
+|---------|-----------|---------------|---------|
+| **BIND9** | `bind9` | `dns` | Authoritative DNS (recursion off) with RFC2136/TSIG updates; DNS-over-HTTPS through nginx |
+| **nginx** | `nginx` | *(the vhosts below)* | Reverse proxy — HTTPS vhosts, DoH (`/dns-query`), CA certificates page; TCP passthrough for LDAP/LDAPS |
+| **Step-CA** | `step-ca` | `ca`, `certs` | Internal PKI — root CA → intermediate → service certificates, ACME; CA certificates for every system on `certs.<domain>` |
+| **OpenBao** | `openbao` | `vault` | Secrets: fabric's own secrets, unlocked at boot by a key file, USB stick, security key or KMIP HSM |
+| **389 Directory Server** | `dirsrv` | `ldap` | Directory (terminates its own TLS; StartTLS/LDAPS only). On by default (`install_ldap`) |
+| **Keycloak** | `keycloak`, `postgres` | `sso` | Identity and Access Management (IAM) and SSO, federated with LDAP. On in the default plan (`install_keycloak`) |
+| **Open Fabric** (web UI) | `fabric-web` + host service `fabric-agent` | `fabric` | Control-plane web UI — mTLS client cert + Keycloak OIDC/TOTP (requires Keycloak); unprivileged container, host actions only via `fabric-agent` |
+| **Kea DHCP** *(optional)* | `kea-dhcp4`, `kea-ddns` | — | DHCPv4 with lease hostnames in their own dynamic DNS zone (`install_kea`) |
+| **FreeRADIUS** *(optional)* | `freeradius` | — | 802.1X: EAP-TLS by linked certificate, MAB by MAC, EAP-TTLS for people, checked against 389-DS (`install_freeradius`) |
+| **Fluent Bit** *(optional)* | `fluentbit` | — | Log forwarding to syslog (TLS) and/or Elasticsearch (`install_fluentbit`) |
 
-Everything is rendered from Jinja2 templates. Settings come from a vars file (`--file`, or `custom-vars.yaml` in the checkout) and prompts, and are kept in `/opt/fabric/config/fabric.yaml`. Secrets (CA password, TSIG keys, LDAP role-account passwords, webui OIDC secret) are generated on the first run into `/opt/fabric/config/fabric-secrets.yml` (`0600`) and never passed on a command line. Every container runs non-root, with no capabilities and a read-only filesystem; the host firewall and Docker daemon hardening are on by default.
+Everything is rendered from Jinja2 templates. Settings come from a vars file (`--file`) and prompts, and are kept in `/opt/fabric/config/fabric.yaml` (rendered to `/opt/fabric/config/vars.yaml`). Secrets (CA password, TSIG keys, LDAP role-account passwords, OIDC client secrets, …) are generated on the first run and then kept in OpenBao; they are never passed on a command line. Every container runs non-root, with no capabilities and a read-only filesystem (the one documented exception: the optional Kea DHCP server needs the host network and two capabilities); the host firewall and Docker daemon hardening are on by default.
 
 ---
 
@@ -43,14 +47,16 @@ Every image is pinned by digest (amd64 + arm64) in
 changes a running image, `sudo fabricctl images update` does. Setup pulls or
 builds:
 - `nginx` (stable branch), `openbao/openbao`
-- `smallstep/step-ca` and `keycloak/keycloak` (optional) — bases of thin local hardened layers
-- `postgres` (optional, with Keycloak)
-- `debian:trixie-slim` — base of the images built locally from Debian packages: `fabric/bind9:local` (BIND 9.20), `fabric/dirsrv:local` (389 Directory Server, optional) and `fabric/web:local` (the web UI, container `fabric-web`)
+- `smallstep/step-ca` and `keycloak/keycloak` (optional) — bases of thin local hardened layers (`fabric/stepca:local`, `fabric/keycloak:local`)
+- `postgres` (optional, with Keycloak), `fluent/fluent-bit` (optional)
+- `debian:trixie-slim` — base of the images built locally from Debian packages: `fabric/bind9:local` (BIND 9.20), `fabric/dirsrv:local` (389 Directory Server), `fabric/web:local` (the web UI, container `fabric-web`), `fabric/kea:local` (Kea 3.0 LTS from ISC's signed repository, optional) and `fabric/freeradius:local` (optional)
 
 ### Deployment Modes
-- **Install:** `sudo apt install ./fabricctl_<version>_all.deb`, then `sudo fabricctl setup` — shows the hardened default plan; Proceed or Advanced (relax any item).
+- **Install:** `sudo apt install ./fabricctl_<version>_all.deb` (built by `installers/deb/build-deb.sh`, attached to each GitHub release), then `sudo fabricctl setup` — shows the hardened default plan; Proceed or Advanced (relax any item).
+- **From a checkout:** `sudo installers/deb/install-from-checkout.sh [setup options]` — builds the .deb from the checkout, installs it with apt, runs `fabricctl setup`; run it again to upgrade to the checkout's code.
 - **Non-interactive:** `sudo fabricctl setup --file vars.yaml --non-interactive --yes`.
 - **Run:** every service under systemd `fabric.target` — `fabricctl status|start|stop|restart`.
+- **Remove:** `sudo fabricctl uninstall` (offers an export of all data first); `sudo apt purge fabricctl` exports to `/var/backups/fabric/` and uninstalls.
 - **Offline (Air-gapped):** `--offline` never downloads; packages and images must already be present. Signed offline image bundles (`fabricctl images export/import`) are planned — see [the design](docs/design/fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases).
 
 ---
@@ -60,29 +66,26 @@ builds:
 Comprehensive documentation is provided in the `docs/` directory to help you understand, deploy, and maintain the infrastructure.
 
 - [**Full Setup Guide**](docs/install.md) — Requirements, the default plan, non-interactive and offline installs, reinstall/uninstall.
-- [**Configuration Variables**](docs/vars.md) — Detailed reference for all customizable variables in `custom-vars.yaml`.
+- [**Configuration Variables**](docs/vars.md) — Detailed reference for every setting in the vars file (`fabricctl setup --file`).
 - [**Keycloak Deployment**](docs/keycloak.md) — Configuration nuances, architecture, and gotchas for the Keycloak and LDAP integration.
 - [**Operations**](docs/operations.md) — Live configuration changes via the `fabricctl` interactive editor (DNS records, TSIG keys), lifecycle commands (`setup`, `doctor`, `certs`, `tsig`, `client-cert`, `reinstall`, `uninstall`), TSIG keys for RFC2136 clients.
-- [**webui Management UI**](docs/webui.md) — Browser front end for `fabricctl`: security model, client certificates, first login, troubleshooting.
-- [**Roadmap: `fabricctl` apt package, Kea DHCP, 802.1X**](docs/design/fabricctl-package.md) — `apt install fabricctl`, the `fabric-agent` privilege model, signed image channels and offline bundles, OpenBao, DHCP and 802.1X.
+- [**Open Fabric web UI**](docs/webui.md) — Browser front end for `fabricctl`: security model, client certificates, first login, troubleshooting.
+- [**Design and decisions**](docs/design/fabricctl-package.md) — the `fabricctl` package, the `fabric-agent` privilege model, signed image channels and offline bundles, OpenBao, DHCP, 802.1X, the repository layout (D1–D25).
 - [**Architecture and Reference**](docs/architecture.md) — In-depth execution flow, directory structures, PKI chains, and template rendering logic.
-- [**AI Test Plan**](docs/testplan.md) — Automated testing scripts and procedures.
+- [**Test Plan**](docs/testplan.md) — Manual test plan and which parts the suites in `tests/` automate.
 - [**Subordinate CA Setup**](docs/subordinate.md) — How to configure this stack as a downstream CA.
+- [**Disk encryption**](docs/disk-encryption.md) — Manual: LUKS for fabric's data, unlocked by the same YubiKey or USB stick.
 - [**Function reference**](docs/lib-doc/README.md) — every function of `fabricctl/`, `webui/` and `installers/`: purpose, inputs, results, failures and what uses them (generated from the code).
 
 ---
 
 ## Gaps and Next Tasks
 
-The following gaps were identified while writing this document:
-
 **Missing features:**
-- No automated health check for DoH (`/dns-query`) or DoT (`:853`) endpoints — these are core delivery paths.
-- No LDAP user/group provisioning tooling — `vars.yaml` defines the OU structure but adding actual users requires manual `ldapadd` (as `super_admin`/`user_creator_admin` over StartTLS or LDAPS) or the Keycloak admin console (writable LDAP federation).
+- DNS-over-TLS (`:853`) is not exposed yet; there is no automated health check for DoH (`/dns-query`).
+- No `fabricctl` command for people: they are added in the web UI (People), in the Keycloak admin console (writable LDAP federation) or with `ldapadd` (as `super_admin`/`user_creator_admin` over StartTLS or LDAPS).
+- Signed offline image bundles (`fabricctl images export/import`) and the signed image channel are designed but not built yet.
+- No scheduled certificate renewal, monitoring or alerting — service certificates are renewed by `fabricctl setup` or `fabricctl certs`.
 
 **Documentation gaps:**
-- `fabricctl/lib/manage.sh --mint-certs` ACME mode references a Portainer webhook URL but its expected format and behavior are not documented.
-- IPv6 is not addressed in `vars.yaml` or `fabricctl/jinja/docker-compose.yml.j2`, despite BIND9 listening on `listen-on-v6 { any; }`.
-- No monitoring or alerting integration — cert expiry requires manual verification.
-
-<!-- readme-version: cdab97e -->
+- IPv6: zones can hold AAAA records (with ULA reverse zones), but `fabric_net` and the published ports are IPv4 only; this is not described in one place.

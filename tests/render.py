@@ -100,7 +100,7 @@ for tpl in sorted(env.list_templates()):
     if tpl.startswith('systemd/'):
         extra = dict(item={'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []})
     if tpl.endswith('.json.j2'):
-        __import__('json').loads(env.get_template(tpl).render(**full))
+        json.loads(env.get_template(tpl).render(**full))
     text = env.get_template(tpl).render(**full, **extra)
     if out:
         dest = os.path.join(out, tpl[:-3])
@@ -231,8 +231,6 @@ print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, 
 
 # FreeRADIUS (802.1X): clients with their secrets, BlastRADIUS protection unless relaxed per client,
 # EAP-TLS only with the fabric CA, no session resumption, the policy module, a hardened container
-sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
-from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 rclients, rembedded = normalize_radius_clients([{"name": "Switch1", "address": "192.168.7.2"},
                                                 {"name": "ap-old", "address": "192.168.7.16/28",
@@ -289,8 +287,10 @@ print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS, EAP
 
 # each systemd unit waits for its health check by container name: that name
 # must be a container_name in its compose template (else start hangs 10 min)
-for container, folder in re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'",
-                                    open(os.path.join(REPO, "fabricctl", "lib", "deploy.py")).read()):
+units = re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'",
+                   open(os.path.join(REPO, "fabricctl", "lib", "deploy.py")).read())
+assert len(units) >= 8, f"deploy.py's unit list not found (the pattern matched {units})"
+for container, folder in units:
     text = open(os.path.join(REPO, "fabricctl", "jinja", folder, "docker-compose.yml.j2")).read()
     assert re.search(rf"^\s+container_name: {re.escape(container)}\s*$", text, re.M), (folder, container)
 print('every unit waits on a container its compose file defines')
@@ -307,7 +307,6 @@ print('every fabriclib module imports')
 
 # 802.1X guides: the Windows scripts carry the root CA, pin the server by name and root thumbprint,
 # and hold a well-formed LAN profile; PowerShell here-strings close at column 0; CRLF; public data only
-import re as _re  # noqa: E402
 import subprocess as _sp  # noqa: E402
 import tempfile as _tf  # noqa: E402
 import xml.etree.ElementTree as _ET  # noqa: E402

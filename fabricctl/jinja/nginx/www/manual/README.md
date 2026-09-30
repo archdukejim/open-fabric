@@ -7,5 +7,5 @@ The in-browser manual, deployed to `/opt/nginx/www/manual/` and served at
 | File | What |
 |---|---|
 | `index.html.j2` | The manual viewer (extends `shared/base.html.j2`): loads Markdown from `docs/` and renders it with marked and mermaid → `index.html` |
-| `marked.min.js` | Vendored marked (Markdown parser), copied as is |
-| `mermaid.min.js` | Vendored mermaid (diagrams in the docs), copied as is |
+| `marked.min.js` | Vendored marked v15.0.12 (Markdown parser; its banner says so), copied as is; source URL and checksum are not recorded |
+| `mermaid.min.js` | Vendored mermaid 10.9.1 (diagrams in the docs; version string inside the bundle), copied as is; source URL and checksum are not recorded |

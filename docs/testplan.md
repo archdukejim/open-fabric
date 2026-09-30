@@ -1,23 +1,23 @@
-# AI Test Plan: fabric Deployment
+# Test Plan: fabric Deployment
 
 **Deployment Domain:** `<domain>`
 **Host IP:** `<host_ip>`
 **LAN CIDR:** `<lan_cidr>`
 
-This document outlines the testing strategy for an AI agent to execute, validate, and troubleshoot the deployment of the `fabric` infrastructure in offline or standard environments.
+This document outlines the manual testing strategy (for a person or an AI agent) to execute, validate, and troubleshoot the deployment of the `fabric` infrastructure in offline or standard environments. Most of it is automated by the suites in [`tests/`](../tests/README.md): `sudo tests/run-all.sh` runs every suite except `sandbox`; `sudo tests/run-all.sh sandbox` does a full install from the .deb in a disposable systemd + Docker container. Steps below name the suite that automates them.
 
 ## 1. Environment Preparation
 - [ ] Verify execution environment is Ubuntu 24.04.
 - [ ] Ensure the AI has `sudo` access or operates as `root`.
 - [ ] Verify network connectivity and DNS resolution.
 - [ ] Capture existing networking configuration (e.g., `ip a`, `resolvectl status`, `cat /etc/resolv.conf`) to ensure proper rollback if execution fails.
-- [ ] Variables in `custom-vars.yaml` have been correctly rendered.
+- [ ] The vars file (start from `fabricctl/examples/vars.yaml`, installed as `/usr/share/doc/fabricctl/examples/vars.yaml`) has the five required values: `domain`, `hostname`, `host_ip`, `lan_cidr`, `lan_gateway` (automated: `sudo tests/run-all.sh render`).
 
 ## 2. Full Installation Test
 - [ ] **Action**: `sudo apt install ./fabricctl_<v>_all.deb`, then `sudo fabricctl setup --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox with no checkout inside).
 - [ ] **Expected**:
   - Every setup step completes and setup prints `fabric is ready`; `sudo fabricctl doctor` passes; a second `sudo fabricctl setup` converges without re-issuing certificates; no secret appears in any process's argv.
-  - Docker containers `nginx`, `bind9`, `step-ca` (and optionally `dirsrv`, `keycloak`, `postgres`, `webui`) are healthy.
+  - Docker containers `nginx`, `bind9`, `step-ca`, `openbao`, `dirsrv` (and, when installed, `keycloak`, `postgres`, `fabric-web`, `kea-dhcp4`, `kea-ddns`, `freeradius`, `fluentbit`) are healthy; `sudo fabricctl status` lists every unit as active.
   - If Keycloak is enabled, `systemctl is-active fabric-web fabric-agent` reports `active` for both.
   - The `verify` step's LDAP/webui checks pass (role-account binds, plaintext bind refused, LDAPS cert verifies, agent socket `0660` with webui gid, webui returns `400` without a client cert).
 - [ ] **Validation**: 
@@ -29,20 +29,20 @@ This document outlines the testing strategy for an AI agent to execute, validate
 ## 3. Subfunctionality Tests
 
 ### 3.1 DNS and Zone Updates
-- [ ] **Action**: Modify A/CNAME records in `custom-vars.yaml` or via `fabricctl`.
+- [ ] **Action**: Modify A/CNAME records with `sudo fabricctl --interactive` (DNS), in the web UI (BIND9), or in `/opt/fabric/config/vars.yaml`.
 - [ ] **Action**: Run `sudo fabricctl --apply`.
 - [ ] **Expected**: `fabricctl` detects DNS changes, re-renders templates, and updates only the changed zones (freeze → swap file → drop `.jnl` → thaw) without restarting the container. Re-running `--apply` with no record changes touches no zone.
 - [ ] **Validation**: Use `dig` to confirm the new records resolve correctly; `fabricctl --interactive` → DNS shows the zone `IN SYNC` and lists CNAME/MX/TXT/SRV values.
 
 ### 3.2 PKI / Bring Your Own Certs (BYOC)
-- [ ] **Action**: Conduct a teardown (`sudo installers/deb/install-from-checkout.sh --uninstall --force`) to prepare a clean environment.
-- [ ] **Action**: Generate an offline Root CA, set `byoc: true` and specify paths in `custom-vars.yaml`.
-- [ ] **Action**: Run `sudo installers/deb/install-from-checkout.sh --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox).
+- [ ] **Action**: Conduct a teardown (`sudo fabricctl uninstall --yes --no-export`, or `--export DIR` to keep a copy) to prepare a clean environment.
+- [ ] **Action**: Generate an offline Root CA and an intermediate, set `byoc: true` and `ca_crt_path`, `ica_crt_path` (and `ica_key_path` if not `<ica>.key`) in the vars file.
+- [ ] **Action**: Run `sudo fabricctl setup --file vars.yaml --non-interactive --yes` (from a checkout: `sudo installers/deb/install-from-checkout.sh --file vars.yaml --non-interactive --yes`).
 - [ ] **Expected**: Step-CA imports the offline CA and starts successfully.
 - [ ] **Validation**: Inspect `/opt/stepca/data/certs/` to confirm the BYOC intermediate cert is present.
 
 ### 3.3 Dynamic Configuration Updates
-- [ ] **Action**: Modify a setting in `custom-vars.yaml` (e.g., timezone, domain).
+- [ ] **Action**: Modify a setting with `sudo fabricctl --interactive` or in `/opt/fabric/config/vars.yaml` (e.g., timezone).
 - [ ] **Action**: Run `sudo fabricctl --apply`.
 - [ ] **Expected**: Configuration templates are re-rendered and only affected services are restarted or reloaded.
 
@@ -52,7 +52,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Action**: Anonymous `ldapsearch -ZZ -H ldap://ldap.<domain> -x -b <base_dn> "(uid=*)" uid uidNumber userPassword`.
 - [ ] **Expected**: POSIX attributes are returned; `userPassword` is never returned.
 
-### 3.5 webui
+### 3.5 Web UI (Open Fabric)
 - [ ] **Action**: `curl --cacert /opt/stepca/data/certs/root_ca.crt https://fabric.<domain>/` without a client certificate.
 - [ ] **Expected**: HTTP `400` from nginx.
 - [ ] **Action**: use the login kit setup wrote to `~/fabric-admin/` (automated: `tests/sandbox/login_test.py`, run by `tests/sandbox/run.sh`): trust the root CA, import the `.p12`, browse to `https://fabric.<domain>`, log in with `initial-password.txt`.
@@ -64,7 +64,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Action**: BIND9 → TSIG keys → create a key for the zone (listed hosts), put the `rfc2136.ini` into a certbot client, Apply, run a DNS-01 challenge.
 - [ ] **Expected**: the challenge succeeds for the listed hosts only. After **New secret** + Apply the old secret is refused.
 
-### 3.6 webui Isolation
+### 3.6 Web UI Isolation
 - [ ] **Action**: Inspect the container: `docker inspect fabric-web`, `docker exec fabric-web id`, `docker exec fabric-web sh -c 'grep Cap /proc/self/status'`.
 - [ ] **Expected**: uid/gid `912` (`service_users.webui`), `CapEff` all zero, `ReadonlyRootfs: true`, `no-new-privileges`, no published ports, no `/var/run/docker.sock`, only `/config`, `/certs`, `/run/webui`, `/agent` (+ tmpfs `/tmp`) mounted; writing to `/` or `/agent` fails; host config (`/opt/fabric`, `vars.yaml`, `stepca/data/secrets`) not visible.
 - [ ] **Action**: As another host user, and as a process with the webui gid but a different uid, connect to `/opt/webui/agent/agent.sock`.

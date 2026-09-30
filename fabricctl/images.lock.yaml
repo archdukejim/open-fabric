@@ -3,8 +3,9 @@
 # Every image is pinned by its multi-arch index digest (amd64 + arm64): an
 # upstream push never changes what a host runs. vars.yaml.j2 takes its
 # image_* defaults from here, and `fabricctl images status/update` compares
-# each host against this list. Later the watch-images workflow proposes
-# changes to this file after the regression suites pass.
+# each host against this list. Later a watch-images workflow (planned,
+# not in .github/workflows yet) proposes changes to this file after the
+# regression suites pass.
 #
 #   track:  which new upstream tags may become candidates (a tag pattern
 #           within one major/minor, or a floating tag whose digest moves)
@@ -52,7 +53,8 @@ images:
     digest: sha256:d792375ca8e53be72fc25716c28f291f32c6fc6f4f31d12d0d14bc78cefe9226
     track: "5.1.*"
     policy: auto
-  debian:                            # base of fabric/bind9:local, fabric/dirsrv:local and fabric/web:local
+  debian:                            # base of fabric/bind9:local, fabric/dirsrv:local, fabric/web:local,
+                                     # fabric/kea:local and fabric/freeradius:local
     var: image_debian
     repo: debian
     tag: trixie-slim

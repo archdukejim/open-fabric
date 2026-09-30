@@ -9,7 +9,7 @@ The Debian package: a wrapper that turns the repository's product folders
 | `build-deb.sh` | Build `dist/fabricctl_<version>_all.deb` from this checkout (one package for amd64 and arm64) |
 | `install-from-checkout.sh` | Build the .deb from this checkout, install it with apt, run `fabricctl setup` (development installs) |
 | `control.in` | Package metadata; `@VERSION@` is filled in by `build-deb.sh` |
-| `fabricctl` | `/usr/bin/fabricctl`: `setup`/`reinstall`/`uninstall` run the packaged code, everything else the deployed install |
+| `fabricctl` | `/usr/bin/fabricctl`: `setup`/`reinstall`/`uninstall`/`restore` and help run the packaged code, everything else the deployed install |
 | `postinst` | Prints the next step; never starts services or touches the network |
 | `postrm` | `remove`: leaves the install running and untouched; `purge`: export to `/var/backups/fabric/`, then uninstall |
 
@@ -18,7 +18,7 @@ Repository → host:
 | Repository | On the host |
 |---|---|
 | `fabricctl/` (not `examples/`) | `/usr/lib/fabricctl/fabric/` |
-| `webui/*.py` | `/usr/lib/fabricctl/fabric/lib/webui/` |
+| `webui/` (the app; not `Dockerfile`, `.dockerignore`) | `/usr/lib/fabricctl/fabric/lib/webui/` |
 | `webui/Dockerfile`, `.dockerignore` | `/usr/lib/fabricctl/fabric/jinja/webui/build/` |
 | `docs/`, `LICENSE`, `README.md` | `/usr/lib/fabricctl/` |
 | `fabricctl/examples/vars.yaml` | `/usr/share/doc/fabricctl/examples/vars.yaml` |

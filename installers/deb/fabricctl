@@ -3,7 +3,8 @@
 #
 # The package ships fabric in /usr/lib/fabricctl; `fabricctl setup` deploys it
 # to the install (default /opt/fabric) and runs it from there. So:
-#   setup / reinstall / uninstall  -> the packaged code (an upgraded package
+#   setup / reinstall / uninstall / restore / help
+#                                  -> the packaged code (an upgraded package
 #                                     is what gets deployed)
 #   everything else                -> the deployed install
 set -euo pipefail

@@ -1,4 +1,5 @@
-"""Unit test for deploy.py zone handling with rndc stubbed out (run in WSL)."""
+"""The `zone` suite: deploy.py's zone deployment (deploy_zone_files, reload_zone)
+with rndc stubbed out. No Docker, no BIND."""
 import os
 import sys
 import tempfile

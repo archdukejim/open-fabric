@@ -19,7 +19,8 @@ import sys
 
 from product_code import REPO, tracked_files
 
-LEDGER = os.path.join(REPO, "docs", "maintenance", "review-ledger.tsv")
+LEDGER_PATH = "docs/maintenance/review-ledger.tsv"
+LEDGER = os.path.join(REPO, *LEDGER_PATH.split("/"))
 HEAD = "# path\tblob (git hash-object of the reviewed content)\treviewed (UTC date)\tnote\n"
 
 
@@ -72,6 +73,8 @@ def check(entries):
     Feeds:   main."""
     never, changed = [], []
     for path in tracked_files():
+        if path == LEDGER_PATH:                  # the ledger cannot review itself
+            continue
         if path not in entries:
             never.append(path)
         elif entries[path][0] != blob(path):
@@ -111,7 +114,7 @@ def main(argv):
         return 0
     for p in never:
         print(f"never reviewed: {p}")
-    total = len(tracked_files())
+    total = len([p for p in tracked_files() if p != LEDGER_PATH])
     print(f"{total - len(never)}/{total} files reviewed; {len(changed)} changed since their review")
     return 1 if never else 0
 

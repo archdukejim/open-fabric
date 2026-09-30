@@ -59,8 +59,9 @@ check("bundles: fabric-admin holds every permission; fabric-auditor only read on
       and not any(n.endswith((":write", ":admin", ":unlock", ":issue", ":sign")) for n in aud_comp), (comp, aud_comp))
 
 flows = {f["alias"]: f["id"] for f in kc.call("GET", f"{R}/authentication/flows")[1]}
-check("client bound to MFA browser flow",
-      client.get("authenticationFlowBindingOverrides", {}).get("browser") == flows.get("fabric-webui-mfa"))
+check("client bound to MFA browser flow", flows.get("fabric-webui-mfa")
+      and client.get("authenticationFlowBindingOverrides", {}).get("browser") == flows["fabric-webui-mfa"],
+      (sorted(flows), client.get("authenticationFlowBindingOverrides")))
 execs = kc.call("GET", f"{R}/authentication/flows/fabric-webui-mfa/executions")[1]
 otp = [e for e in execs if e.get("providerId") == "auth-otp-form"]
 check("OTP form REQUIRED in MFA flow", otp and all(e["requirement"] == "REQUIRED" for e in otp),

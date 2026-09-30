@@ -1,6 +1,6 @@
 # Design: `fabricctl` as an apt package, Kea DHCP, 802.1X
 
-Status: **in progress.** Done: phase 0 (rename), container hardening, and phase 1 — the native installer (`fabricctl setup`, §4); Ansible and the playbooks are removed. The rest is proposal.
+Status: **in progress.** Built: phase 0 (rename), the phase 0.5 foundations except CI, phase 1 (the native installer `fabricctl setup`, §4; Ansible and the playbooks are removed), the `.deb` build (phase 2, without the APT repo), OpenBao (phase 0.7 and the KMIP slot), Kea (phase 3), FreeRADIUS (phase 4, two passes), RBAC (§7e), log forwarding (§7f) and the host side of image updates (image-updates.md steps 1–2). Each section says what is built; the rest is proposal. Where the built system differs from the plan (the privilege model in §1a, the package layout in §3, the setup defaults in §1b), the section says so.
 
 ## 1. Goal
 
@@ -16,8 +16,9 @@ sudo fabricctl setup               # interactive, or: fabricctl setup --file var
 
 Everything setup does (preconditioning, rendering, PKI bootstrap,
 containers, checks) already happens locally on the host, driven by
-`fabricctl`; the package only changes how the code arrives. Day-2 operations stay the same command (`fabricctl apply`,
-`fabricctl dns ...`) and the web UI.
+`fabricctl`; the package only changes how the code arrives. Day-2 operations stay the same command (`fabricctl --apply`,
+`fabricctl tsig|acl|dhcp|radius|vault|images ...`) and the web UI. DNS records themselves are changed in
+the web UI or in `vars.yaml` + `fabricctl --apply`; there is no `fabricctl dns` command.
 
 The package and the command share one name. Plain `fabric` is taken
 (Python Fabric is packaged as `fabric` in Debian and Ubuntu); `fabricctl` is
@@ -35,8 +36,17 @@ grow the web UI to manage every service.
 | Stands alone? | **Yes** — everything is possible from the CLI | No — every action is a request to fabricctl's daemon |
 | Artifact | `fabricctl` .deb: `fabricctl` CLI + `fabric-agent` daemon + systemd timers | `fabric` container image, installed, pinned (via the channel) and updated by fabricctl |
 
-One repo (`archdukejim/fabric`) builds and tests both; each fabricctl
+One repo (`archdukejim/open-fabric`, D24) builds and tests both; each fabricctl
 version declares the web UI image it expects.
+
+> **Built (differs from the table):** the `.deb` ships the code only; the
+> systemd units (one per service, `fabric-agent.service`, `fabric.target`)
+> are rendered by `fabricctl setup`, and there are **no timers** yet. The
+> web UI image is not pulled from a channel: setup builds it locally as
+> `fabric/web:local` from `webui/Dockerfile` on the pinned Debian digest
+> (`image_debian`), and `fabricctl images update` rebuilds it when that
+> digest moves. So "each fabricctl version declares the web UI image" holds
+> only in the sense that the package carries the web UI's source.
 
 **Privilege model (decided):**
 
@@ -53,6 +63,26 @@ version declares the web UI image it expects.
   user's Keycloak role.
 - Every operation is audited with the real actor: Unix user for the CLI,
   Keycloak user for the UI.
+
+> **Built (differs from the decided model):**
+>
+> - **The CLI runs as root and does the work itself.** `/usr/bin/fabricctl`
+>   refuses to run unless root (`sudo fabricctl …`) and calls fabriclib
+>   directly: it does not talk to `fabric-agent`. There is no CLI socket and
+>   no `fabric-admins` group; the access control for the CLI is sudo.
+> - **`fabric-agent` serves only the web UI.** It is a root, sandboxed
+>   systemd service (`fabricctl/lib/agent/server.py`, unit
+>   `fabric-agent.service`), installed only with the web UI
+>   (`install_webui`). Its one socket is `<base>/webui/agent/agent.sock`
+>   (root:<webui gid>, 0660), mounted into the web UI container; SO_PEERCRED
+>   admits the web UI container's uid and root. Every web UI call carries the
+>   person's signed Keycloak token, which the agent verifies and checks
+>   against its route table (default deny, §7e). Root peers are not asked
+>   for a token.
+> - **Nobody is added to the `docker` group** and nothing mounts the Docker
+>   socket (as decided).
+> - **Audit actor:** the Keycloak user for the web UI; the CLI records
+>   `root`, not the Unix user who ran `sudo`.
 
 ## 1b. Setup: secure by default, fully scriptable
 
@@ -85,14 +115,35 @@ and fails on anything missing — for automation and re-provisioning.
 
 Every setting can be changed later (`fabricctl security …`,
 `fabricctl vault seal-…`, `fabricctl updates …`, or editing `fabric.yaml` +
-`fabricctl apply`). `fabricctl status` and the Open Fabric web UI show a
+`fabricctl --apply`). `fabricctl status` and the Open Fabric web UI show a
 **security posture** summary that lists every relaxed default as a warning.
+
+> **Built:** the Proceed / Advanced / Quit plan (`fabriclib/setup/choose_plan.py`)
+> with `--file`, `--non-interactive`, `--yes`, `--offline` and `--step`; re-running
+> `fabricctl setup` is the reconfigure (there is no `--reconfigure`). Settings are
+> saved to `/opt/fabric/config/fabric.yaml` and rendered to `vars.yaml`. What the
+> plan covers today:
+>
+> - Firewall: **UFW** (SSH from the LAN only) plus `DOCKER-USER` iptables rules
+>   so Docker-published ports are LAN-only, re-applied at boot by
+>   `fabric-firewall.service` (`security.firewall`, `security.firewall_allow`) —
+>   not nftables.
+> - Docker daemon hardening as in the table (`security.docker_daemon_hardening`).
+> - Container hardening: always on (no per-service setting).
+> - Optional services: LDAP, Keycloak, web UI, and under Advanced Kea, FreeRADIUS
+>   and Fluent Bit.
+>
+> **Not built:** userns-remap and rootless Docker (D11), the image-update item
+> (image updates follow D21 instead: applied only by `fabricctl images update`),
+> the "TOTP optional" relaxation, `fabricctl security …` / `fabricctl updates …`,
+> and the security posture summary in `fabricctl status` and the web UI.
+> OpenBao's unlock is chosen after setup with `fabricctl vault …` (§7c).
 
 ## 2. What exists to build on
 
 | Today | Reuse |
 |---|---|
-| `fabricctl/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
+| `fabricctl/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl --apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
 | `webui/` (container app), `fabricctl/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh` | Ship as-is inside the package |
 | `fabricctl/jinja/**` templates | Ship as-is (package data) |
 | `fabriclib/setup/` — the native installer (§4) | Ships as-is |
@@ -113,6 +164,37 @@ fabricctl_<ver>_<arch>.deb
   /etc/fabric/                            conffiles: fabric.yaml (vars), link-vars.yaml
   /var/lib/fabric/                        secrets, rendered vars, archive/audit
 ```
+
+> **Built (differs from the sketch):** `installers/deb/build-deb.sh` builds
+> `fabricctl_<ver>_all.deb`; `installers/deb/assemble-tree.sh` maps the
+> repository (D25) onto the installed tree:
+>
+> ```
+> /usr/bin/fabricctl                  installers/deb/fabricctl (bash): setup/reinstall/uninstall/restore run the
+>                                     packaged code, everything else the deployed install (root only)
+> /usr/lib/fabricctl/fabric/          fabricctl/ (lib, jinja templates, images.lock.yaml) + webui/ (as lib/webui
+>                                     and jinja/webui/build)
+> /usr/lib/fabricctl/                 docs/, LICENSE, README.md
+> /usr/share/doc/fabricctl/examples/  vars.yaml
+> ```
+>
+> `fabricctl setup` copies `/usr/lib/fabricctl/fabric` to `/opt/fabric` (the
+> install), keeps config in `/opt/fabric/config` (`fabric.yaml`, `vars.yaml`,
+> `fabric-secrets.yml` until it moves into OpenBao) and the audit log in
+> `/opt/fabric/archive`, service data in `/opt/<service>`, and renders the
+> systemd units into `/etc/systemd/system`. `/etc/fabric` holds only
+> OpenBao's unlock methods (`/etc/fabric/openbao`) and the image rollback
+> state (`/etc/fabric/images`). No units, conffiles or `/var/lib/fabric` are
+> shipped, and there is no `fabricctl-images` package: `setup --offline`
+> only requires the images to be present already.
+>
+> Actual `Depends:` (`installers/deb/control.in`): `python3 (>= 3.10)`,
+> `python3-yaml`, `python3-jinja2`, `openssl`, `curl`, `ca-certificates`,
+> `iptables`, `ufw`, `dnsutils`; Recommends `python3-pykcs11`,
+> `python3-pykmip`. Docker is not a dependency: the setup step `host`
+> installs Docker Engine. `postinst` only prints the next step (accounts and
+> directories are made by setup); `postrm` leaves fabric running on
+> `remove` and exports then uninstalls it on `purge`.
 
 - **Depends:** `python3 (>= 3.11)`, `python3-yaml`, `python3-jinja2`,
   `docker.io | docker-ce`, `docker-compose-v2 | docker-compose-plugin`,
@@ -153,6 +235,10 @@ fabricctl_<ver>_<arch>.deb
   - Offline sites: the same `dists/` + `pool/` tree can be mirrored to a
     local path or web server (`deb [signed-by=…] file:/srv/fabric-apt stable
     main`).
+  - **Built:** `.github/workflows/package.yml` builds the `.deb` on every
+    push and PR (build artifact) and attaches it to the GitHub Release on a
+    `v*` tag (checking the tag equals `fabricctl/VERSION`). **Not built:**
+    the reprepro repository, its signing key and the `gh-pages` publishing.
 - **Offline installs:** `fabricctl-images_<ver>_<arch>.deb` (or a tarball)
   carries `docker save` output; `fabricctl setup --offline` loads it.
 
@@ -329,14 +415,30 @@ endpoint over `fabricctl` actions, so CLI and UI never diverge:
 
 Role split (Keycloak realm roles): `fabric-admin` (everything),
 `fabric-operator` (DNS/DHCP/leases, no PKI/directory), `fabric-auditor`
-(read-only).
+(read-only). *Superseded by the RBAC bundles of §7e (D19).*
+
+> **Built:** tabs Overview (service health), BIND9 (forward and reverse
+> zones, records, TSIG keys), Kea (subnets, reservations with apply, live
+> leases), Step-CA (CA, sign a CSR, new key + certificate, inspect, convert,
+> issued list), 389-DS (devices, device roles, certificate links, people:
+> add a person, reset a sign-in), FreeRADIUS (RADIUS clients, group
+> mappings, recent decisions, setup guides) and OpenBao (status, unlock
+> methods, secrets pointer, disk-encryption guide). The web UI app lives in
+> `webui/` and the agent in `fabricctl/lib/agent/`. **Not yet:** certificate
+> revocation, SCEP/ACME provisioners, CoA, DHCP names under the BIND tab,
+> `fabricctl doctor` output and image updates in the UI; the version is
+> shown only in the footer.
 
 ## 7a. Targets and hardening
 
 - **Architectures:** everything runs on **arm64 and amd64**. Every upstream
   image used publishes both (verified 2026-09-27: nginx, ubuntu/bind9,
   step-ca, keycloak, postgres, debian, registry). Locally built images (`dirsrv`, `webui`) start from
-  `debian:trixie-slim` and build natively on either.
+  `debian:trixie-slim` and build natively on either. *Now (`fabricctl/images.lock.yaml`):* the
+  upstream images are nginx, step-ca, keycloak, postgres, openbao, fluent-bit and debian;
+  `bind9`, `dirsrv`, `kea`, `freeradius` and the web UI are built locally `FROM` the pinned
+  Debian digest, step-ca and keycloak through thin local layers `FROM` their pinned digests.
+  `ubuntu/bind9` and `registry` are no longer used.
 - **Reference hardware:** Raspberry Pi, **4 GB**, Ubuntu Server 24.04 LTS
   (arm64). Development/testing on amd64. Memory limits at 4 GB total ≈ 2.3 GB
   (Keycloak 1.2 GB is the bulk), leaving ~1 GB for Kea, FreeRADIUS, the
@@ -349,7 +451,10 @@ Role split (Keycloak realm roles): `fabric-admin` (everything),
   only the capabilities it needs, `no-new-privileges`, read-only root where
   the image allows. Where an upstream image needs its permissions reworked,
   a thin local build layer does it — always `FROM` a pinned digest (§7b), so
-  an upstream push can never change what gets built.
+  an upstream push can never change what gets built. **Built**, with one
+  documented exception: `kea-dhcp4` runs as root inside its container (host
+  network, `NET_RAW` + `NET_BIND_SERVICE`, read-only, `no-new-privileges`)
+  because Kea cannot drop privileges. Preflight is built as described.
 - **Docker daemon:** `no-new-privileges` by default, `icc: false`,
   `userland-proxy: false`, `live-restore: true`. The installer **asks**
   `userns-remap` is **on by default** (container root → unprivileged host
@@ -357,10 +462,18 @@ Role split (Keycloak realm roles): `fabric-admin` (everything),
   with stated limits: it hides client source IPs unless the slower
   slirp4netns/pasta port driver is used (BIND/RADIUS ACLs), has no real host
   networking (no Kea DHCP) and needs a system-wide low-port sysctl.
+  **Built:** the hardened `daemon.json` (plus bounded json-file logs).
+  **Not built:** userns-remap and rootless Docker.
 - **Line endings:** `.gitattributes` forces LF so a Windows checkout can't
   ship CRLF scripts or Dockerfiles to the Pi.
 
 ## 7b. Image channels (tested versions, decoupled from releases)
+
+> **Status: not built** (phase 0.6). No channel file, signing key, local
+> registry, update timer or `images export/import` exists yet. What is
+> built is the host side driven by the lock shipped with fabric
+> (`fabricctl images status / update / rollback / prune`, image-updates.md
+> build steps 1–2): hosts pull from the upstream registries by digest.
 
 The tested set of image versions is published **separately from fabric
 releases**, so a Pi running an older fabric still gets newly tested images.
@@ -444,7 +557,18 @@ everything else.
 > USB sticks — tested on a Pi —, PKCS#11 security keys and KMIP HSMs, the
 > latter two against SoftHSM2 / PyKMIP only), Keycloak sign-in to OpenBao's
 > own UI per role bundle, break glass. **Not yet:** rotated credentials,
-> SSH CA.
+> SSH CA, a Secrets section in the web UI that edits `apps/` (the OpenBao
+> tab points to OpenBao's own UI instead).
+>
+> As built, the details below differ in small ways: the key-file slot
+> replaces the bare `unseal.key` (an old one is migrated into a slot);
+> fabric-unlock is the `openbao` unit's start condition
+> (`fabricctl vault unlock`), not a separate unit; a USB stick is mounted
+> next to the RAM key folder (`usb-<slot id>`) only while it is read; when
+> the last present unlock device is pulled, fabric **stops** OpenBao (a udev
+> rule runs `fabricctl vault device-event`) rather than calling
+> `bao operator seal`; the CLI is `fabricctl vault slots | test | remove |
+> rotate | add-usb | add-kmip | tokens | add-key | break-glass`.
 
 **OpenBao** (MPL-2.0, Linux Foundation fork of Vault; Vault-compatible API,
 CLI and clients) rather than HashiCorp Vault, whose BSL licence is not open
@@ -594,10 +718,19 @@ what *people* may do in fabric.
   389-DS, the agent's token check and route table, pages that follow the
   permissions, token renewal (a removed role ends the session), the
   Helpdesk people pages (add a person, reset a sign-in; fabric-group
-  members only by an admin).
+  members only by an admin). The permission list as built
+  (`fabricctl/lib/fabriclib/rbac/permissions.py`, roles named
+  `fabric:<permission>`) differs slightly from the list above: it adds
+  `status:read` and `dhcp:read|write`, names the unlock-method permission
+  `vault:unlock`, and uses `system:admin` only for the admin bundle (and a
+  privileged sign-in reset); no route needs it yet. The bundles are the
+  Keycloak roles `fabric-admin` (the configurable `webui_admin_role`),
+  `fabric-network-operator`, `fabric-equipment-operator`,
+  `fabric-pki-operator`, `fabric-helpdesk` and `fabric-auditor`.
 - **The host CLI** stays root (`sudo fabricctl` = everything); RBAC covers
   the web UI and its agent API. Step-up sign-in (5 min) and the typed host
-  name stay on dangerous changes whatever the role.
+  name stay on dangerous changes whatever the role. *As built, both apply
+  to OpenBao unlock-method changes only.*
 
 ## 7f. Log forwarding (decided, D20; built)
 
@@ -624,49 +757,58 @@ the web UI (destinations, last delivery, backlog) and in `fabricctl status`.
 - **Settings** in `vars.yaml` (`log_forwarding: {syslog: …, elastic: …}`),
   shown in `fabricctl status` and the Overview tab (last delivery, backlog).
   Local logs stay where they are; forwarding is a copy.
+- **As built:** Fluent Bit reads the host journal (every container logs
+  there through Docker's journald driver, and fabric's audit log is copied
+  to it as `fabric-audit`) and OpenBao's audit log. Delivery counters are
+  shown by `fabricctl logs status` (`fabricctl logs set-password elastic`
+  stores the Elasticsearch password in OpenBao). The web UI has no Fluent
+  Bit section yet: the Overview shows only the `fluentbit` service's health,
+  and `fabricctl status` only its unit state.
 
 ## 8. Phases
 
 | Phase | Deliverable | Depends on |
 |---|---|---|
 | 0 ✅ | Rename to fabric, `fabricctl` (no migration: pre-fabric hosts are rebuilt) | — |
-| 0.5 | Foundations: container hardening, version lock with digest pinning, LF line endings, arm64 + amd64 CI running the real-container suites, Pi preflight | — |
-| 0.6 | Signed image channels on GitHub Pages, local registry, `fabric-update` timer with rollback, offline export/import | 0.5 |
+| 0.5 (mostly ✅) | Foundations: container hardening ✅, version lock with digest pinning ✅ (`fabricctl/images.lock.yaml`), LF line endings ✅, Pi preflight ✅; arm64 + amd64 CI running the real-container suites — not built (suites run by hand: `sudo tests/run-all.sh`) | — |
+| 0.6 | Signed image channels on GitHub Pages, local registry, `fabric-update` timer with rollback, offline export/import — not built; host-side `fabricctl images update / rollback / prune` from the shipped lock is built (image-updates.md steps 1–2) | 0.5 |
 | 0.7 ✅ | OpenBao: container, unlock methods (key file, USB, PKCS#11), OIDC login via Keycloak for OpenBao's own UI, break glass, KV for fabric (secrets moved in) and apps | 0.5 |
-| 0.8 | OpenBao: KMIP unlock, rotated DB/LDAP credentials, SSH certificate CA (secrets are browsed in OpenBao's own UI) | 0.7 |
+| 0.8 (KMIP ✅) | OpenBao: KMIP unlock ✅ (tested against PyKMIP), rotated DB/LDAP credentials, SSH certificate CA (secrets are browsed in OpenBao's own UI) | 0.7 |
 | 1 ✅ | Native installer `fabricctl setup` (all playbooks ported); Ansible removed | — |
-| 2 | `.deb` build + signed apt repo in CI (amd64 + arm64 test runs); `setup.sh` becomes a wrapper | 1 |
+| 2 (partly ✅) | `.deb` build ✅ (`package.yml`: every push, attached to the GitHub Release on a tag); `setup.sh` became `installers/deb/install-from-checkout.sh`, which installs through the same `.deb` ✅ (D25); signed apt repo and amd64 + arm64 test runs in CI — not built | 1 |
 | 3 ✅ | Kea DHCP + DDNS + reservations (CLI + UI) | 2 |
 | 4 (two passes ✅) | FreeRADIUS 802.1X: EAP-TLS, MAB, dynamic VLANs ✅; people by password (EAP-TTLS) ✅; RadSec, CoA, SCEP later | 3 (MAB uses reservations) |
-| 5 | Web UI: PKI, directory, roles, health | 3, 4 |
+| 5 (mostly ✅) | Web UI: PKI ✅ (sign, issue, inspect, convert, issued; no revocation), directory ✅ (devices, device roles, people), roles ✅ (RBAC, §7e), health (service status only; no doctor output or updates) | 3, 4 |
 
 Each phase ships on its own and is tested the same way as 1.5.0: real
 containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
+*Today these suites exist under `tests/` and run by hand (`sudo tests/run-all.sh`);
+CI only builds the package.*
 
 ## 9. Decisions needed
 
 | # | Question | Recommendation |
 |---|---|---|
-| D1 | Python-in-.deb vs Go binary | Python (§3) |
+| D1 | Python-in-.deb vs Go binary | Python (§3). *Built this way* |
 | D2 | Target OSes | Ubuntu 24.04 (reference: Raspberry Pi 4 GB, arm64), Debian 13, Raspberry Pi OS (Debian 13-based); amd64 + arm64 |
-| D3 | Service data under `/opt/<svc>` or `/var/lib/fabric/<svc>` | `/var/lib/fabric` for new installs; keep `/opt` paths on existing hosts |
-| D4 | Kea in a container (host networking) or native package | Container, for parity with the other services and easy pinning |
-| D5 | Lease backend: memfile or Postgres | memfile; Postgres only if HA or large lease counts |
+| D3 | Service data under `/opt/<svc>` or `/var/lib/fabric/<svc>` | `/var/lib/fabric` for new installs; keep `/opt` paths on existing hosts. *Not followed so far: every install uses `/opt/fabric` and `/opt/<svc>` (D24/D25 keep them)* |
+| D4 | Kea in a container (host networking) or native package | Container, for parity with the other services and easy pinning. *Built this way (§5)* |
+| D5 | Lease backend: memfile or Postgres | memfile; Postgres only if HA or large lease counts. *Built: memfile* |
 | D6 | Which switches/APs must 802.1X support (vendor affects VLAN attributes, CoA, RadSec) | Needs your inventory |
-| D7 ✅ | Apt repo hosting | GitHub Releases for the `.deb` + reprepro-built signed repo on GitHub Pages (`gh-pages`), dedicated signing key in Actions secrets (§2 Distribution) |
-| D8 ✅ | Keep Ansible for remote install? | No: removed. `setup.sh` is a local bootstrap; remote = ssh + apt (phase 2) |
-| D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b) |
-| D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b) |
-| D11 ✅ | Docker privilege | Harden all containers + daemon; userns-remap on by default; rootless opt-in with stated limits (§1b, §7a) |
-| D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabric-agent` — deliberately not `fabricd`, FRRouting's OpenFabric daemon — `fabric-admins` group, no docker group) and the Open Fabric web UI container; one repo, two artifacts (§1a) |
+| D7 ✅ | Apt repo hosting | GitHub Releases for the `.deb` + reprepro-built signed repo on GitHub Pages (`gh-pages`), dedicated signing key in Actions secrets (§3 Distribution). *Built: the Release `.deb`; not built: the repo* |
+| D8 ✅ | Keep Ansible for remote install? | No: removed. The local bootstrap is `installers/deb/install-from-checkout.sh` (was `setup.sh`, D25); remote = ssh + apt (phase 2) |
+| D9 ✅ | Updates | fabric updater + local registry; no Watchtower (§7b). *Built: the updater as `fabricctl images update` (D21); no local registry* |
+| D10 ✅ | Image versions | Signed, CI-tested channel on GitHub Pages, independent of releases; offline export/import + local mirror (§7b). *Not built: hosts follow the lock shipped with fabric* |
+| D11 ✅ | Docker privilege | Harden all containers + daemon; userns-remap on by default; rootless opt-in with stated limits (§1b, §7a). *Built: container + daemon hardening; not built: userns-remap, rootless* |
+| D14 ✅ | Product split and privilege model | fabricctl (CLI + root `fabric-agent` — deliberately not `fabricd`, FRRouting's OpenFabric daemon — `fabric-admins` group, no docker group) and the Open Fabric web UI container; one repo, two artifacts (§1a). *Built differently: the CLI runs as root via sudo, `fabric-agent` serves only the web UI, no `fabric-admins` group (§1a)* |
 | D15 ✅ | Setup UX | Default change list → Proceed / Advanced; everything settable in `vars.yaml`; `--non-interactive` (§1b) |
-| D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c) |
+| D12 ✅ | Secrets | OpenBao, all four uses, auto-unseal from a local key file (§7c; the unseal part is refined by D17: the key file is one slot among several). *Built: fabric's secrets and apps KV; not built: rotated credentials, SSH CA* |
 | D18 ✅ | Disk encryption | Done by people themselves: fabric ships a manual guide (web UI + docs/disk-encryption.md) for LUKS2 with the same YubiKey (FIDO2) or USB stick; no `fabricctl disk` (§7d, revised 2026-09-29) |
 | D17 ✅ | How OpenBao is unlocked | Key slots (local file, USB sticks, PKCS#11 security keys, KMIP HSMs); any one enabled slot unlocks; handled on the host by fabric-unlock; vendor-neutral (§7c) |
 | D16 ✅ | Where Kea registers DHCP hostnames | A separate dynamic subzone per DHCP scope (`dhcp.<domain>`, per-VLAN subzones with 802.1X); never the rendered zones (§5) |
 | D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
 | D20 ✅ | Central logging | Fluent Bit as an optional stack component (`install_fluentbit`, chosen at setup, hot-addable): forwards all logs to syslog (RFC 5424, TLS) and/or Elasticsearch/OpenSearch, disk-buffered, credentials in OpenBao (§7f) |
-| D21 | Image updates (validation pipeline and host side) | Daily watcher → regression on amd64 + arm64 incl. an upgrade test → pass: PR auto-merged, signed list published; fail: GitHub issue. Hosts fetch the list automatically unless offline, apply only on command (or opt-in auto-apply), prune old fabric images ([image-updates.md](image-updates.md)) |
+| D21 (host side partly built) | Image updates (validation pipeline and host side) | Daily watcher → regression on amd64 + arm64 incl. an upgrade test → pass: PR auto-merged, signed list published; fail: GitHub issue. Hosts fetch the list automatically unless offline, apply only on command (or opt-in auto-apply), prune old fabric images ([image-updates.md](image-updates.md)) |
 | D25 ✅ | Repository layout | Three product folders: `fabricctl/` (the Linux host side), `webui/` (the control-plane container) and `installers/deb/` (the Debian package wrapper; more formats as siblings). The installed tree (`/usr/lib/fabricctl/fabric`, `/opt/fabric`) is unchanged: `installers/deb/assemble-tree.sh` maps the folders onto it, so installs upgrade in place. The web UI stays in this repository (it changes together with the agent API it calls; split only once that API is versioned and CI publishes images). `setup.sh` became `installers/deb/install-from-checkout.sh`: a checkout installs through the same .deb as a release |
 | D24 ✅ | Names | The repository is `open-fabric` and the web UI is shown as "Open Fabric" (subtitle *web control*). Everything else keeps its name: the package and command `fabricctl`, `/opt/fabric`, `/etc/fabric`, `fabric.target` and the `fabric-*` units, `fabriclib`, the Keycloak `fabric:*` roles, OpenBao's `fabric/` path, the image names — renaming those would need migration code on every install for no user benefit. The root daemon is `fabric-agent`, never `fabricd` (FRRouting's OpenFabric daemon). The repository is renamed before the image channel and APT repository are published on GitHub Pages (Pages URLs do not redirect) |
 | D23 ✅ | How FreeRADIUS decides | fabric's own policy (python3 module) asks 389-DS on every request, as the read-only `cn=radius_reader`, over verified LDAPS: nothing is cached or exported, so a disabled device or an unlinked certificate is refused at its next authentication. EAP-TLS devices are found by the SHA-256 fingerprint of the presented certificate (recorded during verification, keyed by serial, since FreeRADIUS exposes no fingerprint); MAB by MAC. People (EAP-TTLS/PAP) are checked by binding as the person, then by membership of a mapped group (`radius_people`). The directory unreachable means Reject (fail closed) |

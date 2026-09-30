@@ -2,8 +2,8 @@
 # -----------------------------------------------------------------------
 # Run fabric's test suites against real containers.
 #
-#   sudo tests/run-all.sh [suite ...]      suites: render nginx zone webui pki openbao fluentbit kea freeradius dirsrv keycloak hardening
-#   sudo tests/run-all.sh sandbox          opt-in: full install in a systemd + Docker sandbox (~10 min)
+#   sudo tests/run-all.sh [suite ...]      suites: docs render nginx zone webui pki openbao fluentbit kea freeradius dirsrv keycloak hardening
+#   sudo tests/run-all.sh sandbox          opt-in: full install in a systemd + Docker sandbox (about 30 min)
 #
 # Needs: Linux (amd64 or arm64), Docker with buildx, python3 with yaml +
 # jinja2, openssl, curl, setpriv. Runs as root (chown to service uids,
@@ -14,7 +14,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export FABRIC_TEST_OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(render nginx zone webui pki openbao fluentbit kea freeradius dirsrv keycloak hardening)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(docs render nginx zone webui pki openbao fluentbit kea freeradius dirsrv keycloak hardening)
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo)." >&2; exit 2; }
 rm -rf "$FABRIC_TEST_OUT"; mkdir -p "$FABRIC_TEST_OUT"
@@ -32,6 +32,7 @@ run() {  # name command...
 
 for s in "${SUITES[@]}"; do
     case "$s" in
+        docs)     run docs     python3 "$HERE/docs/run.py" ;;
         render)   run render   python3 "$HERE/render.py" "$FABRIC_TEST_OUT/rendered" ;;
         nginx)    run nginx    bash "$HERE/nginx_check.sh" "$FABRIC_TEST_OUT/rendered" ;;
         zone)     run zone     python3 "$HERE/zone_test.py" ;;

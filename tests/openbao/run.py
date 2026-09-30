@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """OpenBao against the real, pinned image, started from fabric's own compose
-template and config: hardening, TLS, static-seal auto-unseal, init,
-idempotent configuration, least-privilege AppRoles, root token revocation,
-and what happens when the seal key goes missing.
+template and config: the vault key and its unlock methods (key file, USB
+stick on a loop device, security key on SoftHSM2, HSM on a PyKMIP server),
+static-seal auto-unseal, init, idempotent configuration, least-privilege
+AppRoles and people's policies, break glass, root token revocation, fabric's
+secrets moved into OpenBao, rotation, tampering, the kill switch, what
+happens when the key goes missing, and hardening.
 
     sudo python3 tests/openbao/run.py          (needs Docker, openssl, root)
 """

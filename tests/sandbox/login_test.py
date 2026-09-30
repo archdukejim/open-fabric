@@ -11,8 +11,10 @@ handed out. Proves the admin gets in and that everyone else is refused:
   - a real directory user without the fabric-admin role   -> 403
   - a valid certificate presented for another user        -> 403
   - the initial password stops working after the first login
+  - a directory group gives a role bundle: an auditor reads, a change is refused
   - OpenBao's own UI: the admin signs in with Keycloak (TOTP) and gets the
     fabric-admin policy (apps/ yes, fabric's own secrets no); others refused
+  - people: the admin adds a person and resets a sign-in
 
   python3 login_test.py <vars.yaml> <other-user> <other-password> <other-p12-password>
 Prints PASS/FAIL lines.
@@ -287,7 +289,7 @@ token = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) els
 
 
 def policies(res):
-    auth = res.get("auth") or {} if isinstance(res, dict) else {}
+    auth = (res.get("auth") or {}) if isinstance(res, dict) else {}
     return set(auth.get("policies") or []) | set(auth.get("identity_policies") or [])
 
 
@@ -325,7 +327,7 @@ st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/_new",
 check(f"people: the admin adds {NEW} -> one-time password shown once", st == 200 and "shown only now" in page,
       (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
-check(f"people: {NEW} is in the directory (written by Keycloak), in users only", f"{NEW}@lan.test" in page, page[:200])
+check(f"people: {NEW} is in the directory (written by Keycloak)", f"{NEW}@lan.test" in page, page[:200])
 st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/{NEW}/reset", {"csrf": csrf})
 check(f"people: the admin resets {NEW}'s sign-in", st == 200 and "sign-in reset" in page, (st, page[:300]))
 

@@ -75,9 +75,10 @@ run2=$(PYTHONPATH="$REPO" python3 "$REPO/fabricctl/lib/keycloak_bootstrap.py" --
 echo "$run2" | sed 's/^/    /'
 check "bootstrap run 2 converges (no creates)" "grep -q 'complete' <<<\"\$run2\" && ! grep -q 'created' <<<\"\$run2\""
 
-verify=$(REPO="$REPO" W="$W" python3 "$HERE/verify.py" 2>&1)
+verify=$(REPO="$REPO" W="$W" python3 "$HERE/verify.py" 2>&1); verify_rc=$?
 echo "$verify"
 PASS=$((PASS + $(grep -c '^PASS' <<<"$verify"))); FAIL=$((FAIL + $(grep -c '^FAIL' <<<"$verify")))
+check "verify.py ran to the end" "[ $verify_rc -eq 0 ]"
 
 # ---- real browser login as the LDAP user -> must be forced into TOTP setup
 CURL="curl -s -c $W/jar -b $W/jar --cacert $D/root.crt --connect-to sso.lan.j-j.family:443:10.254.9.60:8443"
@@ -86,8 +87,7 @@ page=$($CURL "$AUTH")
 action=$(grep -o 'action="[^"]*"' <<<"$page" | head -1 | sed 's/action="//; s/"$//; s/&amp;/\&/g')
 resp=$($CURL -i -X POST --data-urlencode username=jim --data-urlencode 'password=JimPass!23' "$action")
 echo "--- login response:"; grep -iE '^HTTP|^location|<title>|kc-page-title' <<<"$resp" | head -6
-loc=$(grep -i '^location:' <<<"$resp" | tr -d '
-' | cut -d' ' -f2)
+loc=$(grep -i '^location:' <<<"$resp" | tr -d '\r' | cut -d' ' -f2)
 [ -n "$loc" ] && { resp2=$($CURL "$loc"); echo '--- after redirect:'; grep -ioE 'totp|authenticator|one-time|code=[^&"]*' <<<"$resp2" | sort | uniq -c | head; resp="$resp$resp2"; }
 check "LDAP user jim authenticates via 389-DS federation" "! grep -qi 'Invalid username or password' <<<\"\$resp\""
 check "web UI login forces TOTP enrolment (MFA enforced)" "grep -qiE 'totp|authenticator|one-time' <<<\"\$resp\" && ! grep -qi 'mgr.lan.j-j.family/oidc/callback?.*code=' <<<\"\$resp\""

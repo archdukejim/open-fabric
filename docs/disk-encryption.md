@@ -17,6 +17,12 @@ spare machine first, and keep a passphrase.
 - **One key, two jobs.** A YubiKey unlocks OpenBao through its **PIV**
   application (PKCS#11) and LUKS through **FIDO2**. They are separate parts
   of the key; one YubiKey 5 does both.
+- **What is outside `/opt` and `/etc/fabric`?** Keycloak's and Postgres's
+  data are under `/opt` unless you moved them (`keycloak_data_dir`,
+  `postgres_data_dir`): put them on the volume too. `fabricctl reinstall`
+  leaves a backup with plaintext secrets in `/root/fabric-reinstall-<time>/`,
+  and `apt purge` exports to `/var/backups/fabric/`: delete those, or keep
+  them on the encrypted volume as well.
 - **Root or data volume?** Unlocking a **data volume** after boot (below)
   works on Ubuntu 24.04 as installed. Unlocking the **root** filesystem with
   FIDO2 needs systemd in the initramfs: `sudo apt install dracut` (it
@@ -72,7 +78,8 @@ To remove one: `sudo systemd-cryptenroll --wipe-slot=<slot> /dev/sdX2`.
 ## 2b. Unlock with the USB stick
 
 Enrol the stick in fabric **first** (OpenBao → Unlock methods → Add a USB
-stick): fabric erases it. Then add a LUKS key file next to fabric's
+stick, or `sudo fabricctl vault add-usb /dev/sdX --yes`): fabric erases it
+and formats it (ext4, label `FABRIC-KEY`). Then add a LUKS key file next to fabric's
 `fabric-vault/` folder — fabric only touches its own files there:
 
 ```bash

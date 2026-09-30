@@ -8,7 +8,7 @@ file is about *how* we build.
 ## 1. What we are building
 
 - **fabricctl** — the control. Native apt package on the host: `fabricctl`
-  CLI + root `fabric-agent` daemon + systemd timers. Installs, configures,
+  CLI + root `fabric-agent` daemon + systemd units (timers planned). Installs, configures,
   updates and secures the whole stack. Works fully without the web UI.
 - **Open Fabric** (web control) — the control-plane web UI, its own unprivileged container.
   Every action is a request to `fabric-agent`; it holds no power of its own.
@@ -32,16 +32,16 @@ repository layout.
 The repo must stay easy to navigate. For all of our own code:
 
 - **Every distinct function/operation lives in its own file**, named for what
-  it does (`verb_noun`): `dns/add_record.py`, `pki/mint_client_cert.sh`,
-  `vault/seal_kmip.py`. A reader should find the code for an operation from
+  it does (`verb_noun`): `dns/add_record.py`, `pki/issue_client_cert.py`,
+  `vault/add_kmip_slot.py`. A reader should find the code for an operation from
   its name alone.
 - Small private helpers used by exactly one function stay in that function's
   file. A helper used by two or more files moves to its own file in that
   folder's `common/` (or the top-level `common/` if cross-domain) — still one
   helper per file.
-- **Group files by domain in folders** (`dns/`, `dhcp/`, `pki/`, `ldap/`,
-  `keycloak/`, `vault/`, `images/`, `security/`, `setup/`, `agent/`,
-  `webui/`, `common/`). Prefer a new folder over a crowded one.
+- **Group files by domain in folders** (today: `dns/`, `dhcp/`, `pki/`, `ldap/`,
+  `keycloak/`, `vault/`, `secrets/`, `images/`, `security/`, `setup/`,
+  `radius/`, `logs/`, `rbac/`, `system/`, `common/`). Prefer a new folder over a crowded one.
 - Python domain code lives in **`fabricctl/lib/fabriclib/<domain>/`** and is
   imported as `fabriclib.<domain>.<file>` — namespaced so it can never
   collide with system packages (e.g. dnspython is also `dns`).

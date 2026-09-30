@@ -2,4 +2,4 @@
 
 | File | What |
 |---|---|
-| `run.sh` | Start bind9, step-ca, postgres, keycloak and dirsrv from their real rendered compose files and check each works and is hardened (non-root, no capabilities, no-new-privileges, read-only root) |
+| `run.sh` | Start bind9, step-ca, postgres, keycloak, dirsrv and openbao from their real rendered compose files and check each works (DNS answers, TLS, seeding, static seal) and is hardened (non-root, no capabilities, zero effective capabilities, no-new-privileges, read-only root, a memory limit) |

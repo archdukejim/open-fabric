@@ -8,7 +8,8 @@
 #   sudo installers/deb/install-from-checkout.sh --file vars.yaml        answers from a file
 #   sudo installers/deb/install-from-checkout.sh --file vars.yaml --non-interactive --yes
 #
-# Arguments go to `fabricctl setup`. Afterwards use `sudo fabricctl ...`
+# Arguments go to `fabricctl setup`; without --file, the checkout's custom-vars.yaml
+# (if present) is used. Afterwards use `sudo fabricctl ...`
 # directly; running this again upgrades to the checkout's current code.
 # -----------------------------------------------------------------------
 set -euo pipefail
@@ -26,4 +27,16 @@ out="$(mktemp -d)"; trap 'rm -rf "$out"' EXIT
 deb="$(OUT="$out" bash "$HERE/build-deb.sh")"
 echo "installing $(basename "$deb")"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$deb"
+
+# The checkout's own custom-vars.yaml (git-ignored, never packaged) is the
+# answers file unless one is given: setup now runs from the package, which
+# cannot see the checkout.
+case " $* " in
+    *" --file "*|*" --file="*) ;;
+    *) vars="$(cd "$HERE/../.." && pwd)/custom-vars.yaml"
+       if [ -f "$vars" ]; then
+           echo "using $vars"
+           set -- --file "$vars" "$@"
+       fi ;;
+esac
 exec fabricctl setup "$@"

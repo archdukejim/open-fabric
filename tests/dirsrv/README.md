@@ -2,6 +2,6 @@
 
 | File | What |
 |---|---|
-| `run.sh` | 389-DS on fabric's image with fabric's seed: healthy as uid 911, seeding idempotent, TLS-only binds, ACIs, memberOf, the admin user, device RBAC |
+| `run.sh` | 389-DS on fabric's image with fabric's seed: healthy as uid 911, seeding idempotent, TLS-only binds (plaintext and TLS < 1.2 refused), anonymous reads without passwords, ACIs, memberOf, the admin user, device RBAC |
 | `admin_user.py` | Setup's admin step (`ensure_admin_user`) against the test directory |
-| `devices.py` | Device and role operations as `cn=device_admin`, like fabric-agent |
+| `devices.py` | Device and role operations as `cn=device_admin`, like fabric-agent: validation and its refusals, effective permissions and VLAN, certificate links, least privilege, the audit log |

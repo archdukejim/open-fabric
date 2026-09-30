@@ -38,10 +38,13 @@ def check(name, cond, detail=""):
 
 
 def refused(fn, *args, match=""):
+    """True only if fn(*args) raises a ValidationError whose message contains `match`."""
     try:
         fn(*args)
     except ValidationError as exc:
-        return match.lower() in str(exc).lower() or str(exc)
+        if match.lower() in str(exc).lower():
+            return True
+        print(f"    refused, but not for {match!r}: {exc}")
     return False
 
 

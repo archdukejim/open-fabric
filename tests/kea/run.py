@@ -129,7 +129,7 @@ start_dhcp4()
 sh(f"docker run -d --name kt-ddns --network {NET} --ip {DDNS_IP} --user 915:915 --read-only "
    f"--security-opt no-new-privileges:true --cap-drop ALL --tmpfs /tmp --tmpfs /run/kea:uid=915,gid=915 "
    f"-v {W}/kea/config:/config:ro fabric/kea:test /usr/sbin/kea-dhcp-ddns -c /config/kea-dhcp-ddns.conf")
-check("kea-dhcp4 runs and its control socket answers", until(lambda: os.path.exists(f"{W}/kea/run/kea4-ctrl-socket")),
+check("kea-dhcp4 runs and creates its control socket", until(lambda: os.path.exists(f"{W}/kea/run/kea4-ctrl-socket")),
       sh("docker logs kt-dhcp4", ok=False).stdout[-800:] + sh("docker logs kt-dhcp4", ok=False).stderr[-800:])
 
 
@@ -166,11 +166,10 @@ check("another client asking for the same name cannot take it over (DHCID)", ip3
 leases = list_leases(V)
 check("lease list over the control socket shows the clients", any(l["ip"] == ip1 and l["hostname"].startswith("laptop1")
       for l in leases) and any(l["ip"] == "10.254.23.42" for l in leases), leases)
-check("the key may not touch anything but the DHCP subzone",
-      "REFUSED" in sh(f"printf 'server {BIND_IP}\\nzone lan.test\\nupdate add evil.lan.test 60 A 1.2.3.4\\nsend\\n' "
-                      f"| nsupdate -y hmac-sha256:kea-ddns:{secret} 2>&1", ok=False).stdout
-      or "NOTAUTH" in sh(f"printf 'server {BIND_IP}\\nzone lan.test\\nupdate add evil.lan.test 60 A 1.2.3.4\\nsend\\n' "
-                         f"| nsupdate -y hmac-sha256:kea-ddns:{secret} 2>&1", ok=False).stdout)
+evil = sh(f"printf 'server {BIND_IP}\\nzone lan.test\\nupdate add evil.lan.test 60 A 1.2.3.4\\nsend\\n' "
+          f"| nsupdate -y hmac-sha256:kea-ddns:{secret} 2>&1", ok=False).stdout
+check("the key may not touch anything but the DHCP subzone", "REFUSED" in evil or "NOTAUTH" in evil, evil[-300:])
+
 
 def leases_or_none():
     try:

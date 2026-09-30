@@ -1,6 +1,10 @@
 # Image updates: automated validation and the host side
 
-Status: **design** (not built). Extends [fabricctl-package.md §7b](fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases)
+Status: **partly built.** Build steps 1–2 (§8) are built: everything pinned by digest in
+`fabricctl/images.lock.yaml` and `fabricctl images status / update / rollback / prune` on the
+host. Not built: the CI workflows (watcher, regression, publishing, issues), the signed
+channel and its fetch timer, offline export/import, automatic applying, the web UI Updates
+panel and every setting in §7 except `image_prune`. Extends [fabricctl-package.md §7b](fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases)
 and decisions D9, D10, D13. Decision D21 below.
 
 ## 1. Goal
@@ -103,7 +107,20 @@ images:
   from this file** (a render test fails if any image is unpinned or differs
   from the lock). This file replaces today's hand-written `image_*` defaults.
 
+**Built** (`fabricctl/images.lock.yaml`): each entry has `var` (the vars key
+it sets, e.g. `image_keycloak`), `repo`, `tag`, `digest`, `track` and
+`policy`; `platforms` and `suites` from the sketch above are not there yet.
+A second section, `packages:`, pins packages installed into fabric's own
+images from an upstream apt repository (Kea 3.0: exact version, repository,
+signing-key fingerprint; D22). `vars.yaml.j2` takes the `image_*` defaults
+from the lock and the local builds get the pinned ref as `BASE_IMAGE`;
+`tests/render.py` fails on anything unpinned, on a default that differs from
+the lock and on a Dockerfile not `FROM ${BASE_IMAGE}`.
+
 ## 5. CI: watch, test, publish
+
+> **Not built.** The only workflow is `.github/workflows/package.yml`
+> (builds the `.deb`); the suites run by hand (`sudo tests/run-all.sh`).
 
 All workflows live in `.github/workflows/`, use actions pinned by commit
 SHA, and least-privilege tokens.
@@ -201,6 +218,13 @@ Assignment/notification uses the repo's normal GitHub settings.
 
 ### 6.1 Fetch the validated list (automatic, unless offline)
 
+> **Not built.** Today the validated list is the `images.lock.yaml` of the
+> installed fabric: a host learns of new validated images by installing a
+> newer `fabricctl` package and re-running `sudo fabricctl setup` (which
+> keeps the images the host runs), then `fabricctl images status` shows the
+> difference. No timer, `images fetch`, `images export/import` or
+> `offline_mode` setting exists.
+
 `fabric-channel.timer` (daily, randomised delay) runs
 `fabricctl images fetch`:
 
@@ -226,6 +250,20 @@ exported on any online machine with `fabricctl images export`), verified
 exactly like a download.
 
 ### 6.2 Apply (by the admin, or automatically if enabled)
+
+> **Built:** the five commands below except that `images status` compares
+> against the installed lock, not a fetched list. As built, `images update`
+> moves one image var at a time, in the order of
+> `fabriclib/images/constants.py`: it pulls by digest, re-renders and
+> redeploys the configuration (local images rebuild on the new base), then
+> restarts each service using that image through its systemd unit and waits
+> for its container healthcheck (no extra service-specific checks). Services
+> that share a base (`image_debian`: bind9, dirsrv, kea, freeradius and the
+> web UI) move together. On failure that var is rolled back the same way,
+> the run stops and the error is audited. Image vars the admin set in
+> `vars.yaml` are held unless `--force`. The previous ref of each var is
+> kept in `/etc/fabric/images/state.json` for `images rollback`. There is no
+> Updates panel or agent route yet, and no automatic applying.
 
 | Command | What |
 |---|---|
@@ -261,6 +299,12 @@ one-at-a-time, health-gated, auto-rollback procedure; optional
 
 ### 6.3 Automatic cleanup of old images
 
+> **Built:** `fabricctl images prune`, also run after every successful
+> `images update` unless `image_prune: false`; no weekly run (no timer).
+> It keeps every image pinned in `vars.yaml`, the rollback image and any
+> image a container uses, removes other images of the lock's repositories,
+> then prunes dangling local builds (label `org.fabric.base`).
+
 After every successful update (and weekly from the timer):
 
 - Keep: every digest a fabric compose file references now, **and the
@@ -272,6 +316,9 @@ After every successful update (and weekly from the timer):
 - Report what was freed. `image_prune: false` turns it off.
 
 ## 7. Settings (vars.yaml)
+
+Only `image_prune` exists today (plus `image_pins`, written by setup: the
+`image_*` keys the admin set, which `images update` leaves alone).
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -303,7 +350,7 @@ After every successful update (and weekly from the timer):
    tested images instead of building them from distribution packages at
    setup (no mirror needed, faster on a Pi, offline = import the images).
 
-**Precondition for step 5:** rename the GitHub repository to `fabricctl`
+**Precondition for step 5:** rename the GitHub repository (to `open-fabric`, decision D24)
 *before* the validated list (or the APT repo) is published on GitHub Pages:
 GitHub redirects git and web URLs after a rename, but not Pages URLs, and
 hosts will have the list's URL built in.

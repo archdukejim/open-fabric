@@ -20,25 +20,27 @@ fabric is installed as a Debian package, `fabricctl`, on the host it runs on (am
 
 ## Requirements
 
-- Ubuntu 24.04 LTS (Debian 12+ works), **amd64 or arm64** (Raspberry Pi 4/5 included)
-- 3 GB RAM or more with Keycloak (the default); 2 GB without it
+- Ubuntu 24.04 LTS (the reference; other Debian-family systems get a warning), **amd64 or arm64** (Raspberry Pi 4/5 included)
+- 3 GB RAM or more with Keycloak (the default; `preflight` refuses less than about 2.7 GB); 2 GB without it
 - cgroup v2 with the memory controller (Raspberry Pi: add `cgroup_enable=memory` to `/boot/firmware/cmdline.txt` if `preflight` asks for it)
-- Nothing else listening on the LAN IP's ports 53, 80, 443, 636, 853
+- Nothing else listening on the LAN IP's ports 53, 80, 443, 389, 636 (`preflight` warns about these and 853); with DHCP also UDP 67, with 802.1X UDP 1812–1813
+- Root (`sudo`) and, unless `--offline`, internet access for apt and the images
 
-Setup installs what it needs from apt: `openssl`, `ca-certificates`, `curl`, `gnupg`, `ufw`, `iptables`, `dnsutils`, `python3-yaml`, `python3-jinja2`, and Docker Engine (`docker-ce`, `containerd.io`, compose and buildx plugins) from Docker's own apt repository if Docker is missing.
+The package depends on `python3` (3.10+), `python3-yaml`, `python3-jinja2`, `openssl`, `curl`, `ca-certificates`, `iptables`, `ufw` and `dnsutils` (apt installs them with it) and recommends `python3-pykcs11` and `python3-pykmip` (security keys and KMIP as OpenBao unlock methods). Setup's `host` step installs anything still missing (`gnupg` too) and Docker Engine (`docker-ce`, `containerd.io`, compose and buildx plugins) from Docker's own apt repository if Docker is missing.
 
 ## Configure vars
 
-Setup needs five values: `domain`, `hostname`, `host_ip`, `lan_cidr`, `lan_gateway`. Run interactively, it asks for any that are missing and suggests values detected from the default route. For everything else, start from the template:
+Setup needs five values: `domain`, `hostname`, `host_ip`, `lan_cidr`, `lan_gateway`. Run interactively, it asks for any that are missing and suggests values detected from the default route (and, on a first run, `friendly_name` and the first web UI admin's user name). For everything else, start from the example (in the package at `/usr/share/doc/fabricctl/examples/vars.yaml`; in the repository `fabricctl/examples/vars.yaml`):
 
 ```bash
-cp fabricctl/examples/vars.yaml custom-vars.yaml
+cp /usr/share/doc/fabricctl/examples/vars.yaml custom-vars.yaml
+sudo fabricctl setup --file custom-vars.yaml
 ```
 
 Settings are read in this order, later wins:
 
 1. an existing install's `/opt/fabric/config/vars.yaml` (so re-running setup never loses DNS records added in the web UI or editor)
-2. `--file <vars.yaml>`, or, on a fresh install only, `custom-vars.yaml` in the checkout
+2. `--file <vars.yaml>` (only the keys it sets). Without `--file`, a fresh install run straight from a git checkout (`python3 fabricctl/lib/fabriclib/cli.py setup`) reads `custom-vars.yaml` at the checkout's root, and so does `install-from-checkout.sh` (it passes it as `--file` when you give none); the package on its own does not.
 3. answers to prompts
 
 The merged result is saved as `/opt/fabric/config/fabric.yaml`. Secrets (CA password, TSIG secrets, Directory Manager and per-role LDAP passwords, Keycloak credentials, the web UI's OIDC client secret) are generated on the first run into `/opt/fabric/config/fabric-secrets.yml` (`0600`); the `vault` step then moves them into OpenBao (`fabric/secrets`) and shreds the file. They are kept on every re-run and never appear on a command line. Read one with `sudo fabricctl secrets show <name>`.
@@ -53,12 +55,11 @@ lan_cidr: 10.0.0.0/22           # your LAN subnet
 lan_gateway: 10.0.0.1
 
 # ── DNS RECORDS ─────────────────────────────────────────────────────────────
-# Zone key must be the static placeholder 'dynamic_zone_var'.
-# Templates resolve it to the 'domain' value at render time.
+# The zone key 'dynamic_zone_var' is the main zone ('domain');
+# templates resolve it at render time. Other keys are zone names.
 dns:
   dynamic_zone_var:
-    zone_authority: true        # emit NS A record pointing to host_ip
-    tsig: acme_dns-01           # primary TSIG key for this zone
+    zone_authority: true        # emit the "ns" A record pointing to host_ip
     A:
     - { name: nas,  ip: 10.0.3.10 }
 ```
@@ -77,9 +78,7 @@ Key tunables with their defaults:
 
 - [ ] `domain`, `hostname`, `host_ip`, `lan_cidr`, `lan_gateway`
 - [ ] `friendly_name` — used in the CA name
-- [ ] `system_timezone` — IANA timezone string
-- [ ] `dns_server` — upstream DNS used during bootstrap (only used when `use_host_dns: false`; defaults to using the host's existing resolver)
-- [ ] `acme_email` — email for ACME registration
+- [ ] `dns_server` — upstream DNS for the host resolver (only used when `use_host_dns: false`; by default the host's existing resolver is kept)
 - [ ] `ca_name`, `cert_country`, `cert_org` — CA subject fields
 - [ ] `byoc` / `ca_crt_path` / `ica_crt_path` — bring your own offline root instead of a generated one
 - [ ] `dns:` block — A and CNAME records for your hosts
@@ -90,7 +89,8 @@ Key tunables with their defaults:
 - [ ] `bind_dns_port` — change from `53` only if another DNS server must keep port 53 on `host_ip`
 - [ ] `webui_admin_user` — the first web UI admin setup creates (default: the account that ran `sudo`)
 - [ ] `webui_hostname` — the web UI's address (default `fabric.<domain>`; any host name)
-- [ ] `image_*` — every image is already pinned by digest (`fabricctl/images.lock.yaml`); override only to use a local registry (optional; `fabricctl images update` then leaves it alone)
+- [ ] `image_*` — every image is already pinned by digest (`fabricctl/images.lock.yaml`); override only to use a local registry (optional; `fabricctl images update` then leaves it alone unless `--force`)
+- [ ] `install_kea` + `dhcp`, `install_freeradius`, `install_fluentbit` + `log_forwarding` — the optional services (off by default; see [the default plan](#the-default-plan) and [operations.md](operations.md#dhcp-optional-kea))
 
 ---
 
@@ -118,17 +118,17 @@ sudo apt install ./fabricctl_<version>_all.deb    # installs the tool; changes n
 sudo fabricctl setup                              # installs fabric (or: --file vars.yaml)
 ```
 
-The package is built from the repository with `installers/deb/build-deb.sh` (one `_all.deb` for amd64 and arm64), until releases publish it. Installing it only adds `/usr/bin/fabricctl` and the code in `/usr/lib/fabricctl`; `fabricctl setup` does the rest. Example settings: `/usr/share/doc/fabricctl/examples/vars.yaml`.
+The package is built from the repository with `installers/deb/build-deb.sh` (`dist/fabricctl_<version>_all.deb`, one package for amd64 and arm64), until releases publish it. Installing it only adds `/usr/bin/fabricctl` and the code in `/usr/lib/fabricctl` — it never starts services or touches the network; `fabricctl setup` copies the code to `/opt/fabric` and does the rest. Example settings: `/usr/share/doc/fabricctl/examples/vars.yaml`.
 
-**Upgrade:** install the newer `.deb`, then `sudo fabricctl setup`; until you do, every other command reminds you. `apt remove fabricctl` removes the tool and leaves the running install alone.
+**Upgrade:** install the newer `.deb`, then `sudo fabricctl setup`; until you do, every other command reminds you (`note: the fabricctl package is newer than the running install`). An upgrade never changes the container images a host runs: `fabricctl images update` does (see [operations.md](operations.md#fabricctl-images)). `apt remove fabricctl` removes the tool and leaves the running install alone.
 
-**From a git checkout (development):** `sudo installers/deb/install-from-checkout.sh` does the same as `fabricctl setup` without the package.
+**From a git checkout (development):** `sudo installers/deb/install-from-checkout.sh [setup options]` builds the `.deb` from the checkout (`build-deb.sh`, needs `dpkg-deb`, `git` and `tar`), installs it with apt, then runs `fabricctl setup` with the options given (e.g. `--file custom-vars.yaml --non-interactive --yes`). Running it again upgrades the host to the checkout's current code. Afterwards use `sudo fabricctl …` as usual.
 
-Setup is idempotent: change a setting and run it again; finished steps are quick, and certificates are only re-issued when missing, expiring within 30 days, or missing a name.
+Setup is idempotent: change a setting and run it again; finished steps are quick, and certificates are only re-issued when missing, expiring within 30 days, missing a name or not from this CA.
 
 ### The default plan
 
-Every default is the hardened choice. Setup shows the plan and asks **[P]roceed, [A]dvanced, or [Q]uit**. Advanced walks each item and states what relaxing it costs.
+Every default is the hardened choice. Setup shows the plan and asks **[P]roceed, [A]dvanced, or [Q]uit** (Enter proceeds). Advanced walks each item below and states what relaxing it costs, then asks about the optional services, and shows the plan again. `--yes` or `--non-interactive` proceeds without asking.
 
 | Setting | Default | Relaxing it means |
 |---|---|---|
@@ -136,7 +136,15 @@ Every default is the hardened choice. Setup shows the plan and asks **[P]roceed,
 | `security.docker_daemon_hardening` | on | `/etc/docker/daemon.json` gains `no-new-privileges`, `icc: false`, no userland proxy, `live-restore`, bounded logs (merged into what is there, never replaced). |
 | `install_ldap` | on | 389 Directory Server |
 | `install_keycloak` | on | Keycloak SSO + Postgres (needed by the web UI) |
-| `install_webui` | on | Web UI at `https://fabric.<domain>`: client certificate + Keycloak login + TOTP |
+| `install_webui` | on | Web UI at `https://fabric.<domain>` (`webui_hostname`): client certificate + Keycloak login + TOTP. Forced off when Keycloak is off |
+
+Optional services, off by default (Advanced asks about each; or set them in the vars file):
+
+| Setting | Advanced asks | See |
+|---|---|---|
+| `install_kea` + `dhcp` | DHCP on this LAN with Kea: interface, subnet, address pool (default: the top quarter of the subnet) and router, suggested from the default route. Switch off your router's DHCP first | [operations.md](operations.md#dhcp-optional-kea) |
+| `install_freeradius` | 802.1X with FreeRADIUS; refused without 389-DS (`install_ldap`). Switches are added afterwards with `fabricctl radius add-client` | [operations.md](operations.md#8021x-optional-freeradius) |
+| `install_fluentbit` + `log_forwarding` | Forward all logs with Fluent Bit: a syslog server `host[:port]` over TLS (port 6514 by default) and/or an Elasticsearch/OpenSearch URL and user; its password afterwards with `fabricctl logs set-password elastic` | [operations.md](operations.md#log-forwarding-optional-fluent-bit) |
 
 Regardless of the plan, every container runs non-root with all capabilities dropped, `no-new-privileges` and a read-only root filesystem (see [architecture.md](architecture.md#container-hardening)).
 
@@ -148,7 +156,7 @@ Any of these can be set in the vars file and changed later by re-running setup.
 sudo fabricctl setup --file vars.yaml --non-interactive --yes
 ```
 
-`--non-interactive` never prompts and fails if a required value is missing or invalid; `--yes` accepts the plan.
+`--non-interactive` never prompts and fails if a required value is missing or invalid (the first web UI admin then defaults to the account that ran `sudo`, or `fabricadmin`); `--yes` accepts the plan.
 
 ### Options
 
@@ -159,10 +167,10 @@ sudo fabricctl setup --file vars.yaml --non-interactive --yes
 | `--yes`, `-y` | Accept the plan without asking |
 | `--offline` | Never download; packages and images must already be present |
 | `--deploy-base <dir>` | Install root (default `/opt`) |
-| `--step <name>` | Run only this step (repeatable) |
+| `--step <name>` | Run only this step (repeatable); the plan is not shown. An unknown name is refused |
 | `--list` | List the steps |
 
-After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time.
+After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time. When a step fails, setup stops there with the reason (exit 1; some errors show a Python traceback instead): fix it and run setup again. Interrupted, it exits 130.
 
 ### CA certificates for your devices
 
@@ -195,26 +203,29 @@ sudo fabricctl status            # the target, every unit and its container heal
 sudo fabricctl stop              # = systemctl stop fabric.target (every fabric service)
 sudo fabricctl start             # returns once every service is up and healthy
 sudo fabricctl restart
-systemctl status fabric-web      # one service (units: bind9 stepca nginx ldap postgres keycloak openbao fabric-agent fabric-web)
+systemctl status fabric-web      # one service
 ```
+
+Units: `bind9`, `stepca`, `nginx`, `ldap`, `postgres`, `keycloak`, `openbao`, `fabric-agent`, `fabric-web`; with the optional services `kea`, `freeradius`, `fluentbit`. `fabric-firewall` re-applies the firewall rules at boot. `openbao` starts only when an unlock method is present (see [operations.md](operations.md#openbao-secrets)).
 
 ### Steps
 
 | Step | What it does |
 |---|---|
-| `preflight` | Root, architecture, OS, RAM, cgroup memory controller, conflicting listeners |
-| `host` | Host packages; Docker Engine if missing |
+| `preflight` | Root, architecture, RAM, cgroup memory controller (refused if wrong); OS and other programs on fabric's ports (warnings). Changes nothing |
+| `host` | Host packages; Docker Engine with compose and buildx if missing (never downloads with `--offline`) |
 | `docker` | Docker daemon hardening |
-| `deploy` | Render and deploy all configuration (nothing started); install `fabricctl` |
+| `deploy` | Save the settings to `fabric.yaml`; render and deploy all configuration (nothing started); the `fabricctl` command (the package's, or `/usr/local/bin/fabricctl` when run from a checkout) |
 | `accounts` | Service users and groups with fixed uids |
 | `network` | Docker network `fabric_net`; resolver drop-in unless `use_host_dns` |
-| `firewall` | UFW + `DOCKER-USER` rules |
+| `firewall` | UFW + `DOCKER-USER` rules; refuses if your SSH client would be locked out |
 | `pki` | Step-CA init (own root or BYOC), CA certs published and trusted by the host |
 | `bootstrap` | Start BIND9 and Step-CA; validate every zone |
-| `certs` | Issue/renew service certificates |
-| `start` | Start the stack; seed 389-DS; configure Keycloak; fabric-agent + web UI |
+| `certs` | Issue/renew service certificates and `extra_certs` |
+| `start` | Start the stack; seed 389-DS and the default device roles; configure Keycloak; the optional services; fabric-agent + web UI |
+| `vault` | OpenBao: vault key and unlock methods, first-time init (recovery keys to `~/fabric-admin`), configuration, import fabric's secrets and shred the file |
 | `admin` | First web UI admin: LDAP user in `admins`, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
-| `verify` | DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, admin role + client cert, services |
+| `verify` | DNS, HTTPS chains, the CA page and host trust, LDAPS, role binds, plaintext refused, web UI gates, admin role + client cert, OpenBao (unsealed, unlock methods, KV mounts, `vault.<domain>`), services |
 
 ---
 
@@ -222,7 +233,9 @@ systemctl status fabric-web      # one service (units: bind9 stepca nginx ldap p
 
 The install lives under `/opt` (or `--deploy-base`):
 
-*   `/opt/fabric/`: Contains `config/` (`fabric.yaml` — your settings, `vars.yaml` — the fully rendered variables, `secrets.openbao` — the marker saying fabric's secrets are in OpenBao, `link-vars.yaml`), the deployed `lib/` and the `fabricctl` entry point (`/usr/local/bin/fabricctl`).
+*   `/opt/fabric/`: Contains `config/` (`fabric.yaml` — your settings, `vars.yaml` — the fully rendered variables, `secrets.openbao` — the marker saying fabric's secrets are in OpenBao, `link-vars.yaml`), `archive/` (audit log, earlier vars files), the deployed `lib/` and `jinja/`, `VERSION` and `BUILD`. The command is the package's `/usr/bin/fabricctl` (or `/usr/local/bin/fabricctl`, written by setup run from a checkout).
+*   `/opt/openbao/`: OpenBao. `config/`, `data/` (Raft storage), `logs/` (audit log), `certs/`. Its vault key and unlock methods are in `/etc/fabric/openbao/` (root only).
+*   `/opt/kea/`, `/opt/freeradius/`, `/opt/fluentbit/`: the optional services, when installed.
 *   `/opt/bind9/`: Core DNS service. Contains `config/` (`named.conf.*`), `data/` (`db.<zone>` zone data and journals), `log/`, `cache/` and `ssl/` (DoT certificate).
 *   `/opt/nginx/`: Core reverse proxy. Contains `config/` (`nginx.conf`), `www/` (HTML documentation, scripts, portal assets) and `certs/` (service certificates, `client-ca/` bundle for the web UI).
 *   `/opt/stepca/`: Core PKI. Contains `data/` (Internal DB, CA keys in `secrets/`, public CA certs in `certs/`) and `templates/`.
@@ -241,19 +254,22 @@ fabric has no in-place upgrade from pre-fabric (core-template) installs: rebuild
 
 - **DNS records and zone:** copy the `domain` and the `dns:` block into your vars file.
 - **TSIG keys** (RFC2136 clients such as nginx-proxy-manager): add each key to `tsig_keys` with its existing `secret` — see [operations.md](operations.md#tsig-keys-rfc2136-dynamic-updates). Clients keep their configuration.
-- **Root CA:** bring your root and intermediate (with its key) as [BYOC](#generate-pki-optional-before-install), so every client that trusts the old root trusts the new host. Step-CA reads the intermediate key with `ca_password` from `/opt/fabric/config/fabric-secrets.yml`: if your key is encrypted, create that file (`0600`) with `ca_password: <the old CA password>` before the **first** setup (it is then moved into OpenBao with the others).
+- **Root CA:** bring your root and intermediate (with its key) as [BYOC](#generate-pki-optional-before-install), so every client that trusts the old root trusts the new host. Step-CA reads the intermediate key with `ca_password` from `/opt/fabric/config/fabric-secrets.yml`: if your key is encrypted, create that file (`0600`, in a new `/opt/fabric/config/`) with `ca_password: <the old CA password>` before the **first** setup (it is then moved into OpenBao with the others).
 
 LDAP and Keycloak start empty; setup creates the first admin.
+
+To move a fabric install (not a pre-fabric one) to a new host with everything — directory, Keycloak and OpenBao included — use `fabricctl uninstall --export` and `fabricctl restore` instead (below).
 
 ---
 
 ## Reinstall / Uninstall
 
 ```bash
-# Uninstall + setup, keeping config, secrets, the CA and certificates
-# (clients keep trusting the CA). NOT kept: the directory (389-DS users,
-# groups) and Keycloak's database (TOTP enrolments); setup re-creates the
-# first admin with a new login kit.
+# Uninstall + setup, keeping config, secrets, the CA, certificates and
+# OpenBao (its data and vault key) — clients keep trusting the CA. NOT kept:
+# the directory (389-DS users, groups, devices) and Keycloak's database
+# (TOTP enrolments); setup re-creates the first admin with a new login kit.
+# Asks first (--yes: don't); other options go to setup.
 sudo fabricctl reinstall
 
 # Remove fabric. It asks first: export all of fabric's data to a folder
@@ -268,8 +284,14 @@ sudo fabricctl uninstall --yes --no-export
 sudo fabricctl restore /root/fabric-export
 ```
 
-`fabricctl restore` puts the export back in place (owners and modes kept)
-and runs setup on it: the same CA (clients keep trusting it), the same
+`fabricctl reinstall` first copies what it keeps to
+`/root/fabric-reinstall-<time>/` (root only; with fabric's secrets in plain
+text, the CA keys and the vault key). The folder is left there after the
+reinstall: delete it once fabric works again.
+
+`fabricctl restore` asks first (`--yes`: don't), puts the export back in
+place (owners and modes kept) and runs setup on it unattended
+(`--yes --non-interactive`): the same CA (clients keep trusting it), the same
 directory users and devices, Keycloak with its TOTP enrolments, DNS with
 its TSIG keys, and OpenBao with its data — its vault key comes back with
 it, so the key-file unlock method works at once (a USB stick or security
@@ -278,17 +300,27 @@ folder that is not an export. The export's plaintext copy of fabric's
 secrets goes back into OpenBao and is shredded.
 
 `fabricctl uninstall` is the recommended way: the export goes only where you
-say, so nothing is left in `/var` or anywhere else. It removes every service,
-container, the `fabric_net` network, fabric's locally built images, `/opt/<service>`
-folders, the vault key and unlock-method files, the USB kill-switch rule, the
-service accounts and the CA from the host trust store. Docker, downloaded
-images and other containers are not touched; ufw stays enabled.
+say, so nothing is left in `/var` or anywhere else. Every question is asked
+before anything is touched: export first (default yes, to
+`~/fabric-export-<time>` of the account that ran `sudo`)? remove the package
+too (default no)? then type `yes`. The export folder must be an absolute
+path, new or empty, and not inside anything the uninstall deletes; otherwise
+it is refused and nothing changes. With `--yes` the export choice must be
+given (`--export DIR` or `--no-export`).
+
+It removes every service and `fabric.target`, the containers, the
+`fabric_net` network, fabric's locally built images, fabric's `DOCKER-USER`
+rules, the `/opt/<service>` folders (and TSIG credential folders), the vault
+key and unlock-method files, the USB kill-switch rule, the service accounts,
+the CA from the host trust store, the resolver drop-in and a checkout-era
+`/usr/local/bin/fabricctl`. Docker, downloaded images and other containers
+are not touched; ufw stays enabled.
 
 | Command | fabric install | Package | Export |
 |---|---|---|---|
 | `sudo fabricctl uninstall` | removed | removed if you say so | to the folder you choose, if you want one |
 | `sudo apt remove fabricctl` | **kept, still running** | removed | — |
-| `sudo apt purge fabricctl` | removed | removed | always, to `/var/backups/fabric/` (apt cannot ask) |
+| `sudo apt purge fabricctl` | removed | removed | always, to `/var/backups/fabric/fabric-export-<time>/` (apt cannot ask) |
 
 The export (root only, with a README) holds the config, fabric's secrets in
 plain text, the whole CA, the directory (users, devices, roles), Keycloak's

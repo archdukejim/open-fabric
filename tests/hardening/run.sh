@@ -1,10 +1,11 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Hardening suite: start bind9, step-ca, postgres, keycloak and dirsrv from
-# the REAL rendered compose files (docker compose up, including the local
-# build layers), prove each one works, and assert from the host that it is
-# hardened: non-root, all capabilities dropped and none added,
-# no-new-privileges, read-only root filesystem, zero effective capabilities.
+# Hardening suite: start bind9, step-ca, postgres, keycloak, dirsrv and
+# openbao from the REAL rendered compose files (docker compose up, including
+# the local build layers), prove each one works, and assert from the host
+# that it is hardened: non-root, all capabilities dropped and none added,
+# no-new-privileges, read-only root filesystem, zero effective capabilities,
+# a memory limit.
 #
 # Uses the 4 GB memory limits (host_ram_capacity=4) so limits are exercised.
 # Needs root, Docker with compose v2, python3 (yaml, jinja2), openssl, curl.
@@ -99,7 +100,10 @@ wait_healthy() {  # container, timeout
             healthy) return 0 ;;
             unhealthy) docker logs --tail 30 "$1"; return 1 ;;
         esac
-        docker ps -q -f name="^$1$" | grep -q . || { docker logs --tail 30 "$1" 2>&1; return 1; }
+        docker ps -q -f name="^$1$" | grep -q . || {
+            docker logs --tail 30 "$1" 2>&1
+            docker inspect -f 'exited: code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} error={{.State.Error}}' "$1" 2>&1
+            return 1; }
         sleep 3; t=$((t+3))
     done
     docker logs --tail 30 "$1"; return 1
