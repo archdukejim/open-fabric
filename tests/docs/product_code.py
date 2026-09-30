@@ -13,6 +13,7 @@ text that may continue on the following, indented lines:
     Returns: the result on success
     Fails:   each way it fails and what the caller sees ("never" + why)
     Feeds:   which functions use the result ("—" if none)
+    Notes:   optional — background worth keeping (why it works this way)
 """
 import ast
 import os
@@ -22,7 +23,8 @@ import subprocess
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PRODUCT = ("fabricctl", "webui", "installers")
 SECTIONS = ("Purpose", "Inputs", "Returns", "Fails", "Feeds")
-_LABEL = re.compile(r"^\s*(?:#\s*)?(" + "|".join(SECTIONS) + r"):\s?(.*)$")
+OPTIONAL = ("Notes",)                      # background worth keeping; shown, not required
+_LABEL = re.compile(r"^\s*(?:#\s*)?(" + "|".join(SECTIONS + OPTIONAL) + r"):\s?(.*)$")
 _SHELL_FN = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\s*\(\)\s*\{")
 
 
