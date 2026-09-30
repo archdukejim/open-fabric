@@ -177,6 +177,28 @@ still trusts the one root CA, and every site's devices flow up to the root.
 | F3 | HA partners: BIND secondary, Kea HA, 389-DS multi-supplier, per-node intermediates, standby Postgres and OpenBao snapshots, the promote runbook | F1, F2 |
 | F4 | Multi-level hubs; upstream dashboard; image/package mirroring through the upstream; optional delegated administration | F2 |
 
+## 8a. Building F1 + F2 (in progress)
+
+Owner decisions for this build: the join is **online** (the federation
+endpoint); only **fresh installs** join; scope **F1 + F2**; each site gets a
+**new intermediate minted from the root** (`step ca init` makes a root and
+an intermediate with path length 0, which cannot sign CAs — so the root
+site's root key signs every site's intermediate; the site's key never
+leaves the site); a branch's domain is **free, default `<site>.<domain>`**;
+the directory is **split into an organisation part and a local part, and
+existing installs are migrated**.
+
+Milestones, each tested before the next:
+
+| M | What | Notes |
+|---|---|---|
+| M1 | **Directory split** on every install (standalone too): the organisation suffix (`ldap_base_dn`: people, groups, device roles) and a **local suffix** `o=<site_name>` (this install's service accounts, its devices). A device names its roles (`fabricRole`) instead of roles listing members, so a site can put its devices into roles it only has a read-only copy of. Existing installs migrated on upgrade (devices and service accounts moved, role members turned into `fabricRole`). `site_name` defaults to the host name and is fixed after install | Everything that binds or searches: fabric-agent, Keycloak federation, FreeRADIUS, the web UI, OpenBao's LDAP, the seed and ACIs, tests |
+| M2 | **Site CAs**: signing a site's intermediate with the root key (subca template, path length); setup `--join` feeds it into the bring-your-own-CA path | |
+| M3 | **Invite and join**: `fabricctl federation invite|join|status`, one-time invitations kept hashed in fabric's secrets, the federation endpoint (a separate minimal root handler behind nginx, `federation.<domain>`) | |
+| M4 | **DNS**: delegation (NS + glue) for sub-domain sites, secondary zones both ways with TSIG | |
+| M5 | **Identity replication**: 389-DS changelog and replicas; organisation suffix supplied by the root site, read-only at sites; each site's local suffix replicated up; site Keycloak read-only on the organisation (no people created at a site) | |
+| M6 | Web UI Federation tab, docs, a two-site sandbox test, the Pi | |
+
 ## 9. Decisions for the owner
 
 | # | Question | Proposal |
