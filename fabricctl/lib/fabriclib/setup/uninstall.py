@@ -4,6 +4,7 @@ import shutil
 import subprocess
 
 from fabriclib.common.console import info, ok, warn
+from fabriclib.images.constants import STATE as IMAGE_STATE
 
 UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "fabric-agent", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
 TARGET = "/etc/systemd/system/fabric.target"
@@ -15,8 +16,8 @@ LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:loca
 
 def uninstall(ctx):
     """Purpose: remove fabric from this host: units, fabric.target, containers, fabric_net, local images,
-             DOCKER-USER rules, data folders, the OpenBao key and runtime folders, service accounts, CA trust,
-             the CLI wrapper and the resolver drop-in.
+             DOCKER-USER rules, data folders, the OpenBao key and runtime folders, the image rollback record
+             (and /etc/fabric once empty), service accounts, CA trust, the CLI wrapper and the resolver drop-in.
     Inputs:  ctx — SetupContext (state reloaded): vars keycloak_data_dir/postgres_data_dir (deleted when outside
              deploy_base), tsig_keys names (their <deploy_base>/<name> folders), openbao_runtime_dir,
              openbao_admin_dir, openbao_udev_rules, openbao_key_dir, service_users, domain_file.
@@ -67,6 +68,10 @@ def uninstall(ctx):
     if key_dir and os.path.isdir(key_dir):
         shutil.rmtree(key_dir)
         ok(f"removed the OpenBao seal key ({key_dir}): its vault data is gone too")
+    shutil.rmtree(os.path.dirname(IMAGE_STATE), ignore_errors=True)     # image rollback record: meaningless now
+    etc = os.path.dirname(os.path.dirname(IMAGE_STATE))                  # /etc/fabric, if nothing else is in it
+    if os.path.isdir(etc) and not os.listdir(etc):
+        os.rmdir(etc)
 
     for name in (v.get("service_users") or {}):
         if subprocess.run(["id", name], capture_output=True).returncode == 0:

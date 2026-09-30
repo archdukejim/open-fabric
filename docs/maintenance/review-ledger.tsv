@@ -31,7 +31,7 @@ docs/lib-doc/fabriclib-radius.md	e041de9bd1033f836c789a889663130987f537e8	2026-0
 docs/lib-doc/fabriclib-rbac.md	ed2a9c970b6f38ce49b9c88214b13d38373e2195	2026-09-30	
 docs/lib-doc/fabriclib-secrets.md	5b806230b44a2801a466110909a3634ae29ff518	2026-09-30	
 docs/lib-doc/fabriclib-security.md	438481387f88efb1586072df8ca0cecc5a1be4d7	2026-09-30	
-docs/lib-doc/fabriclib-setup.md	91fad88bdab98f70a50c24d227b16bae0747b32a	2026-09-30	
+docs/lib-doc/fabriclib-setup.md	3d4a4c4ef2d4a0d01e6c9b111d93ea74dcd45425	2026-09-30	
 docs/lib-doc/fabriclib-system.md	467b8be64faab59e3eaf98e09911487346595fea	2026-09-30	
 docs/lib-doc/fabriclib-vault.md	930e496504bcb7f0466b99d40d15ac8dc3c44a03	2026-09-30	
 docs/lib-doc/installers.md	64cff5a0930ce3e3aa1d90ef4b22deca1f8b474d	2026-09-30	
@@ -384,7 +384,7 @@ fabricctl/lib/fabriclib/setup/start_bootstrap.py	cd55ee690beb024d64109b2ac4927ba
 fabricctl/lib/fabriclib/setup/start_services.py	e19a7849c43c5c3e3066ed11632b5a7af3db2bff	2026-09-30	
 fabricctl/lib/fabriclib/setup/start_unit.py	cc4af1e91821e56a11833b71793e6072107c80c9	2026-09-30	
 fabricctl/lib/fabriclib/setup/steps.py	58321f785a4ff8de6a60594c255772da51ef8128	2026-09-30	
-fabricctl/lib/fabriclib/setup/uninstall.py	4eef1dca5fbea3c9fdcbd6588d7a7a823dc43b06	2026-09-30	
+fabricctl/lib/fabriclib/setup/uninstall.py	b7537c3b1af1519018b2d4df9661f0cec512b2ac	2026-09-30	
 fabricctl/lib/fabriclib/setup/upgrade_vars.py	1613082fb3ad3fc268c213e49ee1c4d933aaca05	2026-09-30	
 fabricctl/lib/fabriclib/setup/verify_install.py	f64636038895550356ea3dfb2c17319746fb57e2	2026-09-30	
 fabricctl/lib/fabriclib/system/README.md	868f8b3a004cbdc84a527a63c74e1e12247bbe25	2026-09-30	
@@ -454,10 +454,10 @@ installers/deb/README.md	c901a57987d3df929853200ad49e9268a53df4ef	2026-09-30
 installers/deb/assemble-tree.sh	91c8ca582995ff2cb3d8e650c0867424fab2c0af	2026-09-30	
 installers/deb/build-deb.sh	8dd9bc5c2020b8b420018a2f424625693f8b8449	2026-09-30	
 installers/deb/control.in	f84e2f96f8f07fb8810cac80d0f6f8c6a8e6f4eb	2026-09-30	
-installers/deb/fabricctl	4c44802cf7abae8e3275e83833229ba9ba659176	2026-09-30	
+installers/deb/fabricctl	d7c1a10ee7c8e1d64a14f918044d7dd995fe41bd	2026-09-30	
 installers/deb/install-from-checkout.sh	e5e1b9c58f3307397c58d5d84b1edd843e677df5	2026-09-30	
 installers/deb/postinst	5c07a59336349fe0697c17073a1a90bb21b6650d	2026-09-30	
-installers/deb/postrm	4ee4dfb4aa42ad240f1d13c5f03537a36bf7b3f7	2026-09-30	
+installers/deb/postrm	629abba3ee55d37bf33183c116baf265d6a84f06	2026-09-30	
 tests/README.md	f01447978e86ec4279a2e937cf2a13f47ed384e3	2026-09-30	
 tests/dirsrv/README.md	ddc936ba64383fe19e824d864b28ed41b341eda4	2026-09-30	
 tests/dirsrv/admin_user.py	a69937d4c6ce2ca25e23c7bef6a51ca85efe5dbf	2026-09-30	
@@ -504,7 +504,7 @@ tests/sandbox/login_test.py	c14801bca1465606b6d88c2b0d6794ede084c13b	2026-09-30
 tests/sandbox/radius_device.py	29f2b02acaf81ecc3fffacc9d5d90049486548b4	2026-09-30	
 tests/sandbox/radius_mab.py	c9575e9fd8e3c3d52dbd77b879b9ef9a6bd148d5	2026-09-30	
 tests/sandbox/rfc2136_test.sh	cb803d1abcabe3d1e557d242e9f62e8607000407	2026-09-30	
-tests/sandbox/run.sh	5dd0519d25539f76322fc3b848f84fe113f49f31	2026-09-30	
+tests/sandbox/run.sh	e046ab57b6d7886a2d70353aacc109182fe8caa6	2026-09-30	
 tests/sandbox/set_lock.py	3f76da2458bc18d18fbf3efb8b176900a0984ae7	2026-09-30	
 tests/webui/README.md	10b270a62e634adc3de38374c88a60447e7b68e3	2026-09-30	
 tests/webui/test_container.py	6e934b5d7d5aa5b3250e1fe901500e4b3b124f88	2026-09-30	

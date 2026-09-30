@@ -26,4 +26,14 @@ case "$1" in
         fi
         ;;
 esac
+# Bytecode caches written next to the packaged code (by releases before the
+# wrapper stopped that) are not dpkg's files: remove them so the folder goes.
+case "$1" in
+    remove|purge)
+        if [ -d /usr/lib/fabricctl ]; then
+            find /usr/lib/fabricctl -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
+            find /usr/lib/fabricctl -depth -type d -empty -delete 2>/dev/null || true
+        fi
+        ;;
+esac
 exit 0

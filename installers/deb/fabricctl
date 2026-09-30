@@ -10,6 +10,9 @@
 set -euo pipefail
 SRC=/usr/lib/fabricctl/fabric
 INSTALL=/opt/fabric
+# the packaged code is read-only source: no bytecode caches written next to it
+# (dpkg would leave them behind on remove)
+export PYTHONDONTWRITEBYTECODE=1
 
 case "${1:-}" in
     setup|reinstall|uninstall|restore|-h|--help|help)
