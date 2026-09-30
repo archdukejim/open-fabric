@@ -13,9 +13,18 @@ BUILTIN_MATCHES = {"any", "none", "localhost", "localnets"}
 
 
 def _check_entry(entry, data, acl):
-    """One BIND address-match-list element, normalized: an IP or CIDR,
-    `key <tsig key>`, a built-in (any/none/localhost/localnets), another
-    ACL, each optionally negated with a leading `!`."""
+    """Purpose: Validate one BIND address-match-list entry and return it in the form named.conf needs.
+    Inputs:  entry — str: an IP or CIDR, `key <tsig key>`, any/none/localhost/localnets/tsig-updaters, or the name of
+             another ACL in bind_acls; a leading `!` negates it; whitespace is collapsed.
+             data — the loaded vars.yaml dict (reads tsig_keys and bind_acls).
+             acl — str, the ACL being edited (it may not contain itself).
+    Returns: the normalized entry (str): `key "<name>"`, a quoted ACL name, a built-in, a bare IP (one address given
+             without a prefix) or a CIDR network, with any `!` kept.
+    Fails:   ValidationError "no TSIG key named …", "an ACL cannot contain itself", or "not an IP, CIDR, 'key <name>',
+             ACL or any/none/localhost/localnets: …".
+    Feeds:   add_acl_entries.
+    Notes:   a key name typed with quotes (`key "npm"`) is looked up with its quotes and so is not found.
+    """
     entry = " ".join(str(entry).split())
     neg, body = ("!", entry[1:].strip()) if entry.startswith("!") else ("", entry)
     if body.startswith("key "):
@@ -37,9 +46,18 @@ def _check_entry(entry, data, acl):
 
 
 def add_acl_entries(actor, acl, entries, source="cli"):
-    """Create BIND ACL `acl` or add entries to it (bind_acls in vars.yaml).
-    Every ACL may query fabric's zones (allow-query). Run apply afterwards.
-    Returns the ACL's entries."""
+    """Purpose: Create BIND ACL `acl` in vars.yaml (bind_acls) or add entries to it. Every ACL may query fabric's zones
+             (allow-query). Run apply afterwards to render it.
+    Inputs:  actor — str, who asks (audit).
+             acl — str matching NAME_RE (letter or digit, then up to 62 letters, digits, _ or -), not reserved (any,
+             none, localhost, localnets, tsig-updaters).
+             entries — non-empty list of str (see _check_entry); entries already present are skipped.
+             source — "cli" (default) or "web", for the audit line. Reads and writes vars.yaml under vars_lock.
+    Returns: the ACL's full entry list after the change (list of str).
+    Fails:   ValidationError "invalid ACL name …", "give at least one entry", or one from _check_entry; OSError or
+             yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
+    Feeds:   run_acl_command (`fabricctl acl add`); NAME_RE and RESERVED are reused by set_acl_policy and set_key_acls.
+    """
     if not NAME_RE.match(acl) or acl in RESERVED:
         raise ValidationError(f"invalid ACL name {acl!r}")
     if not entries:

@@ -39,13 +39,26 @@ USAGE = """usage: fabricctl vault status
 
 
 def restart_openbao(v, timeout=180):
-    """Restart the openbao unit (its start condition runs fabric-unlock) and
-    wait until OpenBao is unsealed."""
+    """Purpose: restart the openbao unit (its start condition runs fabric-unlock) and wait until OpenBao is active.
+    Inputs:  v — vars; timeout — seconds, for systemctl and for wait_active (180).
+    Returns: None.
+    Fails:   subprocess.CalledProcessError if systemctl fails (e.g. fabric-unlock finds no method);
+             subprocess.TimeoutExpired; ValidationError from wait_active.
+    Feeds:   the restart callable of rotate_vault_key, from run_vault_command (rotate) and the agent route
+             POST /v1/vault/rotate.
+    """
     subprocess.run(["systemctl", "restart", "openbao"], check=True, timeout=timeout)
     wait_active(v, timeout)
 
 
 def _status(v):
+    """Purpose: print `fabricctl vault status`.
+    Inputs:  v — vars.
+    Returns: exit status: 0 when initialised and unsealed; 1 when unreachable, sealed or not initialised.
+    Fails:   OpenBao errors are part of vault_status's result, not raised; OSError from its key-store check when not
+             root.
+    Feeds:   run_vault_command.
+    """
     s = vault_status(v)
     if not s["reachable"]:
         print(f"OpenBao: unreachable — {s.get('error', '')}")
@@ -66,9 +79,20 @@ def _status(v):
 
 
 def run_vault_command(v, argv):
-    """`fabricctl vault …` — OpenBao status and its unlock methods. Never
-    prints key material. `unlock` exits 0 when the key is in place and 1
-    when no method is present (systemd then skips starting OpenBao)."""
+    """Purpose: `fabricctl vault ...`: OpenBao status and its unlock methods. Never prints key material.
+    Inputs:  v — vars; argv — the words after `vault` (none: status). Subcommands: status, unlock, wipe-key, slots,
+             test <slot>, remove <slot> --yes, device-event, add-usb <disk> [--label L] --yes,
+             add-kmip <host:port> --key-id --ca --cert --key [--server-name] [--label] --yes, tokens,
+             add-key <serial> [--module] [--key-id] [--label] --yes, break-glass [--restart], revoke-token,
+             rotate --yes. PINs, recovery keys and tokens come from a prompt or stdin, never argv.
+    Returns: exit status: 0 done; 1 a ValidationError (printed as "error: ..."), `unlock` with no method present
+             (systemd then does not start OpenBao) or `status` not unsealed; 2 unknown command (usage printed).
+    Fails:   ValidationError is caught and printed. Other exceptions propagate as a traceback, e.g. OSError reading a
+             --ca/--cert/--key file, CalledProcessError from restart_openbao during rotate, IndexError for an option
+             without its value.
+    Feeds:   fabriclib/cli.py (`fabricctl vault`); the openbao unit runs `vault unlock` (start condition) and
+             `vault wipe-key` (after start); the udev rules run `vault device-event`.
+    """
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
     try:
         if cmd == "status" and not args:

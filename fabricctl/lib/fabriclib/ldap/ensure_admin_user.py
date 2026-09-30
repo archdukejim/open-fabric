@@ -36,11 +36,19 @@ print(state)
 
 
 def ensure_admin_user(v, user, password, email, container="dirsrv"):
-    """Make sure `user` exists in 389-DS (ou=users,ou=accounts) and is a member
-    of the web UI admin group (Keycloak maps that group to fabric-admin).
-    An existing entry is never changed (its password stays); membership is
-    added if missing. Returns "created", "exists", with "+member" when the
-    membership was added."""
+    """Purpose: Make sure a user exists in 389-DS (ou=users,ou=accounts) and is a member of the web UI admin
+             group (Keycloak maps that group to the admin bundle).
+    Inputs:  v — fabric vars: ldap_base_dn, webui_admin_group (default "admins"); user — uid (put into
+             the DN as given); password — initial password, used only when the entry is created;
+             email — mail attribute; container — dirsrv container name, default "dirsrv".
+    Returns: "created" or "exists", with "+member" appended when the group membership was added.
+    Fails:   ValidationError "creating LDAP user <user> failed: <stderr tail>" on any failure in the
+             container (bind, add, group missing); subprocess.TimeoutExpired after 180 s.
+    Feeds:   setup/create_admin.py run.
+    Notes:   binds as Directory Manager with the container's own DS_DM_PASSWORD; inputs and the password
+             travel as environment variables, never argv. An existing entry is never changed (its password
+             stays).
+    """
     base = v["ldap_base_dn"]
     env = {**os.environ,
            "F_DN": f"uid={user},ou=users,ou=accounts,{base}",

@@ -9,12 +9,20 @@ CN_RE = re.compile(r"^[A-Za-z0-9*][A-Za-z0-9._@*-]{0,252}$")
 
 
 def mint_offline_cert(v, cn, sans=(), days=365, kty="RSA", size=4096, is_ca=False, path_len=0, crv=None):
-    """Sign a certificate directly with the Step-CA intermediate key (works
-    whether or not step-ca is running). Leaf certs use the leaf template;
-    is_ca issues a subordinate CA (subca template, pathLen). kty RSA uses
-    `size`, EC/OKP use `crv` (P-256, P-384, Ed25519). Returns
-    (crt_path, key_path) in stepca/data/artifacts; the crt carries the chain
-    (--bundle). The caller moves or deletes both files."""
+    """Purpose: Sign a certificate directly with the Step-CA intermediate key, whether or not step-ca is
+             running.
+    Inputs:  v — fabric vars (artifacts_dir, run_step); cn — ^[A-Za-z0-9*][A-Za-z0-9._@*-]{0,252}$;
+             sans — extra names (leaf only; cn is always included); days — validity, default 365 (no cap
+             here); kty — "RSA" | "EC" | "OKP"; size — RSA bits, default 4096; is_ca — issue a subordinate
+             CA (subca template, pathLen=path_len) instead of a leaf (leaf template); crv — curve for EC /
+             OKP (P-256, P-384, Ed25519), step's default when None.
+    Returns: (crt_path, key_path) in stepca/data/artifacts, named after cn with ". / space @ *" as "-";
+             the crt carries the chain (--bundle), the key is unencrypted. The caller moves or deletes both.
+    Fails:   ValidationError "invalid certificate name: ..."; run_step's "step-ca refused: ..."; ValueError
+             if days / size / path_len are not numbers; KeyError / OSError from artifacts_dir.
+    Feeds:   issue_client_cert, issue_key_pair, mint_extra_cert.
+    Notes:   the intermediate key's password is a file path inside the container, never a value on argv.
+    """
     if not CN_RE.match(cn):
         raise ValidationError(f"invalid certificate name: {cn!r}")
     artifacts = artifacts_dir(v)

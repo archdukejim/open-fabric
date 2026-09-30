@@ -9,12 +9,24 @@ TRUST_DIR = "/usr/local/share/ca-certificates"
 
 
 def _openssl(*args, data=None):
+    """Purpose: Run openssl for publish_ca_certs and return its output.
+    Inputs:  args — openssl arguments; data — optional stdin (str selects text mode).
+    Returns: stdout: str if data is a str, else bytes (also when there is no data).
+    Fails:   subprocess.CalledProcessError on a non-zero exit.
+    Feeds:   _info, publish_ca_certs.
+    """
     return subprocess.run(["openssl", *args], input=data, capture_output=True, check=True,
                           text=isinstance(data, str)).stdout
 
 
 def _info(pem_path):
-    """Subject, issuer, validity and fingerprints of one certificate."""
+    """Purpose: Subject, issuer, validity and fingerprints of one certificate, for ca-certs.json.
+    Inputs:  pem_path — path of a PEM certificate.
+    Returns: {"subject", "issuer" (RFC 2253), "not_before", "not_after", "sha256", "sha1"}; "" for any
+             value openssl did not print.
+    Fails:   subprocess.CalledProcessError from _openssl if the file is not a certificate.
+    Feeds:   publish_ca_certs.
+    """
     out = _openssl("x509", "-in", pem_path, "-noout", "-subject", "-issuer", "-startdate", "-enddate",
                    "-nameopt", "RFC2253", "-fingerprint", "-sha256").decode()
     sha1 = _openssl("x509", "-in", pem_path, "-noout", "-fingerprint", "-sha1").decode()
@@ -28,6 +40,12 @@ def _info(pem_path):
 
 
 def _write_if_changed(path, data, uid, gid):
+    """Purpose: Write a published file only when its content changed; always set owner and mode 0644.
+    Inputs:  path — target file; data — str or bytes; uid, gid — owner (nginx).
+    Returns: True if the file was (re)written, False if it already held data.
+    Fails:   OSError from read / write / chown / chmod.
+    Feeds:   publish_ca_certs.
+    """
     mode = "wb" if isinstance(data, bytes) else "w"
     old = open(path, "rb" if mode == "wb" else "r").read() if os.path.exists(path) else None
     changed = old != data
@@ -40,21 +58,25 @@ def _write_if_changed(path, data, uid, gid):
 
 
 def publish_ca_certs(certs_dir, www_dir, uid, gid, trust_prefix):
-    """Publish the fabric root and intermediate CA certificates for every kind
-    of system into www_dir (served at certs.<domain>) and trust them on this
-    host. Idempotent; returns True if anything changed.
-
-      root-ca.crt / intermediate-ca.crt   PEM   Linux, macOS, iOS, Android
-      root-ca.cer / intermediate-ca.cer   DER   Windows
-      root-ca.pem / intermediate-ca.pem   PEM   shown as text (paste into devices)
-      root-ca.der / intermediate-ca.der   DER   devices that want binary DER
-      ca-chain.pem                        PEM   intermediate + root bundle
-      ca-chain.p7b                        PKCS#7 (DER) root + intermediate
-      ca-certs.json                       subject, validity, SHA-256/SHA-1 fingerprints
-
-    certs_dir holds Step-CA's root_ca.crt and intermediate_ca.crt (the latter may
-    carry the root too, as with a bring-your-own chain: only its first
-    certificate is the intermediate)."""
+    """Purpose: Publish the fabric root and intermediate CA certificates for every kind of system into
+             www_dir (served at certs.<domain>) and trust them on this host. Idempotent.
+    Inputs:  certs_dir — holds Step-CA's root_ca.crt and intermediate_ca.crt (the latter may carry the root
+             too, as with a bring-your-own chain: only its first certificate is used); www_dir — the certs
+             web root (created if missing); uid, gid — owner of the published files (nginx);
+             trust_prefix — file name prefix in /usr/local/share/ca-certificates.
+    Returns: True if any published file or trust-store file changed, else False.
+    Fails:   subprocess.CalledProcessError from openssl or update-ca-certificates; OSError (missing CA
+             files, trust directory not writable).
+    Feeds:   setup/init_pki.py _publish_ca_certs.
+    Notes:   update-ca-certificates --fresh runs only when a trust-store file changed. Files published:
+               root-ca.crt / intermediate-ca.crt   PEM   Linux, macOS, iOS, Android
+               root-ca.cer / intermediate-ca.cer   DER   Windows
+               root-ca.pem / intermediate-ca.pem   PEM   shown as text (paste into devices)
+               root-ca.der / intermediate-ca.der   DER   devices that want binary DER
+               ca-chain.pem                        PEM   intermediate + root bundle
+               ca-chain.p7b                        PKCS#7 (DER) root + intermediate
+               ca-certs.json                       subject, validity, SHA-256/SHA-1 fingerprints
+    """
     os.makedirs(www_dir, exist_ok=True)
     changed = False
     info = {}

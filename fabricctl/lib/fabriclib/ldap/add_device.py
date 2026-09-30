@@ -29,9 +29,19 @@ out({"ok": True})
 
 
 def add_device(v, actor, name, fields, source="web"):
-    """Add a device (enabled unless fields say otherwise) under ou=devices
-    and into its roles. fields: type, macs, owner (username), description,
-    enabled, roles."""
+    """Purpose: Add a device under ou=devices and put it into its roles.
+    Inputs:  v — fabric vars; actor — str, for the audit; name — host-name label (stripped, lower-cased,
+             DEVICE_NAME_RE); fields — {type, macs, owner (username), description, enabled (default True),
+             roles} (check_device_fields); source — default "web".
+    Returns: the normalised device name.
+    Fails:   ValidationError "device name: a host name label — ..."; "device <name> already exists";
+             check_device_fields' messages; "no such user: <owner>" (from the directory);
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   agent/server.py Handler.directory (POST /v1/devices) -> webui agentclient.save_device.
+    Notes:   runs as cn=device_admin; audited as DEVICE_ADD.
+    """
     name = str(name).strip().lower()
     if not DEVICE_NAME_RE.match(name):
         raise ValidationError("device name: a host name label — lowercase letters, digits and '-'")

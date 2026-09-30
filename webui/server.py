@@ -58,14 +58,32 @@ REFRESH_BEFORE = 60              # renew the ID token this many seconds before i
 
 
 def token_perms(claims):
-    """fabric permissions in a verified ID token's roles claim."""
+    """Purpose: List the fabric permissions in a verified ID token: every role in the 'roles' claim that starts with
+             'fabric:', with the prefix removed.
+    Inputs:  claims — dict of verified ID token claims; reads claims['roles'] (a list; non-str entries are ignored;
+             missing or empty means none).
+    Returns: sorted list of unique permission names, e.g. ['dns:read', 'dns:write']; [] if there are none.
+    Fails:   never for a list or missing 'roles'; TypeError if 'roles' is a truthy non-iterable value.
+    Feeds:   Handler.callback (none → 403) and Handler.renew (none → session ends); stored as sess['perms'] and shown
+             to pages through Handler.ctx → views._render's can().
+    """
     return sorted({r[len(PERM_PREFIX):] for r in claims.get("roles") or []
                    if isinstance(r, str) and r.startswith(PERM_PREFIX)})
 
 
 def parse_dn(dn):
-    """Parse an RFC 2253 DN (as nginx's $ssl_client_s_dn gives it) into a
-    list of (attr, value), honouring backslash escapes."""
+    """Purpose: Split an RFC 2253 distinguished name (as nginx's $ssl_client_s_dn / _i_dn gives it) into (attribute,
+             value) pairs, honouring backslash escapes.
+    Inputs:  dn — str, e.g. 'CN=jim,O=Fabric'; may be empty.
+    Returns: list of (ATTRIBUTE upper-cased, value) tuples, whitespace stripped, in the order given; an empty dn
+             gives [('', '')].
+    Fails:   never.
+    Feeds:   App.__init__ (issuer_dn of the Step-CA intermediate) and Handler.client_cert (issuer and subject of the
+             presented certificate).
+    Notes:   An escaped character is kept literally (so an escaped comma does not split); hex escapes (such as an
+             escaped 2C) are not decoded and multi-valued RDNs ('+') are not split. Both sides are parsed the same
+             way, so the issuer comparison still works.
+    """
     parts, cur, esc = [], "", False
     for ch in dn:
         if esc:
@@ -87,6 +105,13 @@ def parse_dn(dn):
 
 
 def cert_subject_rfc2253(path):
+    """Purpose: Read a PEM certificate's subject DN in RFC 2253 form with openssl.
+    Inputs:  path — str, path to a PEM certificate (the Step-CA intermediate from the config).
+    Returns: the subject str without the 'subject=' prefix, e.g. 'CN=Fabric Intermediate CA,O=Fabric'.
+    Fails:   subprocess.CalledProcessError when openssl cannot read the file; FileNotFoundError if openssl is not
+             installed. Both stop the server at start.
+    Feeds:   App.__init__ → parse_dn → App.issuer_dn.
+    """
     res = subprocess.run(["openssl", "x509", "-in", path, "-noout", "-subject", "-nameopt", "RFC2253"],
                          capture_output=True, text=True, check=True)
     return res.stdout.strip().removeprefix("subject=").strip()
@@ -94,6 +119,19 @@ def cert_subject_rfc2253(path):
 
 class App:
     def __init__(self, cfg):
+        """Purpose: Hold the web UI's shared state: config, the Keycloak OIDC client, the expected client-certificate
+                 issuer, and the in-memory sessions and pending logins.
+        Inputs:  cfg — dict from webui.json: public_url, ca_file, intermediate_ca, admin_role, session_idle (default
+                 900 s), session_max (default 28800 s), keycloak {ip, port (default 8443), hostname, realm,
+                 client_id, client_secret}.
+        Returns: None (constructor); sets oidc, sso_origin, admin_role, issuer_dn, idle, max_age, sessions {sid:
+                 session}, pending {state: login}, lock.
+        Fails:   KeyError for a missing required config key; ValueError from int() on bad session limits;
+                 CalledProcessError from cert_subject_rfc2253. All stop the server at start.
+        Feeds:   main, which sets it as Handler.app for every request.
+        Notes:   admin_role is only named in the 'no fabric role' refusal; access is decided by the fabric:
+                 permission roles in the token. Sessions live only in memory: a restart signs everyone out.
+        """
         self.cfg = cfg
         kc = cfg["keycloak"]
         self.public_url = cfg["public_url"].rstrip("/")
@@ -112,6 +150,13 @@ class App:
         self.lock = threading.Lock()
 
     def sweep(self):
+        """Purpose: Drop expired sessions (idle longer than idle or older than max_age) and login attempts older than
+                 LOGIN_TTL (600 s).
+        Inputs:  none (reads and changes self.sessions and self.pending under self.lock).
+        Returns: None.
+        Fails:   never.
+        Feeds:   Handler.handle_request, at the start of every request.
+        """
         now = time.time()
         with self.lock:
             for sid, s in list(self.sessions.items()):
@@ -129,12 +174,34 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- plumbing ------------------------------------------------------
     def address_string(self):
+        """Purpose: Name the client in log lines: the address nginx forwarded, since the unix socket has none.
+        Inputs:  none (reads the X-Real-IP request header).
+        Returns: the X-Real-IP value, or 'nginx' when it is absent.
+        Fails:   never.
+        Feeds:   log_message.
+        """
         return self.headers.get("X-Real-IP", "nginx")
 
     def log_message(self, fmt, *args):
+        """Purpose: Write one request or error log line to stderr (the container log), prefixed with the client address.
+        Inputs:  fmt — %-format str; args — its values (both from BaseHTTPRequestHandler).
+        Returns: None.
+        Fails:   never in practice (TypeError only if fmt and args did not match).
+        Feeds:   — (called by BaseHTTPRequestHandler).
+        """
         sys.stderr.write(f"{self.address_string()} {fmt % args}\n")
 
     def send(self, status, body=b"", content_type="text/html; charset=utf-8", headers=None):
+        """Purpose: Send a complete response with the fixed security headers.
+        Inputs:  status — int HTTP status; body — bytes or str (str is UTF-8 encoded), default empty; content_type —
+                 default text/html; headers — list of (name, value) extra headers, e.g. Location, Set-Cookie.
+        Returns: None; the response is written (no body for HEAD).
+        Fails:   OSError (e.g. BrokenPipeError) when nginx has closed the connection.
+        Feeds:   —; used by every handler, redirect and deny.
+        Notes:   Cache-Control no-store, nosniff, no referrer, no framing, COOP same-origin and a CSP without any
+                 script source: styles and images from self only, forms may post to self and the Keycloak origin (its
+                 login form).
+        """
         if isinstance(body, str):
             body = body.encode()
         self.send_response(status)
@@ -155,12 +222,32 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def redirect(self, location, headers=None):
+        """Purpose: Send a 303 See Other to a location.
+        Inputs:  location — str URL or path; headers — optional list of extra (name, value) headers such as
+                 Set-Cookie.
+        Returns: None; the 303 response is sent.
+        Fails:   as send.
+        Feeds:   —.
+        """
         self.send(303, b"", headers=[("Location", location)] + list(headers or []))
 
     def deny(self, status, message):
+        """Purpose: Send an error page with a status and a message.
+        Inputs:  status — int HTTP status (400, 401, 403, 404, 500, 503); message — str shown to the person
+                 (autoescaped).
+        Returns: None; the error page is sent.
+        Fails:   as send.
+        Feeds:   —.
+        """
         self.send(status, views.error_page(status, message))
 
     def cookie(self, name):
+        """Purpose: Read one cookie from the request.
+        Inputs:  name — str cookie name; reads the Cookie header.
+        Returns: the cookie value str, or None when it is absent or the Cookie header does not parse.
+        Fails:   never.
+        Feeds:   session (__Host-webui) and callback (__Host-webui-login).
+        """
         jar = cookies.SimpleCookie()
         try:
             jar.load(self.headers.get("Cookie", ""))
@@ -170,10 +257,27 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def set_cookie(name, value, max_age, samesite="Strict"):
+        """Purpose: Build a Set-Cookie header for the web UI's host-only cookies.
+        Inputs:  name — str; value — str, written as is (callers pass URL-safe tokens or ''); max_age — int seconds,
+                 0 deletes the cookie; samesite — 'Strict' (default) or 'Lax'.
+        Returns: ('Set-Cookie', '<name>=<value>; Path=/; Secure; HttpOnly; SameSite=<samesite>; Max-Age=<max_age>').
+        Fails:   never.
+        Feeds:   login, callback and post (/logout), which pass it to send / redirect.
+        Notes:   The __Host- cookie names require Secure, Path=/ and no Domain, so no other host can set them.
+        """
         return ("Set-Cookie", f"{name}={value}; Path=/; Secure; HttpOnly; SameSite={samesite}; Max-Age={max_age}")
 
     def read_form(self):
-        """Form fields as {name: str}; file uploads (multipart) as {name: bytes}."""
+        """Purpose: Read and parse a POST body: urlencoded or multipart form data.
+        Inputs:  none; reads the Content-Length and Content-Type headers and the request body (at most MAX_BODY, 64
+                 KiB).
+        Returns: dict: urlencoded → {name: str} (first value of each, blanks kept); multipart → {name: str} for text
+                 parts and {name: bytes} for file parts.
+        Fails:   ValueError 'request too large' above MAX_BODY, and ValueError from int() on a bad Content-Length;
+                 neither is a ValidationError, so handle_request answers 500.
+        Feeds:   handle_request (the CSRF check), then post and its vault_post, radius_post, stepca_post, dirsrv_post
+                 and tsig_post.
+        """
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY:
             raise ValueError("request too large")
@@ -195,7 +299,15 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def upload(form, file_field, text_field):
-        """A pasted value, or an uploaded file (binary DER goes to the agent as base64)."""
+        """Purpose: Take a value from an upload field or, if none was uploaded, from its paste field; binary files (DER)
+                 are base64-encoded for the agent.
+        Inputs:  form — dict from read_form; file_field — str name of the file input; text_field — str name of the
+                 textarea.
+        Returns: str: the uploaded file as ASCII text (PEM), or base64 of it if it is not ASCII, else the pasted
+                 text, else ''.
+        Fails:   never.
+        Feeds:   stepca_post (sign/review, inspect, convert) → agentclient describe_csr, inspect_pem, convert_cert.
+        """
         data = form.get(file_field)
         if isinstance(data, bytes) and data:
             try:
@@ -207,6 +319,18 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- gate 1+2: client certificate ------------------------------------
     def client_cert(self):
+        """Purpose: Gates 1 and 2: the verified client certificate nginx forwarded, accepted only if it was issued
+                 directly by the fabric Step-CA intermediate.
+        Inputs:  none; reads the headers X-SSL-Client-Verify, X-SSL-Client-I-DN, X-SSL-Client-S-DN and
+                 X-SSL-Client-Fingerprint (set by nginx) and self.app.issuer_dn.
+        Returns: {'cn': str, 'fp': str} — the subject CN and certificate fingerprint; None when verification did not
+                 succeed, the issuer DN differs from the intermediate's (compared as a set of attributes), the
+                 subject does not have exactly one non-empty CN, or the fingerprint is missing.
+        Fails:   never — refusal is the None return.
+        Feeds:   handle_request (None → 403), then login, callback and session.
+        Notes:   The headers can be trusted only because this server listens on a unix socket that nobody but nginx
+                 can reach.
+        """
         if self.headers.get("X-SSL-Client-Verify") != "SUCCESS":
             return None
         issuer = parse_dn(self.headers.get("X-SSL-Client-I-DN", ""))
@@ -221,6 +345,19 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- gate 3+4: session ------------------------------------------------
     def session(self, cert):
+        """Purpose: Gates 3 and 4: the signed-in session for this request, bound to the presented certificate, renewing
+                 its ID token shortly before it expires.
+        Inputs:  cert — dict from client_cert; reads the __Host-webui cookie and self.app.sessions.
+        Returns: a copy of the session plus 'sid': {user, fp, csrf, id_token, refresh_token, perms, exp, created,
+                 last, auth_at, sid}; None when there is no cookie, the id is unknown, the session is idle or too
+                 old, the certificate fingerprint or CN differs (the session is then deleted), or renewal failed.
+        Fails:   OIDC refusals are a None return (via renew); OSError / ssl.SSLError from the Keycloak refresh
+                 propagate to handle_request (500).
+        Feeds:   handle_request (None → redirect to /login; else the ID token goes to agentclient and the session to
+                 get / post).
+        Notes:   It updates 'last' (idle timer) and renews when fewer than REFRESH_BEFORE (60 s) remain on the ID
+                 token, so role changes in Keycloak apply within one token lifetime.
+        """
         sid = self.cookie(SESSION_COOKIE)
         if not sid:
             return None
@@ -240,8 +377,16 @@ class Handler(BaseHTTPRequestHandler):
         return sess
 
     def renew(self, sess):
-        """A fresh ID token (current roles) for the session; False (and the
-        session ends) if Keycloak refuses: signed out, disabled, role gone."""
+        """Purpose: Replace a session's ID token with a fresh one from Keycloak, picking up the person's current roles;
+                 end the session if Keycloak refuses.
+        Inputs:  sess — dict from session (uses sid, refresh_token, user); updated in place on success.
+        Returns: True if renewed (stored session and sess get id_token, refresh_token, perms, exp); False if Keycloak
+                 refused (OIDCError), the new token has no fabric permission, or the username changed — these remove
+                 the stored session — or the session vanished meanwhile.
+        Fails:   OSError / ssl.SSLError from the Keycloak call propagate (500 in handle_request).
+        Feeds:   session.
+        Notes:   auth_at is not changed: a refresh is not a new sign-in, so the vault step-up still needs one.
+        """
         try:
             claims, id_token, refresh_token = self.app.oidc.refresh(sess["refresh_token"])
         except OIDCError:
@@ -263,15 +408,46 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- dispatch -----------------------------------------------------------
     def do_HEAD(self):
+        """Purpose: Answer HEAD exactly like GET; send leaves out the body.
+        Inputs:  the request, as do_GET.
+        Returns: None; the response is sent.
+        Fails:   as handle_request.
+        Feeds:   — (called by BaseHTTPRequestHandler).
+        """
         self.do_GET()
 
     def do_GET(self):
+        """Purpose: Entry point for GET requests.
+        Inputs:  the request (path, headers).
+        Returns: None; the response is sent by handle_request('GET').
+        Fails:   as handle_request.
+        Feeds:   — (called by BaseHTTPRequestHandler and do_HEAD).
+        """
         self.handle_request("GET")
 
     def do_POST(self):
+        """Purpose: Entry point for POST requests.
+        Inputs:  the request (path, headers, body).
+        Returns: None; the response is sent by handle_request('POST').
+        Fails:   as handle_request.
+        Feeds:   — (called by BaseHTTPRequestHandler).
+        """
         self.handle_request("POST")
 
     def handle_request(self, method):
+        """Purpose: Run every request through the security gates, then route it, and turn errors into error pages.
+        Inputs:  method — 'GET' or 'POST'. Reads the path and query (first value per key), the client-certificate
+                 headers, the session cookie, and for POST the Origin header and the form's csrf field.
+        Returns: the response: GET /static/app.css → 200 stylesheet; GET /login and GET /oidc/callback → login /
+                 callback (no session needed); no valid session → 303 to /login; POST → post; GET → get.
+        Fails:   403 without an accepted client certificate; 403 'CSRF check failed' when Origin is not public_url or
+                 csrf does not match the session's; 400 with the message on agentclient.ValidationError; 303 to
+                 /login on AuthError; 403 'Not allowed: …' on PermissionDenied; 503 on AgentError; 500 on anything
+                 else (traceback to stderr).
+        Feeds:   — (called by do_GET, do_HEAD, do_POST).
+        Notes:   It first clears the agent token for this thread, then sets the session's ID token so every
+                 fabric-agent call runs as the signed-in person; fabric-agent enforces the permissions.
+        """
         actions.set_token(None)          # this thread may have served someone else before
         try:
             self.app.sweep()
@@ -319,6 +495,17 @@ class Handler(BaseHTTPRequestHandler):
     # -- auth ---------------------------------------------------------------
     def login(self, cert, next_path="/"):
         # Only a local path may follow the login (no open redirect).
+        """Purpose: Start a Keycloak sign-in: remember the attempt (bound to this certificate) and send the browser to
+                 Keycloak.
+        Inputs:  cert — dict from client_cert (fp is stored); next_path — str from ?next=, where to go after sign-in;
+                 anything that is not a local path (not starting with '/', starting with '//', or containing a
+                 backslash) becomes '/'.
+        Returns: 303 to the Keycloak authorization URL, setting __Host-webui-login (the state, SameSite=Lax, 600 s);
+                 App.pending[state] gets nonce, verifier, fp, created, next.
+        Fails:   never refuses.
+        Feeds:   handle_request (GET /login), reached from session failures and the vault step-up in vault_post.
+        Notes:   The login cookie is Lax because it must come back with the top-level redirect from Keycloak.
+        """
         if not next_path.startswith("/") or next_path.startswith("//") or "\\" in next_path:
             next_path = "/"
         url, state, nonce, verifier = self.app.oidc.start_login()
@@ -329,6 +516,24 @@ class Handler(BaseHTTPRequestHandler):
         self.redirect(url, [self.set_cookie(LOGIN_COOKIE, state, LOGIN_TTL, "Lax")])
 
     def callback(self, cert, query):
+        """Purpose: Finish a Keycloak sign-in: check the attempt, verify the tokens, check the person against the
+                 certificate and their fabric roles, and create the session.
+        Inputs:  cert — dict from client_cert; query — dict with state, code or error; reads the __Host-webui-login
+                 cookie and App.pending.
+        Returns: 200 'Signed in' page (meta refresh to the stored next path) that sets __Host-webui (the session id,
+                 Max-Age session_max) and clears the login cookie; the session gets a new CSRF token, the tokens,
+                 perms and auth_at; LOGIN is audited.
+        Fails:   400 when the state is unknown or expired, the login cookie does not match, or another certificate
+                 started the login (the attempt is used up either way); 401 when Keycloak returned an error or no
+                 code; 401 'Login failed: …' on OIDCError; 403 when the Keycloak username is not the certificate CN,
+                 and 403 when the token has no fabric role (both audited as LOGIN_DENIED). agent errors from
+                 agentclient (ValidationError, AuthError, PermissionDenied, AgentError) propagate to handle_request
+                 (400, redirect to /login, 403, 503) from the audit calls.
+        Feeds:   handle_request (GET /oidc/callback).
+        Notes:   A 200 with meta refresh rather than a redirect, so the first request carrying the Strict session
+                 cookie starts from this origin. auth_at is the token's auth_time (never later than now), used by the
+                 vault step-up.
+        """
         state = query.get("state", "")
         with self.app.lock:
             pending = self.app.pending.pop(state, None)
@@ -372,10 +577,26 @@ class Handler(BaseHTTPRequestHandler):
     # -- pages --------------------------------------------------------------
     @staticmethod
     def ctx(sess):
+        """Purpose: The page context every view needs: who is signed in, the CSRF token, their permissions and the
+                 installed version.
+        Inputs:  sess — dict from session.
+        Returns: {'user': str, 'csrf': str, 'perms': list, 'version': actions.version_info()}.
+        Fails:   Agent errors from agentclient (ValidationError, AuthError, PermissionDenied, AgentError) propagate
+                 to handle_request (400, redirect to /login, 403, 503) from version_info.
+        Feeds:   get, post (/apply), radius_post, stepca_post, dirsrv_post, tsig_post → every views page.
+        """
         return {"user": sess["user"], "csrf": sess["csrf"], "perms": sess.get("perms") or [],
                 "version": actions.version_info()}
 
     def bind9_page(self, ctx, query, status=200):
+        """Purpose: Render the BIND9 tab: forward zone records, generated reverse zones or TSIG keys.
+        Inputs:  ctx — dict from ctx; query — dict: view ('reverse' or 'tsig', anything else is forward), zone (a
+                 zone key; default the first forward zone), msg, err; status — int, default 200.
+        Returns: the BIND9 page with the given status.
+        Fails:   Agent errors from agentclient (ValidationError, AuthError, PermissionDenied, AgentError) propagate
+                 to handle_request (400, redirect to /login, 403, 503) (e.g. an unknown zone key → 400).
+        Feeds:   get (/bind9) and tsig_post (re-shows the TSIG section with 400 on a validation error).
+        """
         section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"
         zones = actions.list_zones()
         forward = [z for z in zones if not z.get("reverse")]
@@ -387,6 +608,15 @@ class Handler(BaseHTTPRequestHandler):
             reverse=actions.reverse_zones() if section == "reverse" else None))
 
     def stepca_page(self, ctx, view, status=200, **extra):
+        """Purpose: Render the Step-CA tab for one sub-view, with the CA summary, linkable devices and the issued list
+                 where needed.
+        Inputs:  ctx — dict from ctx; view — str, one of views.STEPCA_VIEWS (anything else → 'ca'); status — int,
+                 default 200; extra — passed to views.stepca (review, inspected, err, device).
+        Returns: the Step-CA page with the given status.
+        Fails:   a failing CA summary shows as unreadable and a failing device list as no devices (AgentError,
+                 ValidationError only); errors from list_issued on the 'issued' view propagate to handle_request.
+        Feeds:   get (/stepca) and stepca_post (review and inspect results, validation errors with 400).
+        """
         if view not in views.STEPCA_VIEWS:
             view = "ca"
         try:
@@ -403,6 +633,16 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(status, views.stepca(ctx, view, ca, issued=issued, devices=devices, **extra))
 
     def openbao_page(self, ctx, query):
+        """Purpose: Render the OpenBao tab: status, unlock methods and their add/rotate/remove forms, secrets, disk
+                 encryption.
+        Inputs:  ctx — dict from ctx; query — dict: view (one of views.OPENBAO_VIEWS, else 'status'), slot (for the
+                 remove view), msg, err.
+        Returns: 200 OpenBao page; slot changes are live and every add type is enabled.
+        Fails:   Agent errors from agentclient (ValidationError, AuthError, PermissionDenied, AgentError) propagate
+                 to handle_request (400, redirect to /login, 403, 503) from vault_slots, vault_status and
+                 vault_devices (the last only for add-security-key and add-usb).
+        Feeds:   get (/openbao).
+        """
         view = query.get("view") if query.get("view") in views.OPENBAO_VIEWS else "status"
         slots = actions.vault_slots()
         devices = actions.vault_devices() if view in ("add-security-key", "add-usb") else None
@@ -412,8 +652,22 @@ class Handler(BaseHTTPRequestHandler):
                                             add_live={"security-key": True, "usb": True, "hsm": True}))
 
     def vault_post(self, sess, parts, form):
-        """Unlock-method changes: a fresh sign-in (step-up) and the host name
-        typed as confirmation, then one fabric-agent call."""
+        """Purpose: Change the vault's unlock methods: rotate the key, test or remove a method, or add a USB stick,
+                 security key or KMIP HSM — each one fabric-agent call after a recent sign-in and the host name typed
+                 as confirmation.
+        Inputs:  sess — dict from session (user, auth_at); parts — path segments after /openbao/: ['rotate'],
+                 ['slots', <id>, 'test'|'remove'], ['slots', 'add-usb'], ['slots', 'add-security-key'], ['slots',
+                 'add-hsm']; form — confirm (must equal the host name), label, and per kind: disk; token
+                 ('<module>|<serial>'), key ('existing' uses key_id, else 'new'), pin; endpoint, key_id, server_name,
+                 ca_file / cert_file / key_file (uploads or text).
+        Returns: 303 to /login?next=/openbao?view=unlock… when the last sign-in is older than STEP_UP (300 s);
+                 otherwise 303 to /openbao?view=unlock with msg (success) or err.
+        Fails:   303 with err when the confirmation is not the host name, on ValidationError, and for other 'add-…'
+                 kinds ('arrives in the next update'); 404 for any other path; AgentError, PermissionDenied and
+                 AuthError propagate to handle_request; KeyError if the agent's answer lacks key_id, dropped or id.
+        Feeds:   post (/openbao/…).
+        Notes:   The step-up is checked before the path, so even an unknown path asks for a fresh sign-in first.
+        """
         back = {"view": "unlock"}
         if time.time() - sess.get("auth_at", 0) > STEP_UP:
             return self.redirect("/login?" + urllib.parse.urlencode({"next": "/openbao?view=unlock&msg=" + urllib.parse.quote(
@@ -456,6 +710,14 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/openbao?" + urllib.parse.urlencode({**back, "msg": msg}))
 
     def dirsrv_page(self, ctx, query, status=200):
+        """Purpose: Render the 389-DS tab: devices, one device, roles, one role, or people.
+        Inputs:  ctx — dict from ctx; query — dict: view ('device', 'roles', 'role', 'people', else 'devices'), name
+                 (device or role; unknown → the list), msg, err; status — int, default 200.
+        Returns: the directory page with the given status; when the directory cannot be read (AgentError,
+                 ValidationError) the page shows why instead of the data.
+        Fails:   PermissionDenied and AuthError propagate to handle_request (403, redirect to /login).
+        Feeds:   get (/dirsrv).
+        """
         view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
         kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}
         try:
@@ -473,6 +735,15 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(status, views.dirsrv(ctx, view, data=data, **kw))
 
     def get(self, sess, path, query):
+        """Purpose: Route a signed-in GET to its page.
+        Inputs:  sess — dict from session; path — str: /, /bind9, /stepca, /dirsrv, /openbao, /kea, /freeradius,
+                 /audit; query — dict (view, zone, device, name, slot, msg, err as each page uses them).
+        Returns: 200 page (overview, BIND9, Step-CA, directory, OpenBao, Kea, FreeRADIUS with its setup guides for
+                 view switches / windows, audit log).
+        Fails:   404 for any other path; agent errors from agentclient (ValidationError, AuthError, PermissionDenied,
+                 AgentError) propagate to handle_request (400, redirect to /login, 403, 503).
+        Feeds:   handle_request.
+        """
         ctx = self.ctx(sess)
         if path == "/":
             return self.send(200, views.overview(ctx, actions.service_status()))
@@ -496,6 +767,22 @@ class Handler(BaseHTTPRequestHandler):
         return self.deny(404, "Not found.")
 
     def post(self, sess, path, form):
+        """Purpose: Route a signed-in, CSRF-checked POST to its action.
+        Inputs:  sess — dict from session; path — str; form — dict from read_form. Routes: /logout;
+                 /bind9/zone/<key>/add (type, name, ip, target, text, priority, weight, port) and …/delete (type,
+                 index, name); /apply; /stepca/…; /openbao/…; /dirsrv/…; /kea/reservations (mac, ip, hostname) and
+                 /kea/reservations/<mac>/delete; /freeradius/clients…; /freeradius/people (group, vlan, priority) and
+                 /freeradius/people/<group>/delete; /bind9/tsig/….
+        Returns: /logout: session dropped, LOGOUT audited, 303 to Keycloak's logout URL clearing the session cookie.
+                 Zone records, Kea and FreeRADIUS people: 303 back to the tab with msg or err (err includes the last
+                 300 characters of a failed apply). /apply: 200 apply result. The rest: as stepca_post, vault_post,
+                 dirsrv_post, radius_post, tsig_post.
+        Fails:   404 for an unknown path or operation; ValidationError → 303 with err on the routes handled here; a
+                 non-numeric record index raises ValueError (500); agent errors from agentclient (ValidationError,
+                 AuthError, PermissionDenied, AgentError) propagate to handle_request (400, redirect to /login, 403,
+                 503).
+        Feeds:   handle_request.
+        """
         user = sess["user"]
         if path == "/logout":
             with self.app.lock:
@@ -574,8 +861,17 @@ class Handler(BaseHTTPRequestHandler):
         return self.deny(404, "Not found.")
 
     def radius_post(self, sess, parts, form):
-        """RADIUS clients: add, new secret, remove — saved and applied at
-        once; a secret is shown once on its own page, never in a URL."""
+        """Purpose: RADIUS clients: add, new shared secret, remove — saved and applied at once; a secret is shown once
+                 on its own page, never in a URL.
+        Inputs:  sess — dict from session; parts — path segments after /freeradius/clients: [] add (form: name,
+                 lower-cased; address; message_authenticator '1' to require it; secret, optional), [<name>,
+                 'rotate'], [<name>, 'delete']; form — dict from read_form.
+        Returns: add / rotate: 200 page with the shared secret, the RADIUS host IP and whether applying worked;
+                 delete: 303 to /freeradius with msg, or err if applying failed.
+        Fails:   404 for other paths; ValidationError → 303 to /freeradius with err; AgentError, PermissionDenied and
+                 AuthError propagate to handle_request.
+        Feeds:   post (/freeradius/clients…).
+        """
         try:
             if not parts:
                 name = form.get("name", "").strip().lower()
@@ -601,7 +897,17 @@ class Handler(BaseHTTPRequestHandler):
                                                   bool(res.get("applied")), res.get("output", "")))
 
     def stepca_post(self, sess, op, form):
-        """Manual PKI: each form maps to one fabric-agent operation."""
+        """Purpose: Manual PKI: each Step-CA form maps to one fabric-agent operation.
+        Inputs:  sess — dict from session; op — str after /stepca/: 'sign/review' (csr_file or csr, device), 'sign'
+                 (csr, days, device), 'issue' (cn, sans split on spaces/commas, key_type, days, device), 'inspect'
+                 (file or data), 'convert' (cert_file or cert, key_file or key); form — dict from read_form.
+        Returns: sign/review: Step-CA sign view with the decoded request; inspect: inspect view with the result;
+                 sign, issue, convert: 200 result page with downloads (a private key only on this page, never
+                 stored).
+        Fails:   404 for an unknown op; ValidationError → the form's view again with status 400 and the error;
+                 AgentError, PermissionDenied and AuthError propagate to handle_request.
+        Feeds:   post (/stepca/…).
+        """
         ctx, user = self.ctx(sess), sess["user"]
         back = {"sign/review": "sign", "sign": "sign", "issue": "issue", "inspect": "inspect",
                 "convert": "convert"}.get(op)
@@ -630,6 +936,14 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def device_form(form):
+        """Purpose: Turn the device edit form into the fields fabric-agent's save_device takes.
+        Inputs:  form — dict from read_form: type, owner, description, macs (space or comma separated), enabled (any
+                 non-empty value), role_<name> checkboxes.
+        Returns: {'type': str, 'owner': str, 'description': str, 'macs': [str], 'enabled': bool, 'roles': [role names
+                 checked]}.
+        Fails:   never.
+        Feeds:   dirsrv_post → agentclient.save_device.
+        """
         return {"type": form.get("type", ""), "owner": form.get("owner", ""), "description": form.get("description", ""),
                 "macs": [m for m in re.split(r"[\s,]+", form.get("macs", "")) if m],
                 "enabled": bool(form.get("enabled")),
@@ -637,12 +951,31 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def role_form(form):
+        """Purpose: Turn the role edit form into the fields fabric-agent's save_role takes.
+        Inputs:  form — dict from read_form: description, vlan, priority, perm_<permission> checkboxes.
+        Returns: {'description': str, 'vlan': str, 'priority': str, 'permissions': [permissions checked]}.
+        Fails:   never.
+        Feeds:   dirsrv_post → agentclient.save_role.
+        """
         return {"description": form.get("description", ""), "vlan": form.get("vlan", ""),
                 "priority": form.get("priority", ""),
                 "permissions": [k[5:] for k, val in form.items() if k.startswith("perm_") and val]}
 
     def dirsrv_post(self, sess, parts, form):
-        """Devices, device roles and people: each form maps to one fabric-agent call."""
+        """Purpose: Devices, device roles and people: each form maps to one fabric-agent call.
+        Inputs:  sess — dict from session; parts — path segments after /dirsrv/: ['people', '_new'] (form uid, first,
+                 last, email), ['people', <uid>, 'reset'], ['devices'|'roles', '_new'] (form name + fields),
+                 ['devices'|'roles', <name>] (save), [..., <name>, 'delete'], ['devices', <name>, 'certs', …] (unlink
+                 the certificate in form sha256); form — dict from read_form.
+        Returns: people: 200 page with the one-time password; devices and roles: 303 to /dirsrv with msg — the new
+                 item's page after create, the list after delete, the item's page otherwise.
+        Fails:   404 for an unknown kind or operation or a missing name; ValidationError → 303 with err (people list;
+                 the list after a failed create; else the item's page); AgentError, PermissionDenied and AuthError
+                 propagate to handle_request.
+        Feeds:   post (/dirsrv/…).
+        Notes:   Only the third path segment is looked at, so any path under …/certs/ unlinks (the page posts to
+                 …/certs/unlink).
+        """
         user = sess["user"]
         kind, name, op = (parts + ["", "", ""])[:3]
         if kind == "people":
@@ -687,7 +1020,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.redirect("/dirsrv?" + urllib.parse.urlencode({**back, "err": str(exc)}))
 
     def tsig_post(self, sess, rest, form):
-        """TSIG keys for a zone: create, rotate, delete (apply publishes them)."""
+        """Purpose: TSIG keys: create, rotate, delete (Apply publishes them to BIND9).
+        Inputs:  sess — dict from session; rest — str after /bind9/tsig/ (unquoted): 'create' (form name, zone,
+                 scope, hosts space/comma separated, type_<T> checkboxes, secret — optional existing one),
+                 '<name>/rotate', '<name>/delete'; form — dict from read_form.
+        Returns: create / rotate: 200 page with the secret and an RFC2136 ini (shown once); delete: 303 to
+                 /bind9?view=tsig with msg.
+        Fails:   404 for anything else; ValidationError → the TSIG section again with 400 and the error; AgentError,
+                 PermissionDenied and AuthError propagate to handle_request.
+        Feeds:   post (/bind9/tsig/…).
+        """
         ctx, user = self.ctx(sess), sess["user"]
         name, _, op = rest.rpartition("/")
         back = {"view": "tsig"}
@@ -715,6 +1057,18 @@ class UnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
 
 
 def main():
+    """Purpose: Start the web UI: load the config, point agentclient at fabric-agent, and serve HTTP on a unix socket
+             that only nginx's group can use.
+    Inputs:  command line --config <path to webui.json> (required); the config's agent_socket, socket, socket_gid
+             (int or group name) and the keys App needs.
+    Returns: never returns while serving (serve_forever).
+    Fails:   SystemExit from argparse without --config; OSError / json.JSONDecodeError reading the config; KeyError
+             for a missing key (also from grp.getgrnam for an unknown group); errors from App; OSError binding the
+             socket.
+    Feeds:   — (the container's ENTRYPOINT in webui/Dockerfile).
+    Notes:   A stale socket is removed first; it is created under umask 0117, then group-owned by nginx's group and
+             set to 0660, so only nginx can connect and the forwarded certificate headers cannot be forged.
+    """
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     args = ap.parse_args()

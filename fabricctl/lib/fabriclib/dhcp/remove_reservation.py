@@ -6,8 +6,18 @@ from fabriclib.common.write_audit import write_audit
 
 
 def remove_reservation(actor, mac, source="cli"):
-    """Remove the reservation of `mac` from vars.yaml (applied by the next
-    apply; the client then gets a pool address at its next renewal)."""
+    """Purpose: Remove a MAC's reservation from vars.yaml. Applied by the next apply; the client then gets a pool
+             address at its next renewal.
+    Inputs:  actor — str, who asks (audit).
+             mac — str (case, and - or :, do not matter).
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock.
+    Returns: None.
+    Fails:   ValidationError "no reservation for …"; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars /
+             write_audit.
+    Feeds:   agent route POST /v1/dhcp/reservations/<mac>/delete (fabricctl/lib/agent/server.py, called by
+             webui/server.py); run_dhcp_command (unreserve).
+    Notes:   only the first subnet holding the MAC is changed (normalize_dhcp keeps MACs unique).
+    """
     mac = str(mac).strip().lower().replace("-", ":")
     with vars_lock():
         data = load_vars()

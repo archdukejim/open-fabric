@@ -12,11 +12,17 @@ ROOT_DIR = "@root"          # absolute paths outside the install root (the OpenB
 
 
 def backup_install(ctx):
-    """Copy what a reinstall must keep — config + secrets, the whole Step-CA
-    (keys, database) and every issued certificate/key — to a root-only
-    directory, preserving owners and modes (cp -a). OpenBao's data and its
-    seal key (outside the install root, kept under @root/) go together: one
-    is useless without the other. Returns its path."""
+    """Purpose: copy what a reinstall must keep — config + secrets, the whole Step-CA (keys, database), every
+             issued certificate/key and OpenBao's data with its key folder — to a root-only folder.
+    Inputs:  ctx — SetupContext: KEEP folders under deploy_base, secrets_file; vars.openbao_key_dir (state is
+             reloaded here).
+    Returns: the backup path /root/fabric-reinstall-<timestamp> (0700): KEEP copied with cp -a, the key folder
+             under @root/<abs path>, and fabric-secrets.yml exported from OpenBao when the secrets live there.
+    Fails:   FileExistsError if the folder exists (same second); CalledProcessError from cp -a; ValidationError
+             from export_secrets when OpenBao is unreachable.
+    Feeds:   cli main (`reinstall`), then restore_install.
+    Notes:   OpenBao's data and its key go together: one is useless without the other. The directory
+             (389-DS data) and Keycloak's database are not kept."""
     dest = f"/root/fabric-reinstall-{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(dest, mode=0o700)
     for rel in KEEP:

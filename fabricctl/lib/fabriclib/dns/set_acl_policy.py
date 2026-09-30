@@ -8,10 +8,17 @@ from fabriclib.dns.normalize_acl_policies import normalize_acl_policies
 
 
 def set_acl_policy(actor, acl, policy, source="cli"):
-    """Give ACL `acl` an update policy (records / any_name, record_types,
-    domain) that every TSIG key in it inherits as BIND update-policy grants,
-    or remove it with policy=None. The ACL is created if missing. Run apply
-    afterwards. Returns the stored policy (None when removed)."""
+    """Purpose: Give ACL `acl` an update policy that every TSIG key in it inherits as BIND update-policy grants, or
+             remove it. The ACL is created (empty) if missing. Run apply afterwards.
+    Inputs:  actor — str, who asks (audit).
+             acl — str matching NAME_RE, not reserved.
+             policy — dict (records | any_name, record_types, domain; see normalize_acl_policies), or None to remove it.
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock.
+    Returns: the stored policy dict, or None when removed.
+    Fails:   ValidationError "invalid ACL name …", "ACL … has no update policy", or one from normalize_acl_policies;
+             OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
+    Feeds:   run_acl_command (`fabricctl acl policy`).
+    """
     if not NAME_RE.match(acl) or acl in RESERVED:
         raise ValidationError(f"invalid ACL name {acl!r}")
     with vars_lock():

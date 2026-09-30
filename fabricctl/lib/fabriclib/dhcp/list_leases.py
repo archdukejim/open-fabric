@@ -4,8 +4,13 @@ from fabriclib.dhcp.kea_command import kea_command
 
 
 def list_leases(v):
-    """Active DHCPv4 leases from Kea (lease_cmds hook): [{ip, mac,
-    hostname, expires, subnet_id, state}], latest expiry first. Read-only."""
+    """Purpose: The DHCPv4 leases Kea holds (lease_cmds hook, lease4-get-all). Read-only.
+    Inputs:  v — the vars dict (deploy_base_dir).
+    Returns: [{"ip", "mac", "hostname", "subnet_id", "state" (active / declined / expired / ?), "expires" (local time,
+             ISO to the minute; "" without cltt)}], latest expiry first.
+    Fails:   ValidationError from kea_command; ValueError or TypeError on malformed lease fields.
+    Feeds:   dhcp_overview; tests/kea/run.py.
+    """
     out = []
     for lease in kea_command(v, "lease4-get-all").get("leases") or []:
         start = int(lease.get("cltt", 0))

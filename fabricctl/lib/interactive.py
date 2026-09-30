@@ -51,13 +51,22 @@ CATEGORIES = [
 ]
 
 def load_yaml(path):
+    """Purpose: read a YAML file, treating a missing or empty file as an empty mapping.
+    Inputs:  path — str, file path.
+    Returns: the parsed data (normally a dict); {} if the file does not exist or is empty.
+    Fails:   OSError if it exists but cannot be read; yaml.YAMLError if it is not valid YAML.
+    Feeds:   print_vars, edit_links, interactive_mode, apply_mode."""
     if not os.path.exists(path):
         return {}
     with open(path, "r") as f:
         return yaml.safe_load(f) or {}
 
 def clean_data(data):
-    """Recursively convert empty strings to None (null in YAML)."""
+    """Purpose: recursively turn empty strings into None so they are written as YAML null.
+    Inputs:  data — any YAML-like value (dicts and lists are walked).
+    Returns: a new structure of the same shape with every "" replaced by None; other values unchanged.
+    Fails:   never — plain recursion (RecursionError only for absurdly deep data).
+    Feeds:   save_yaml."""
     if isinstance(data, dict):
         return {k: clean_data(v) for k, v in data.items()}
     elif isinstance(data, list):
@@ -67,17 +76,35 @@ def clean_data(data):
     return data
 
 def save_yaml(path, data):
+    """Purpose: write the editor's data back to a YAML file (empty strings become null, key order kept).
+    Inputs:  path — str, destination (CUSTOM_VARS_FILE or LINK_VARS_FILE); data — the mapping. Note the order is (path,
+             data), the reverse of deploy.save_yaml.
+    Returns: None.
+    Fails:   OSError if the file cannot be written; yaml.representer.RepresenterError for unsupported types. It takes no
+             vars lock, unlike the fabriclib DNS edits.
+    Feeds:   edit_dns, edit_list_of_dicts, edit_links, mint_certificates_interactive, interactive_mode."""
     cleaned = clean_data(data)
     with open(path, "w") as f:
         yaml.dump(cleaned, f, default_flow_style=False, sort_keys=False)
 
 def audit_log(key, old_val, new_val, action="MODIFIED"):
+    """Purpose: record one editor change in fabric's audit log as the sudo user.
+    Inputs:  key — the variable changed; old_val, new_val — shown as text; action — str, default "MODIFIED".
+    Returns: None (write_audit line "Key: <key> | Old: ... | New: ..." with source "cli").
+    Fails:   never — an OSError from write_audit is swallowed.
+    Feeds:   edit_dns, edit_list_of_dicts, edit_links, mint_certificates_interactive, interactive_mode."""
     try:
         write_audit(_actor(), action, f"Key: {key} | Old: {old_val} | New: {new_val}")
     except OSError:
         pass
 
 def print_vars():
+    """Purpose: `fabricctl --print`: list the top-level variables of the vars file.
+    Inputs:  none; reads CUSTOM_VARS_FILE (<fabric>/config/vars.yaml).
+    Returns: None; prints one numbered line per key (dicts and lists shown as "(complex structure)"), or a notice when
+             the file is missing or empty.
+    Fails:   OSError / yaml.YAMLError from load_yaml.
+    Feeds:   `interactive.py --print` (manage.sh MODE print)."""
     data = load_yaml(CUSTOM_VARS_FILE)
     if not data:
         print(f"{YELLOW}No custom variables found in {CUSTOM_VARS_FILE}{NC}")
@@ -93,19 +120,33 @@ def print_vars():
 
 
 def _actor():
+    """Purpose: the name recorded as the acting user for CLI changes.
+    Inputs:  none; reads env SUDO_USER, then USER.
+    Returns: str — SUDO_USER, else USER, else "root".
+    Fails:   never.
+    Feeds:   audit_log, edit_dns_zone (add_record / remove_record actor)."""
     return os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
 
 
 def _reload(full_data):
-    """Re-read vars.yaml into the caller's dict after a locked fabriclib write,
-    so later saves from this editor cannot overwrite it with a stale copy."""
+    """Purpose: re-read vars.yaml into the caller's dict after a locked fabriclib write, so a later save from this
+             editor cannot overwrite that write with a stale copy.
+    Inputs:  full_data — dict, the editor's working copy, changed in place; reads fabriclib's VARS_FILE via load_vars.
+    Returns: None (full_data now equals the file).
+    Fails:   OSError / yaml.YAMLError from load_vars.
+    Feeds:   edit_dns_zone (after add_record / remove_record)."""
     fresh = load_vars()
     full_data.clear()
     full_data.update(fresh)
 
 
 def _prompt_record(rtype):
-    """Ask for the fields fabriclib.dns.validate_record expects for rtype."""
+    """Purpose: ask on the terminal for the fields fabriclib.dns.validate_record expects for one record type.
+    Inputs:  rtype — str, one of A, AAAA, CNAME, TXT, MX, SRV (any other type gets only a name).
+    Returns: dict form: name plus ip | target | text | priority/target | priority/weight/port/target (MX priority
+             defaults to "10", SRV priority and weight to "0"); values are unvalidated strings.
+    Fails:   EOFError / KeyboardInterrupt from input().
+    Feeds:   edit_dns_zone (passed to add_record, which validates)."""
     form = {"name": input("Record name (e.g. '@', 'www'): ").strip()}
     if rtype in ('A', 'AAAA'):
         form["ip"] = input("IP address: ").strip()
@@ -128,6 +169,16 @@ _SYNC_COLOURS = {"in_sync": GREEN, "out_of_sync": YELLOW, "not_loaded": RED, "un
 
 
 def edit_dns_zone(full_data, zone_key, domain_var):
+    """Purpose: menu for one DNS zone: show its sync state and records, add or delete a record, apply live, or
+             force-recreate the zone.
+    Inputs:  full_data — dict, the vars working copy (reloaded after each change); zone_key — key under dns
+             ("dynamic_zone_var" is the main domain); domain_var — the domain shown for dynamic_zone_var. Reads
+             BIND_DATA_DIR; prompts on stdin.
+    Returns: None when the user picks "b".
+    Fails:   ValidationError from add_record/remove_record is shown and the loop continues; SystemExit from apply_mode
+             is caught. "f" (typed "force" to confirm) stops bind9, deletes db.<zone> and its journal, applies and
+             restarts bind9; systemctl failures are not checked. EOFError/KeyboardInterrupt propagate.
+    Feeds:   edit_dns."""
     disp_zone = domain_var if zone_key == 'dynamic_zone_var' else zone_key
 
     while True:
@@ -200,6 +251,11 @@ def edit_dns_zone(full_data, zone_key, domain_var):
             input("Press Enter to continue...")
 
 def edit_dns(data):
+    """Purpose: menu listing the DNS zones in the vars (the main domain always first) and adding new zones.
+    Inputs:  data — dict, the vars working copy; a new zone is added to data["dns"] and saved to CUSTOM_VARS_FILE.
+    Returns: None when the user picks "b".
+    Fails:   an invalid zone name (HOST_RE) is shown and refused; OSError from save_yaml; EOFError from input().
+    Feeds:   interactive_mode (menu 1), handle_complex_variable (key dns)."""
     while True:
         dns_data = data.get('dns') if isinstance(data.get('dns'), dict) else {}
         os.system('clear')
@@ -236,6 +292,12 @@ def edit_dns(data):
             edit_dns_zone(data, zones[int(choice)-1], domain_var)
 
 def edit_list_of_dicts(key, data, schema):
+    """Purpose: generic menu to add, modify or delete entries of a list-of-mappings variable.
+    Inputs:  key — the variable (e.g. tsig_keys); data — dict, the vars working copy (data[key] made a list if it is
+             not); schema — list of field names prompted for. "[a, b]" input becomes a list, digits an int.
+    Returns: None when the user picks "b"; each change is saved to CUSTOM_VARS_FILE and audited.
+    Fails:   no validation here (bad entries fail later at apply); OSError from save_yaml; EOFError from input().
+    Feeds:   interactive_mode (menu 4, tsig_keys), handle_complex_variable."""
     if key not in data or not isinstance(data[key], list):
         data[key] = []
         
@@ -304,6 +366,12 @@ def edit_list_of_dicts(key, data, schema):
                 audit_log(key, "item", "None", "DELETED")
 
 def handle_complex_variable(k, data):
+    """Purpose: open the right editor for a dict/list variable picked from a category list.
+    Inputs:  k — the variable name; data — dict, the vars working copy.
+    Returns: None. dns -> edit_dns; tsig_keys, ldap_groups, ldap_organizational_units -> edit_list_of_dicts with a fixed
+             field list; anything else prints "No interactive editor exists" and waits for Enter.
+    Fails:   as the editor it calls.
+    Feeds:   interactive_mode (category screens 3 and 6)."""
     if k == 'dns':
         edit_dns(data)
     elif k in ['tsig_keys', 'ldap_groups', 'ldap_organizational_units']:
@@ -318,6 +386,12 @@ def handle_complex_variable(k, data):
         input("Press Enter to continue...")
 
 def edit_links():
+    """Purpose: menu to add, modify or delete the landing page links (link-vars.yaml).
+    Inputs:  none; reads and writes LINK_VARS_FILE (env LINK_VARS_PATH, else <fabric>/config/link-vars.yaml, else
+             <base>/link-vars.yaml). A link may contain Jinja such as {{ domain }}.
+    Returns: None when the user picks "b"; each change saved and audited.
+    Fails:   OSError / yaml.YAMLError from load_yaml or save_yaml; EOFError from input().
+    Feeds:   interactive_mode (menu 5)."""
     data = load_yaml(LINK_VARS_FILE)
     if 'links' not in data or not isinstance(data['links'], list):
         data['links'] = []
@@ -373,6 +447,14 @@ def edit_links():
 
 
 def mint_certificates_interactive(data):
+    """Purpose: menu to describe one extra certificate, save it to extra_certs and mint it.
+    Inputs:  data — dict, the vars working copy (cert_* values are only displayed). Prompts for CN, SANs, days, key
+             type/size, CA flag (path_len 0) and output directory.
+    Returns: None when the user picks "b". On "m" the entry is appended to data["extra_certs"], saved, audited, and
+             minted with `fabriclib/cli.py extra-cert <json>`; the minted path or the error is printed.
+    Fails:   an empty CN is refused; a minting failure is printed, not raised (the entry stays saved); OSError from
+             save_yaml; EOFError from input().
+    Feeds:   interactive_mode (menu 2)."""
     cert_data = {
         'cn': '',
         'sans': [],
@@ -483,6 +565,15 @@ def mint_certificates_interactive(data):
             input("Press Enter to continue...")
 
 def interactive_mode():
+    """Purpose: `fabricctl --interactive`: the top-level variables editor menu (DNS, certificates, service settings,
+             TSIG keys, links, other keys; add/delete a key; apply).
+    Inputs:  none; reads CUSTOM_VARS_FILE and, on apply, DEPLOYED_VARS_FILE (/opt/fabric/config/vars.yaml);
+             IMMUTABLE_KEYS cannot be deleted or edited, WARNED_KEYS ask for "yes" before apply. Prompts on stdin.
+    Returns: never returns normally: sys.exit(0) on q/quit/exit or after a successful apply.
+    Fails:   sys.exit with apply_mode's code when the apply fails; OSError from save_yaml; EOFError from input().
+    Feeds:   `interactive.py --interactive` (manage.sh default MODE).
+    Notes:   CUSTOM_VARS_FILE and DEPLOYED_VARS_FILE are the same file on a standard /opt install, and edits are saved
+             before apply, so the WARNED_KEYS check finds no difference there."""
     data = load_yaml(CUSTOM_VARS_FILE)
     
     while True:
@@ -649,6 +740,18 @@ def interactive_mode():
             continue
 
 def apply_mode():
+    """Purpose: `fabricctl --apply`: run the deploy engine (deploy.apply_deployment) on the vars file, report which
+             variables changed and restart the services it returns.
+    Inputs:  none; sets env CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE and DEPLOY_BASE_DIR for deploy.py; reads the newest
+             <fabric>/archive/*-vars.yaml (else DEPLOYED_VARS_FILE) and /tmp/fabric-render/vars.yaml.
+    Returns: None; progress printed. Returns early ("System is up to date") when no top-level key differs.
+    Fails:   sys.exit(<code>) with "Error deploying configurations!" when apply_deployment exits; sys.exit(1) with a
+             traceback on any other exception. A failing `systemctl restart` raises CalledProcessError (not caught); a
+             timeout is printed.
+    Feeds:   `interactive.py --apply` (manage.sh MODE apply, fabriclib/system/apply_changes.py for the web UI);
+             interactive_mode; edit_dns_zone.
+    Notes:   apply_deployment already restarted those services, so each active one is restarted a second time here,
+             fabric-web synchronously. The archive it compares with is written by apply_deployment in the same run."""
     import glob
     from deploy import apply_deployment
     print(f"{BOLD}Applying changes natively...{NC}")

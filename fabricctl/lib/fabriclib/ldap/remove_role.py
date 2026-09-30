@@ -14,8 +14,18 @@ out({"ok": True})
 
 
 def remove_role(v, actor, name, source="web"):
-    """Delete a device role. Refused while devices are still in it, so no
-    device silently loses (or keeps) access."""
+    """Purpose: Delete a device role, refused while devices are still in it so no device silently loses
+             (or keeps) access.
+    Inputs:  v — fabric vars; actor — str, for the audit; name — ROLE_NAME_RE; source — default "web".
+    Returns: None.
+    Fails:   ValidationError "invalid role name: ..."; "role <name> still has <n> device(s); take them out
+             first"; "no such entry";
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   agent/server.py Handler.directory (POST /v1/roles/<name>/delete) -> webui agentclient.delete_role.
+    Notes:   audited as ROLE_REMOVE.
+    """
     if not ROLE_NAME_RE.match(str(name)):
         raise ValidationError(f"invalid role name: {name!r}")
     run_dirsrv(v, _REMOVE, {"name": name})

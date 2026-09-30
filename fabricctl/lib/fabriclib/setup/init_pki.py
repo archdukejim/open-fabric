@@ -9,12 +9,26 @@ from fabriclib.setup.errors import SetupError
 
 
 def _chown_tree(path, uid, gid):
+    """Purpose: give a whole directory tree to one owner.
+    Inputs:  path — root of the tree; uid, gid — ints.
+    Returns: None; path and everything below it chowned (symlinks followed).
+    Fails:   OSError from os.chown.
+    Feeds:   run (Step-CA's data folder to the step user)."""
     for root, dirs, files in os.walk(path):
         for name in [root] + [os.path.join(root, n) for n in dirs + files]:
             os.chown(name, uid, gid)
 
 
 def _configure_ca_json(ca_json, v):
+    """Purpose: converge Step-CA's ca.json after `step ca init`: bring-your-own chain paths, DNS names,
+             certificate lifetimes, an ACME provisioner with fabric's leaf template.
+    Inputs:  ca_json — path to ca.json; v — vars: byoc, hostname_stepca, stepca_cert_max_lifetime_hours
+             (default 131400h), stepca_cert_allow_subordinate_ca, cert_acme_lifetime_hours (default 2160h).
+    Returns: None; ca.json rewritten (tab-indented). With stepca_cert_allow_subordinate_ca the JWK provisioner
+             may issue the basicConstraints extension (2.5.29.19).
+    Fails:   OSError/json.JSONDecodeError reading ca.json; KeyError without hostname_stepca or
+             "authority" in ca.json.
+    Feeds:   run."""
     with open(ca_json) as f:
         cfg = json.load(f)
     if v.get("byoc"):
@@ -39,17 +53,25 @@ def _configure_ca_json(ca_json, v):
 
 
 def _publish_ca_certs(ctx, certs_dir):
-    """Every CA format on certs.<domain>, and the CA trusted on this host.
-    Runs on every setup: a reinstall keeps the CA but not /opt/nginx or the
-    host trust entries. Returns True if anything changed."""
+    """Purpose: publish every CA format on certs.<domain> and trust the CA on this host; done on every
+             setup, since a reinstall keeps the CA but not /opt/nginx or the host trust entries.
+    Inputs:  ctx — SetupContext: vars.domain_file, service user nginx (uid/gid); certs_dir — Step-CA certs folder.
+    Returns: True if anything changed (from publish_ca_certs).
+    Fails:   CalledProcessError from openssl/update-ca-certificates and OSError inside publish_ca_certs;
+             KeyError without domain_file.
+    Feeds:   run."""
     return publish_ca_certs(certs_dir, ctx.path("nginx", "www", "certs"), *ctx.uid("nginx"),
                             trust_prefix=f"fabric-{ctx.vars['domain_file']}")
 
 
 def _public_certs_readable(certs_dir):
-    """root_ca.crt / intermediate_ca.crt are public: the web UI (mounted
-    read-only at /certs) verifies client certificates against them. step ca
-    init creates the directory 0700; keys live in secrets/, never here."""
+    """Purpose: make the public CA certificates world-readable: the web UI (mounted read-only at /certs)
+             verifies client certificates against root_ca.crt/intermediate_ca.crt. `step ca init` creates the
+             folder 0700; keys live in secrets/, never here.
+    Inputs:  certs_dir — Step-CA certs folder.
+    Returns: None; the folder 0755, every *.crt in it 0644.
+    Fails:   OSError if the folder is missing or chmod fails.
+    Feeds:   run."""
     os.chmod(certs_dir, 0o755)
     for name in os.listdir(certs_dir):
         if name.endswith(".crt"):
@@ -57,10 +79,18 @@ def _public_certs_readable(certs_dir):
 
 
 def run(ctx):
-    """Initialise Step-CA once (its own chain, or a bring-your-own root +
-    intermediate when byoc), configure ca.json, publish the CA certs and
-    trust them on the host. With an existing ca.json only the publishing and
-    trust are (re)done."""
+    """Purpose: initialise Step-CA once (its own root, or a bring-your-own root + intermediate when byoc),
+             configure ca.json, publish the CA certificates and trust them on the host.
+    Inputs:  ctx — SetupContext: vars byoc, ca_crt_path, ica_crt_path, ica_key_path (default: the .crt path
+             with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json
+             settings; secrets.ca_password; service user step.
+    Returns: None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and
+             ca.json configured, chain verified, published and trusted. With an existing ca.json only the
+             permissions, publishing and trust are (re)done.
+    Fails:   SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when
+             `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets
+             when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars.
+    Feeds:   setup step `pki`, run by run_setup via STEPS."""
     v = ctx.vars
     data = ctx.path("stepca", "data")
     ca_json = os.path.join(data, "config", "ca.json")

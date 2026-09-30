@@ -2,10 +2,15 @@ from fabriclib.radius.list_auth_log import list_auth_log
 
 
 def radius_overview(v, log_limit=50):
-    """What the FreeRADIUS tab and `fabricctl radius status` show: on/off,
-    the server name supplicants check, the RADIUS clients (never their
-    secrets), the groups whose members may join by password, and the
-    recent decisions. Read-only."""
+    """Purpose: What the FreeRADIUS tab and `fabricctl radius status` show. Read-only.
+    Inputs:  v — the vars dict (install_freeradius, hostname_radius, host_ip, radius_clients, radius_people).
+             log_limit — how many recent decisions to read (default 50).
+    Returns: {"enabled", "server_name", "host_ip", "clients": [{"name", "address", "message_authenticator"}] (never
+             secrets), "people": [{"group", "vlan", "priority"}], "log" (see list_auth_log), "log_error"}.
+    Fails:   never for the journal — any error reading it goes into log_error.
+    Feeds:   agent route GET /v1/radius (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command
+             (status, with log_limit=0).
+    """
     on = bool(v.get("install_freeradius"))
     out = {"enabled": on, "server_name": v.get("hostname_radius", ""), "host_ip": v.get("host_ip", ""),
            "clients": [{"name": c.get("name"), "address": c.get("address"),

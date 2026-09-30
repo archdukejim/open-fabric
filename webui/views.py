@@ -927,8 +927,18 @@ MENU_PERMS = {"sign": "pki:sign", "issue": "pki:issue", "convert": "pki:issue", 
 
 
 def _render(name, **kw):
-    """Pages see `can(permission)`: what the signed-in person may do
-    (fabric-agent enforces it; the pages only hide what they cannot use)."""
+    """Purpose: Render one template with the common page variables, hiding the tabs, sub-menus and forms the signed-in
+             person has no permission for.
+    Inputs:  name — key of _TEMPLATES; kw — the template's variables: ctx (dict with user, csrf, perms, version;
+             default None = no header, tabs or footer), tab (active tab id; default None), menu / sections (lists of
+             (view, label), filtered through MENU_PERMS), and any others.
+    Returns: the rendered HTML str. Templates also get can(permission) and tabs (TABS filtered through TAB_PERMS).
+    Fails:   jinja2.TemplateNotFound for an unknown name; other jinja2 errors propagate (e.g. UndefinedError when the
+             template reads an attribute of a value the caller left out).
+    Feeds:   every page function in this file.
+    Notes:   This only hides what the person cannot use; fabric-agent enforces every permission. Autoescape is on and
+             pages carry no inline script or style, so they work under the server's strict CSP.
+    """
     kw.setdefault("ctx", None)
     kw.setdefault("tab", None)
     perms = set((kw["ctx"] or {}).get("perms") or ())
@@ -944,20 +954,49 @@ def _render(name, **kw):
 
 
 def error_page(status, message):
+    """Purpose: The error page: status, message and a 'Sign in again' link.
+    Inputs:  status — int HTTP status shown as the heading; message — str (autoescaped).
+    Returns: HTML str, without header menu or tabs (no ctx).
+    Fails:   never in practice (fixed template, two plain values).
+    Feeds:   server.Handler.deny; devserver.
+    """
     return _render("error", status=status, message=message)
 
 
 def continue_page(target):
+    """Purpose: The 'Signed in' page that moves on to the target with a meta refresh and a link.
+    Inputs:  target — str local path to continue to (server.Handler.login allows only local paths).
+    Returns: HTML str.
+    Fails:   never in practice (fixed template, one plain value).
+    Feeds:   server.Handler.callback.
+    """
     return _render("continue", target=target)
 
 
 def overview(ctx, services):
-    """services: [(name, systemd state, container health)]"""
+    """Purpose: The Overview tab: one tile per service with a traffic light and a link to its tab.
+    Inputs:  ctx — page context (server.Handler.ctx); services — list of (name, systemd state, container health) from
+             agentclient.service_status(); names are described via SERVICES.
+    Returns: HTML str.
+    Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
+             left out).
+    Feeds:   server.Handler.get (/); devserver; tests/webui/test_devserver.py.
+    """
     return _render("overview", ctx=ctx, tab="overview", services=services, service_info=SERVICES)
 
 
 def bind9(ctx, section, zones, zone=None, types=(), msg="", err="", tsig_keys=None, reverse=None):
-    """section: forward (zone records) | reverse (generated PTRs) | tsig."""
+    """Purpose: The BIND9 tab: forward zone records and the add form, generated reverse zones, or TSIG keys.
+    Inputs:  ctx — page context; section — 'forward' | 'reverse' | 'tsig'; zones — list of zone dicts from
+             list_zones() (those with 'reverse' set are hand-written reverse zones); zone — zone_detail() dict for
+             the forward section, or None; types — record types for the add form; msg, err — flash texts; tsig_keys —
+             list from list_tsig_keys() for the tsig section; reverse — reverse_zones() dict {'zones': {name: [ptr]},
+             'skipped': [...]}, default empty.
+    Returns: HTML str.
+    Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
+             left out).
+    Feeds:   server.Handler.bind9_page; devserver.
+    """
     return _render("bind9", ctx=ctx, tab="bind9", section=section, bind9_sections=BIND9_SECTIONS,
                    forward_zones=[z for z in zones if not z.get("reverse")],
                    manual_reverse=[z for z in zones if z.get("reverse")], zone=zone, types=types, msg=msg,
@@ -966,7 +1005,16 @@ def bind9(ctx, section, zones, zone=None, types=(), msg="", err="", tsig_keys=No
 
 
 def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err="", devices=None, device=""):
-    """devices: directory devices a certificate can be linked to (sign/issue)."""
+    """Purpose: The Step-CA tab: CA details, sign a CSR, new key + certificate, inspect, convert, or the issued list.
+    Inputs:  ctx — page context; view — one of STEPCA_VIEWS; ca — ca_summary() dict or None when unreadable; issued —
+             list_issued() for the issued view; review — describe_csr() result to confirm before signing; inspected —
+             inspect_pem() result; err — error text; devices — directory devices a certificate can be linked to (sign
+             / issue); device — preselected device name.
+    Returns: HTML str.
+    Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
+             left out).
+    Feeds:   server.Handler.stepca_page; devserver.
+    """
     return _render("stepca", ctx=ctx, tab="stepca", view=view, menu=STEPCA_MENU, ca=ca, issued=issued,
                    review=review, inspected=inspected, err=err, key_types=KEY_TYPES, devices=devices or [],
                    device=device)
@@ -974,8 +1022,18 @@ def stepca(ctx, view, ca, issued=None, review=None, inspected=None, err="", devi
 
 def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host="", live=False, msg="", err="",
             add_live=None):
-    """status: vault_status(); slots: list_slots(); devices: detect_devices().
-    live: whether slot changes are available (False shows them disabled)."""
+    """Purpose: The OpenBao tab: status, unlock methods (with add, rotate and remove views), secrets, disk encryption
+             guide.
+    Inputs:  ctx — page context; status — vault_status() dict; view — one of OPENBAO_VIEWS; slots — list of unlock
+             methods (vault_slots()['slots']); devices — vault_devices() dict (pkcs11, tokens, disks) for the add
+             views, default no devices; slot_id — the method the remove view is about; host — this host's name, typed
+             to confirm; live — whether slot changes are available (False shows them disabled); msg, err — flash
+             texts; add_live — {'security-key', 'usb', 'hsm': bool}, which add forms are enabled, default none.
+    Returns: HTML str; the section tab is the view itself for status, secrets and disk, else 'unlock'.
+    Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
+             left out); UndefinedError if a slot's type is not in SLOT_TYPES.
+    Feeds:   server.Handler.openbao_page; devserver.
+    """
     section = view if view in ("status", "secrets", "disk") else "unlock"
     return _render("openbao", ctx=ctx, tab="openbao", s=status, view=view, section=section, sections=OPENBAO_SECTIONS,
                    slots=list(slots), devices=devices or {"tokens": [], "disks": []}, slot_types=SLOT_TYPES,
@@ -984,7 +1042,17 @@ def openbao(ctx, status, view="status", slots=(), devices=None, slot_id="", host
 
 
 def freeradius(ctx, overview, msg="", err="", view="overview", guides=None):
-    """view: overview, or a setup guide (switches, windows) filled in from guides (radius_guides())."""
+    """Purpose: The FreeRADIUS tab: overview (server, people groups, RADIUS clients, recent decisions) or a setup guide
+             for switches or Windows.
+    Inputs:  ctx — page context; overview — radius_overview() dict (enabled, host_ip, server_name, people, clients,
+             log, log_error); msg, err — flash texts; view — 'overview', 'switches' or 'windows' (anything else →
+             overview); guides — radius_guides() dict for the guides; each guides['windows'][method]['script'] is
+             base64-encoded here for its download link.
+    Returns: HTML str.
+    Fails:   KeyError if a Windows guide entry has no 'script'; other jinja2 errors propagate (e.g. UndefinedError
+             when the template reads an attribute of a value the caller left out).
+    Feeds:   server.Handler.get (/freeradius); devserver.
+    """
     g = dict(guides or {})
     if g.get("windows"):
         g["windows"] = {m: dict(w, b64=_b64(w["script"])) for m, w in g["windows"].items()}
@@ -993,20 +1061,51 @@ def freeradius(ctx, overview, msg="", err="", view="overview", guides=None):
 
 
 def radius_secret(ctx, name, secret, action, host_ip, applied=True, output=""):
+    """Purpose: The page that shows a RADIUS client's shared secret once, after adding it or making a new one.
+    Inputs:  ctx — page context; name — client name; secret — str; action — 'added' or 'rotated'; host_ip — the
+             RADIUS server address to enter on the device; applied — bool, whether applying worked; output — apply
+             output, only its last 300 characters are shown.
+    Returns: HTML str.
+    Fails:   TypeError if output is not a str (it is sliced); otherwise never in practice.
+    Feeds:   server.Handler.radius_post; devserver.
+    """
     return _render("radius_secret", ctx=ctx, tab="freeradius", client=name, secret=secret, action=action,
                    host_ip=host_ip, applied=applied, output=output[-300:])
 
 
 def kea(ctx, overview, msg="", err=""):
+    """Purpose: The Kea tab: subnets, reservations with add/remove forms, and leases — or how to turn DHCP on.
+    Inputs:  ctx — page context; overview — dhcp_overview() dict (enabled, interfaces, lease_time, ddns_zone,
+             subnets, leases, leases_error); msg, err — flash texts.
+    Returns: HTML str.
+    Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
+             left out).
+    Feeds:   server.Handler.get (/kea); devserver.
+    """
     return _render("kea", ctx=ctx, tab="kea", d=overview, msg=msg, err=err)
 
 
 def person_result(ctx, uid, what, password):
+    """Purpose: The page that shows a person's one-time password once, after creating them or resetting their sign-in.
+    Inputs:  ctx — page context; uid — user name; what — 'created' or 'reset'; password — the one-time password str.
+    Returns: HTML str.
+    Fails:   never in practice (plain values).
+    Feeds:   server.Handler.dirsrv_post; devserver.
+    """
     return _render("person_result", ctx=ctx, tab="dirsrv", uid=uid, what=what, password=password)
 
 
 def dirsrv(ctx, view, data=None, people=None, device=None, role=None, msg="", err="", unavailable=""):
-    """view: devices | device | roles | role | people. data: device_overview()."""
+    """Purpose: The 389-DS tab: devices, one device, roles, one role, or people and groups.
+    Inputs:  ctx — page context; view — 'devices' | 'device' | 'roles' | 'role' | 'people'; data — device_overview()
+             dict (devices, roles, types, permissions), default empty; people — list_people() dict (users, groups,
+             keycloak_url) for the people view; device / role — the item for the detail views; msg, err — flash
+             texts; unavailable — why the directory could not be read (shown instead of the data).
+    Returns: HTML str; the section tab is 'devices' for device and 'roles' for role.
+    Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
+             left out).
+    Feeds:   server.Handler.dirsrv_page; devserver.
+    """
     section = {"device": "devices", "role": "roles"}.get(view, view)
     return _render("dirsrv", ctx=ctx, tab="dirsrv", view=view, section=section, sections=DIRSRV_SECTIONS,
                    data=data or {"devices": [], "roles": [], "types": [], "permissions": {}}, people=people,
@@ -1014,12 +1113,27 @@ def dirsrv(ctx, view, data=None, people=None, device=None, role=None, msg="", er
 
 
 def _b64(text):
+    """Purpose: Base64-encode a text for a data: download link.
+    Inputs:  text — str (encoded as UTF-8).
+    Returns: base64 str.
+    Fails:   AttributeError if text is not a str.
+    Feeds:   freeradius (Windows scripts), pki_result (PEM files), tsig_result (the ini file).
+    """
     return base64.b64encode(text.encode()).decode()
 
 
 def pki_result(ctx, kind, r):
-    """kind: sign | issue | convert. Files are offered as data: downloads, so
-    nothing (least of all a private key) is kept server-side for a later GET."""
+    """Purpose: The result page after signing, issuing or converting a certificate: details and every format as a
+             download.
+    Inputs:  ctx — page context; kind — 'sign' | 'issue' | 'convert'; r — the agent's result: name, cert, der_b64,
+             fullchain, info (subject, sans, key, not_before, not_after, serial, sha256), and optionally p7b_b64,
+             key, p12_b64, p12_password, device.
+    Returns: HTML str with .crt, .cer, -fullchain.pem and, when present, .p7b, .key and .p12 downloads.
+    Fails:   KeyError for another kind or when name, cert, der_b64 or fullchain is missing; other jinja2 errors
+             propagate (e.g. UndefinedError when the template reads an attribute of a value the caller left out).
+    Feeds:   server.Handler.stepca_post; devserver.
+    Notes:   Files are data: links, so nothing (least of all a private key) is kept on the server for a later GET.
+    """
     n = r["name"]
     files = [(f"{n}.crt", "application/x-x509-ca-cert", _b64(r["cert"]), "certificate, PEM (Linux, most devices)"),
              (f"{n}.cer", "application/pkix-cert", r["der_b64"], "certificate, DER (Windows)"),
@@ -1037,19 +1151,45 @@ def pki_result(ctx, kind, r):
 
 
 def tsig_result(ctx, name, secret, ini, action):
+    """Purpose: The page that shows a TSIG key's secret and RFC2136 client settings once.
+    Inputs:  ctx — page context; name — key name; secret — str; ini — RFC2136 ini text (also offered as a download);
+             action — 'created' or 'rotated'.
+    Returns: HTML str.
+    Fails:   AttributeError if ini is not a str (from _b64); otherwise never in practice.
+    Feeds:   server.Handler.tsig_post; devserver.
+    """
     return _render("tsig_result", ctx=ctx, tab="bind9", key_name=name, secret=secret, ini=ini, ini_b64=_b64(ini),
                    action=action)
 
 
 def apply_result(ctx, ok, output):
+    """Purpose: The page after Apply: whether it worked and its output.
+    Inputs:  ctx — page context; ok — bool; output — str from apply_changes().
+    Returns: HTML str.
+    Fails:   never in practice (plain values).
+    Feeds:   server.Handler.post (/apply); devserver.
+    """
     return _render("apply", ctx=ctx, tab="bind9", ok=ok, output=output)
 
 
 def audit(ctx, lines):
+    """Purpose: The audit log page, newest first.
+    Inputs:  ctx — page context; lines — iterable of str from read_audit(), printed one after the other as is (each
+             carries its own line break).
+    Returns: HTML str.
+    Fails:   never in practice (plain values).
+    Feeds:   server.Handler.get (/audit); devserver.
+    """
     return _render("audit", ctx=ctx, lines=lines)
 
 
 def css():
+    """Purpose: The whole stylesheet, served as /static/app.css (light and dark colour schemes).
+    Inputs:  none.
+    Returns: CSS str.
+    Fails:   never.
+    Feeds:   server.Handler.handle_request (GET /static/app.css); devserver.
+    """
     return """
 :root{--bg:#f8fafc;--surface:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;
 --accent:#0369a1;--ok:#15803d;--bad:#b91c1c;--warn:#b45309;color-scheme:light dark}

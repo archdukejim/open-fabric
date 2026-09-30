@@ -4,12 +4,14 @@ from fabriclib.images.switch_image import switch_image
 
 
 def update_images(ctx, names=None, force=False, actor="root", source="cli"):
-    """Move services to their validated images (images.lock.yaml of the
-    installed fabric). `names`: services to update, None = every service
-    with an update. Images the admin set explicitly are skipped unless
-    `force`. Services sharing a base (bind9, dirsrv and fabric-web on Debian)
-    move together. Stops at the first failure (that service is rolled back).
-    Returns [(var, target, [services])]."""
+    """Purpose: move services to their validated images (images.lock.yaml of the installed fabric).
+             Services sharing an image var (image_debian: bind9, dirsrv, kea, freeradius, fabric-web) move together.
+    Inputs:  ctx — SetupContext; names — list of service names, None = every service with an update;
+             force — bool, also move images the admin set (state "held"); actor, source — for the audit log.
+    Returns: list of (var, target ref, [service names moved]) in dependency order.
+    Fails:   ValidationError for names not installed here; stops at the first switch_image failure
+             (ValidationError; that service was rolled back, earlier vars stay updated).
+    Feeds:   run_images_command (update)."""
     rows = image_status(ctx)
     known = {r["service"] for r in rows}
     unknown = set(names or ()) - known

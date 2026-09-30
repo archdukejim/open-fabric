@@ -10,10 +10,17 @@ from fabriclib.pki.describe_csr import describe_csr
 
 
 def inspect_pem(v, data):
-    """Decode certificates (PEM chain, DER or base64) or a CSR for reading.
-    Certificates are checked against this fabric's CA. Private keys are
-    refused unread. Returns {kind: 'cert' | 'csr', items: [{info, text,
-    trusted}]} (CSR items carry describe_csr's policy verdict)."""
+    """Purpose: Decode certificates (or, failing that, one CSR) for reading on the PKI page, saying
+             whether this fabric's CA issued each certificate.
+    Inputs:  v — fabric vars (CA files via ca_files); data — str or bytes: a PEM chain, DER, base64 or a CSR.
+    Returns: {"kind": "cert", "items": [{"info": describe_cert dict, "trusted": bool, "text": openssl
+             -text}]} for at most the first 10 certificates, or {"kind": "csr", "items": [{"info": {subject,
+             sans, key, ca_requested, problems}, "trusted": None, "text"}]}.
+    Fails:   ValidationError "that is a private key: it was not read or stored. ..." for any input holding
+             "PRIVATE KEY"; describe_csr's messages when the input is not a certificate (e.g. "no csr found
+             in the input"); openssl's first error line.
+    Feeds:   agent route POST /v1/pki/inspect -> webui agentclient.inspect_pem -> PKI page.
+    """
     raw = data if isinstance(data, str) else data.decode("latin-1")
     if "PRIVATE KEY" in raw:
         raise ValidationError("that is a private key: it was not read or stored. Inspect the certificate instead.")

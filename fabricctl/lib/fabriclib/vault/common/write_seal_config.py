@@ -13,8 +13,15 @@ seal "static" {{
 
 
 def write_seal_config(v, key_id, previous_key_id=None):
-    """<base>/openbao/config/seal.hcl for the vault key `key_id` (plus the
-    previous one during a rotation). Returns True if it changed."""
+    """Purpose: write OpenBao's seal.hcl: which key id(s) its static seal reads from RAM.
+    Inputs:  v — vars: service_users.openbao uid/gid, openbao_runtime_dir (named in the file's comment),
+               deploy_base_dir; key_id — current key version; previous_key_id — the old one during a rotation, or None.
+    Returns: True if <deploy_base_dir>/openbao/config/seal.hcl changed (written openbao:openbao 0640);
+             False if it already had this content.
+    Fails:   OSError from makedirs, the read or write_private_file; KeyError if service_users has no openbao entry.
+    Feeds:   ensure_vault_key, rotate_vault_key (both ignore the return value).
+    Notes:   only key ids are written; the keys are /openbao/seal/<id>.key inside the container (the RAM runtime dir).
+    """
     uid, gid = (int(v["service_users"]["openbao"][k]) for k in ("uid", "gid"))
     prev = (f'  previous_key_id = "{previous_key_id}"\n'
             f'  previous_key    = "file:///openbao/seal/{previous_key_id}.key"\n') if previous_key_id else ""

@@ -23,10 +23,22 @@ DEST="${1:?usage: assemble-tree.sh <dest>}"
 mkdir -p "$DEST"
 
 # files under the given paths as git sees them (deleted-but-unstaged ones skipped), NUL-separated
+# Purpose: list the repository files to ship under the given paths: tracked plus untracked-but-not-ignored,
+#          skipping files deleted from the working tree, so secrets, local vars and __pycache__ never ship.
+# Inputs:  $@ — paths relative to $REPO (git pathspecs). Reads the git index and working tree of $REPO.
+# Returns: NUL-separated repo-relative paths on stdout; status of the subshell pipeline.
+# Fails:   non-zero (and set -e/pipefail stops the script) if git fails, e.g. $REPO is not a git checkout.
+# Feeds:   copy.
 files() {
     (cd "$REPO" && git ls-files -z --cached --others --exclude-standard -- "$@" \
         | while IFS= read -r -d '' f; do [ -e "$f" ] && printf '%s\0' "$f"; done)
 }
+# Purpose: copy the shipped files under some repository paths into $DEST, renaming them on the way.
+# Inputs:  $1 — a GNU tar --transform expression (sed-style, applied to repo-relative paths);
+#          $2… — repository paths to copy (as for files). Writes under $DEST.
+# Returns: status of the tar pipeline; files land at $DEST/<transformed path>.
+# Fails:   non-zero (set -e/pipefail stops the script) if git or tar fails; needs GNU tar (--null -T, --transform).
+# Feeds:   the script body (fabricctl/, webui/, docs and top-level files).
 copy() {  # copy <tar --transform expression> <paths...>
     local expr="$1"; shift
     files "$@" | (cd "$REPO" && tar --null -T - -cf -) | tar -xf - -C "$DEST" --transform "$expr"

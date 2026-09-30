@@ -7,12 +7,19 @@ CONFIG_FILES = ["radiusd.conf", "clients.conf", "fabric-radius.json", "mods/alwa
 
 
 def deploy_freeradius(v, secrets, jinja_env):
-    """FreeRADIUS's files under <deploy_base>/freeradius: the configuration
-    (config/, root:freerad 0640 — clients.conf holds the RADIUS secrets,
-    ldap-password the directory account's) and fabric's policy code
-    (python/). The certificates (certs/: server.pem, server.key, and ca.pem,
-    the fabric CA that client certificates and 389-DS must chain to) come
-    from setup's certificate step. Returns True if anything changed."""
+    """Purpose: Write FreeRADIUS's files under <deploy_base>/freeradius during apply: the configuration (config/) and
+             fabric's policy code (python/).
+    Inputs:  v — the rendered vars: deploy_base_dir, service_users.freeradius uid/gid and what the templates use.
+             secrets — fabric's secrets dict (radius_secrets, ldap_radius_password).
+             jinja_env — Jinja environment whose first search path holds freeradius/config/*.j2 and
+             freeradius/python/*.py.
+    Returns: True if any file changed, else False.
+    Fails:   KeyError on missing vars; OSError from makedirs, chown, listing or writing; jinja2 errors while rendering.
+    Feeds:   deploy.py (apply); tests/freeradius/run.py.
+    Notes:   config files are root:freerad 0640 (clients.conf holds the RADIUS secrets, ldap-password the directory
+             account's). certs/ (server.pem, server.key and ca.pem, the fabric CA that client certificates and 389-DS
+             must chain to) is only created here; setup's certificate step fills it.
+    """
     base = os.path.join(v["deploy_base_dir"], "freeradius")
     gid = int(v["service_users"]["freeradius"]["gid"])
     uid = int(v["service_users"]["freeradius"]["uid"])

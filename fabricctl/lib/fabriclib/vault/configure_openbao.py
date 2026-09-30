@@ -11,6 +11,13 @@ ROLES = {"fabric-setup": ("fabric-setup", SETUP_CREDS), "fabric-agent": ("fabric
 
 
 def _call(v, token, method, path, body=None, ok=(200, 204)):
+    """Purpose: one OpenBao call that must succeed.
+    Inputs:  v — vars; token — OpenBao token; method, path, body — as for bao_request;
+             ok — statuses that count as success (200, 204).
+    Returns: the response data (dict).
+    Fails:   ValidationError "OpenBao <method> <path>: <errors>" for any other status; from bao_request.
+    Feeds:   configure_openbao.
+    """
     status, data = bao_request(v, method, path, token=token, body=body)
     if status not in ok:
         raise ValidationError(f"OpenBao {method} {path}: {data.get('errors') or status}")
@@ -18,17 +25,32 @@ def _call(v, token, method, path, body=None, ok=(200, 204)):
 
 
 def _login_works(v, creds):
+    """Purpose: check whether stored AppRole credentials still log in.
+    Inputs:  v — vars; creds — dict with role_id and secret_id (missing ones are sent as null).
+    Returns: True on a 200 login, else False.
+    Fails:   ValidationError from bao_request if OpenBao is unreachable.
+    Feeds:   configure_openbao (new credentials only when the stored ones fail).
+    """
     status, _ = bao_request(v, "POST", "auth/approle/login",
                             body={"role_id": creds.get("role_id"), "secret_id": creds.get("secret_id")})
     return status == 200
 
 
 def configure_openbao(v, token):
-    """Bring OpenBao to fabric's configuration; safe to re-run (converges):
-    AppRole auth, KV v2 at fabric/ and apps/, the
-    fabric-setup and fabric-agent policies and AppRoles (tokens and secret
-    IDs only usable from fabric_net, i.e. this host), and their credentials
-    in <openbao_key_dir> (root, 0400). Returns the list of changes made."""
+    """Purpose: bring OpenBao to fabric's configuration; safe to re-run (converges).
+    Inputs:  v — vars: fabric_subnet (default 10.255.0.0/24), openbao_key_dir;
+             token — the initial root token on first setup, else a fabric-setup token.
+             Reads and writes the AppRole credential files SETUP_CREDS and AGENT_CREDS.
+    Returns: list of changes made (str): "AppRole auth", "KV <mount>", "policy <name>", "AppRole <role> credentials".
+    Fails:   ValidationError from _call when OpenBao refuses a step, or from bao_request if it is unreachable;
+             OSError writing credentials; ValueError on a corrupt credentials file.
+    Feeds:   setup/setup_openbao, tests/openbao/run.py.
+    Notes:   converges AppRole auth, KV v2 at fabric/ and apps/, every policy in POLICIES, and the fabric-setup and
+             fabric-agent AppRoles: tokens 15 min (at most 30), tokens and secret IDs usable only from fabric_net
+             (this host), secret IDs without TTL or use limit. Credentials are root 0400 in <openbao_key_dir>; new
+             ones are made only when the stored ones no longer log in. The role settings are rewritten every run
+             (not reported as a change).
+    """
     changes = []
     if "approle/" not in _call(v, token, "GET", "sys/auth"):
         _call(v, token, "POST", "sys/auth/approle", {"type": "approle"})

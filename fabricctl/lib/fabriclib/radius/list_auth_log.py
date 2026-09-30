@@ -8,13 +8,19 @@ INCORRECT_RE = re.compile(r"Login incorrect(?: \((.*?)\))?: \[(.*?)\] \(from cli
 
 
 def list_auth_log(limit=100):
-    """Recent 802.1X decisions from FreeRADIUS's journal, newest first:
-    [{time, decision, method, device (or the person), person (bool), vlan,
-    mac, nas, reason}]. fabric's
-    policy logs every decision it makes; a request refused before it (a
-    certificate that does not chain to the fabric CA, a broken EAP exchange)
-    shows FreeRADIUS's own reason. Never secrets: FreeRADIUS logs no
-    passwords (auth_badpass/auth_goodpass are off)."""
+    """Purpose: Recent 802.1X decisions from FreeRADIUS's journal, newest first.
+    Inputs:  limit — int, how many to return (default 100); reads up to limit*4 journal entries tagged freeradius via
+             journalctl.
+    Returns: [{"time", "decision" (ACCEPT / REJECT), "method", "device" (or the person), "person" (bool), "vlan", "mac",
+             "nas", "reason"}]; entries from FreeRADIUS's own "Login incorrect" lines carry "identity" instead of
+             "person".
+    Fails:   FileNotFoundError without journalctl; subprocess.TimeoutExpired after 30 s. Unparseable lines are skipped.
+    Feeds:   radius_overview, run_radius_command (log).
+    Notes:   fabric's policy logs every decision it makes; a request refused before it (a certificate that does not
+             chain to the fabric CA, a broken EAP exchange) shows FreeRADIUS's own reason, unless fabric's REJECT for
+             the same MAC came within 2 s. Never secrets: FreeRADIUS logs no passwords (auth_badpass / auth_goodpass are
+             off).
+    """
     res = subprocess.run(["journalctl", "-t", "freeradius", "-n", str(limit * 4), "-o", "json", "--no-pager"],
                          capture_output=True, text=True, timeout=30)
     entries, last_fabric = [], None

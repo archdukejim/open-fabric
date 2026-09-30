@@ -12,7 +12,7 @@ start, and it is wiped once OpenBao is unsealed.
 
 | File | What |
 |---|---|
-| `constants.py` | File names (slot store, AppRole credentials), KV mounts, the fabric-setup and fabric-agent policies |
+| `constants.py` | File names (slot store, iteration-1 key file, AppRole credentials, bootstrap token), KV mounts, the policies (fabric-setup, fabric-agent, fabric-admin, fabric-auditor), OIDC mount / client / role and the bundle → policy map |
 | `ensure_vault_key.py` | First unlock method: a random key in a key-file slot, or an iteration-1 key file migrated as-is; never a new key next to an existing vault |
 | `unlock_vault.py` | fabric-unlock: key from any present method → RAM (openbao user, 0400); reports a store changed while locked |
 | `wipe_runtime_keys.py` | Overwrite and delete the key copies in RAM once OpenBao is unsealed |
@@ -26,7 +26,7 @@ start, and it is wiped once OpenBao is unsealed.
 | `vault_device_event.py` | Kill switch: an enrolled device pulled while it is the only present method → stop OpenBao; plugged back → start it |
 | `remove_slot.py` | Remove a method (never the last; a remaining one must vouch), destroying its copy where possible |
 | `rotate_vault_key.py` | New key for every present method, the rest dropped; OpenBao moved over with previous → current key rotation |
-| `configure_oidc.py` | Sign-in with Keycloak for people: OIDC auth, discovery verified against the fabric CA, one role bound to the admin role → `fabric-admin` policy |
+| `configure_oidc.py` | Sign-in with Keycloak for people: OIDC auth, discovery verified against the fabric CA, one role admitting the bundles in `OIDC_BUNDLE_POLICIES`; each bundle an external group carrying its policy (admin → `fabric-admin`, `fabric-auditor`) |
 | `generate_root_token.py` | Break glass: root token from the recovery keys over the root-only socket (one-time pad), audited |
 | `init_openbao.py` | Initialise once: recovery keys + initial root token (None if already initialised) |
 | `configure_openbao.py` | Converge: AppRole auth, KV v2 `fabric/` + `apps/`, policies, AppRoles bound to fabric_net, their credentials (root 0400) |

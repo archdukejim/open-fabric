@@ -9,12 +9,18 @@ USAGE = "usage: fabricctl restore <export folder> [--yes]   (a folder written by
 
 
 def run_restore_command(args, deploy_base, cli):
-    """`fabricctl restore <folder>`: bring back a fabric that was removed
-    with `fabricctl uninstall --export` (or `apt purge`): its data goes back
-    in place with owners and modes, then setup runs on it — the same CA,
-    directory, Keycloak, DNS and vault (its key comes back with it).
-    Refused while fabric is installed here. `cli` is this fabricctl's
-    cli.py, which setup is run with (the packaged, newest code)."""
+    """Purpose: `fabricctl restore <folder>`: bring back a fabric removed with `fabricctl uninstall --export` (or
+             apt purge): its data goes back in place with owners and modes, then setup runs on it — the same CA,
+             directory, Keycloak, DNS and vault (its key comes back with it).
+    Inputs:  args — command arguments: the export folder (first non-option), --yes/-y, --deploy-base, --no-color;
+             deploy_base — install root; cli — path of this fabricctl's cli.py (the packaged, newest code) that
+             setup is run with.
+    Returns: 1 when refused (no folder, not an export, fabric already installed) or not confirmed; on success
+             it does not return: restore_install, then the process is replaced by
+             `cli.py setup --yes --non-interactive`.
+    Fails:   ValidationError is printed with USAGE (exit 1); CalledProcessError from restore_install (cp -a);
+             EOFError from input() without --yes; OSError from os.execv.
+    Feeds:   cli main (`restore`)."""
     folder = next((a for a in args if not a.startswith("-")), None)
     ctx = SetupContext(deploy_base=deploy_base)
     try:

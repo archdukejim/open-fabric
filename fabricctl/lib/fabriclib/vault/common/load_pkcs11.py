@@ -2,7 +2,13 @@ from fabriclib.common.errors import ValidationError
 
 
 def load_pkcs11(module):
-    """PyKCS11 and the loaded library (python3-pykcs11 is a Recommends of the package)."""
+    """Purpose: import PyKCS11 and load one PKCS#11 library.
+    Inputs:  module — path of the library; loading runs its code as root, so callers pass only allowed paths.
+    Returns: (PyKCS11 module, PyKCS11Lib with the library loaded).
+    Fails:   ValidationError if python3-pykcs11 (a Recommends of the package) is not installed;
+             PyKCS11.PyKCS11Error if the library cannot be loaded.
+    Feeds:   find_token, list_pkcs11_tokens.
+    """
     try:
         import PyKCS11
     except ImportError:

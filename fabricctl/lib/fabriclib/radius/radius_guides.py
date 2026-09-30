@@ -3,11 +3,16 @@ from fabriclib.radius.windows_setup_script import windows_setup_script
 
 
 def radius_guides(v, root_pem=None):
-    """What the FreeRADIUS tab's setup guides need, filled in for this
-    install: where switches send RADIUS, the certificate name supplicants
-    check, where the CA certificates are published, the RADIUS clients, the
-    groups mapped for password logins, and a Windows setup script per
-    method ({tls, ttls}: {filename, script}). Only public data."""
+    """Purpose: What the FreeRADIUS tab's setup guides need, filled in for this install. Only public data.
+    Inputs:  v — the vars dict (host_ip, hostname_radius, hostname_certs, domain, radius_clients, radius_people,
+             deploy_base_dir).
+             root_pem — the fabric root CA as PEM; None reads <deploy_base>/stepca/data/certs/root_ca.crt.
+    Returns: {"host_ip", "server_name", "certs_url", "domain", "clients" (names), "people" (group names), "windows":
+             {"tls" | "ttls": {"filename", "script"}}}.
+    Fails:   OSError if the root CA file cannot be read; binascii.Error from windows_setup_script on a malformed PEM.
+    Feeds:   agent route GET /v1/radius/guides (fabricctl/lib/agent/server.py, called by webui/server.py for
+             webui/views.py); webui/devserver.py; tests/render.py.
+    """
     if root_pem is None:
         with open(ca_files(v)[0]) as f:
             root_pem = f.read()

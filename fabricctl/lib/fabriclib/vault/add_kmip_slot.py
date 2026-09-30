@@ -19,7 +19,13 @@ UID_RE = re.compile(r"^[\x21-\x7e]{1,128}$")
 
 
 def _check_pems(ca_pem, cert_pem, key_pem):
-    """The PEMs parse and the client key matches its certificate."""
+    """Purpose: check the KMIP PEMs before anything is saved: the CA parses, the client certificate and key match.
+    Inputs:  ca_pem, cert_pem, key_pem — PEM text (str; None counts as empty). They are written to a private
+             temporary folder for the ssl module to load, and deleted with it.
+    Returns: None.
+    Fails:   ValidationError saying whether the CA or the client certificate/key pair is wrong.
+    Feeds:   add_kmip_slot.
+    """
     with tempfile.TemporaryDirectory() as d:
         paths = {}
         for name, text in (("ca.crt", ca_pem), ("client.crt", cert_pem), ("client.key", key_pem)):
@@ -37,16 +43,24 @@ def _check_pems(ca_pem, cert_pem, key_pem):
 
 
 def add_kmip_slot(v, actor, endpoint, key_uid, ca_pem, cert_pem, key_pem, server_name="", label="", source="web"):
-    """Make an HSM / key manager (any KMIP server) an unlock method.
-
-    `endpoint` is host:port (5696 by default on devices); `key_uid` an
-    active AES-256 key on the device that fabric's client may use for
-    Encrypt/Decrypt; `ca_pem` verifies the device's TLS certificate (for
-    `server_name`, default the host); `cert_pem`/`key_pem` are fabric's
-    client certificate registered on the device (e.g. made under Step-CA →
-    New key + certificate). The vault key is wrapped by the device,
-    unwrapped again and checked before the method is saved. Returns the
-    slot id."""
+    """Purpose: make an HSM / key manager (any KMIP server) an unlock method, verified end to end before it is saved.
+    Inputs:  v — vars (openbao_key_dir, ...); actor — who asked (audit); endpoint — "host:port" (5696 is usual);
+             key_uid — the device's id of an active AES-256 key fabric's client may Encrypt/Decrypt with
+               (printable, at most 128);
+             ca_pem — CA of the device's TLS certificate; cert_pem, key_pem — fabric's client certificate and key
+               registered on the device (e.g. made under Step-CA -> New key + certificate);
+             server_name — name on the device's certificate (default: the host); label — at most 60, simple
+               punctuation; source — audit source ("web"). Reads and writes slots.json.
+    Returns: the new slot id, "hsm-<6 hex>".
+    Fails:   ValidationError: bad endpoint, key id, server name, label or PEMs; no vault key yet; that device key is
+             already a method; no present method can vouch for the new one; the device's unwrap does not match; the
+             device refuses Encrypt/Decrypt (any other exception, wrapped). On the last two the certificate folder
+             is removed again. OSError writing the files.
+    Feeds:   agent route POST /v1/vault/slots/add-hsm, `fabricctl vault add-kmip` (run_vault_command),
+             tests/openbao/run.py.
+    Notes:   the certificates and client key are root 0400 in <openbao_key_dir>/kmip-<id>/. Revoking fabric's
+             client on the device, or disabling the key there, is the kill switch. Audited as VAULT_SLOT_ADD.
+    """
     host, _, port = (endpoint or "").strip().rpartition(":")
     if not HOST_RE.match(host) or not port.isdigit() or not 0 < int(port) < 65536:
         raise ValidationError("endpoint: host:port, e.g. kms.lan:5696")

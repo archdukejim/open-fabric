@@ -3,8 +3,14 @@ from fabriclib.ldap.constants import PERMISSIONS
 
 
 def check_role_fields(fields):
-    """Validate a device role's settings. Returns {description,
-    permissions, vlan (None or 1..4094), priority (0..1000, default 100)}."""
+    """Purpose: Validate and normalise a device role's settings.
+    Inputs:  fields — dict: permissions (list, each in ldap/constants PERMISSIONS), vlan (empty or
+             1..4094), priority (0..1000, default 100), description.
+    Returns: {"description", "permissions" (sorted, unique), "vlan" (int or None), "priority" (int)}.
+    Fails:   ValidationError "unknown permission: ..."; "VLAN must be 1 to 4094 (or empty)"; "priority must
+             be 0 to 1000"; "description: one line, at most 200 characters".
+    Feeds:   add_role, update_role; webui/devserver.py (preview server).
+    """
     perms = sorted(set(fields.get("permissions") or []))
     unknown = [p for p in perms if p not in PERMISSIONS]
     if unknown:

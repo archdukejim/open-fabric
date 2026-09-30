@@ -10,10 +10,18 @@ from fabriclib.secrets.save_secrets import save_secrets
 
 
 def rotate_radius_secret(actor, name, secret=None, source="cli"):
-    """Give a RADIUS client a new shared secret (`secret`, or a random one),
-    kept in OpenBao. The device must be given the same one: until then
-    FreeRADIUS does not answer it. Applied by the next apply. Returns the
-    secret, to be shown once."""
+    """Purpose: Give a RADIUS client a new shared secret, kept in fabric's secrets. Applied by the next apply; until the
+             device has the same secret, FreeRADIUS does not answer it.
+    Inputs:  actor — str, who asks (audit).
+             name — str (lower-cased).
+             secret — str matching SECRET_RE, or None for a random 32-character one.
+             source — "cli" (default) or "web". Reads vars.yaml under vars_lock.
+    Returns: the secret (str), to be shown once.
+    Fails:   ValidationError "the secret must be 16-128 printable characters, …", "no RADIUS client …"; errors from
+             save_secrets; OSError or yaml.YAMLError from the vars helpers.
+    Feeds:   agent route POST /v1/radius/clients/<name>/rotate (fabricctl/lib/agent/server.py, called by
+             webui/server.py); run_radius_command (rotate-secret).
+    """
     name = str(name).strip().lower()
     if secret is not None and not SECRET_RE.match(secret):
         raise ValidationError("the secret must be 16-128 printable characters, without spaces, quotes, backslashes or $")

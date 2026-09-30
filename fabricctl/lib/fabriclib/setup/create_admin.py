@@ -39,6 +39,11 @@ the '{group}' group).
 
 
 def _write(path, text, owner):
+    """Purpose: write a private file for the operator.
+    Inputs:  path — destination; text — content; owner — (uid, gid).
+    Returns: None; file 0600 (created under umask 077) owned by owner.
+    Fails:   OSError on write, chmod or chown.
+    Feeds:   run (initial-password.txt, <user>.crt, p12-password.txt, README.txt)."""
     old = os.umask(0o077)
     try:
         with open(path, "w") as f:
@@ -50,11 +55,20 @@ def _write(path, text, owner):
 
 
 def run(ctx):
-    """The first web UI admin, end to end: an LDAP user in the admin group
-    (Keycloak grants it fabric-admin), a client certificate (.p12) whose CN
-    is that username, and the fabric root CA — collected with instructions
-    in ~/fabric-admin of the account that ran setup. Idempotent: an existing
-    user keeps their password; the certificate is renewed when due."""
+    """Purpose: the first web UI admin, end to end: an LDAP user in the admin group (Keycloak grants it
+             fabric-admin), a client certificate (.p12, CN = username) and the fabric root CA, collected with
+             instructions in ~/fabric-admin of the account that ran setup.
+    Inputs:  ctx — SetupContext: vars install_webui, install_keycloak, install_ldap (default True),
+             webui_admin_user, webui_admin_email, webui_admin_group (default admins), webui_client_cert_days
+             (default 365), domain, hostname_mgr, hostname_certs, host_ip; secrets (Keycloak admin); the
+             published CA under <deploy_base>/nginx/www/certs. Env SUDO_USER via sudo_owner.
+    Returns: None. Without web UI, Keycloak or LDAP: nothing. Otherwise the kit folder (0700) holds root-ca.crt/.cer,
+             README.txt and, when due, <user>.p12, <user>.crt and p12-password.txt; initial-password.txt only when
+             the user was created (then Keycloak forces a password change). Idempotent: an existing user keeps
+             their password; the certificate is renewed when due or from another CA.
+    Fails:   ValidationError from ensure_admin_user, require_password_change or issue_client_cert (propagates,
+             not SetupError); CalledProcessError from openssl; OSError on files. Warns when run as root without sudo.
+    Feeds:   setup step `admin`, run by run_setup via STEPS."""
     v = ctx.vars
     if not (v.get("install_webui") and v.get("install_keycloak") and v.get("install_ldap", True)):
         ok("no web UI: nothing to do")

@@ -27,8 +27,13 @@ DM_DN = "cn=Directory Manager"
 
 
 def bind_dm(timeout=120):
-    """Bind as Directory Manager over LDAPI. On first boot dscontainer reports
-    healthy (via autobind) before it has applied DS_DM_PASSWORD, so retry."""
+    """Purpose: bind as Directory Manager over LDAPI, retrying: on first boot dscontainer reports healthy
+             (via autobind) before it has applied DS_DM_PASSWORD.
+    Inputs:  timeout — seconds to keep retrying, default 120. Reads DS_DM_PASSWORD from the environment.
+    Returns: a bound ldap connection (python-ldap LDAPObject).
+    Fails:   ldap.INVALID_CREDENTIALS or ldap.SERVER_DOWN after the timeout; KeyError if DS_DM_PASSWORD is unset;
+             other LDAP errors at once. Seeding then stops with a traceback (non-zero exit).
+    Feeds:   main."""
     deadline = time.time() + timeout
     while True:
         conn = ldap.initialize(LDAPI_URI)
@@ -42,8 +47,14 @@ def bind_dm(timeout=120):
 
 
 def parse_ldif(text):
-    """Yield (dn, changetype, body). body is [(attr, value)] for adds and
-    [(op, attr, [values])] for modifies. Handles folding, comments and ::."""
+    """Purpose: parse LDIF text into records (a small parser: folding, comments and base64 "::" values).
+    Inputs:  text — str, the LDIF file content.
+    Returns: generator of (dn, changetype, body): for "add", body is [(attr, value)]; otherwise body is
+             [(op, attr, [values])] with op lower-cased ("replace", "add", "delete"). Base64 values are decoded
+             to str with surrogateescape.
+    Fails:   binascii.Error on bad base64; IndexError for a record with no lines after comment removal.
+             Comments inside a folded line and "<" URL values are not supported.
+    Feeds:   main."""
     lines = []
     for raw in text.splitlines():
         if raw.startswith(" ") and lines:
@@ -97,6 +108,12 @@ def parse_ldif(text):
 
 
 def current_values(conn, dn, attr):
+    """Purpose: the current values of one attribute of an entry.
+    Inputs:  conn — bound LDAPObject; dn — str; attr — str, matched case-insensitively.
+    Returns: list of str values (UTF-8 decoded); [] if the entry has no such attribute; None if the entry does
+             not exist.
+    Fails:   other ldap.LDAPError from the search; UnicodeDecodeError for a binary value that is not UTF-8.
+    Feeds:   main."""
     try:
         res = conn.search_s(dn, ldap.SCOPE_BASE, attrlist=[attr])
     except ldap.NO_SUCH_OBJECT:
@@ -109,6 +126,11 @@ def current_values(conn, dn, attr):
 
 
 def password_ok(dn, password):
+    """Purpose: whether a password already binds for a DN, so an unchanged userPassword is not replaced.
+    Inputs:  dn — str; password — str (clear text from the LDIF).
+    Returns: bool, True when a simple bind over LDAPI succeeds.
+    Fails:   never — every LDAP error counts as False (an error from the final unbind would propagate).
+    Feeds:   main."""
     test = ldap.initialize(LDAPI_URI)
     try:
         test.simple_bind_s(dn, password)
@@ -120,6 +142,11 @@ def password_ok(dn, password):
 
 
 def norm(vals):
+    """Purpose: compare attribute values case- and whitespace-insensitively.
+    Inputs:  vals — iterable of str.
+    Returns: sorted list of stripped, lower-cased values.
+    Fails:   never (AttributeError only for non-str items).
+    Feeds:   main."""
     return sorted(v.strip().lower() for v in vals)
 
 
@@ -127,10 +154,25 @@ OID_RE = re.compile(r"^\(\s*([0-9.]+)")
 
 
 def oids(vals):
+    """Purpose: the OIDs of schema definitions, so an attributeTypes/objectClasses value is added once even
+             though the server rewrites its text.
+    Inputs:  vals — iterable of str definitions, each "( 1.2.3 … )".
+    Returns: set of OID strings; values that do not start with "( <oid>" contribute nothing.
+    Fails:   never.
+    Feeds:   main."""
     return {m.group(1) for m in (OID_RE.match(v.strip()) for v in vals) if m}
 
 
 def main(paths):
+    """Purpose: idempotently apply LDIF files to this container's 389-DS: add missing entries, apply only
+             the modify operations whose values differ, and print RESTART_REQUIRED if anything under cn=config
+             changed.
+    Inputs:  paths — list of LDIF file paths (applied in sorted order); DS_DM_PASSWORD in the environment.
+    Returns: None; prints "+ dn" / "~ dn: attrs" lines and "seed: N added, M modified".
+    Fails:   SystemExit with a message for an unsupported changetype or a modify on a missing entry; ldap errors
+             (e.g. schema violations) and bind_dm failures propagate as a traceback; exit is non-zero either way.
+    Feeds:   run as `python3 /seed/seed.py /seed/*.ldif` by lib/dirsrv.sh (seed) and the dirsrv, freeradius
+             and hardening test suites; RESTART_REQUIRED is read by dirsrv.sh."""
     conn = bind_dm()
     added = modified = 0
     restart = False

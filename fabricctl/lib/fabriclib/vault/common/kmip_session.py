@@ -7,11 +7,17 @@ from fabriclib.common.errors import ValidationError
 
 @contextlib.contextmanager
 def kmip_session(host, port, server_name, ca_file, cert_file, key_file, timeout=10):
-    """An open KMIP client (PyKMIP's ProxyKmipClient) on a TLS connection
-    fabric makes itself: TLS 1.2+, the server certificate verified against
-    `ca_file` and `server_name`, fabric's client certificate. PyKMIP's own
-    TLS code is not used: it does not verify the server certificate
-    (it ORs cert_reqs into the context options)."""
+    """Purpose: context manager giving an open PyKMIP client on a mutual-TLS connection that fabric builds itself.
+    Inputs:  host, port — the KMIP server (port as str or int); server_name — name its certificate must carry;
+             ca_file — CA that must have signed it; cert_file, key_file — fabric's client certificate and key (paths);
+             timeout — socket timeout in seconds (10).
+    Returns: yields an opened kmip.pie.client.ProxyKmipClient; closed on exit (errors while closing are ignored).
+    Fails:   ValidationError if python3-pykmip is missing, or if connecting or the TLS handshake fails (any exception
+             from client.open(), e.g. a server certificate that does not verify). Errors in the with block propagate.
+    Feeds:   slots/kmip._session (wrap, unwrap, present), tests/openbao/run.py.
+    Notes:   PyKMIP's own TLS code is replaced (its proxy's _create_socket): it does not verify the server
+             certificate (it ORs cert_reqs into the context options). Here: TLS 1.2+, CA and server name verified.
+    """
     try:
         from kmip.pie.client import ProxyKmipClient
     except ImportError:

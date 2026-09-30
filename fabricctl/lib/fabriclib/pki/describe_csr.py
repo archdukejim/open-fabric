@@ -11,11 +11,22 @@ SAN_KINDS = ("DNS", "IP Address", "email")
 
 
 def describe_csr(data):
-    """Decode a certificate signing request (PEM, DER or base64) and judge
-    it against fabric's signing policy. Returns {pem, subject, cn, sans,
-    key, ca_requested, problems, text}; `problems` empty means it may be
-    signed. The CSR's own extensions are never copied: fabric issues a leaf
-    (serverAuth + clientAuth) from its template whatever the CSR asks for."""
+    """Purpose: Decode a certificate signing request and judge it against fabric's signing policy
+             before anything is signed.
+    Inputs:  data — exactly one CSR as PEM, DER bytes or bare base64.
+    Returns: {"pem", "subject" (RFC 2253), "cn", "sans" (values without their type), "key" ("RSA <bits>",
+             "EC <curve>", "Ed25519" or the algorithm), "ca_requested" (bool), "problems" (list of str),
+             "text" (openssl -text)}. Empty problems means it may be signed. Recorded as problems, not
+             raised: a signature that does not verify; a SAN other than DNS / IP / e-mail or malformed; no
+             CN and no SAN; a CN-only request whose CN is not a host, IP or e-mail; RSA under 2048 bits;
+             an EC curve other than P-256/384/521; any other key algorithm.
+    Fails:   ValidationError "give exactly one certificate signing request"; to_pem's messages; openssl's
+             first error line if the request cannot be parsed.
+    Feeds:   agent route POST /v1/pki/describe-csr -> webui agentclient.describe_csr; inspect_pem;
+             sign_csr (refuses unless problems is empty).
+    Notes:   CA:TRUE is only reported: the CSR's own extensions are never copied, fabric issues a leaf
+             (serverAuth + clientAuth) from its template whatever the CSR asks for.
+    """
     blocks = to_pem(data, "csr")
     if len(blocks) != 1:
         raise ValidationError("give exactly one certificate signing request")

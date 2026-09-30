@@ -16,13 +16,22 @@ LABEL_RE = re.compile(r"^[\w .,'()-]{0,60}$")
 
 
 def add_usb_slot(v, actor, disk, label="", source="web", require_usb=True):
-    """Erase a USB stick and make it an unlock method.
-
-    Refuses anything that is not a whole, unmounted USB disk (`require_usb`
-    is off only in tests, where a loop device stands in). The stick gets an
-    ext4 file system with a UUID fabric chooses, the vault key in a
-    root-only file, and is read back and verified before the method is
-    saved. Returns the new slot id."""
+    """Purpose: erase a USB stick and make it an unlock method holding the vault key in a root-only file.
+    Inputs:  v — vars; actor — who asked (audit); disk — whole-disk device path (e.g. /dev/sdb);
+             label — at most 60; source — audit source ("web");
+             require_usb — refuse disks not on USB (off only in tests, where a loop device stands in).
+    Returns: the new slot id, "usb-<first 8 of the new file-system UUID>".
+    Fails:   ValidationError: bad label; not a whole disk on this host; not USB; mounted; no vault key yet; this stick
+             is already a method (by UUID); nothing present to vouch; wipefs or mkfs failed; the key read back does
+             not match. From usb.wrap / usb.unwrap: ValueError, ValidationError, OSError. After mkfs the stick is
+             already erased; nothing is rolled back.
+    Feeds:   agent route POST /v1/vault/slots/add-usb, `fabricctl vault add-usb` (run_vault_command),
+             tests/openbao/run.py.
+    Notes:   ext4, label FABRIC-KEY, a UUID fabric chooses, root_owner 0:0. Duplicates are found by that UUID, not
+             the serial: cheap sticks share one generic serial (seen on hardware: "General_UDisk-0:0"). udev is
+             re-triggered after mkfs, or its database keeps the old ID_FS_UUID and the kill-switch rule never matches
+             when the stick is pulled (found on real hardware). Rewrites the udev rules; audited as VAULT_SLOT_ADD.
+    """
     if not LABEL_RE.match(label or ""):
         raise ValidationError("label: letters, digits and simple punctuation, at most 60")
     facts = block_device(path=disk)

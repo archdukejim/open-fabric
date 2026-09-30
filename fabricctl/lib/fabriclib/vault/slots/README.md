@@ -1,9 +1,12 @@
 # fabriclib/vault/slots
 
-One file per unlock-method (key slot) type. Each exposes `wrap(v, slot, key,
-key_id)` → record, `unwrap(v, slot, record)` → key or None, `present(v,
-slot)`, `forget(v, slot, record)`, optionally `discard(v, slot)` (the whole method is removed), and `TESTED` (what it was tested against;
-"untested" parts say so).
+One file per unlock-method (key slot) type, picked by name through
+`common/slot_type.py`. Each exposes `wrap(v, slot, key, key_id)` → record
+(`pkcs11` and `kmip` also take `attended`), `unwrap(v, slot, record,
+attended=False)` → key or None (the caller verifies it against the check
+value), `present(v, slot)`, `forget(v, slot, record)` (destroy one key
+version's copy), optionally `discard(v, slot)` (the whole method is removed),
+and `TESTED` (what it was tested against; "untested" parts say so).
 
 | File | Type | Tested against |
 |---|---|---|

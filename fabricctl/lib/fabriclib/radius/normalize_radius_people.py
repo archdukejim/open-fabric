@@ -6,10 +6,14 @@ GROUP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,63}$")
 
 
 def normalize_radius_people(mappings):
-    """Check `radius_people`: which directory groups may join the network
-    by password (EAP-TTLS), each with an optional VLAN (1-4094) and a
-    priority (lower wins when a person is in several). Returns the list,
-    sorted by priority then group."""
+    """Purpose: Check radius_people: which directory groups may join the network by password (EAP-TTLS), each with an
+             optional VLAN and a priority.
+    Inputs:  mappings — list of {group, vlan (1-4094 or empty), priority (0-9999, default 100)}, or None.
+    Returns: [{"group", "vlan" (int or None), "priority" (int)}], sorted by priority, then group.
+    Fails:   ValidationError: an entry that is not a dict, a bad group name, a group mapped twice (case-insensitive), a
+             VLAN outside 1-4094, or a priority outside 0-9999.
+    Feeds:   deploy.py (apply), map_radius_group; tests/freeradius/run.py, tests/render.py.
+    """
     out, seen = [], set()
     for m in mappings or []:
         if not isinstance(m, dict):

@@ -4,9 +4,12 @@ import subprocess
 
 
 def detect_network():
-    """Best guesses for hostname, host_ip, lan_gateway, lan_cidr and that
-    interface's name, from the interface that carries the default route.
-    Missing values are None."""
+    """Purpose: best guesses for this host's network settings, used as prompt defaults.
+    Inputs:  none (runs `ip -4 route show default` and `ip -o -4 addr show dev <iface>`; socket.gethostname()).
+    Returns: {"hostname", "host_ip", "lan_gateway", "lan_cidr", "interface"} from the interface carrying the
+             default route; values that cannot be found are None.
+    Fails:   FileNotFoundError if the `ip` command is missing; a failing `ip` just yields None values.
+    Feeds:   collect_vars (defaults for required values), choose_plan._ask_dhcp (interface, subnet, router)."""
     guess = {"hostname": socket.gethostname().split(".")[0], "host_ip": None,
              "lan_gateway": None, "lan_cidr": None, "interface": None}
     route = subprocess.run(["ip", "-4", "route", "show", "default"], capture_output=True, text=True).stdout.split()

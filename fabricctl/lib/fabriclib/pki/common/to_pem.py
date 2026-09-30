@@ -8,9 +8,19 @@ BLOCK_RE = re.compile(r"-----BEGIN ([A-Z0-9 ]+)-----\r?\n.*?-----END \1-----", r
 
 
 def to_pem(data, kind):
-    """Normalise an uploaded or pasted object to PEM text. `data` is PEM
-    text, or DER bytes (a .cer/.der/.csr upload). kind: 'cert' | 'csr' | 'key'.
-    Returns the list of PEM blocks of that kind (a chain may hold several)."""
+    """Purpose: Normalise an uploaded or pasted certificate, CSR or key to PEM text, so every PKI
+             operation works on PEM.
+    Inputs:  data — str (PEM, or bare base64 DER as some devices show it) or bytes (a DER upload, or PEM
+             sent as bytes); kind — "cert" | "csr" | "key" (PRIVATE KEY, RSA PRIVATE KEY, EC PRIVATE KEY;
+             encrypted keys are not matched).
+    Returns: list of PEM blocks (str, each ending in a newline) of that kind in input order (a chain gives
+             several; blocks of other kinds are ignored); [] for empty or blank text.
+    Fails:   ValidationError "no <kind> found in the input" (PEM without a block of that kind); "not a PEM
+             or DER <kind>" (neither PEM nor base64 DER openssl accepts); openssl's first error line for
+             non-ASCII bytes openssl cannot parse as DER; KeyError for an unknown kind.
+    Feeds:   ca_summary, common/ca_chain_pem, convert_cert, describe_csr, inspect_pem, issue_key_pair,
+             sign_csr.
+    """
     if isinstance(data, bytes):
         try:
             data = data.decode("ascii")

@@ -11,17 +11,31 @@ from fabriclib.system.apply_changes import apply_changes
 
 
 def _describe(policy):
+    """Purpose: One line saying what the TSIG keys in an ACL may update under its policy.
+    Inputs:  policy — a normalized ACL policy dict (domain, record_types, records or any_name).
+    Returns: str "members may update <names> (<types>)".
+    Fails:   KeyError if the policy lacks domain or record_types.
+    Feeds:   run_acl_command (list, policy).
+    """
     what = (", ".join(f"_acme-challenge.{r}.{policy['domain']}" for r in policy["records"])
             if policy.get("records") else f"any name in {policy['domain']}")
     return f"members may update {what} ({' '.join(policy['record_types'])})"
 
 
 def run_acl_command(argv):
-    """`fabricctl acl list | add | remove | policy` — BIND ACLs (bind_acls)
-    and their update policies. Every ACL may query fabric's zones. Entries:
-    IP, CIDR, 'key <tsig-key>', another ACL, any/none/localhost/localnets;
-    prefix with ! to exclude. A policy gives every TSIG key in the ACL
-    update rights (e.g. DNS-01 TXT records for chosen hosts only)."""
+    """Purpose: `fabricctl acl list | add | remove | policy` — BIND ACLs (bind_acls) and their update policies; a change
+             is applied right away unless --no-apply.
+    Inputs:  argv — list of str after "acl". add/remove: acl and entries (IP, CIDR, 'key <tsig-key>', another ACL,
+             any/none/localhost/localnets; `!` excludes). policy: acl, --record host (repeatable) or --any-name, --types
+             (comma-separated, default TXT), --domain, or --clear. Reads vars.yaml.
+    Returns: exit status: 0 on success; 1 on a ValidationError or OSError ("error: …" on stderr), including a failed
+             apply (last 2000 characters of its output on stderr).
+    Fails:   SystemExit 2 from argparse on bad arguments; "give --record host (repeatable) or --any-name" and callee
+             ValidationErrors become exit 1; other exceptions (e.g. yaml.YAMLError, apply timeout) propagate.
+    Feeds:   fabriclib/cli.py (`fabricctl acl`).
+    Notes:   every ACL may query fabric's zones; a policy gives every TSIG key in the ACL update rights (e.g. DNS-01 TXT
+             records for chosen hosts only).
+    """
     ap = argparse.ArgumentParser(prog="fabricctl acl")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")

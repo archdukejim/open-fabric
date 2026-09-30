@@ -6,8 +6,18 @@ from fabriclib.common.write_audit import write_audit
 
 
 def remove_record(actor, key, rtype, index, expected_name, source="cli"):
-    """Remove record `index` of `rtype` from zone `key`, only if its name is
-    still `expected_name` (so a stale view cannot delete the wrong record)."""
+    """Purpose: Remove one record from a zone in vars.yaml, only if it is still the one the user saw. Run apply
+             afterwards.
+    Inputs:  actor — str, who asks (audit).
+             key — str zone key; rtype — str record type; index — int position in that type's list.
+             expected_name — str, the name the caller showed (so a stale view cannot delete the wrong record).
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock.
+    Returns: the removed record dict. A type list left empty is deleted from the zone.
+    Fails:   ValidationError "record changed since it was shown; reload and try again" (unknown zone or type, index out
+             of range, or another name); OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
+    Feeds:   agent route POST /v1/zones/<key>/records/delete (fabricctl/lib/agent/server.py);
+             fabricctl/lib/interactive.py.
+    """
     with vars_lock():
         data = load_vars()
         records = ((data.get("dns") or {}).get(key) or {}).get(rtype) or []

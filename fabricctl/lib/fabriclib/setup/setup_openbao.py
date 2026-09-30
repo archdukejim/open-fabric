@@ -38,8 +38,13 @@ Keep a second unlock method (a stick or key in a safe) as the backup.
 
 
 def _save_recovery(v, keys):
-    """Write the recovery keys once into ~/fabric-admin (0600) of the
-    account that ran sudo — the same place as the web UI login kit."""
+    """Purpose: write the OpenBao recovery keys once into ~/fabric-admin of the account that ran sudo — the same
+             place as the web UI login kit.
+    Inputs:  v — vars (hostname_openbao, openbao_key_dir); keys — recovery keys (list of str). Env SUDO_USER via
+             sudo_owner.
+    Returns: path of openbao-recovery-keys.txt (0600, owned by that account; folder 0700).
+    Fails:   OSError creating the folder or file; KeyError for missing vars.
+    Feeds:   run (printed to the operator)."""
     _, home, uid, gid = sudo_owner()
     folder = os.path.join(home, "fabric-admin")
     os.makedirs(folder, mode=0o700, exist_ok=True)
@@ -55,9 +60,20 @@ def _save_recovery(v, keys):
 
 
 def run(ctx):
-    """OpenBao (core): seal key, start, first-time init (recovery keys to
-    ~/fabric-admin, root token used once and revoked), then converge its
-    configuration as fabric's own AppRole. Core services never wait for it."""
+    """Purpose: OpenBao (core): vault key, unlock, start, first-time init (recovery keys to ~/fabric-admin, root
+             token used once and revoked), converge its configuration as fabric's own AppRole, optional Keycloak
+             sign-in, and move fabric's secrets file into OpenBao.
+    Inputs:  ctx — SetupContext: vars (openbao_key_dir, hostname_openbao, install_keycloak, ...),
+             restart_services, secrets_file, secrets.openbao_oidc_secret (Keycloak sign-in only).
+    Returns: None. OpenBao initialised, unsealed and configured; the bootstrap root token revoked and removed;
+             runtime key copies wiped; the secrets file imported and shredded when present. Keycloak sign-in
+             failures are only warned about.
+    Fails:   SetupError: no unlock method present; root token not revoked; OpenBao not unsealed at the end; any
+             ValidationError from the vault helpers ("OpenBao: ..."). SetupError from start_unit when the
+             container is not healthy; CalledProcessError from systemctl.
+    Feeds:   setup step `vault`, run by run_setup via STEPS.
+    Notes:   the initial root token is kept (root, 0400) only until fabric's AppRoles work, so a failure in between
+             does not leave OpenBao initialised but unreachable for setup. Core services never wait for OpenBao."""
     v = ctx.vars
     try:
         state = ensure_vault_key(v)

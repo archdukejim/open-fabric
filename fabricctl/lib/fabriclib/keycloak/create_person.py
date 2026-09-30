@@ -13,15 +13,35 @@ MAIL_RE = re.compile(r"^[^@\s]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,}$")
 
 
 def _q(s):
+    """Purpose: URL-encode one path or query component for the Keycloak admin API (nothing kept, not "/").
+    Inputs:  s — str (a realm, user name, client id or role name).
+    Returns: the percent-encoded str.
+    Fails:   never for a str.
+    Feeds:   create_person.
+    """
     return urllib.parse.quote(s, safe="")
 
 
 def create_person(v, actor, uid, first, last, email, source="web"):
-    """A new realm user (helpdesk, `people:create`): created in Keycloak,
-    which writes the account to 389-DS, member of the plain `users` group
-    only (never a fabric group), with a one-time password that must be
-    changed at the first sign-in (TOTP enrolment follows). Returns that
-    password; it is shown once and stored nowhere."""
+    """Purpose: Helpdesk `people:create`: create a realm user in Keycloak (which writes the account to
+             389-DS) with a one-time password.
+    Inputs:  v — fabric vars (keycloak_admin: ip_keycloak, hostname_keycloak, webui_realm or domain, root
+             CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and
+             simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit
+             source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao).
+    Returns: the one-time password (token_urlsafe(15)): shown once, stored nowhere.
+    Fails:   ValidationError "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address
+             looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused:
+             ..." (any other admin API error or failed admin login, raised as SystemExit by
+             keycloak_bootstrap.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable);
+             OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back.
+    Feeds:   agent route POST /v1/people (agent/server.py Handler.dispatch) -> webui
+             agentclient.create_person -> People page.
+    Notes:   the user joins the plain `users` group only (never a fabric group; skipped silently if that
+             group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP
+             enrolment, at the first sign-in. If a step after the creation fails the account stays, without
+             a known password (reset_sign_in recovers it). Audited as PERSON_CREATE.
+    """
     if not UID_RE.match(uid or ""):
         raise ValidationError("user name: 2-32 characters, a-z 0-9 . _ -, starting with a letter")
     if not NAME_RE.match(first or "") or not NAME_RE.match(last or ""):

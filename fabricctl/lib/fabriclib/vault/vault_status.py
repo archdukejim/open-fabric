@@ -9,7 +9,13 @@ from fabriclib.vault.constants import AGENT_CREDS, SLOT_STORE
 
 
 def _key_state(v):
-    """The unlock methods' store: root-only, and no vault key left in RAM."""
+    """Purpose: check the unlock-method store is safe: root-owned 0600, and no vault key left in RAM.
+    Inputs:  v — vars: openbao_key_dir (slots.json), openbao_runtime_dir (*.key files).
+    Returns: {path, present, ok, detail} plus, when the store exists, methods (count) and key_id; detail lists the
+             problems or summarises the healthy state.
+    Fails:   PermissionError (OSError) when not root; ValueError on a corrupt store.
+    Feeds:   vault_status (its "key" field).
+    """
     path = os.path.join(v["openbao_key_dir"], SLOT_STORE)
     try:
         st = os.stat(path)
@@ -28,10 +34,15 @@ def _key_state(v):
 
 
 def vault_status(v):
-    """OpenBao at a glance, for `fabricctl vault status` and the web UI:
-    reachability, initialised/sealed, version, seal and storage type, the
-    seal key file's permissions, and (as fabric-agent) the secret engines
-    and auth methods. Never returns secrets."""
+    """Purpose: OpenBao at a glance for `fabricctl vault status`, setup and the web UI. Never returns secrets.
+    Inputs:  v — vars; logs in as fabric-agent (AGENT_CREDS) when OpenBao is initialised and unsealed.
+    Returns: {url, key (_key_state), reachable} and, when reachable: initialized, sealed, version, seal_type, storage,
+             recovery_seal, mounts [{path, type, version, description}], auth [paths], optionally secrets {version,
+             updated} (metadata of fabric/secrets, never a value) and error (why a part is missing).
+    Fails:   OpenBao errors (ValidationError) are caught into "error"; OSError from _key_state propagates.
+    Feeds:   agent route GET /v1/vault (webui agentclient.vault_status), run_vault_command._status,
+             setup/setup_openbao, setup/verify_install, tests/openbao/run.py.
+    """
     out = {"url": f"https://{v['hostname_openbao']}/", "key": _key_state(v), "reachable": False}
     try:
         status, health = bao_request(v, "GET", "sys/health?uninitcode=200&sealedcode=200&standbyok=true")

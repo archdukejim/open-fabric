@@ -3,9 +3,14 @@ import os
 
 
 def wipe_runtime_keys(v):
-    """Once OpenBao is unsealed it holds its key in memory: overwrite and
-    delete the copies fabric-unlock left in <openbao_runtime_dir>. Returns
-    how many were wiped."""
+    """Purpose: once OpenBao is unsealed (it holds its key in memory), overwrite and delete the key copies that
+             fabric-unlock left in RAM.
+    Inputs:  v — vars: openbao_runtime_dir; every *.key in it is wiped (zeros, fsync, delete).
+    Returns: how many files were wiped (int).
+    Fails:   OSError other than FileNotFoundError (e.g. not root); a file that vanished meanwhile is skipped.
+    Feeds:   `fabricctl vault wipe-key` (the openbao unit, after start), rotate_vault_key, setup/setup_openbao,
+             tests/openbao/run.py.
+    """
     count = 0
     for path in glob.glob(os.path.join(v["openbao_runtime_dir"], "*.key")):
         try:

@@ -27,6 +27,13 @@ HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]
 
 
 def _valid(key, value):
+    """Purpose: check one answer or vars value for a required or asked setting.
+    Inputs:  key — setting name (host_ip, lan_gateway, lan_cidr, webui_admin_user, domain, hostname, or other);
+             value — str.
+    Returns: True if valid: IPv4 address, IPv4 network, an admin username matching ADMIN_RE that is not
+             "admin"/"root", a DNS name (hostname without dots); any other key just needs a non-empty value.
+    Fails:   never — ValueError from ipaddress is turned into False.
+    Feeds:   collect_vars (which required values to ask), _ask."""
     try:
         if key in ("host_ip", "lan_gateway"):
             ipaddress.IPv4Address(value)
@@ -42,6 +49,11 @@ def _valid(key, value):
 
 
 def _load(path):
+    """Purpose: read a YAML vars file if it exists.
+    Inputs:  path — file path or None/"".
+    Returns: the parsed dict; {} when path is empty, missing or the file is empty.
+    Fails:   OSError if unreadable; yaml.YAMLError if it does not parse.
+    Feeds:   collect_vars."""
     if not path or not os.path.exists(path):
         return {}
     with open(path) as f:
@@ -49,6 +61,11 @@ def _load(path):
 
 
 def _ask(key, default):
+    """Purpose: prompt until the operator gives a valid value for one setting.
+    Inputs:  key — setting name (label from LABELS); default — offered value (Enter accepts it) or None.
+    Returns: the valid answer (str).
+    Fails:   EOFError from input() when stdin is closed; loops forever on invalid input by design.
+    Feeds:   collect_vars."""
     while True:
         answer = input(f"  {LABELS.get(key, key)} [{default or ''}]: ").strip() or (default or "")
         if _valid(key, answer):
@@ -57,12 +74,20 @@ def _ask(key, default):
 
 
 def collect_vars(ctx):
-    """Return the path of the vars file this install is rendered from.
-
-    --file wins; otherwise an existing install's vars.yaml; otherwise the
-    required values are asked for (auto-detected defaults). Missing or
-    invalid required values are asked for, or are an error with
-    --non-interactive. The result is saved as <config>/fabric.yaml."""
+    """Purpose: work out the settings this install is rendered from and save them as <config>/fabric.yaml.
+    Inputs:  ctx — SetupContext: user_vars_file (--file), non_interactive, vars_file (existing install),
+             source_dir (a checkout's ../custom-vars.yaml), config_dir, secrets_file, deploy_base;
+             env SUDO_USER (default admin name).
+    Returns: path of fabric.yaml (str). Leaves ctx.vars = the data written. Precedence: an existing
+             vars.yaml is the base and --file overrides the keys it sets; on a fresh install without --file a
+             checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images
+             (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required
+             values are asked for (defaults from detect_network); webui_admin_user is chosen once.
+             Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
+    Fails:   SetupError for missing/invalid required values with --non-interactive, invalid tsig_keys, or a
+             secrets file that cannot be written (ValidationError converted); OSError/yaml errors on files.
+    Feeds:   run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps
+             before deploy; deploy_config renders from fabric.yaml."""
     data = {}
     user_file = ctx.user_vars_file
     repo_vars = os.path.join(os.path.dirname(ctx.source_dir), "custom-vars.yaml")

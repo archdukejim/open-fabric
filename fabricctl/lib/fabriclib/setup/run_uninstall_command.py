@@ -15,20 +15,36 @@ USAGE = """usage: fabricctl uninstall                      asks: export first? w
 
 
 def _opt(args, name):
+    """Purpose: the value after an option.
+    Inputs:  args — argument list; name — option such as "--export".
+    Returns: the next word, or None when the option is absent or last.
+    Fails:   never.
+    Feeds:   run_uninstall_command."""
     return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else None
 
 
 def _package_installed():
+    """Purpose: whether the fabricctl .deb is installed.
+    Inputs:  none (runs dpkg-query).
+    Returns: True when dpkg reports "install ok installed" for fabricctl.
+    Fails:   FileNotFoundError without dpkg-query.
+    Feeds:   run_uninstall_command."""
     res = subprocess.run(["dpkg-query", "-W", "-f=${Status}", "fabricctl"], capture_output=True, text=True)
     return res.returncode == 0 and "install ok installed" in res.stdout
 
 
 def run_uninstall_command(args, deploy_base):
-    """`fabricctl uninstall`: offers to export all of fabric's data to a
-    folder you choose (nothing is left in /var or anywhere else), removes
-    fabric, and optionally the fabricctl package too (apt purge, which then
-    finds nothing left to do). Every question is asked before anything is
-    touched. Unattended (--yes) the export choice must be explicit."""
+    """Purpose: `fabricctl uninstall`: offer to export all of fabric's data to a folder you choose, remove
+             fabric, and optionally the fabricctl package too. Every question is asked before anything is touched.
+    Inputs:  args — --yes/-y, --export DIR, --no-export, --purge-package; deploy_base — install root.
+             Unattended (--yes) the export choice must be explicit. Interactive otherwise.
+    Returns: 0 when removed (package purge result is printed, not returned); 1 when refused or not confirmed.
+             Leaves the export folder (root only) when one was chosen.
+    Fails:   ValidationError (bad/missing export choice or folder from check_export_dir, or OpenBao unreachable in
+             export_secrets) is printed with USAGE, exit 1, before anything is removed; CalledProcessError from
+             export copying (the stack is stopped by then) and OSError from uninstall propagate; EOFError from
+             input().
+    Feeds:   cli main (`uninstall`); installers/deb/postrm (apt purge: --yes --export)."""
     ctx = SetupContext(deploy_base=deploy_base).load_state()
     export, purge = _opt(args, "--export"), "--purge-package" in args
     try:

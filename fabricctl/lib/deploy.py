@@ -33,6 +33,13 @@ DEPLOY_BASE_DIR = os.environ.get("DEPLOY_BASE_DIR", "/opt")
 TARGET_FABRIC = os.path.join(DEPLOY_BASE_DIR, "fabric")
 
 def run_cmd(cmd, check=True, timeout=120):
+    """Purpose: run a shell command line and capture its output (used for the openssl secret generators).
+    Inputs:  cmd — str, run with shell=True (never pass untrusted text); check — bool, default True: exit on a non-zero
+             status; timeout — seconds, default 120.
+    Returns: the subprocess.CompletedProcess (text stdout/stderr).
+    Fails:   sys.exit(1) after printing "Command failed: <cmd>" and its stderr when check is set and the command fails,
+             or "Command timed out after Ns" on a timeout.
+    Feeds:   generate_secret_b64; apply_deployment (alphanumeric LDAP/OIDC/RADIUS secrets)."""
     try:
         res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         if check and res.returncode != 0:
@@ -44,25 +51,51 @@ def run_cmd(cmd, check=True, timeout=120):
         sys.exit(1)
 
 def load_yaml(path):
+    """Purpose: read a YAML file, treating a missing or empty file as an empty mapping.
+    Inputs:  path — str, file path.
+    Returns: the parsed data (normally a dict); {} if the file does not exist or is empty.
+    Fails:   OSError if it exists but cannot be read; yaml.YAMLError if it is not valid YAML.
+    Feeds:   apply_deployment (the admin's vars file). interactive.py has its own copy with the same name."""
     if not os.path.exists(path):
         return {}
     with open(path, 'r') as f:
         return yaml.safe_load(f) or {}
 
 def save_yaml(data, path):
+    """Purpose: write data to a YAML file in block style.
+    Inputs:  data — a YAML-safe object; path — str, destination (overwritten). Note the argument order differs from
+             interactive.save_yaml(path, data).
+    Returns: None.
+    Fails:   OSError if the file cannot be written; yaml.representer.RepresenterError for unsupported types.
+    Feeds:   apply_deployment (the rendered vars.yaml in /tmp/fabric-render)."""
     with open(path, 'w') as f:
         yaml.safe_dump(data, f, default_flow_style=False)
 
 def generate_secret_b64(length=32):
+    """Purpose: generate a random secret, base64-encoded, with `openssl rand`.
+    Inputs:  length — int, number of random bytes (default 32).
+    Returns: str, the base64 text without newline (44 characters for 32 bytes).
+    Fails:   sys.exit(1) from run_cmd if openssl fails or times out.
+    Feeds:   apply_deployment (CA, rndc, LDAP, Keycloak, Kea DDNS and TSIG secrets)."""
     return run_cmd(f"openssl rand -base64 {length} | tr -d '\\n'").stdout.strip()
 
 def ensure_dir(path, mode=0o750, uid=0, gid=0):
+    """Purpose: make sure a directory exists with the given mode and owner (created if missing, fixed if not).
+    Inputs:  path — str; mode — int, default 0o750; uid, gid — int, default 0 (root).
+    Returns: None.
+    Fails:   OSError (PermissionError when not root, FileExistsError if path is a file) from os.makedirs/chmod/chown.
+    Feeds:   apply_deployment (archive, web, service, OpenBao, BIND9, dirsrv, webui, Step-CA and data directories)."""
     if not os.path.exists(path):
         os.makedirs(path, mode=mode)
     os.chmod(path, mode)
     os.chown(path, uid, gid)
 
 def get_service_user(vars_dict, service_name):
+    """Purpose: look up the uid/gid a service's files must belong to.
+    Inputs:  vars_dict — the rendered vars (reads service_users.<name>.uid/gid); service_name — str, e.g. "bind".
+    Returns: (uid, gid) as ints; (0, 0) when the service is not listed.
+    Fails:   ValueError/TypeError if a listed uid or gid is not a number.
+    Feeds:   apply_deployment (ownership of every deployed file and directory)."""
     users = vars_dict.get('service_users', {})
     svc = users.get(service_name, {})
     return int(svc.get('uid', 0)), int(svc.get('gid', 0))
@@ -77,6 +110,12 @@ def get_service_user(vars_dict, service_name):
 SERIAL_RE = re.compile(r"^\s*\d+\s*;\s*Serial.*$", re.MULTILINE)
 
 def rndc(args, timeout=15):
+    """Purpose: run an rndc command inside the bind9 container as the bind user.
+    Inputs:  args — str appended to `rndc` in a shell command line (e.g. "freeze <zone>"; zone names come from validated
+             vars); timeout — seconds, default 15.
+    Returns: the subprocess.CompletedProcess (not checked: callers read returncode/stdout/stderr), or None on a timeout.
+    Fails:   never raises for a failed command; prints "rndc <args> timed out" and returns None on a timeout.
+    Feeds:   _served_serial, reload_zone, apply_deployment (freeze before restart, `rndc reconfig`)."""
     try:
         return subprocess.run(f"docker exec -u bind bind9 rndc {args}", shell=True,
                               capture_output=True, text=True, timeout=timeout)
@@ -85,13 +124,24 @@ def rndc(args, timeout=15):
         return None
 
 def zone_content_changed(src, dst):
-    """Compare zone files ignoring the SOA serial, which changes on every render."""
+    """Purpose: tell whether a rendered zone file differs from the deployed one, ignoring the SOA serial (which changes
+             on every render).
+    Inputs:  src — rendered zone file path; dst — deployed zone file path.
+    Returns: True if dst is missing or the records differ, else False.
+    Fails:   OSError if src (or an existing dst) cannot be read.
+    Feeds:   deploy_zone_files."""
     if not os.path.exists(dst):
         return True
     with open(src) as a, open(dst) as b:
         return SERIAL_RE.sub("", a.read()) != SERIAL_RE.sub("", b.read())
 
 def install_zone_file(src, dst, uid, gid):
+    """Purpose: put a rendered zone file in place for BIND9 and drop its now-stale journal.
+    Inputs:  src — rendered zone file; dst — deployed path; uid, gid — the bind user's ids.
+    Returns: None; dst copied with a fresh mtime (so BIND sees it as newer on thaw/reload), mode 0640, and dst.jnl
+             removed (a journal for the old file would make BIND refuse the zone: "journal out of sync").
+    Fails:   OSError from the copy, chown or chmod.
+    Feeds:   reload_zone; apply_deployment (when BIND9 is stopped or about to restart)."""
     shutil.copy2(src, dst)
     # Fresh mtime: BIND reloads a zone file on thaw/reload only if it is newer
     # than what it loaded; copy2 kept the render time, often older than BIND's
@@ -105,7 +155,13 @@ def install_zone_file(src, dst, uid, gid):
         os.remove(dst + ".jnl")
 
 def deploy_zone_files(src_dir, dst_dir, uid, gid):
-    """Return [(zone, src, dst)] for zone files whose records actually changed."""
+    """Purpose: find the rendered zone files (db.<zone>) whose records differ from the deployed ones.
+    Inputs:  src_dir — rendered bind9/data directory; dst_dir — deployed bind9/data directory; uid, gid — accepted but
+             unused.
+    Returns: [(zone, src, dst)] for each changed zone, sorted by file name; [] if src_dir does not exist.
+    Fails:   OSError if a file cannot be read (from zone_content_changed).
+    Feeds:   apply_deployment (changed_zones, installed or reloaded later); tests/zone_test.py.
+    Notes:   despite its name it copies nothing: installing is done by install_zone_file / reload_zone."""
     changed = []
     if not os.path.isdir(src_dir):
         return changed
@@ -118,24 +174,37 @@ def deploy_zone_files(src_dir, dst_dir, uid, gid):
     return changed
 
 def _file_serial(path):
+    """Purpose: read the SOA serial from a zone file (the line "<n> ; Serial").
+    Inputs:  path — zone file path.
+    Returns: the serial as a string, or None if there is no such line.
+    Fails:   OSError if the file cannot be read.
+    Feeds:   reload_zone (the serial BIND must end up serving); tests/zone_test.py."""
     m = re.search(r"^\s*(\d+)\s*;\s*Serial", open(path).read(), re.MULTILINE)
     return m.group(1) if m else None
 
 
 def _served_serial(zone):
+    """Purpose: ask BIND9 which SOA serial it currently serves for a zone (`rndc zonestatus`).
+    Inputs:  zone — zone name.
+    Returns: the serial as a string, or None if rndc failed, timed out or printed no serial.
+    Fails:   never raises — rndc failures become None.
+    Feeds:   reload_zone (to confirm the new file is being served)."""
     res = rndc(f"zonestatus {zone}")
     m = re.search(r"^serial: (\d+)", res.stdout if res else "", re.MULTILINE)
     return m.group(1) if m else None
 
 
 def reload_zone(zone, src, dst, uid, gid):
-    """Swap a zone file under a running BIND and make sure BIND serves it.
-
-    Freezing a dynamic zone makes BIND write its in-memory copy to the file,
-    and that write can land after ours and put the old zone back (seen in
-    the sandbox: "zone serial unchanged" on thaw, the new record missing).
-    So the served serial is checked against the new file, and the swap is
-    repeated until it matches."""
+    """Purpose: swap a zone file under a running BIND9 and make sure BIND serves the new one.
+    Inputs:  zone — zone name; src — rendered file; dst — deployed file; uid, gid — bind user's ids. Needs the bind9
+             container running.
+    Returns: None. Dynamic zones are frozen, swapped and thawed; static zones (freeze fails) swapped and reloaded.
+             Retried up to 5 times until `rndc zonestatus` shows src's serial.
+    Fails:   never raises for BIND errors: prints "Warning: BIND9 did not accept zone ..." or "... serves <zone> serial
+             X, not Y" and returns. OSError from install_zone_file propagates.
+    Feeds:   apply_deployment (live zone updates); tests/zone_test.py.
+    Notes:   freezing makes BIND write its in-memory copy to the file, and that write can land after ours and put the
+             old zone back ("zone serial unchanged" on thaw), hence the serial check and retry."""
     print(f"Updating zone {zone}...")
     want = _file_serial(src)
     res = None
@@ -161,9 +230,26 @@ def reload_zone(zone, src, dst, uid, gid):
         print(f"  Warning: BIND9 serves {zone} serial {_served_serial(zone)}, not {want}")
 
 def apply_deployment(start_services=True):
-    """Render and deploy all configuration. With start_services=False (first
-    install, used by `fabricctl setup`) files are deployed but nothing is
-    started, restarted or reloaded: certificates do not exist yet."""
+    """Purpose: the deploy engine: render every template from the vars file and secrets into /tmp/fabric-render, copy
+             what changed into DEPLOY_BASE_DIR and /etc/systemd/system, then reload or restart what is affected. Missing
+             secrets (CA, rndc, LDAP, Keycloak, Kea, OIDC, TSIG, RADIUS) are generated once and saved.
+    Inputs:  start_services — bool, default True. False (first install, `fabricctl setup` via
+             fabriclib/setup/deploy_config.py): files are deployed, changed images rebuilt and zones swapped safely, but
+             no service is started, restarted or reloaded (certificates may not exist yet). Reads env CUSTOM_VARS_PATH
+             (default <DEPLOY_BASE_DIR>/fabric/config/vars.yaml), SECRETS_FILE_OVERRIDE (default
+             .../fabric-secrets.yml), LINK_VARS_PATH, DEPLOY_BASE_DIR (at import), and the fabric tree
+             (FABRIC_DIR/jinja, docs). Must run as root.
+    Returns: set of systemd service names whose configuration changed. With start_services=True they have already been
+             restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them.
+    Fails:   sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys,
+             ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is
+             set with install_ldap false; host_ram_capacity is 1 or 2; vars.yaml.j2 or any template fails to render; an
+             image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad
+             link-vars file is only printed. OSError from file operations propagates.
+    Feeds:   fabriclib/setup/deploy_config.py (setup, images/switch_image.py); interactive.apply_mode (`fabricctl
+             --apply`, the menu, and fabriclib/system/apply_changes.py for the web UI); `python3 deploy.py`.
+    Notes:   no --pull on image builds: apply never takes a new base image implicitly. Old vars are archived to
+             <fabric>/archive/<stamp>-vars.yaml before being replaced."""
     print("Starting native Python deployment...")
     
     custom_vars_path = os.environ.get("CUSTOM_VARS_PATH", os.path.join(TARGET_FABRIC, "config/vars.yaml"))

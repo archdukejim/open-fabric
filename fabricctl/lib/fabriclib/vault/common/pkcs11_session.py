@@ -6,13 +6,18 @@ from fabriclib.vault.common.find_token import find_token
 
 @contextlib.contextmanager
 def pkcs11_session(module, serial, pin, attended=False):
-    """A logged-in session on the token, closed afterwards.
-
-    PIN retries are precious (a YubiKey locks its PIV applet after three).
-    A locked PIN or a last try is never used. Unattended (fabric-unlock at
-    boot, the kill switch) a token that already saw a wrong PIN is not tried
-    either, so a stale stored PIN costs one try, not all of them; a person
-    running `vault test` clears that with one correct login."""
+    """Purpose: context manager giving a logged-in PKCS#11 session on one token; logs out and closes it afterwards.
+    Inputs:  module — allowed library path; serial — token serial; pin — the user PIN (str);
+             attended — True when a person asked for this: a token that saw a wrong PIN is then still tried.
+    Returns: yields (PyKCS11 module, session, token info).
+    Fails:   ValidationError: the token is not plugged in; its PIN is locked; only one try is left (never spent);
+             it saw a wrong PIN and this is unattended; wrong PIN (CKR_PIN_INCORRECT); any other login refusal.
+             From find_token: ValidationError (no PyKCS11) or PyKCS11Error. Errors in the with block propagate.
+    Feeds:   slots/pkcs11 wrap and unwrap, add_security_key_slot.
+    Notes:   PIN retries are precious (a YubiKey locks its PIV applet after three). Unattended (fabric-unlock at
+             boot, the kill switch) a token that already saw a wrong PIN is not tried, so a stale stored PIN costs
+             one try, not all of them; a person running `vault test` clears that with one correct login.
+    """
     found = find_token(module, serial)
     if not found:
         raise ValidationError("the security key is not plugged in")

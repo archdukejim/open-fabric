@@ -4,9 +4,17 @@ import struct
 
 
 def dns_query(name, server, port=53, timeout=3):
-    """A-record lookup straight against one DNS server (stdlib only, so
-    checks do not depend on dig). Returns the list of IPv4 answers,
-    following CNAMEs within the same response."""
+    """Purpose: A-record lookup straight against one DNS server over UDP, stdlib only, so checks do not
+             depend on dig.
+    Inputs:  name — str, the host name (a trailing dot is ignored); server — str, IPv4 address of the server;
+             port — int, default 53; timeout — seconds for the reply, default 3.
+    Returns: list of IPv4 answers as dotted strings (CNAMEs in the same response are skipped, the A records
+             they lead to are kept); empty if the answer has none (including NXDOMAIN).
+    Fails:   socket.timeout (OSError) if no reply in time; OSError on a network error; struct.error or
+             IndexError on a truncated or malformed reply. Labels longer than 63 bytes are not checked.
+    Feeds:   setup/verify_install.py.
+    Notes:   no TCP fallback and no check of the reply's id or rcode; the answer section is read right after
+             the question, assuming the server echoed it unchanged."""
     qid = random.randint(0, 65535)
     labels = b"".join(bytes([len(p)]) + p.encode() for p in name.rstrip(".").split("."))
     query = struct.pack(">HHHHHH", qid, 0x0100, 1, 0, 0, 0) + labels + b"\0" + struct.pack(">HH", 1, 1)

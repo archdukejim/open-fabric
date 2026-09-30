@@ -15,18 +15,33 @@ APT_ENV = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE"
 
 
 def _missing(pkgs):
+    """Purpose: which of the given Debian packages are not installed.
+    Inputs:  pkgs — package names (list of str).
+    Returns: the names (in order) that dpkg-query does not report as "install ok installed".
+    Fails:   FileNotFoundError without dpkg-query; unknown packages count as missing.
+    Feeds:   run."""
     res = subprocess.run(["dpkg-query", "-W", "-f=${Package} ${Status}\\n", *pkgs], capture_output=True, text=True)
     installed = {l.split()[0] for l in res.stdout.splitlines() if l.endswith("install ok installed")}
     return [p for p in pkgs if p not in installed]
 
 
 def _docker_ok():
+    """Purpose: whether Docker Engine, compose v2 and buildx all answer.
+    Inputs:  none (runs `docker version`, `docker compose version`, `docker buildx version`).
+    Returns: True only if all three exit 0.
+    Fails:   FileNotFoundError if docker is missing (run checks shutil.which first).
+    Feeds:   run."""
     return all(subprocess.run(cmd, capture_output=True).returncode == 0
                for cmd in (["docker", "version"], ["docker", "compose", "version"], ["docker", "buildx", "version"]))
 
 
 def _install_docker():
-    """Docker's official apt repository (docker-ce + compose + buildx)."""
+    """Purpose: install docker-ce, containerd, buildx and compose from Docker's official apt repository.
+    Inputs:  none (reads /etc/os-release for distro and codename; `dpkg --print-architecture`). Needs network.
+    Returns: None; leaves /etc/apt/keyrings/docker.asc, /etc/apt/sources.list.d/docker.list and the packages.
+    Fails:   CommandError from common.run when curl, apt-get update or apt-get install fails (propagates, not
+             converted to SetupError); FileNotFoundError without /etc/os-release.
+    Feeds:   run."""
     rel = {}
     with open("/etc/os-release") as f:
         for line in f:
@@ -46,7 +61,14 @@ def _install_docker():
 
 
 def run(ctx):
-    """Host packages and Docker Engine (compose v2 + buildx), running and enabled."""
+    """Purpose: host packages (HOST_PACKAGES) and Docker Engine with compose v2 and buildx, running and enabled.
+    Inputs:  ctx — SetupContext: offline (never download). Env APT_ENV for apt.
+    Returns: None; missing packages installed, Docker installed if needed, docker.service enabled and answering
+             `docker info`. Idempotent: nothing is installed when present.
+    Fails:   SetupError: offline with packages or Docker missing; apt install failure (with advice on apt
+             sources); Docker not answering after about 60 s. CommandError from `apt-get update`,
+             `systemctl enable --now docker`, the version queries or _install_docker propagates.
+    Feeds:   setup step `host`, run by run_setup via STEPS."""
     missing = _missing(HOST_PACKAGES)
     if missing:
         if ctx.offline:

@@ -7,15 +7,29 @@ from fabriclib.secrets.load_secrets import load_secrets
 
 
 def _flat(secrets):
+    """Purpose: Flatten fabric's secrets for listing: each tsig_secrets entry becomes "tsig/<name>".
+    Inputs:  secrets — the secrets dict.
+    Returns: new dict; every other top-level key kept as is (radius_secrets stays one entry holding all
+             RADIUS client secrets).
+    Fails:   AttributeError if tsig_secrets is present but not a dict.
+    Feeds:   run_secrets_command.
+    """
     out = {k: v for k, v in secrets.items() if k != "tsig_secrets"}
     out.update({f"tsig/{k}": v for k, v in (secrets.get("tsig_secrets") or {}).items()})
     return out
 
 
 def run_secrets_command(argv, path=SECRETS_FILE):
-    """`fabricctl secrets list` (names only) and `fabricctl secrets show
-    <name>` (one value, e.g. keycloak_admin_password or tsig/npm). Reads
-    from wherever fabric's secrets live; every `show` is audited."""
+    """Purpose: `fabricctl secrets list` (names only) and `fabricctl secrets show <name>` (one value, e.g.
+             keycloak_admin_password or tsig/npm), read from wherever fabric's secrets live.
+    Inputs:  argv — ["list"] or ["show", name]; path — the secrets file, default SECRETS_FILE.
+    Returns: exit status: 0 done (output on stdout), 1 error (message on stderr: OpenBao unavailable,
+             unknown name), 2 usage.
+    Fails:   load_secrets' ValidationError is reported, not raised; OSError from write_audit propagates;
+             yaml.YAMLError for a malformed file.
+    Feeds:   fabriclib/cli.py (fabricctl secrets).
+    Notes:   every `show` is audited as SECRET_READ with the name, never the value.
+    """
     if argv[:1] == ["list"] and len(argv) == 1:
         try:
             names = sorted(_flat(load_secrets(path)))

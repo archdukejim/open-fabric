@@ -9,10 +9,17 @@ FIELDS = ("records", "any_name", "record_types", "domain", "algorithm", "out")
 
 
 def update_tsig_key(actor, name, changes, source="cli"):
-    """Change what an existing TSIG key may update (its secret is untouched).
-    `changes` may set records (a list), any_name (True; None removes it),
-    record_types, domain, algorithm, out. Run apply afterwards. Returns the
-    key as stored."""
+    """Purpose: Change what an existing TSIG key may update; its secret is untouched. Run apply afterwards.
+    Inputs:  actor — str, who asks (audit).
+             name — str key name.
+             changes — dict with keys from FIELDS: records (list), any_name (True), record_types, domain, algorithm,
+             out; a value of None, [] or "" removes that field.
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock.
+    Returns: the key dict as stored after normalize_tsig_keys.
+    Fails:   ValidationError "cannot change …" (unknown field), "no TSIG key named …", or one from normalize_tsig_keys;
+             OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
+    Feeds:   run_tsig_command (`fabricctl tsig update`).
+    """
     unknown = set(changes) - set(FIELDS)
     if unknown:
         raise ValidationError(f"cannot change {', '.join(sorted(unknown))}")

@@ -8,8 +8,14 @@ from fabriclib.dns.zone_name import zone_name
 
 
 def zone_detail(key):
-    """One zone: its records (with display values; A/AAAA also say where
-    their automatic PTR goes, or why there is none) and BIND sync status."""
+    """Purpose: One zone for the zone page: its records with display values, where each A/AAAA record's automatic PTR
+             goes (or why there is none), and BIND's sync status.
+    Inputs:  key — str zone key in `dns:`. Reads vars.yaml; runs sync_status (docker exec rndc).
+    Returns: {"key", "name", "records": [{"type", "index", "name", "value", and for A/AAAA "ptr", "ptr_note"}], "status"
+             (sync message)}.
+    Fails:   ValidationError "unknown zone"; OSError or yaml.YAMLError from load_vars or sync_status.
+    Feeds:   agent route GET /v1/zones/<key> (fabricctl/lib/agent/server.py, called by webui/server.py).
+    """
     data = load_vars()
     zone = (data.get("dns") or {}).get(key)
     if zone is None:

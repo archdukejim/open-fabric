@@ -16,6 +16,12 @@ from fabriclib.pki.export_p12 import export_p12
 
 
 def _write(tmp, name, body):
+    """Purpose: Write text to a new 0600 file in convert_cert's private temp directory.
+    Inputs:  tmp — the 0700 temp directory; name — file name; body — str content.
+    Returns: the file's path (str).
+    Fails:   OSError if the file cannot be created or written.
+    Feeds:   convert_cert (leaf, full chain, key and chain files for openssl and export_p12).
+    """
     path = os.path.join(tmp, name)
     fd = os.open(path, os.O_WRONLY | os.O_CREAT, 0o600)
     with os.fdopen(fd, "w") as f:
@@ -24,12 +30,23 @@ def _write(tmp, name, body):
 
 
 def convert_cert(v, actor, cert_data, key_data="", source="web"):
-    """Re-package a certificate for devices that want another format: PEM
-    (.crt), DER (.cer), the full chain (.pem, .p7b) and — given its private
-    key — a password-protected .p12. A certificate issued by this fabric gets
-    the fabric chain appended; any other keeps the chain it came with. The
-    key is used in memory/0600 temp files only and not kept. Returns {name,
-    cert, fullchain, der_b64, p7b_b64, p12_b64, p12_password, info}."""
+    """Purpose: Re-package a certificate for devices that want another format: PEM (.crt), DER (.cer),
+             the full chain (.pem, .p7b) and, given its private key, a password-protected .p12.
+    Inputs:  v — fabric vars (CA files via ca_files / ca_chain_pem); actor — str, for the audit;
+             cert_data — PEM (a chain: the first is the leaf), DER bytes or base64; key_data — optional
+             unencrypted private key (PEM or DER), default "" (no .p12); source — audit source, default "web".
+    Returns: {"name": download name, "cert": leaf PEM, "fullchain": leaf + chain PEM, "info": describe_cert
+             dict, "fabric_issued": bool, "der_b64", "p7b_b64", "p12_b64" and "p12_password" ("" without
+             a key)}.
+    Fails:   ValidationError "no certificate given"; to_pem's messages (bad input); "give exactly one
+             private key"; "the private key could not be read (encrypted keys are not supported)"; "the
+             private key does not belong to this certificate"; openssl's first error line (openssl helper);
+             subprocess.CalledProcessError from export_p12; OSError from temp files or the audit log.
+    Feeds:   agent route POST /v1/pki/convert (Handler.pki) -> webui agentclient.convert_cert -> PKI page.
+    Notes:   a certificate that verifies against this fabric's CA gets the fabric chain; any other keeps the
+             chain it came with. The key only lives in 0600 files in a 0700 temp directory removed on return
+             and is not kept; the .p12 password is generated and returned once. Audited as PKI_CONVERT.
+    """
     certs = to_pem(cert_data, "cert")
     if not certs:
         raise ValidationError("no certificate given")

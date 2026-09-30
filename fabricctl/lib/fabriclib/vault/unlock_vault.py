@@ -9,14 +9,21 @@ from fabriclib.vault.common.write_private_file import write_private_file
 
 
 def unlock_vault(v):
-    """fabric-unlock: get the vault key from any present unlock method and
-    put it where OpenBao's static seal reads it (<openbao_runtime_dir>, RAM,
-    openbao user, 0400) — the current key, and the previous one while a
-    rotation is in progress. Returns {"slot": slot id, "tamper": bool}, or
-    None when no method is present (OpenBao then must not start: without
-    its key file it would not run at all). A slot store that does not match
-    its signature is reported (audit) but does not block the unlock: every
-    key is still verified against its check value."""
+    """Purpose: fabric-unlock: get the vault key from any present method and put it where OpenBao's static seal
+             reads it.
+    Inputs:  v — vars: openbao_runtime_dir (RAM), openbao_admin_dir (default /run/fabric/openbao-admin),
+             service_users.openbao uid/gid. Reads slots.json and tries the methods unattended.
+    Returns: {"slot": id of the method used, "tamper": bool}, or None when there is no store or no method is present.
+    Fails:   OSError creating the folders or files (e.g. not root); KeyError if service_users has no openbao entry.
+             A method's failure is not raised (obtain_key).
+    Feeds:   `fabricctl vault unlock` (the openbao unit's start condition), rotate_vault_key, setup/setup_openbao,
+             tests/openbao/run.py.
+    Notes:   writes <runtime>/<key_id>.key (openbao user, 0400), and the previous key too while a rotation is in
+             progress; also prepares the break-glass socket folder (openbao user, 0700). None means OpenBao must not
+             start: without its key file it would not run at all. A store that does not match its signature is
+             audited (VAULT_SLOTS_TAMPERED) but does not block the unlock: every key is still verified against its
+             check value.
+    """
     store = read_slot_store(v)
     if not store:
         return None

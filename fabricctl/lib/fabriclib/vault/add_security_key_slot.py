@@ -19,8 +19,14 @@ KEY_LABEL = "fabric-vault"
 
 
 def _generate(P, session):
-    """A new RSA-2048 pair on the token: private part sensitive and not
-    extractable. Returns its CKA_ID (hex)."""
+    """Purpose: make a new RSA-2048 key pair on the token whose private half is sensitive and not extractable.
+    Inputs:  P — PyKCS11 module; session — logged-in read-write session. The pair gets label "fabric-vault" and a
+             random 8-byte CKA_ID.
+    Returns: the new pair's CKA_ID in hex (16 characters).
+    Fails:   ValidationError if the token will not generate a pair through PKCS#11, explaining how to make one with
+             the vendor tool instead (YubiKey: `ykman piv keys generate` in slot 9d, which is key id 03).
+    Feeds:   add_security_key_slot.
+    """
     ident = tuple(os.urandom(8))
     common = [(P.CKA_TOKEN, True), (P.CKA_LABEL, KEY_LABEL), (P.CKA_ID, ident)]
     try:
@@ -38,6 +44,13 @@ def _generate(P, session):
 
 
 def _check_existing(P, session, key_id):
+    """Purpose: accept an existing key pair only if it is RSA and its private key can never leave the token.
+    Inputs:  P — PyKCS11 module; session — logged-in session; key_id — the pair's CKA_ID in hex.
+    Returns: None.
+    Fails:   ValidationError: no pair with that id, not RSA, or the private key is not sensitive or is extractable;
+             PyKCS11Error from the token.
+    Feeds:   add_security_key_slot.
+    """
     ident = tuple(bytes.fromhex(key_id))
     private = session.findObjects([(P.CKA_CLASS, P.CKO_PRIVATE_KEY), (P.CKA_ID, ident)])
     public = session.findObjects([(P.CKA_CLASS, P.CKO_PUBLIC_KEY), (P.CKA_ID, ident)])
@@ -52,14 +65,25 @@ def _check_existing(P, session, key_id):
 
 
 def add_security_key_slot(v, actor, module, token_serial, pin, key_id="new", label="", source="web"):
-    """Make a PKCS#11 security key an unlock method.
-
-    `module` must be one of the allowed libraries; the token is found by its
-    serial. With key_id "new" the token makes an RSA-2048 key pair that can
-    never leave it; otherwise the existing pair with that CKA_ID is used
-    (sensitive, not extractable). The vault key is wrapped by the token,
-    unwrapped again and checked before the method is saved. The PIN is kept
-    root-only on this host. Returns the new slot id."""
+    """Purpose: make a PKCS#11 security key or smart card an unlock method, verified before it is saved.
+    Inputs:  v — vars (openbao_pkcs11_modules, openbao_key_dir, ...); actor — who asked (audit);
+             module — library path, must be in pkcs11_modules(v); token_serial — the token's PKCS#11 serial;
+             pin — 4 to 64 printable characters;
+             key_id — "new" (default: the token makes an RSA-2048 pair) or an existing pair's CKA_ID in hex (e.g. 03);
+             label — at most 60; source — audit source ("web").
+             Reads slots.json, and /sys (detect_devices) for the token's USB serial.
+    Returns: the new slot id, "key-<last 8 of the serial>-<last 4 of the key id>".
+    Fails:   ValidationError: library not allowed; bad label, PIN or key id; no vault key yet; the token is already a
+             method; nothing present to vouch; from pkcs11_session, _generate or _check_existing; the token's unwrap
+             does not match. Once the PIN is saved any failure removes it again (pkcs11.discard) and re-raises
+             (ValueError, PyKCS11Error, OSError as they come).
+    Feeds:   agent route POST /v1/vault/slots/add-security-key, `fabricctl vault add-key` (run_vault_command),
+             tests/openbao/run.py.
+    Notes:   the PIN is kept root 0400 on this host (pin-<slot id>): the token is the factor, like a stick, but its
+             key cannot be copied. The kill-switch udev rule needs exactly one USB device whose serial matches the
+             token's; otherwise it is off and the method's detail says so. A pair made here stays on the token if
+             enrolment fails. Rewrites the udev rules; audited as VAULT_SLOT_ADD.
+    """
     if module not in pkcs11_modules(v):
         raise ValidationError("that PKCS#11 library is not on the allowed list (openbao_pkcs11_modules)")
     if not LABEL_RE.match(label or ""):

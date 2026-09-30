@@ -33,11 +33,18 @@ print(json.dumps(added))
 
 
 def ensure_default_device_roles(v, marker, container="dirsrv"):
-    """Create fabric's default device roles (DEFAULT_DEVICE_ROLES) once: on a
-    new install, and on the first setup of an install from before they
-    existed. A role that already exists by name is left as it is. `marker`
-    (a file) records that it was done, so a default role the admin deleted
-    or renamed is never brought back. Returns the names added."""
+    """Purpose: Create fabric's default device roles (DEFAULT_DEVICE_ROLES) once: on a new install, and on
+             the first setup of an install from before they existed.
+    Inputs:  v — fabric vars: ldap_base_dn; marker — path of the file recording that it was done;
+             container — dirsrv container name, default "dirsrv".
+    Returns: list of role names added ([] when the marker exists; roles that exist by name are left as
+             they are).
+    Fails:   ValidationError "creating the default device roles failed: <stderr tail>"; subprocess.
+             TimeoutExpired after 180 s; OSError writing the marker.
+    Feeds:   setup/start_services.py run.
+    Notes:   binds as Directory Manager with the container's DS_DM_PASSWORD; roles arrive as JSON in the
+             environment. The marker keeps a default role the admin deleted or renamed from coming back.
+    """
     if os.path.exists(marker):
         return []
     env = {**os.environ, "F_BASE": v["ldap_base_dn"], "F_ROLES": json.dumps(DEFAULT_DEVICE_ROLES)}

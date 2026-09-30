@@ -18,6 +18,16 @@ out({"devices": devices, "roles": roles})
 
 
 def read_directory(v):
-    """Every device and device role, raw ({devices, roles}); owners as DNs,
-    role members as device names."""
+    """Purpose: Every device and device role, raw, in one directory read.
+    Inputs:  v — fabric vars (run_dirsrv).
+    Returns: {"devices": [{name, type, enabled, macs, owner (DN or ""), description, certs (SHA-256
+             fingerprints)}], "roles": [{name, description, permissions, vlan (int or None), priority (int,
+             default 100), members (device names)}]}.
+    Fails:
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   add_device, update_device, remove_device, require_device, device_overview, list_devices,
+             list_roles.
+    """
     return run_dirsrv(v, _READ)

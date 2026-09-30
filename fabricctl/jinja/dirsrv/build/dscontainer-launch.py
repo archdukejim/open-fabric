@@ -15,6 +15,13 @@ _real_signal = signal.signal
 
 
 def _signal(sig, handler):
+    """Purpose: stand-in for signal.signal that refuses to install a SIGCHLD handler, so upstream
+             dscontainer's unguarded waitpid handler never runs (tini, PID 1, reaps children instead).
+    Inputs:  sig — signal number; handler — the handler dscontainer asks for.
+    Returns: signal.SIG_DFL for SIGCHLD (nothing installed); otherwise the previous handler, as signal.signal does.
+    Fails:   as signal.signal for other signals (ValueError, OSError on an invalid signal).
+    Feeds:   installed as signal.signal before this script runs /usr/libexec/dirsrv/dscontainer (the image's
+             ENTRYPOINT, dirsrv/build/Dockerfile)."""
     if sig == signal.SIGCHLD:
         return signal.SIG_DFL
     return _real_signal(sig, handler)

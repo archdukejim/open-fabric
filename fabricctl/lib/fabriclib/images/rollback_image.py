@@ -7,8 +7,15 @@ from fabriclib.images.switch_image import switch_image
 
 
 def rollback_image(ctx, name, actor="root", source="cli"):
-    """Move a service (and any sharing its base) back to the image it ran
-    before its last update. Returns the services moved."""
+    """Purpose: move a service (and every service sharing its image var) back to the image it ran before
+             its last `fabricctl images update`.
+    Inputs:  ctx — SetupContext; name — str, a service name from SERVICES; actor, source — for the audit log.
+             Reads the rollback STATE file.
+    Returns: list of service names moved; [] if already on that image.
+    Fails:   ValidationError for an unknown service or when no previous image is recorded; everything
+             switch_image raises (ValidationError on a failed pull or failed health check);
+             json.JSONDecodeError if STATE is corrupt.
+    Feeds:   run_images_command (rollback)."""
     service = next((s for s in SERVICES if s["name"] == name), None)
     if service is None:
         raise ValidationError(f"unknown service {name!r}")

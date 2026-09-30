@@ -116,6 +116,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- Dispatch ---
+# Purpose: `fabricctl --render-jinja <file.j2>`: render one Jinja2 template with fabric's vars and filters
+#          (fabriclib/common/jinja_env.py) and write the result for the calling user.
+# Inputs:  none as arguments; reads globals set by the flag parser: $RENDER_TEMPLATE (required), $RENDER_VARS
+#          (default $VARS_FILE), $RENDER_OUTPUT (a file, or a directory; default the sudo caller's home);
+#          $SUDO_USER/$USER, $FABRIC_DIR.
+# Returns: the rendered file at the destination (<template without .j2>, or <name>.rendered), mode 0644, owned by
+#          the caller when not root; prints the paths used and "Render complete"; exit status 0.
+# Fails:   exit 1 with an err line when the template is not given or not found, or the vars file is missing.
+#          A read or render error makes the embedded Python exit 1; its message goes to /dev/null, so under
+#          `set -e` the script stops silently. Paths are pasted into the Python source, so a quote in one breaks it.
+# Feeds:   the MODE dispatch below (render-jinja).
 do_render_jinja() {
     echo -e "${BOLD}fabric render-jinja${NC}"
     if [ -z "$RENDER_TEMPLATE" ]; then

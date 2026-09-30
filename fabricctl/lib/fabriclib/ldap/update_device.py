@@ -29,8 +29,18 @@ out({"ok": True})
 
 
 def update_device(v, actor, name, fields, source="web"):
-    """Replace a device's type, MACs, owner, description, enabled flag and
-    role memberships with `fields` (same shape as add_device)."""
+    """Purpose: Replace a device's type, MACs, owner, description, enabled flag and role memberships.
+    Inputs:  v — fabric vars; actor — str, for the audit; name — an existing device; fields — same shape as
+             add_device (check_device_fields); source — default "web".
+    Returns: None.
+    Fails:   ValidationError "no device named ..."; check_device_fields' messages; "no such user: <owner>"
+             (from the directory);
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   agent/server.py Handler.directory (POST /v1/devices/<name>) -> webui agentclient.save_device.
+    Notes:   only role memberships that change are touched. Audited as DEVICE_UPDATE.
+    """
     directory = read_directory(v)
     if not any(d["name"] == name for d in directory["devices"]):
         raise ValidationError(f"no device named {name!r}")

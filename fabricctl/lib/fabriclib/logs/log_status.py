@@ -3,10 +3,15 @@ import urllib.request
 
 
 def log_status(v, timeout=3):
-    """Log forwarding at a glance, from Fluent Bit's own metrics
-    (http://<ip_fluentbit>:2020, on fabric_net only): per destination the
-    records sent, retries, errors and dropped records. {"enabled": False}
-    when Fluent Bit is not installed; "reachable": False when it is down."""
+    """Purpose: Log forwarding at a glance, from Fluent Bit's own metrics (http://<ip_fluentbit>:2020, reachable on
+             fabric_net only).
+    Inputs:  v — the vars dict (install_fluentbit, ip_fluentbit).
+             timeout — seconds for the HTTP request (default 3).
+    Returns: {"enabled": False} when Fluent Bit is not installed; else {"enabled": True, "reachable", "outputs": {name:
+             {"sent", "retries", "errors", "dropped"}} (null outputs skipped), and "error" when unreachable}.
+    Fails:   never for network or JSON errors (they go into "error"); KeyError if ip_fluentbit is missing.
+    Feeds:   run_logs_command (status); tests/fluentbit/run.py.
+    """
     if not v.get("install_fluentbit"):
         return {"enabled": False}
     out = {"enabled": True, "reachable": False, "outputs": {}}

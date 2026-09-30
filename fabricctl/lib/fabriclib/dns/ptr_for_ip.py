@@ -6,11 +6,15 @@ ULA = ipaddress.ip_network("fc00::/7")
 
 
 def ptr_for_ip(ip):
-    """Where an address's automatic PTR record lives: (reverse zone, label)
-    — a /24 in-addr.arpa zone for IPv4, a /64 ip6.arpa zone for IPv6 — or
-    (None, reason) for addresses fabric must not claim reverse DNS for
-    (public, loopback, link-local): serving their zone locally would shadow
-    someone else's network."""
+    """Purpose: Where an address's automatic PTR record lives, or why it gets none.
+    Inputs:  ip — str (or anything whose str() is an address).
+    Returns: (reverse zone, label): a /24 in-addr.arpa zone and the last octet for private IPv4 (RFC 1918, CGNAT); a /64
+             ip6.arpa zone and 16 nibbles for IPv6 ULA; or (None, reason) for an invalid, loopback, link-local,
+             unspecified, multicast, public or global address.
+    Fails:   never — a bad address returns (None, "not an IP address").
+    Feeds:   reverse_zones, zone_detail; webui/devserver.py.
+    Notes:   serving a public address's reverse zone locally would shadow someone else's network.
+    """
     try:
         addr = ipaddress.ip_address(str(ip).strip())
     except ValueError:

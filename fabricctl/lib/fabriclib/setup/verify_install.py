@@ -11,6 +11,12 @@ from fabriclib.vault.vault_status import vault_status
 
 
 def _curl(url, host, ip, port, root_ca, client_cert=False):
+    """Purpose: one HTTP(S) request pinned to an IP, for the checks.
+    Inputs:  url; host, ip, port — `--resolve host:port:ip`; root_ca — CA file to verify with, or None for the
+             host's trust store; client_cert — unused.
+    Returns: (curl exit code, HTTP status code as str).
+    Fails:   never raises for HTTP/TLS errors (they are the exit code); FileNotFoundError without curl.
+    Feeds:   checks."""
     ca = ["--cacert", root_ca] if root_ca else []      # None: the host's own trust store
     res = subprocess.run(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10",
                           *ca, "--resolve", f"{host}:{port}:{ip}", url],
@@ -19,6 +25,12 @@ def _curl(url, host, ip, port, root_ca, client_cert=False):
 
 
 def _ldap_bind(uri, dn, password):
+    """Purpose: try an LDAP simple bind from inside the dirsrv container.
+    Inputs:  uri — LDAP URI as seen in the container; dn — bind DN; password — passed via environment, never argv.
+    Returns: "BOUND" on success, otherwise the python-ldap exception name (e.g. "INVALID_CREDENTIALS",
+             "CONFIDENTIALITY_REQUIRED"), or "" if docker exec failed.
+    Fails:   never raises for bind errors; FileNotFoundError without docker.
+    Feeds:   checks."""
     env = {**os.environ, "CHECK_URI": uri, "CHECK_DN": dn, "CHECK_PW": password}
     code = ("import ldap, os; c = ldap.initialize(os.environ['CHECK_URI']);\n"
             "try:\n c.simple_bind_s(os.environ['CHECK_DN'], os.environ['CHECK_PW']); print('BOUND')\n"
@@ -29,7 +41,17 @@ def _ldap_bind(uri, dn, password):
 
 
 def checks(ctx):
-    """[(name, passed, detail)] for a running install."""
+    """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
+             trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin
+             (Keycloak role, client certificate), OpenBao state and every installed service.
+    Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port,
+             install_ldap/webui/keycloak, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA
+             root, the agent socket, ~/fabric-admin of the sudo user.
+    Returns: list of (name, passed: bool, detail: str).
+    Fails:   ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading
+             root_ca.crt; subprocess.TimeoutExpired from the LDAPS probe (15 s); struct.error/IndexError from
+             dns_query on a malformed reply. Check failures are results, not exceptions.
+    Feeds:   run."""
     v, s = ctx.vars, ctx.secrets
     root_ca = ctx.path("stepca", "data", "certs", "root_ca.crt")
     port = int(v.get("bind_dns_port", 53))
@@ -128,8 +150,12 @@ def checks(ctx):
 
 
 def run(ctx):
-    """Check the running install end to end; fail setup if anything is wrong.
-    Same checks as `fabricctl doctor`."""
+    """Purpose: check the running install end to end and fail setup if anything is wrong (same checks as
+             `fabricctl doctor`).
+    Inputs:  ctx — SetupContext with state loaded (see checks).
+    Returns: None; each check printed as ok or error.
+    Fails:   SetupError("<n> check(s) failed"); exceptions from checks propagate.
+    Feeds:   setup step `verify`, run by run_setup via STEPS; run_setup main for `fabricctl doctor`."""
     failed = 0
     for name, passed, detail in checks(ctx):
         (ok if passed else err)(f"{name}" + (f" — {detail}" if detail else ""))

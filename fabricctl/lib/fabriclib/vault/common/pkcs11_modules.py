@@ -8,9 +8,14 @@ DEFAULT_MODULES = ["/usr/lib/*/libykcs11.so*",              # YubiKey PIV (packa
 
 
 def pkcs11_modules(v):
-    """The PKCS#11 libraries fabric may load: paths or globs from
-    `openbao_pkcs11_modules` (root-owned vars; never from a request — loading
-    a library runs its code as root), resolved to files that exist."""
+    """Purpose: the PKCS#11 libraries fabric may load, resolved to files present on this host.
+    Inputs:  v — vars: openbao_pkcs11_modules (paths or globs; root-owned vars, never from a request),
+             else DEFAULT_MODULES (YubiKey ykcs11, OpenSC, SoftHSM2).
+    Returns: list of existing library paths (str) without duplicates, in pattern order, sorted within a pattern.
+    Fails:   never — a pattern that matches nothing adds nothing.
+    Feeds:   add_security_key_slot (allowed-list check), list_pkcs11_tokens.
+    Notes:   loading a library runs its code as root; that is why the list comes only from the host's vars.
+    """
     out = []
     for pattern in v.get("openbao_pkcs11_modules") or DEFAULT_MODULES:
         for path in sorted(glob.glob(pattern)):

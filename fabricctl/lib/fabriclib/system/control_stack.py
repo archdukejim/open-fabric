@@ -5,9 +5,14 @@ from fabriclib.system.service_status import service_status
 
 
 def control_stack(verb):
-    """`fabricctl start|stop|restart|status`: the whole stack through
-    fabric.target (every fabric unit is PartOf it). status returns
-    [(unit, state, container health)] — no change is made."""
+    """Purpose: `fabricctl start|stop|restart|status`: the whole stack through fabric.target (every fabric
+             unit is PartOf it).
+    Inputs:  verb — "start", "stop", "restart" or "status".
+    Returns: [] for start/stop/restart once systemctl succeeded; for status [(unit, state, container health)]:
+             fabric.target first, then service_status() — no change is made.
+    Fails:   ValidationError when systemctl fails or the verb is unknown; subprocess.TimeoutExpired after 900 s.
+    Feeds:   cli main (prints the rows).
+    Notes:   stop names every installed unit too: stopping an inactive target would not reach them."""
     if verb in ("start", "stop", "restart"):
         # stop: name the units too — stopping an inactive target would not
         # reach them (PartOf propagates from an active target only).

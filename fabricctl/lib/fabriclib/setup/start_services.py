@@ -16,8 +16,18 @@ ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv
 
 
 def run(ctx):
-    """Start the stack in dependency order (local image layers build on first
-    start), seed 389-DS, configure Keycloak, then fabric-agent and the web UI."""
+    """Purpose: start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, then fabric-agent
+             and the web UI, and activate fabric.target.
+    Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
+             install_fluentbit, install_kea, install_freeradius; restart_services (units to restart);
+             target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file.
+    Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
+             container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6
+             tries, 15 s apart); fabric-agent and fabric-web running when the web UI is on.
+    Fails:   SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration
+             still fails after 6 tries; CalledProcessError from systemctl; ValidationError from
+             ensure_default_device_roles (propagates).
+    Feeds:   setup step `start`, run by run_setup via STEPS."""
     v, lib = ctx.vars, os.path.join(ctx.target_dir, "lib")
     # fabric.target groups every unit: systemctl start|stop|restart fabric.target
     subprocess.run(["systemctl", "enable", "fabric.target"], check=True, capture_output=True)

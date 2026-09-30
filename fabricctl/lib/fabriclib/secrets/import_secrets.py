@@ -10,8 +10,14 @@ from fabriclib.secrets.constants import MARKER, VAULT_PATH
 
 
 def _shred(path):
-    """Overwrite then unlink (best effort on flash and copy-on-write file
-    systems; the disk-encryption layer is what really protects old blocks)."""
+    """Purpose: Overwrite a file with random bytes, fsync, then delete it.
+    Inputs:  path — file to destroy.
+    Returns: None.
+    Fails:   OSError if the file cannot be opened, written or removed.
+    Feeds:   import_secrets.
+    Notes:   best effort on flash and copy-on-write file systems; the disk-encryption layer is what really
+             protects old blocks.
+    """
     size = os.path.getsize(path)
     with open(path, "r+b") as f:
         f.write(os.urandom(max(size, 1)))
@@ -21,11 +27,19 @@ def _shred(path):
 
 
 def import_secrets(v, secrets_file, token=None):
-    """Move fabric's secrets from the 0600 file into OpenBao (KV v2
-    fabric/secrets): write, read back, compare, and only when identical
-    shred the file and write the marker that makes OpenBao the source of
-    truth. Idempotent: no file means nothing to do. Returns "imported",
-    "unchanged" (a restored file equal to what OpenBao holds) or "none"."""
+    """Purpose: Move fabric's secrets from the 0600 file into OpenBao (KV v2 fabric/secrets): write, read
+             back, compare, and only when identical write the marker and shred the file.
+    Inputs:  v — fabric vars for OpenBao; secrets_file — path of fabric-secrets.yml; token — OpenBao token,
+             default a SETUP_CREDS AppRole login per call.
+    Returns: "imported" (written), "unchanged" (a restored file equal to what OpenBao holds) or "none" (no
+             file: nothing to do). Idempotent.
+    Fails:   ValidationError "<file> is empty; refusing to import it over fabric's secrets"; "fabric's
+             secrets read back from OpenBao differ from the file; the file was kept"; read_vault_secrets /
+             write_vault_secrets' ValidationError; yaml.YAMLError; OSError.
+    Feeds:   setup/setup_openbao.py run.
+    Notes:   the marker (0644, never secret itself) makes OpenBao the source of truth from then on (see
+             secrets_in_openbao); it is written before the file is shredded.
+    """
     if not os.path.exists(secrets_file):
         return "none"
     with open(secrets_file) as f:

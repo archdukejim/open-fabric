@@ -34,9 +34,16 @@ POST = {
 
 
 def required_permission(method, route):
-    """The permission an agent request needs, or None if the route is not
-    allowed at all. `route` is the path after /v1/ as a list; "*" in the
-    table matches one name segment. Literal entries win over wildcards."""
+    """Purpose: The permission an agent request needs; routes not in the table are refused (default deny).
+    Inputs:  method — "GET" or "POST" (anything else allows nothing); route — the path after /v1/ as a list
+             or tuple of segments.
+    Returns: a permission name (e.g. "dns:write"), "session" (any signed-in fabric user), or None (route
+             not allowed).
+    Fails:   never — an unknown route gives None.
+    Feeds:   agent/server.py Handler.authorize (None -> 403 "not allowed").
+    Notes:   an exact entry wins; otherwise the first same-length pattern in table order where "*" matches
+             any one segment.
+    """
     table = GET if method == "GET" else POST if method == "POST" else {}
     route = tuple(route)
     if route in table:

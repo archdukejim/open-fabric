@@ -12,6 +12,11 @@ _conf = {}
 
 
 def load_config():
+    """Purpose: load the policy's settings once per process: fabric-radius.json and the reader's password.
+    Inputs:  none. Reads /etc/freeradius/fabric/fabric-radius.json and the file its "password_file" names.
+    Returns: dict (cached module-level): uri, ca_file, bind_dn, base, people, password_file, password, …
+    Fails:   OSError if a file is missing or unreadable; json.JSONDecodeError; KeyError without "password_file".
+    Feeds:   connect, check_person, lookup_device."""
     if not _conf:
         with open(CONFIG) as f:
             _conf.update(json.load(f))
@@ -21,6 +26,14 @@ def load_config():
 
 
 def connect(dn=None, password=None):
+    """Purpose: open a verified LDAPS connection to 389-DS and bind, with short timeouts so a switch still
+             gets an answer when the directory is down.
+    Inputs:  dn — str, bind as this DN (a person) with `password`; None (default) binds as the reader account
+             (conf bind_dn and its password file).
+    Returns: a bound python-ldap LDAPObject.
+    Fails:   ldap.INVALID_CREDENTIALS, ldap.UNWILLING_TO_PERFORM (e.g. locked account), ldap.SERVER_DOWN,
+             ldap.TIMEOUT and other ldap.LDAPError from the bind; load_config errors.
+    Feeds:   search (reader connection per thread), check_person (bind as the person)."""
     conf = load_config()
     c = ldap.initialize(conf["uri"])
     c.set_option(ldap.OPT_X_TLS_CACERTFILE, conf["ca_file"])
@@ -35,8 +48,13 @@ def connect(dn=None, password=None):
 
 
 def search(base, filterstr, attrs):
-    """One search on this thread's connection; reconnects once if 389-DS
-    restarted since. Any other LDAP error propagates (the caller refuses)."""
+    """Purpose: one one-level search on this thread's reader connection; reconnects once if 389-DS
+             restarted since.
+    Inputs:  base — str DN; filterstr — str LDAP filter (callers escape values); attrs — list of attribute names.
+    Returns: list of (dn, {attr: [bytes]}) for the direct children of base that match.
+    Fails:   ldap.SERVER_DOWN / CONNECT_ERROR / TIMEOUT on the second attempt; any other LDAP error at once
+             (the caller refuses).
+    Feeds:   check_person, lookup_device."""
     for attempt in (1, 2):
         c = getattr(_local, "conn", None)
         try:

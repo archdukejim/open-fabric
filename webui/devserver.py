@@ -55,7 +55,14 @@ SAMPLE_RADIUS = {"enabled": True, "server_name": "radius.home.arpa", "host_ip": 
                           "vlan": "-", "mac": "02:aa:bb:cc:dd:01", "nas": "switch1", "reason": "device disabled"}],
                  "log_error": ""}
 def sample_radius_guides():
-    """The guides as fabric-agent fills them in, with the dev preview's own throwaway CA."""
+    """Purpose: The FreeRADIUS setup guides as fabric-agent fills them in, built from the sample RADIUS data and the
+             dev preview's own throwaway CA (SAMPLE_ROOT_PEM). Sample only; nothing is read from a host.
+    Inputs:  none (reads SAMPLE_RADIUS and SAMPLE_ROOT_PEM).
+    Returns: fabriclib.radius.radius_guides' dict ({"host_ip", "server_name", "people", "windows": {...}, ...}) from a
+             checkout; without fabriclib (the webui image) a placeholder dict with the same keys the page reads.
+    Fails:   never on a missing fabriclib (ImportError is caught); anything radius_guides raises propagates.
+    Feeds:   Handler.do_GET for /freeradius (views "switches" and "windows").
+    """
     try:
         from fabriclib.radius.radius_guides import radius_guides
     except ImportError:          # the webui image carries no fabriclib: placeholder scripts
@@ -169,6 +176,14 @@ SAMPLE_INFO = {"subject": "CN=device.home.arpa,OU=IT,O=Fabric", "issuer": "CN=Fa
 
 
 def sample_result(kind):
+    """Purpose: A fake PKI result for the sign/issue/convert result page, shaped like fabric-agent's reply.
+    Inputs:  kind — "sign", "issue" or "convert"; "issue" adds a key and .p12, "convert" adds .p7b and .p12;
+             anything else gets the base fields only.
+    Returns: {"name", "cert", "fullchain", "der_b64", "info"} plus the kind's extras; certificates and keys are
+             placeholder text, p12_password is a fresh random token.
+    Fails:   never.
+    Feeds:   Handler.do_POST for /stepca/sign, /stepca/issue and /stepca/convert (views.pki_result).
+    """
     b64 = base64.b64encode(SAMPLE_PEM.encode()).decode()
     r = {"name": "device.home.arpa", "cert": SAMPLE_PEM, "fullchain": SAMPLE_PEM * 3, "der_b64": b64,
          "info": SAMPLE_INFO}
@@ -183,16 +198,36 @@ class DevState:
     """In-memory sample data; nothing leaves this process."""
 
     def __init__(self):
+        """Purpose: Fresh in-memory copies of the sample zones, audit, TSIG keys, directory, people, issued certs and
+                 vault slots; nothing leaves this process.
+        Inputs:  none (deep-copies SAMPLE and SAMPLE_SLOTS).
+        Returns: None.
+        Fails:   never.
+        Feeds:   Handler.state (one DevState per process, shared by all request threads under self.lock).
+        Notes:   SAMPLE_RADIUS and SAMPLE_DHCP are not copied here: do_POST changes those module-level dicts directly.
+        """
         self.data = copy.deepcopy(SAMPLE)
         self.data["slots"] = copy.deepcopy(SAMPLE_SLOTS)
         self.lock = threading.Lock()
 
     def zones(self):
+        """Purpose: The zone list, in the shape fabric-agent's GET /v1/zones returns.
+        Inputs:  none (reads self.data["zones"]).
+        Returns: [{"key": str, "name": str, "records": int, "reverse": False}].
+        Fails:   never.
+        Feeds:   Handler.do_GET for /bind9 (views.bind9).
+        """
         return [{"key": k, "name": z["name"], "records": len(z["records"]), "reverse": False}
                 for k, z in self.data["zones"].items()]
 
     def reverse(self):
-        """The same PTR generation apply uses, over the sample records."""
+        """Purpose: The reverse zones, made by the same PTR generation apply uses, over the in-memory sample records.
+        Inputs:  none (reads self.data["zones"]; uses fabriclib.dns.reverse_zones when importable).
+        Returns: {"zones": {...}, "skipped": [...]}; {"zones": {}, "skipped": []} without fabriclib.
+        Fails:   KeyError if the "dynamic_zone_var" sample zone is gone (never: no route deletes zones); anything
+                 reverse_zones raises propagates.
+        Feeds:   Handler.do_GET for /bind9?view=reverse.
+        """
         if not reverse_zones:
             return {"zones": {}, "skipped": []}
         dns = {}
@@ -203,6 +238,13 @@ class DevState:
         return reverse_zones({"domain": self.data["zones"]["dynamic_zone_var"]["name"], "dns": dns})
 
     def zone(self, key):
+        """Purpose: One sample zone with its records, in the shape fabric-agent's GET /v1/zones/<key> returns.
+        Inputs:  key — a key of self.data["zones"].
+        Returns: {"key", "name", "status": dev-preview note, "records": [{"type", "index", "name", "value"} plus
+                 "ptr"/"ptr_note" for A/AAAA when fabriclib is present]}; "index" is the position in the zone's list.
+        Fails:   KeyError for an unknown key (the caller checks first).
+        Feeds:   Handler.do_GET for /bind9 (forward view); the index is what do_POST's record delete expects.
+        """
         z = self.data["zones"][key]
         return {"key": key, "name": z["name"], "status": "dev preview — sample data, not served by BIND",
                 "records": [dict({"type": t, "index": i, "name": n, "value": v}, **self._ptr(t, v))
@@ -210,12 +252,25 @@ class DevState:
 
     @staticmethod
     def _ptr(rtype, value):
+        """Purpose: Where an A/AAAA record's automatic PTR goes, for the zone table.
+        Inputs:  rtype — record type; value — the record's address text.
+        Returns: {} for other types or without fabriclib; else {"ptr": "<label>.<zone>" or "", "ptr_note": "" or why
+                 there is no PTR}.
+        Fails:   never — ptr_for_ip reports a bad address as a reason instead of raising.
+        Feeds:   DevState.zone.
+        """
         if rtype not in ("A", "AAAA") or not ptr_for_ip:
             return {}
         zone, label = ptr_for_ip(value)
         return {"ptr": f"{label}.{zone}" if zone else "", "ptr_note": "" if zone else label}
 
     def overview(self):
+        """Purpose: Devices, roles and the RBAC vocabulary, in the shape fabric-agent's GET /v1/devices returns.
+        Inputs:  none (reads self.data["directory"]; needs fabriclib's list_devices).
+        Returns: {"devices", "roles" (sorted by priority then name), "types", "permissions"}; None without fabriclib.
+        Fails:   never in practice — anything list_devices raises propagates.
+        Feeds:   Handler.do_GET for /dirsrv and /stepca (device picker).
+        """
         if not list_devices:
             return None
         d = self.data["directory"]
@@ -223,7 +278,16 @@ class DevState:
                 "types": DEVICE_TYPES, "permissions": {k: list(v) for k, v in PERMISSIONS.items()}}
 
     def save(self, kind, name, form):
-        """Device/role create or edit, validated by the real fabriclib rules, in memory."""
+        """Purpose: Create or edit a device or role in memory, validated by the real fabriclib rules, and log it.
+        Inputs:  kind — "devices", anything else means roles; name — device/role name (new names are checked against
+                 DEVICE_NAME_RE / ROLE_NAME_RE, "_new" is refused for devices); form — the posted form: devices use
+                 type, owner, description, enabled, macs and role_<name> keys; roles use description, vlan, priority and
+                 perm_<permission> keys.
+        Returns: None; self.data["directory"] and role memberships are updated, an audit line is added.
+        Fails:   ValidationError from check_device_fields / check_role_fields or for a bad new name. Only called when
+                 fabriclib imported (NameError otherwise).
+        Feeds:   Handler.do_POST for /dirsrv/<kind>/<name> and /dirsrv/<kind>/_new.
+        """
         d = self.data["directory"]
         if kind == "devices":
             f = check_device_fields({"type": form.get("type"), "owner": form.get("owner"),
@@ -254,7 +318,14 @@ class DevState:
         self.log("DEVICE_SAVE" if kind == "devices" else "ROLE_SAVE", f"{name} (in memory)")
 
     def vault_action(self, parts, form):
-        """Unlock-method flows in memory: {"msg": ...} or {"err": ...}."""
+        """Purpose: The vault unlock-method flows (rotate, test, remove, add) acted out on the in-memory slots only.
+        Inputs:  parts — path segments after /openbao/: ["rotate"], ["slots", <id>, "test"|"remove"] or
+                 ["slots", "add-security-key"|"add-usb"|"add-hsm"]; form — posted form; "confirm" must be "pi-core",
+                 the add forms read token, disk, endpoint, key_id and label.
+        Returns: {"msg": str} on success or {"err": str} (wrong confirmation, last method, unknown action).
+        Fails:   never in practice (sample key_ids are "fabric-<n>" and at least one slot always remains).
+        Feeds:   Handler.do_POST for /openbao/..., which redirects to /openbao?view=unlock with msg or err.
+        """
         slots = self.data["slots"]
         if form.get("confirm", "") != "pi-core":
             return {"err": "Type this host's name (pi-core) to confirm."}
@@ -291,6 +362,12 @@ class DevState:
         return {"msg": f"{views.SLOT_TYPES[kind][0]} added and tested (dev preview: nothing was written)."}
 
     def log(self, action, detail):
+        """Purpose: Add a dev-preview line to the in-memory audit log (newest first).
+        Inputs:  action — str action name such as "DNS_ADD"; detail — str.
+        Returns: None.
+        Fails:   never.
+        Feeds:   Handler.do_GET for /audit (views.audit).
+        """
         self.data["audit"].insert(0, f"[dev] User: dev (web) | Action: {action} | {detail}\n")
 
 
@@ -300,9 +377,22 @@ class Handler(BaseHTTPRequestHandler):
            "version": {"version": "dev preview", "build": "sample data · no sign-in · nothing is saved"}}
 
     def log_message(self, fmt, *args):
+        """Purpose: Silence BaseHTTPRequestHandler's per-request log lines.
+        Inputs:  fmt, *args — the standard log format and values; ignored.
+        Returns: None.
+        Fails:   never.
+        Feeds:   — (called by http.server).
+        """
         pass
 
     def send(self, status, body, ctype="text/html; charset=utf-8", location=None):
+        """Purpose: Send one complete response with the same no-store and strict CSP headers as production.
+        Inputs:  status — int HTTP status; body — str (UTF-8 encoded) or bytes; ctype — Content-Type,
+                 default HTML; location — optional Location header for redirects.
+        Returns: None.
+        Fails:   OSError (e.g. BrokenPipeError) if the client has gone.
+        Feeds:   — (writes the response); used by do_GET and do_POST.
+        """
         data = body.encode() if isinstance(body, str) else body
         self.send_response(status)
         self.send_header("Content-Type", ctype)
@@ -315,6 +405,15 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        """Purpose: Render the real pages (views.py) with sample or in-memory data: /, /bind9, /stepca, /openbao,
+                 /dirsrv, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks
+                 like). No sign-in, no client certificate, no fabric-agent.
+        Inputs:  none (reads self.path: path and query msg, err, view, zone, device, slot, name).
+        Returns: None; sends 200 with the page, 403 for /preview/denied, 404 for anything else.
+        Fails:   an exception from views or fabriclib is not caught here: http.server logs it and closes the
+                 connection without a response.
+        Feeds:   — (sends the response).
+        """
         path = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(self.path).query))
         with self.state.lock:
@@ -373,6 +472,17 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(404, views.error_page(404, "Not found."))
 
     def do_POST(self):
+        """Purpose: Act out every form post in memory only (DNS records, TSIG keys, apply, PKI, vault, devices, roles,
+                 people, DHCP reservations, RADIUS clients and groups) and show the same result page or redirect as
+                 production. Nothing is saved, signed or applied; secrets and passwords shown are fake or throwaway.
+        Inputs:  none (reads self.path and the body: urlencoded, or multipart where only text fields are kept and file
+                 uploads are dropped; at most 65536 bytes of Content-Length are read). No CSRF or sign-in check.
+        Returns: None; sends 200 result pages, 303 redirects carrying msg/err, or 404 for an unknown route.
+        Fails:   ValidationError from DevState.save becomes a 303 with err; other errors (e.g. ValueError from a
+                 non-numeric vlan, priority or index, IndexError for an unexpected .../rotate path) are not caught:
+                 http.server logs them and closes the connection.
+        Feeds:   — (sends the response).
+        """
         path = urllib.parse.unquote(urllib.parse.urlsplit(self.path).path)
         length = min(int(self.headers.get("Content-Length") or 0), 65536)
         body = self.rfile.read(length)
@@ -537,6 +647,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    """Purpose: Start the dev preview HTTP server (sample data, no sign-in, nothing saved).
+    Inputs:  command line: --bind (default 127.0.0.1), --port (default 8080), --as <bundle> to see the UI with that
+             role bundle's permissions (default admin: every permission).
+    Returns: never returns normally (serve_forever).
+    Fails:   SystemExit via argparse for bad arguments or an unknown bundle (every non-admin bundle when fabriclib is
+             missing, as BUNDLES is then empty); OSError if the address is in use.
+    Feeds:   `python3 webui/devserver.py`; tests/webui/test_devserver.py starts it as a subprocess.
+    """
     ap = argparse.ArgumentParser(description="Fabric web UI dev preview (sample data, no sign-in, no backend)")
     ap.add_argument("--bind", default="127.0.0.1", help="address to listen on (default 127.0.0.1)")
     ap.add_argument("--port", type=int, default=8080)

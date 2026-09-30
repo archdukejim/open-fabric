@@ -12,19 +12,23 @@ ACL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$")
 
 
 def normalize_tsig_keys(keys, domain, secrets=None):
-    """Validate tsig_keys and fill defaults. Returns (keys, embedded_secrets).
-
-    Entry: {name, algorithm=hmac-sha256, domain=<domain>, record_types=[TXT],
-    records=[host, ...] (optional: only _acme-challenge.<host>.<domain>),
-    any_name (optional: any name in the zone; never implied),
-    primary (optional), out (optional rfc2136.ini path), acls (optional:
-    BIND ACLs to put the key in),
-    secret (optional: an existing key's base64 secret, e.g. from another
-    DNS server whose clients must keep working)}.
-
-    `secret` values are taken out of the entries (secrets belong in
-    fabric-secrets.yml, never in vars) and returned as {name: secret},
-    together with any in a separate `secrets` mapping {name: secret}."""
+    """Purpose: Validate tsig_keys, fill defaults and take every secret out of the entries (secrets belong in fabric's
+             secrets, never in vars).
+    Inputs:  keys — list of dicts: name (required, NAME_RE, unique), algorithm (default hmac-sha256, one of ALGORITHMS),
+             domain (default `domain`; "{{ domain }}" replaced), record_types (default [TXT]), records (hosts: only
+             _acme-challenge.<host>.<domain>), any_name (any name in the zone; never implied), primary, out (rfc2136.ini
+             path), acls (BIND ACLs to put the key in), secret (base64 of an existing key, e.g. from another DNS server
+             whose clients must keep working).
+             domain — str, the fabric domain.
+             secrets — optional {name: secret} merged in first (a secret embedded in an entry wins).
+    Returns: (keys, embedded): the normalized list, and {name: secret} for every secret found or given.
+    Fails:   ValidationError "tsig_keys entry needs a name", "invalid or duplicate TSIG key name", "…: algorithm must be
+             one of …", "…: invalid domain …", "…: invalid record_types …", "…: invalid record names …", "…: invalid ACL
+             names …", "…: secret is not valid base64".
+    Feeds:   deploy.py (apply), setup/collect_vars.py, add_tsig_key, update_tsig_key, replace_tsig_secret (to check a
+             secret); ACL_RE, LABEL_RE and RTYPE_RE are reused by normalize_acl_policies.
+    Notes:   records clear any_name; any_name is kept only when explicitly true.
+    """
     embedded = {}
     for name, secret in (secrets or {}).items():
         embedded[str(name)] = str(secret)

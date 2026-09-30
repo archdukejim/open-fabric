@@ -4,8 +4,16 @@ from fabriclib.pki.common.openssl import openssl
 
 
 def describe_cert(pem):
-    """Subject, issuer, names, key, validity, usages and fingerprint of one
-    PEM certificate, as a dict for pages and the issued-certificate ledger."""
+    """Purpose: The facts about one certificate that the PKI pages and the issued-certificate ledger show.
+    Inputs:  pem — str, a PEM certificate (only the first one is read).
+    Returns: {"subject", "issuer" (RFC 2253), "serial" (hex), "not_before", "not_after" (openssl dates,
+             e.g. "Sep 30 12:00:00 2027 GMT"), "sha256" (colon hex fingerprint), "sans" (["DNS:x",
+             "IP Address:y", ...]), "usage" (extended key usage text or ""), "key" (e.g. "RSA 2048",
+             "EC 256"; "?" if unrecognised), "is_ca" (bool: CA:TRUE present)}.
+    Fails:   ValidationError with openssl's first error line if pem is not a certificate (openssl helper).
+    Feeds:   ca_summary, convert_cert, inspect_pem, issue_key_pair, sign_csr (their "info"; record_issued
+             keeps part of it).
+    """
     out = openssl("x509", "-noout", "-subject", "-issuer", "-serial", "-startdate", "-enddate",
                   "-fingerprint", "-sha256", "-nameopt", "RFC2253", data=pem)
     vals = {}

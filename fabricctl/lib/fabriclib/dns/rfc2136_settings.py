@@ -1,7 +1,14 @@
 def rfc2136_settings(v, key, secret):
-    """The rfc2136.ini a certbot-style client (e.g. nginx-proxy-manager's
-    DNS challenge) needs for one TSIG key: server, port, key name, secret,
-    algorithm, zone."""
+    """Purpose: The rfc2136.ini text a certbot-style client (e.g. nginx-proxy-manager's DNS challenge) needs for one
+             TSIG key.
+    Inputs:  v — the vars dict (host_ip, bind_dns_port default 53, domain).
+             key — a normalized tsig_keys entry (name, algorithm, domain).
+             secret — base64 str, written as is.
+    Returns: str: dns_rfc2136_server, _port, _name, _secret, _algorithm (upper case) and _base_domain lines.
+    Fails:   KeyError if key has no "name".
+    Feeds:   deploy.py (writes each key's rfc2136.ini), create_zone_tsig_key, rotate_tsig_key.
+    Notes:   the text holds the secret; callers must keep it private.
+    """
     return (f"# RFC2136 credentials for TSIG key: {key['name']}\n"
             f"dns_rfc2136_server = {v.get('host_ip')}\n"
             f"dns_rfc2136_port = {v.get('bind_dns_port', 53)}\n"

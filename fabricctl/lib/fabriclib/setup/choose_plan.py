@@ -17,8 +17,13 @@ PLAN = [
 
 
 def _ask_log_forwarding(ctx):
-    """Optional (off by default): Fluent Bit forwarding every log to syslog
-    and/or Elasticsearch/OpenSearch (design D20)."""
+    """Purpose: Advanced plan question: forward all logs with Fluent Bit (off by default, design D20).
+    Inputs:  ctx — SetupContext; reads and writes ctx.vars install_fluentbit and log_forwarding (syslog host/port,
+             elastic url/user). Interactive (input()).
+    Returns: None; ctx.vars updated. A syslog target without port uses 6514; the Elasticsearch password is set
+             later with `fabricctl logs set-password elastic`.
+    Fails:   EOFError from input() when stdin is closed.
+    Feeds:   choose_plan (Advanced)."""
     on = bool(ctx.vars.get("install_fluentbit"))
     answer = input(f"\n  Optional: forward all logs (journal, audit logs) to syslog and/or Elasticsearch "
                    f"(Fluent Bit)? [{'Y/n' if on else 'y/N'}] ").strip().lower()
@@ -43,8 +48,15 @@ def _ask_log_forwarding(ctx):
 
 
 def _ask_dhcp(ctx):
-    """Optional (off by default): Kea 3.0 LTS serving DHCP on this LAN, lease
-    hostnames registered in dhcp.<domain>."""
+    """Purpose: Advanced plan question: serve DHCP with Kea (off by default), and its interface, subnet,
+             pool and router.
+    Inputs:  ctx — SetupContext; reads and writes ctx.vars install_kea and dhcp; defaults from lan_cidr,
+             lan_gateway and detect_network(). Interactive.
+    Returns: None; ctx.vars["dhcp"] = one interface and one subnet (existing reservations kept). The default
+             pool is the top quarter of the subnet; empty when the subnet has 8 hosts or fewer.
+    Fails:   ValueError from ipaddress when the subnet typed (or defaulted) is not a network; EOFError from
+             input().
+    Feeds:   choose_plan (Advanced)."""
     import ipaddress
     from fabriclib.setup.detect_network import detect_network
     on = bool(ctx.vars.get("install_kea"))
@@ -72,9 +84,12 @@ def _ask_dhcp(ctx):
 
 
 def _ask_radius(ctx):
-    """Optional (off by default): FreeRADIUS 802.1X. Devices and their roles
-    live in the directory; switches are added later (fabricctl radius
-    add-client, or the FreeRADIUS tab)."""
+    """Purpose: Advanced plan question: 802.1X with FreeRADIUS (off by default).
+    Inputs:  ctx — SetupContext; reads ctx.vars install_freeradius and install_ldap. Interactive.
+    Returns: None; ctx.vars["install_freeradius"] set — forced False when install_ldap is False (802.1X needs
+             389-DS). Switches are added later (`fabricctl radius add-client`).
+    Fails:   EOFError from input().
+    Feeds:   choose_plan (Advanced)."""
     on = bool(ctx.vars.get("install_freeradius"))
     answer = input(f"\n  Optional: 802.1X with FreeRADIUS (devices join by certificate or MAC, VLAN per role)? "
                    f"[{'Y/n' if on else 'y/N'}] ").strip().lower()
@@ -88,6 +103,11 @@ def _ask_radius(ctx):
 
 
 def _get(data, dotted, default):
+    """Purpose: read a dotted key ("security.firewall") from nested dicts.
+    Inputs:  data — dict; dotted — key path; default — value when any part is missing or not a dict.
+    Returns: the value found, or default.
+    Fails:   never.
+    Feeds:   choose_plan."""
     node = data
     for part in dotted.split("."):
         if not isinstance(node, dict) or part not in node:
@@ -97,6 +117,11 @@ def _get(data, dotted, default):
 
 
 def _set(data, dotted, value):
+    """Purpose: write a dotted key into nested dicts, creating intermediate dicts.
+    Inputs:  data — dict (modified); dotted — key path; value — value to store.
+    Returns: None.
+    Fails:   TypeError/AttributeError if an intermediate key holds a non-dict value.
+    Feeds:   choose_plan."""
     parts = dotted.split(".")
     node = data
     for part in parts[:-1]:
@@ -105,10 +130,15 @@ def _set(data, dotted, value):
 
 
 def choose_plan(ctx):
-    """Show what setup will do (every default is the hardened choice), then
-    Proceed / Advanced / Quit. Advanced walks each item and states the cost
-    of relaxing it. Choices are written into ctx.vars (and so into
-    fabric.yaml), so a --file can set all of them non-interactively."""
+    """Purpose: show what setup will do (every default is the hardened choice), then Proceed / Advanced / Quit.
+             Advanced walks each PLAN item, states the cost of relaxing it, and asks the optional services.
+    Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
+             webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
+    Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
+             rendered); install_webui is forced off when Keycloak is off. deploy_config saves ctx.vars to
+             fabric.yaml, so a --file can set all of these non-interactively.
+    Fails:   SystemExit("setup cancelled") on Quit; EOFError from input(); errors of the _ask_* helpers.
+    Feeds:   run_setup main (full runs only, after collect_vars)."""
     def show():
         heading("fabricctl setup will:")
         for key, default, does, _ in PLAN:

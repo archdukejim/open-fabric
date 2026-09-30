@@ -4,9 +4,13 @@ from fabriclib.images.built_from import built_from
 
 
 def needs_rebuild(compose_file):
-    """True if a service in this compose file builds a local image that is
-    missing, was built FROM another base than its BASE_IMAGE build arg, or
-    carries another pinned package version (a changed pin in images.lock.yaml)."""
+    """Purpose: whether a compose file's locally built image must be rebuilt: missing, built FROM another
+             base than its BASE_IMAGE build arg, or (Kea) built with another pinned KEA_VERSION.
+    Inputs:  compose_file — str, path to a rendered docker-compose.yml. Asks Docker via built_from.
+    Returns: bool; False when no service has a build section with BASE_IMAGE or KEA_VERSION.
+    Fails:   OSError if the file cannot be read; yaml.YAMLError on invalid YAML; AttributeError if a service's
+             `build` is a plain string rather than a mapping.
+    Feeds:   deploy.py (decides whether to run `docker compose build`)."""
     with open(compose_file) as f:
         services = (yaml.safe_load(f) or {}).get("services") or {}
     for svc in services.values():

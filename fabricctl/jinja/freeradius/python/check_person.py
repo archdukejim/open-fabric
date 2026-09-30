@@ -9,13 +9,16 @@ UID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 
 
 def check_person(uid, password):
-    """A person joining by password (EAP-TTLS/PAP, inside the TLS tunnel):
-    {person, allowed, vlan, reason}. The password is checked by binding to
-    389-DS as that person over verified LDAPS, so the directory's lockout
-    policy counts network logins and a locked account cannot join. Only
-    members of a mapped group (fabric-radius.json "people") may join; the
-    VLAN comes from the mapping with the lowest priority number that sets
-    one (ties by group name)."""
+    """Purpose: decide a person joining by password (EAP-TTLS/PAP, inside the TLS tunnel). The password is
+             checked by binding to 389-DS as that person over verified LDAPS, so the directory's lockout policy
+             counts network logins; only members of a group mapped in fabric-radius.json "people" may join.
+    Inputs:  uid — str user name (must match UID_RE); password — str. Reads fabric-radius.json and 389-DS
+             (ou=users,ou=accounts and memberOf).
+    Returns: dict {person, allowed, vlan, reason}; when allowed also "group" (the best mapping). vlan comes from
+             the mapping with the lowest priority number that sets one (ties by group name), else None.
+    Fails:   ldap errors other than a refused bind (directory down, timeout) and config errors (OSError,
+             KeyError) propagate; the caller turns them into Access-Reject.
+    Feeds:   fabric_radius._decide_person."""
     conf = load_config()
     if not UID_RE.match(uid or "") or not password:
         return {"person": uid or "-", "allowed": False, "vlan": None, "reason": "not a user name and password"}

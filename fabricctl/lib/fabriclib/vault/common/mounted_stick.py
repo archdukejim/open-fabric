@@ -7,10 +7,15 @@ from fabriclib.common.errors import ValidationError
 
 @contextlib.contextmanager
 def mounted_stick(v, fs_path, name, writable=False):
-    """Mount a key stick's file system for the duration of a `with` block at
-    <openbao_runtime_dir>/../usb-<name> (a RAM path), read-only unless
-    `writable`, always nosuid,nodev,noexec; unmount afterwards, whatever
-    happens."""
+    """Purpose: context manager that mounts a key stick's file system for a with block and always unmounts it after.
+    Inputs:  v — vars: openbao_runtime_dir (the mount point is its sibling usb-<name>, a RAM path, made 0700);
+             fs_path — device node holding the file system; name — the slot id, used in the mount point's name;
+             writable — mount read-write (default read-only). Always nosuid,nodev,noexec. Needs root.
+    Returns: yields the mount point (str); afterwards it syncs, unmounts and removes the folder.
+    Fails:   ValidationError "cannot mount" when mount fails; OSError if the mount point cannot be made.
+             Unmount and rmdir failures are ignored (the folder then stays).
+    Feeds:   slots/usb wrap, unwrap and forget.
+    """
     point = os.path.join(os.path.dirname(v["openbao_runtime_dir"].rstrip("/")), f"usb-{name}")
     os.makedirs(point, mode=0o700, exist_ok=True)
     opts = ("rw" if writable else "ro") + ",nosuid,nodev,noexec"

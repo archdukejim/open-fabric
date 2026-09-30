@@ -68,7 +68,7 @@ Comprehensive documentation is provided in the `docs/` directory to help you und
 - [**Architecture and Reference**](docs/architecture.md) — In-depth execution flow, directory structures, PKI chains, and template rendering logic.
 - [**AI Test Plan**](docs/testplan.md) — Automated testing scripts and procedures.
 - [**Subordinate CA Setup**](docs/subordinate.md) — How to configure this stack as a downstream CA.
-- [**Library Reference**](docs/lib-doc.md) — The `fabriclib` Python package and the remaining shell modules.
+- [**Function reference**](docs/lib-doc/README.md) — every function of `fabricctl/`, `webui/` and `installers/`: purpose, inputs, results, failures and what uses them (generated from the code).
 
 ---
 

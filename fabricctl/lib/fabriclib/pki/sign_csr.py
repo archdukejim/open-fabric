@@ -19,13 +19,21 @@ from fabriclib.pki.describe_csr import describe_csr
 
 
 def sign_csr(v, actor, csr, days, device="", source="web"):
-    """Sign a device's certificate signing request with the Step-CA
-    intermediate: a leaf certificate (serverAuth + clientAuth, the CSR's
-    names, the fabric subject defaults) valid for `days`. The private key
-    never leaves the device. Refuses requests that fail describe_csr's
-    policy. With `device`, the certificate is linked to that directory
-    device (checked first). Returns {name, cert, chain, fullchain, der_b64,
-    info, device}."""
+    """Purpose: Sign a device's certificate signing request with the Step-CA intermediate as a leaf
+             certificate; the private key never leaves the device.
+    Inputs:  v — fabric vars; actor — str (audit, ledger, device link); csr — PEM, DER or base64
+             (describe_csr); days — 1 .. pki_manual_max_days (valid_days); device — optional directory
+             device to link, checked first (require_device); source — default "web".
+    Returns: {"name", "cert", "chain" (intermediate + root), "fullchain", "der_b64", "info": describe_cert
+             dict, "device"}.
+    Fails:   ValidationError "cannot sign: <problems>"; describe_csr's messages; valid_days' messages; "no
+             device named ..."; "step-ca refused: ..." (run_step); "refusing: the signed certificate would
+             be a CA"; link_device_cert / run_dirsrv errors (raised after signing); OSError.
+    Feeds:   agent route POST /v1/pki/sign -> webui agentclient.sign_csr -> PKI page.
+    Notes:   the leaf template sets serverAuth + clientAuth, the CSR's names and fabric's subject defaults;
+             the CSR's own extensions are ignored. The CSR goes to a random-named artifact file (O_EXCL,
+             0640, step user) that is removed afterwards. Ledger kind "csr"; audited as PKI_SIGN_CSR.
+    """
     req = describe_csr(csr)
     if req["problems"]:
         raise ValidationError("cannot sign: " + "; ".join(req["problems"]))

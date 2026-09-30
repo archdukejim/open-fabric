@@ -22,6 +22,12 @@ USAGE = """usage: fabricctl radius status                     server name, RADIU
 
 
 def _apply(args):
+    """Purpose: Apply a just-recorded 802.1X change now, unless --no-apply was given.
+    Inputs:  args — list of str (looks for "--no-apply"). Runs apply_changes as root (interactive.py --apply).
+    Returns: 0 if skipped or applied; 1 if apply failed (last 2000 characters of its output on stdout).
+    Fails:   subprocess.TimeoutExpired (900 s) and OSError from apply_changes propagate.
+    Feeds:   run_radius_command (add-client, rotate-secret, remove-client, map-group, unmap-group).
+    """
     if "--no-apply" in args:
         print("recorded; apply with: sudo fabricctl --apply")
         return 0
@@ -31,11 +37,27 @@ def _apply(args):
 
 
 def _secret(args):
+    """Purpose: An existing shared secret typed at a hidden prompt, never taken from argv.
+    Inputs:  args — list of str (looks for "--secret-prompt").
+    Returns: the stripped secret (str), or None without --secret-prompt.
+    Fails:   EOFError / KeyboardInterrupt from getpass propagate.
+    Feeds:   run_radius_command (add-client, rotate-secret).
+    """
     return getpass.getpass("shared secret (hidden): ").strip() if "--secret-prompt" in args else None
 
 
 def run_radius_command(v, argv):
-    """`fabricctl radius …` — the FreeRADIUS tab's operations, without the web UI."""
+    """Purpose: `fabricctl radius status | log | add-client | rotate-secret | remove-client | map-group | unmap-group` —
+             the FreeRADIUS tab's operations without the web UI.
+    Inputs:  v — the rendered vars (SetupContext.load_state().vars).
+             argv — list of str after "radius" (default status); options -n N, --vlan N, --priority N, --secret-prompt,
+             --no-message-authenticator, --no-apply.
+    Returns: exit status: 0 success; 1 a ValidationError or a failed apply; 2 usage (printed to stderr).
+    Fails:   ValidationError is caught (exit 1); a non-numeric -n (ValueError), an option given last without its value
+             (IndexError) and journalctl errors in `log` propagate.
+    Feeds:   fabriclib/cli.py (`fabricctl radius`).
+    Notes:   a new secret is printed once; an existing one is typed at a hidden prompt, never passed in argv.
+    """
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
     pos = [a for i, a in enumerate(args) if not a.startswith("-")
            and (i == 0 or args[i - 1] not in ("--vlan", "--priority", "-n"))]

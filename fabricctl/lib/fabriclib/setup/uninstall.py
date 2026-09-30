@@ -14,10 +14,17 @@ LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:loca
 
 
 def uninstall(ctx):
-    """Remove fabric from this host: units, containers, fabric_net, local
-    images, data directories, service accounts, CA trust, the CLI.
-    Only fabric's own objects are touched (no global Docker prune, no Docker
-    restart); host firewall defaults stay as they are."""
+    """Purpose: remove fabric from this host: units, fabric.target, containers, fabric_net, local images,
+             DOCKER-USER rules, data folders, the OpenBao key and runtime folders, service accounts, CA trust,
+             the CLI wrapper and the resolver drop-in.
+    Inputs:  ctx — SetupContext (state reloaded): vars keycloak_data_dir/postgres_data_dir (deleted when outside
+             deploy_base), tsig_keys names (their <deploy_base>/<name> folders), openbao_runtime_dir,
+             openbao_admin_dir, openbao_udev_rules, openbao_key_dir, service_users, domain_file.
+    Returns: None. Only fabric's own objects are touched (no global Docker prune, no Docker restart); ufw
+             stays enabled. The vault data and key are gone afterwards — export first to keep them.
+    Fails:   OSError from shutil.rmtree for the external data and key folders or os.remove; every command
+             failure (systemctl, docker, iptables, userdel, update-ca-certificates) is ignored.
+    Feeds:   cli main (`reinstall`), run_uninstall_command."""
     ctx.load_state()
     v = ctx.vars
 

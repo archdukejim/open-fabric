@@ -6,10 +6,17 @@ from fabriclib.common.errors import ValidationError
 
 
 def kea_command(v, command, arguments=None, timeout=10):
-    """One command to kea-dhcp4 over its control socket (host side:
-    <deploy_base>/kea/run/kea4-ctrl-socket, root only). Returns the
-    response's `arguments` (or {}); raises ValidationError if Kea is not
-    running or refuses."""
+    """Purpose: Send one command to kea-dhcp4 over its control socket (host side <deploy_base>/kea/run/kea4-ctrl-socket,
+             root only).
+    Inputs:  v — the vars dict (deploy_base_dir).
+             command — str Kea command, e.g. "lease4-get-all".
+             arguments — dict, sent only when not empty.
+             timeout — seconds per socket operation (default 10).
+    Returns: the response's "arguments" dict, or {} (result 0 = ok, 3 = empty).
+    Fails:   ValidationError "Kea is not answering (…): sudo fabricctl status" (OSError or timeout), "Kea sent no answer
+             to …", "Kea refused …: <text>"; IndexError on an empty list response.
+    Feeds:   list_leases.
+    """
     path = os.path.join(v["deploy_base_dir"], "kea", "run", "kea4-ctrl-socket")
     req = {"command": command, **({"arguments": arguments} if arguments else {})}
     resp = None

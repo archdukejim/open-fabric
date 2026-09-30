@@ -6,14 +6,18 @@ from fabriclib.vault.common.slot_type import slot_type
 
 
 def vault_device_event(v, systemctl=None):
-    """An enrolled unlock device was plugged in or pulled out (udev):
-
-    - no method present any more and OpenBao running → stop it at once: its
-      key leaves memory with the process (the kill switch);
-    - a method present and OpenBao stopped → start it (fabric-unlock runs as
-      its start condition).
-    A key-file method is always present, so it disables the kill switch.
-    Returns "stopped", "started" or "unchanged"."""
+    """Purpose: the kill switch: an enrolled unlock device was plugged in or pulled out (run from udev).
+    Inputs:  v — vars; reads slots.json and asks each type whether its device is present;
+             systemctl — callable(*args) returning a CompletedProcess (default: runs systemctl; tests pass a fake).
+    Returns: "stopped" — no method present any more and OpenBao was running: stopped at once, its key leaves memory
+               with the process; "started" — a method present and OpenBao stopped (fabric-unlock runs as its start
+               condition); "unchanged" otherwise.
+    Fails:   never for a method's present() (caught); ValueError/OSError reading the store; audit write errors.
+             systemctl failures are not checked.
+    Feeds:   `fabricctl vault device-event` (run from the rules of write_device_rules), tests/openbao/run.py.
+    Notes:   a key-file method is always present, so it disables the kill switch. Audited as VAULT_LOCKED or
+             VAULT_UNLOCK.
+    """
     systemctl = systemctl or (lambda *a: subprocess.run(["systemctl", *a], capture_output=True, text=True))
     store = read_slot_store(v) or {"slots": []}
     here = []

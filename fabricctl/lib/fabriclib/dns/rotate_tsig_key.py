@@ -5,9 +5,17 @@ from fabriclib.dns.rfc2136_settings import rfc2136_settings
 
 
 def rotate_tsig_key(actor, name, source="web"):
-    """Give a TSIG key a newly generated secret and return (secret,
-    rfc2136_ini_text) for its clients. Run apply afterwards; the old secret
-    is then refused."""
+    """Purpose: Give a TSIG key a newly generated secret and return what its clients need. Run apply afterwards; the old
+             secret is then refused.
+    Inputs:  actor — str, who asks (audit).
+             name — str key name.
+             source — default "web". Reads vars.yaml.
+    Returns: (secret, rfc2136_ini_text).
+    Fails:   ValidationError "no TSIG key named …" (from replace_tsig_secret, or if the key vanished meanwhile); errors
+             from save_secrets; OSError or yaml.YAMLError from load_vars.
+    Feeds:   agent route POST /v1/tsig/<name>/rotate (fabricctl/lib/agent/server.py, called by webui/server.py);
+             tests/pki/run.py.
+    """
     secret = replace_tsig_secret(actor, name, None, source=source)
     v = load_vars()
     key = next((k for k in v.get("tsig_keys") or [] if k.get("name") == name), None)

@@ -7,9 +7,19 @@ from fabriclib.dns.builtin_acls import builtin_acls
 
 
 def remove_acl_entries(actor, acl, entries=None, source="cli"):
-    """Remove entries from a BIND ACL, or the whole ACL when `entries` is
-    empty. Built-in ACLs and their built-in entries stay (they are rendered
-    on every apply). Run apply afterwards."""
+    """Purpose: Remove entries from a BIND ACL, or the whole ACL (and its update policy) when `entries` is empty. Run
+             apply afterwards.
+    Inputs:  actor — str, who asks (audit).
+             acl — str, an ACL present in bind_acls.
+             entries — list of str to remove (compared with quotes ignored), or None/empty for the whole ACL.
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock.
+    Returns: None.
+    Fails:   ValidationError "no ACL named …", "… is built in; remove its added entries instead", "… is not in …", "… is
+             a built-in entry of …"; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
+    Feeds:   run_acl_command (`fabricctl acl remove`).
+    Notes:   a TSIG key's own `acls` list in tsig_keys is left as is, and apply re-adds its `key` entry (and so the ACL)
+             from it.
+    """
     with vars_lock():
         data = load_vars()
         acls = dict(data.get("bind_acls") or {})

@@ -6,8 +6,14 @@ from fabriclib.setup.errors import SetupError
 
 
 def run(ctx):
-    """Start the two services certificate minting depends on: BIND9 (step-ca
-    resolves names through it) and Step-CA; then check every zone file."""
+    """Purpose: start the two services certificate minting depends on — BIND9 (step-ca resolves names through
+             it) and Step-CA — then check every zone file loads.
+    Inputs:  ctx — SetupContext: vars.domain, vars.dns (zone keys; "dynamic_zone_var" means the main domain),
+             service user bind.
+    Returns: None; units bind9 and stepca enabled and started, both containers healthy, every zone valid.
+    Fails:   CalledProcessError from `systemctl enable --now`; SetupError when a container is not healthy within
+             600 s (last 40 log lines included) or `named-checkzone` rejects a zone.
+    Feeds:   setup step `bootstrap`, run by run_setup via STEPS."""
     info("starting bind9 and step-ca (images build on first start)")
     subprocess.run(["systemctl", "enable", "--now", "bind9", "stepca"], check=True)
     for container in ("bind9", "step-ca"):

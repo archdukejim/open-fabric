@@ -5,11 +5,14 @@ STAGE_DIR = "/var/tmp/fabric-reinstall-src"
 
 
 def stage_source(ctx):
-    """Return the fabric/ tree setup should run from after an uninstall.
-
-    A git checkout survives uninstall and is used as-is. The installed copy
-    (<deploy_base>/fabric, docs included) is deleted by uninstall, so it is
-    first copied to /var/tmp."""
+    """Purpose: the fabric tree setup should run from after an uninstall: a git checkout survives the
+             uninstall and is used as-is; the installed copy (<deploy_base>/fabric) is deleted by it, so it is
+             first copied to /var/tmp.
+    Inputs:  ctx — SetupContext: source_dir (the tree this code runs from), target_dir.
+    Returns: ctx.source_dir when it is outside the install; otherwise STAGE_DIR/fabric (folder 0700, re-created),
+             a copy without config/, archive/ (they hold secrets and are kept by the backup) and __pycache__.
+    Fails:   OSError/shutil.Error while copying.
+    Feeds:   cli main (`reinstall`: its lib/fabriclib/cli.py runs setup)."""
     src = os.path.realpath(ctx.source_dir)
     if not src.startswith(os.path.realpath(ctx.target_dir) + os.sep) and src != os.path.realpath(ctx.target_dir):
         return ctx.source_dir

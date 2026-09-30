@@ -25,15 +25,29 @@ WantedBy=multi-user.target docker.service
 
 
 def _ssh_client():
+    """Purpose: the IP address the current SSH session comes from.
+    Inputs:  none (env SSH_CONNECTION; sudo must keep it).
+    Returns: the client address (str), or None when not over SSH.
+    Fails:   never.
+    Feeds:   run (lockout guard)."""
     parts = os.environ.get("SSH_CONNECTION", "").split()
     return parts[0] if parts else None
 
 
 def run(ctx):
-    """Default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER
-    rules so Docker-published ports are LAN-only too. Relax with
-    security.firewall: false; add ranges (e.g. a VPN) with
-    security.firewall_allow: [cidr, ...]."""
+    """Purpose: default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so
+             Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service.
+    Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
+             (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them); vars_file,
+             target_dir. Env SSH_CONNECTION.
+    Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
+             (existing ufw rules kept), UNIT written, enabled and restarted, DOCKER-USER rebuilt. Off: DOCKER-USER
+             opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left
+             as it is.
+    Fails:   SetupError when the SSH client is outside every allowed CIDR (would lock the operator out);
+             CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an
+             invalid CIDR.
+    Feeds:   setup step `firewall`, run by run_setup via STEPS."""
     security = ctx.vars.get("security") or {}
     if not security.get("firewall", True):
         apply_docker_firewall(ctx.vars_file)

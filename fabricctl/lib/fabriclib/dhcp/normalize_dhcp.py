@@ -9,6 +9,12 @@ MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
 
 
 def _pool(text, net):
+    """Purpose: Parse one pool "first - last" and check that it lies in its subnet.
+    Inputs:  text — str "a.b.c.d - a.b.c.e"; net — the subnet (ipaddress network).
+    Returns: (first, last) as ipaddress addresses.
+    Fails:   ValidationError "pool …: 'first - last' addresses" or "pool …: must lie inside …, first <= last".
+    Feeds:   normalize_dhcp.
+    """
     try:
         lo, hi = (ipaddress.ip_address(p.strip()) for p in str(text).split("-"))
     except ValueError:
@@ -19,12 +25,19 @@ def _pool(text, net):
 
 
 def normalize_dhcp(v):
-    """Check `dhcp:` (and that nothing static collides with it) before
-    anything is rendered: interfaces, subnets, pools inside their subnet,
-    routers, reservations (MAC, address inside the subnet but outside its
-    pools, unique), the DDNS subdomain, the lease time; and no static A
-    record of the zones inside a pool (Kea would hand that address out).
-    Returns the normalised dict; raises ValidationError."""
+    """Purpose: Check `dhcp:` (and that nothing static collides with it) before anything is rendered.
+    Inputs:  v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4
+             network, host bits zero), pools, routers, reservations [{mac, ip, hostname}]}], ddns_subdomain (one label,
+             default dhcp), lease_time (int 300-2592000, default 86400)}; dns (its A records).
+    Returns: a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` with subnets normalized (subnet as str,
+             reservations with lower-case colon MACs and a hostname only when set).
+    Fails:   ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4
+             subnet, a bad pool, a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
+             pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain
+             ValueError (not a ValidationError) if routers is not an IP address.
+    Feeds:   deploy.py (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py.
+    Notes:   a static A record inside a pool is refused because Kea would hand that address out.
+    """
     d = dict(v.get("dhcp") or {})
     if not v.get("install_kea"):
         return d

@@ -11,14 +11,19 @@ from fabriclib.vault.slots import local
 
 
 def ensure_vault_key(v):
-    """Make sure the vault key exists in at least one unlock method.
-
-    - slot store present: nothing to do ("present").
-    - an iteration-1 install (a bare unseal.key next to the vault): that key
-      becomes the "local" slot, unchanged — no rotation ("migrated").
-    - fresh: a random 32-byte key in a new "local" slot ("created").
-    Never creates a key next to an initialised vault without one (a new key
-    cannot open it: restore the key instead). Also writes seal.hcl."""
+    """Purpose: make sure the vault key exists in at least one unlock method, and write seal.hcl for it.
+    Inputs:  v — vars: openbao_key_dir (made root 0700), openbao_seal_key_id (default "fabric-1"),
+             deploy_base_dir (openbao/data), service_users (for seal.hcl). Reads slots.json and an iteration-1
+             unseal.key.
+    Returns: "present" — a store exists (only seal.hcl is converged);
+             "migrated" — an iteration-1 install's bare unseal.key became the "local" slot unchanged (no rotation)
+               and the old file was removed;
+             "created" — fresh: a random 32-byte key in a new "local" slot.
+    Fails:   ValidationError if unseal.key is not 32 bytes, or if OpenBao already holds data but no unlock method
+             exists (a new key cannot open it: restore the key from backup); OSError (e.g. not root).
+    Feeds:   setup/setup_openbao, tests/openbao/run.py.
+    Notes:   never creates a key next to an initialised vault without one.
+    """
     store = read_slot_store(v)
     if store:
         write_seal_config(v, store["key_id"], store.get("previous_key_id"))

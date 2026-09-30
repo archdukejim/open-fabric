@@ -16,9 +16,17 @@ out({"users": sorted(users, key=lambda u: u["uid"]), "groups": sorted(groups, ke
 
 
 def list_people(v):
-    """People and their groups, read-only: they are managed in Keycloak,
-    which writes them to 389-DS (link to its admin console included). No
-    passwords are read."""
+    """Purpose: People and their groups, read-only: they are managed in Keycloak, which writes them to
+             389-DS. No passwords are read.
+    Inputs:  v — fabric vars: hostname_keycloak, webui_realm (else domain), and run_dirsrv's.
+    Returns: {"users": [{uid, name, mail, locked, groups (names under ou=groups)}] sorted by uid, "groups":
+             [{name, members (count)}] sorted by name, "keycloak_url": the realm's admin console URL}.
+    Fails:
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   agent route GET /v1/people -> webui agentclient.list_people -> People page.
+    """
     people = run_dirsrv(v, _PEOPLE)
     realm = v.get("webui_realm") or v.get("domain", "")
     people["keycloak_url"] = f"https://{v.get('hostname_keycloak', '')}/admin/{realm}/console/"

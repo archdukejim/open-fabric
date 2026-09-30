@@ -67,11 +67,17 @@ _PROFILE = """<?xml version="1.0"?>
 
 
 def windows_lan_profile(method, server_name, root_sha1):
-    """The wired 802.1X profile Windows imports (`netsh lan add profile`):
-    method "tls" (the machine's certificate, before anyone signs in) or
-    "ttls" (the person's user name and password, PAP inside TLS). Either way
-    the server must present `server_name` from the root CA with SHA-1
-    thumbprint `root_sha1` ("aa bb cc …"), without asking the user."""
+    """Purpose: The wired 802.1X profile Windows imports (`netsh lan add profile`).
+    Inputs:  method — "tls" (the machine's certificate, before anyone signs in) or "ttls" (the person's user name and
+             password, PAP inside TLS).
+             server_name — str the server certificate must name.
+             root_sha1 — the root CA's SHA-1 thumbprint ("aa bb cc …"). Both are XML-escaped.
+    Returns: the LANProfile XML (str).
+    Fails:   ValueError "unknown method …".
+    Feeds:   windows_setup_script.
+    Notes:   either way Windows checks the server name and root CA without asking the user. Untested on Windows by the
+             fabric project until the hardware test.
+    """
     thumb, server = escape(root_sha1), escape(server_name)
     if method == "tls":
         config, mode, eap_type, author = _TLS.format(server=server, thumb=thumb), "machine", 13, 0

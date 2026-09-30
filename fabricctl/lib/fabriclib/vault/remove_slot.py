@@ -8,11 +8,19 @@ from fabriclib.vault.write_device_rules import write_device_rules
 
 
 def remove_slot(v, actor, slot_id, source="web"):
-    """Remove an unlock method. Refused for the last one, and unless another
-    method is present to vouch for the change (the store is re-signed with
-    the vault key). The removed method's copy is destroyed where fabric can
-    (a local file is shredded); a USB stick's copy stays readable on the
-    stick until the key is rotated."""
+    """Purpose: remove an unlock method, destroying its copy of the key where fabric can.
+    Inputs:  v — vars; actor — who asked (audit); slot_id — the method to remove; source — audit source ("web").
+             Reads and writes slots.json.
+    Returns: None.
+    Fails:   ValidationError: no such method; no other method holds the current key (never the last); none of them is
+             present to vouch. Errors from the type's forget (before the store is saved) or discard (after)
+             propagate, e.g. ValidationError or OSError.
+    Feeds:   agent route POST /v1/vault/slots/<id>/remove, `fabricctl vault remove` (run_vault_command),
+             tests/openbao/run.py.
+    Notes:   the store is re-signed with the key a remaining method gives. A local file is shredded; a USB stick's
+             copy only if it is plugged in, otherwise it stays readable on the stick until the key is rotated.
+             Rewrites the udev rules; audited as VAULT_SLOT_REMOVE.
+    """
     store = read_slot_store(v)
     slots = store["slots"] if store else []
     target = next((s for s in slots if s["id"] == slot_id), None)

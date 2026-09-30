@@ -48,10 +48,24 @@ except ldap.LDAPError as x:
 
 
 def run_dirsrv(v, snippet, payload=None):
-    """Run a directory operation (python snippet using `c`, `IN`, `out`,
-    `Refused`, `DEV`, `ROLES`, `USERS`, `GROUPS`) in the dirsrv container
-    as cn=device_admin. Returns what the snippet passed to out(); a
-    Refused(...) or LDAP refusal becomes a ValidationError."""
+    """Purpose: Run one directory operation (a Python snippet) inside the dirsrv container, bound over LDAPI
+             as the least-privilege cn=device_admin.
+    Inputs:  v — fabric vars: ldap_base_dn, dirsrv_container (default "dirsrv"); snippet — Python source
+             using c (the bound connection), IN (payload), out(obj), Refused, DEV, ROLES, USERS, GROUPS;
+             payload — JSON-serialisable input, default {}. Reads ldap_device_admin_password via load_secrets.
+    Returns: the object the snippet passed to out() (dict or list).
+    Fails:   ValidationError "ldap_device_admin_password is missing: re-run `sudo fabricctl setup`"; "389-DS
+             (dirsrv) is not running — ..."; the snippet's Refused(message); an LDAP refusal: "that name is
+             already taken", "no such entry", "the directory refused the change (not permitted for
+             cn=device_admin)", "directory error: ..."; RuntimeError "directory operation failed: ..." (other
+             docker or Python failures, no output); subprocess.TimeoutExpired after 60 s;
+             json.JSONDecodeError if the last line is not JSON; load_secrets' ValidationError.
+    Feeds:   common/read_directory, add_device, update_device, remove_device, link_device_cert, add_role,
+             update_role, remove_role, list_people.
+    Notes:   input and password travel as environment variables (docker exec -e NAME), the script on
+             stdin: nothing is on argv. Binding as cn=device_admin, never Directory Manager, lets the
+             directory's ACIs, not this code, decide what can change.
+    """
     password = load_secrets().get("ldap_device_admin_password")
     if not password:
         raise ValidationError("ldap_device_admin_password is missing: re-run `sudo fabricctl setup`")

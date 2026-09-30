@@ -1,5 +1,12 @@
 def format_value(rtype, record):
-    """Right-hand side of a record as it appears in the zone file."""
+    """Purpose: The right-hand side of a record as it appears in the zone file, for display.
+    Inputs:  rtype — str record type.
+             record — the stored record dict (ip, canonical, text, priority, exchange, weight, port, target, value).
+    Returns: str: the IP (A/AAAA), canonical name (CNAME), quoted text (TXT), "priority exchange" (MX), "priority weight
+             port target" (SRV), else value or target; missing fields render as "".
+    Fails:   never — dict reads with defaults.
+    Feeds:   zone_detail; the interactive zone editor (fabricctl/lib/interactive.py).
+    """
     if rtype in ("A", "AAAA"):
         return str(record.get("ip", ""))
     if rtype == "CNAME":

@@ -26,12 +26,26 @@ _lock = threading.Lock()                    # artifact file names derive from th
 
 
 def issue_key_pair(v, actor, cn, sans=(), key_type="RSA-2048", days=365, device="", source="web"):
-    """Generate a private key and a leaf certificate for a device that cannot
-    make its own CSR. The key is returned once (PEM and inside a .p12 with a
-    generated password) and is not kept on this host. With `device`, the
-    certificate is linked to that directory device (checked first). Returns
-    {name, cert, chain, fullchain, key, der_b64, p12_b64, p12_password, info,
-    device}."""
+    """Purpose: Generate a private key and a leaf certificate for a device that cannot make its own CSR;
+             the key is handed out once and not kept on this host.
+    Inputs:  v — fabric vars; actor — str (audit, ledger, device link); cn — host name, IP or e-mail
+             (valid_san); sans — iterable of str, blanks dropped, each valid_san; key_type — a KEY_TYPES
+             label: "RSA-2048" (default), "RSA-3072", "RSA-4096", "EC-P256", "EC-P384"; days — 1 ..
+             pki_manual_max_days (valid_days), default 365; device — optional directory device to link,
+             checked first (require_device); source — default "web".
+    Returns: {"name", "cert", "chain" (intermediate + root), "fullchain", "key" (PEM), "der_b64", "p12_b64",
+             "p12_password", "info": describe_cert dict, "device"}.
+    Fails:   ValidationError "the name ... is not a host name, IP address or e-mail address"; "invalid
+             alternative names: ..."; "key type must be one of ..."; valid_days' messages; "no device
+             named ..." (require_device); "invalid certificate name: ..." from mint_offline_cert (an IPv6
+             or e-mail CN with + or % passes valid_san but not CN_RE); "step-ca refused: ..." (run_step);
+             link_device_cert / run_dirsrv errors (raised after issuing); CalledProcessError from
+             export_p12; OSError.
+    Feeds:   agent route POST /v1/pki/issue -> webui agentclient.issue_key_pair -> PKI page.
+    Notes:   a module lock serialises minting because artifact file names derive from the CN; the
+             artifacts are deleted right after reading. Recorded in the ledger (record_issued, kind
+             "keypair") and audited as PKI_ISSUE.
+    """
     cn = str(cn).strip()
     if not valid_san(cn):
         raise ValidationError(f"the name {cn!r} is not a host name, IP address or e-mail address")

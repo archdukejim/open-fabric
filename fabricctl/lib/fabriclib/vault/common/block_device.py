@@ -3,9 +3,18 @@ import subprocess
 
 
 def block_device(path=None, fs_uuid=None):
-    """lsblk facts for a whole disk given its path, or for the disk holding the
-    file system with `fs_uuid`: {path, fs_path, model, serial, tran, rm, uuid,
-    mounted: [mountpoints of it and its partitions]} or None. Read-only."""
+    """Purpose: look up one disk's facts with lsblk, by the disk's path or by a file-system UUID on it. Read-only.
+    Inputs:  path — whole-disk device path (e.g. /dev/sdb; a partition path does not match), or None;
+             fs_uuid — file-system UUID to find on a disk or one of its partitions, or None.
+             Runs lsblk (udev's database) and, for fs_uuid not found there, blkid.
+    Returns: {path (the disk), fs_path (the node holding the file system), model, serial, tran, rm (bool), uuid,
+             mounted: [mountpoints of the disk and its partitions]}; or None when nothing matches or lsblk fails.
+             In the blkid fallback `mounted` is always [].
+    Fails:   FileNotFoundError if lsblk or blkid is not installed; ValueError if lsblk prints something not JSON.
+             A non-zero lsblk exit gives None, not an error.
+    Feeds:   add_usb_slot (by path: is it a whole, unmounted USB disk), slots/usb._stick (by fs_uuid).
+    Notes:   lsblk reads udev's database, which lags right after a device appears; blkid probes the devices.
+    """
     res = subprocess.run(["lsblk", "-J", "-p", "-o", "NAME,PATH,MODEL,SERIAL,TRAN,RM,TYPE,UUID,MOUNTPOINTS"],
                          capture_output=True, text=True)
     if res.returncode != 0:

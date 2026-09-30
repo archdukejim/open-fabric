@@ -128,12 +128,28 @@ class Handler(BaseHTTPRequestHandler):
     allowed_uids = {0}
 
     def address_string(self):
+        """Purpose: the client name used in request log lines (a unix socket peer has no address).
+        Inputs:  none.
+        Returns: str, always "fabric-web".
+        Fails:   never.
+        Feeds:   BaseHTTPRequestHandler's logging (log_request / log_error)."""
         return "fabric-web"
 
     def log_message(self, fmt, *args):
+        """Purpose: write one request log line to stderr (the systemd journal of fabric-agent).
+        Inputs:  fmt — %-format string; args — its values (from BaseHTTPRequestHandler).
+        Returns: None.
+        Fails:   never in practice (a bad format would raise TypeError from the base class's own calls).
+        Feeds:   BaseHTTPRequestHandler (every request and error)."""
         sys.stderr.write(f"{fmt % args}\n")
 
     def reply(self, status, obj):
+        """Purpose: send a complete JSON response.
+        Inputs:  status — int HTTP status; obj — any JSON-serialisable object.
+        Returns: None; status line, Content-Type application/json, Content-Length and the body are written.
+        Fails:   TypeError if obj is not JSON-serialisable (inside dispatch's try it becomes a 500); OSError
+                 (BrokenPipeError) if the peer has gone.
+        Feeds:   dispatch (every answer)."""
         body = json.dumps(obj).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -142,12 +158,28 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def peer_uid(self):
+        """Purpose: the uid of the process on the other end of the unix socket (SO_PEERCRED; kernel-supplied, cannot be
+                 forged by the peer).
+        Inputs:  none; reads self.connection.
+        Returns: int uid.
+        Fails:   OSError if the socket option cannot be read (not a unix socket).
+        Feeds:   dispatch (allowed_uids check), authorize (root peers skip the token)."""
         creds = self.connection.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
         return struct.unpack("3i", creds)[1]
 
     def authorize(self, method, route):
-        """(status, error) if the call is refused, else None. Sets self.user
-        to the token's user (None for root)."""
+        """Purpose: decide whether this request may run: root peers always; everyone else needs a valid Keycloak ID
+                 token that grants the permission the route requires.
+        Inputs:  method — "GET" or "POST"; route — list of path segments after /v1/. Reads the "Authorization: Bearer
+                 <token>" header and vars (load_vars) for token verification.
+        Returns: None when allowed, with self.user = the token's preferred_username and self.perms = its permission set
+                 (both None for a root peer); otherwise (status, error): (401, reason) when verify_user_token rejects
+                 the token or it is missing; (403, "not allowed") when required_permission lists no permission for the
+                 route (default deny); (403, "you need the permission <p>") when the token lacks it ("session" needs
+                 none).
+        Fails:   exceptions other than ValidationError (e.g. KeyError on a token without preferred_username, OSError
+                 from load_vars) propagate to dispatch, which answers 500.
+        Feeds:   dispatch; self.user feeds actor, self.perms the people-reset privilege check."""
         self.user, self.perms = None, None
         if self.peer_uid() == 0:
             return None
@@ -165,6 +197,14 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def body(self):
+        """Purpose: read and parse the request's JSON body.
+        Inputs:  none; reads the Content-Length header and self.rfile. An empty body counts as {}.
+        Returns: dict, the parsed object.
+        Fails:   ValidationError("request too large") over MAX_BODY (64 KiB), ValidationError("expected a JSON object")
+                 for any other JSON value (both -> 400 in dispatch); ValueError / json.JSONDecodeError for a bad
+                 Content-Length or invalid JSON (-> 400 "malformed request"). A negative Content-Length is not refused:
+                 read(-n) then waits for the peer to close the connection.
+        Feeds:   dispatch (every POST)."""
         length = int(self.headers.get("Content-Length") or 0)
         if length > MAX_BODY:
             raise ValidationError("request too large")
@@ -174,6 +214,12 @@ class Handler(BaseHTTPRequestHandler):
         return data
 
     def actor(self, data):
+        """Purpose: the user name recorded in the audit log for this change.
+        Inputs:  data — the request body; its "actor" is used only for root peers (no token).
+        Returns: str — the verified token's user when there is one, else data["actor"].
+        Fails:   ValidationError("invalid actor") (-> 400) when a root peer's actor is missing or does not match
+                 ACTOR_RE (1-64 characters of letters, digits, . _ @ -, starting with a letter or digit).
+        Feeds:   dispatch -> every fabriclib change operation and write_audit."""
         if self.user:                       # the verified token's user, not what the request says
             return self.user
         actor = str(data.get("actor", ""))
@@ -182,12 +228,44 @@ class Handler(BaseHTTPRequestHandler):
         return actor
 
     def do_GET(self):
+        """Purpose: entry point for GET requests (called by BaseHTTPRequestHandler).
+        Inputs:  none; the request is in self.path / self.headers.
+        Returns: None; the answer is sent by dispatch.
+        Fails:   as dispatch (errors become JSON replies).
+        Feeds:   dispatch("GET")."""
         self.dispatch("GET")
 
     def do_POST(self):
+        """Purpose: entry point for POST requests (called by BaseHTTPRequestHandler).
+        Inputs:  none; the request is in self.path / self.headers / self.rfile.
+        Returns: None; the answer is sent by dispatch.
+        Fails:   as dispatch (errors become JSON replies).
+        Feeds:   dispatch("POST")."""
         self.dispatch("POST")
 
     def dispatch(self, method):
+        """Purpose: route one /v1/ request to exactly one fabriclib operation and reply with its result as JSON.
+        Inputs:  method — "GET" or "POST"; self.path (URL-decoded path segments; the query string is ignored), the
+                 Authorization header (see authorize) and, for POST, the JSON body (see body; actor from actor()). GET:
+                 version, services, zones, zones/<key>, audit, pki/ca, pki/issued, tsig, reverse-zones, devices, people,
+                 dhcp, radius, radius/guides, vault, vault/slots, vault/devices. POST: zones/<key>/records[/delete],
+                 apply, pki/<op>, tsig, tsig/<name>/rotate|delete, vault/..., devices/..., roles/...,
+                 dhcp/reservations[/<mac>/delete], radius/clients[/<name>/rotate|delete],
+                 radius/people[/<group>/delete], people, people/<uid>/reset, events.
+        Returns: None; replies 200 with the operation's result (DHCP and RADIUS changes run apply_changes and include
+                 "applied" and the last 2000 characters of its output; secrets and one-time passwords are returned
+                 once).
+        Fails:   never raises; replies 403 "peer not allowed" when the peer uid is not in allowed_uids; 404 "not found"
+                 for a path outside /v1 or an unknown route; 401/403 from authorize; 400 with the message for
+                 ValidationError (bad input, unsupported record type or event, invalid index, fabriclib refusals); 400
+                 "malformed request" for ValueError/JSON errors; 500 "internal error" (traceback to stderr) for anything
+                 else.
+        Feeds:   do_GET, do_POST. Calls fabriclib: dns (list_zones, zone_detail, add_record, remove_record,
+                 list_tsig_keys, create_zone_tsig_key, rotate_tsig_key, remove_tsig_key, reverse_zones), system
+                 (version_info, service_status, apply_changes), common (read_audit, write_audit), pki (ca_summary,
+                 list_issued), ldap (device_overview, list_people), dhcp, radius, vault (vault_status, list_slots,
+                 detect_devices), keycloak (create_person, reset_sign_in), plus pki, vault and directory below.
+        Notes:   POST apply only needs dns:write (required_permission), though it runs the whole deployment."""
         if self.peer_uid() not in self.allowed_uids:
             return self.reply(403, {"error": "peer not allowed"})
         try:
@@ -325,7 +403,14 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def pki(op, actor, data):
-        """The manual PKI operations (one fabriclib.pki file each)."""
+        """Purpose: the manual PKI operations of POST /v1/pki/<op> (one fabriclib.pki file each).
+        Inputs:  op — "describe-csr" | "sign" | "issue" | "inspect" | "convert"; actor — str; data — body with csr,
+                 days, device, cn, sans, key_type, data, cert, key as each operation needs (text fields must be
+                 strings).
+        Returns: the fabriclib result: describe_csr, sign_csr, issue_key_pair, inspect_pem or convert_cert.
+        Fails:   ValidationError("unknown operation") for another op, or from text/strings and the fabriclib function
+                 (-> 400); other exceptions -> 500 in dispatch.
+        Feeds:   dispatch (POST pki/<op>)."""
         if op == "describe-csr":
             return describe_csr(text(data, "csr"))
         if op == "sign":
@@ -341,7 +426,15 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def vault(route, actor, data):
-        """Unlock-method changes (fabriclib.vault)."""
+        """Purpose: changes to OpenBao's unlock methods, POST /v1/vault/... (fabriclib.vault).
+        Inputs:  route — segments after "vault": ["slots","add-usb"], ["slots","add-hsm"], ["slots","add-security-key"],
+                 ["slots",<id>,"test"], ["slots",<id>,"remove"], ["rotate"]; actor — str; data — body (disk, label,
+                 endpoint, key_id, ca, cert, key, server_name, module, token, pin as each needs).
+        Returns: {"id": slot id} for an add; {"ok": bool} for test and remove; rotate_vault_key's result for rotate (it
+                 restarts OpenBao through restart_openbao).
+        Fails:   ValidationError("unknown operation") for another route, or from text() and fabriclib (-> 400); other
+                 exceptions -> 500 in dispatch.
+        Feeds:   dispatch (POST vault/...)."""
         v = load_vars()
         if route == ["slots", "add-usb"]:
             return {"id": add_usb_slot(v, actor, text(data, "disk"), text(data, "label"))}
@@ -363,7 +456,15 @@ class Handler(BaseHTTPRequestHandler):
 
     @staticmethod
     def directory(route, actor, data):
-        """Devices and device roles in 389-DS (fabriclib.ldap, as cn=device_admin)."""
+        """Purpose: devices and device roles in 389-DS, POST /v1/devices/... and /v1/roles/... (fabriclib.ldap, bound as
+                 cn=device_admin).
+        Inputs:  route — ["devices"|"roles"] plus [], [<name>], [<name>,"delete"] or (devices only) [<name>,"certs"];
+                 actor — str; data — body: name, fields (see fields), sha256, link.
+        Returns: {"name": ...} for an add; the result of update_*/remove_* or link_device_cert otherwise (dispatch
+                 replies {} when it is None).
+        Fails:   ValidationError("unknown operation") for another route, or from fields()/text() and fabriclib (-> 400);
+                 other exceptions -> 500 in dispatch.
+        Feeds:   dispatch (POST devices/..., roles/...)."""
         v = load_vars()
         kind, rest = route[0], route[1:]
         add, update, remove = ((add_device, update_device, remove_device) if kind == "devices"
@@ -380,7 +481,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def fields(data):
-    """A device/role form: text values and lists of text only."""
+    """Purpose: validate the "fields" form of a device or role request.
+    Inputs:  data — the request body; data["fields"] must be an object of at most 20 entries whose values are text,
+             booleans, or lists of at most 100 strings. Missing or empty means {}.
+    Returns: dict, the fields unchanged.
+    Fails:   ValidationError("fields must be an object") or ("field <k> has an unsupported value") (-> 400).
+    Feeds:   Handler.directory (add_device, add_role, update_device, update_role)."""
     value = data.get("fields") or {}
     if not isinstance(value, dict) or len(value) > 20:
         raise ValidationError("fields must be an object")
@@ -392,6 +498,11 @@ def fields(data):
 
 
 def text(data, field):
+    """Purpose: read one text field from a request body.
+    Inputs:  data — the request body; field — str, the key.
+    Returns: str, the value; "" when absent.
+    Fails:   ValidationError("<field> must be text") when present but not a string (-> 400).
+    Feeds:   Handler.dispatch, pki, vault, directory."""
     value = data.get(field, "")
     if not isinstance(value, str):
         raise ValidationError(f"{field} must be text")
@@ -399,6 +510,11 @@ def text(data, field):
 
 
 def strings(data, field):
+    """Purpose: read one list-of-text field from a request body.
+    Inputs:  data — the request body; field — str, the key.
+    Returns: list of str (at most 100); [] when absent or empty.
+    Fails:   ValidationError("<field> must be a list of text") for anything else (-> 400).
+    Feeds:   Handler.dispatch (tsig hosts/types), Handler.pki (sans)."""
     value = data.get(field) or []
     if not isinstance(value, list) or not all(isinstance(x, str) for x in value) or len(value) > 100:
         raise ValidationError(f"{field} must be a list of text")
@@ -410,6 +526,15 @@ class UnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
 
 
 def main():
+    """Purpose: start fabric-agent: listen on the unix socket and serve requests, one thread each, until stopped.
+    Inputs:  command-line --socket (path, required; an existing file there is removed), --socket-gid (int, required: the
+             webui container's group), --allow-uid (int, repeatable: peer uids allowed besides root). Set by
+             systemd/fabric-agent.service.j2 (socket <base>/webui/agent/agent.sock).
+    Returns: never returns normally (serve_forever).
+    Fails:   argparse exits 2 on missing/invalid arguments; OSError if the socket cannot be created, chowned or chmodded
+             (must run as root).
+    Feeds:   the fabric-agent systemd unit; webui/agentclient.py is its client.
+    Notes:   the socket is created under umask 0117, then set to root:<socket-gid> 0660."""
     ap = argparse.ArgumentParser()
     ap.add_argument("--socket", required=True)
     ap.add_argument("--socket-gid", type=int, required=True, help="group allowed to connect (webui container gid)")

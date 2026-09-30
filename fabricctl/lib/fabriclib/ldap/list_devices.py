@@ -2,9 +2,18 @@ from fabriclib.ldap.common.read_directory import read_directory
 
 
 def list_devices(v, directory=None):
-    """Devices with their roles and what those roles add up to: effective
-    permissions (union of all roles; none while disabled) and VLAN (from
-    the lowest-priority-number role that sets one). Owner as a username."""
+    """Purpose: Devices with their roles and what those roles add up to.
+    Inputs:  v — fabric vars (used only when directory is not given); directory — optional read_directory
+             result, default a fresh read.
+    Returns: list sorted by name of read_directory's device dicts with "owner" as a username and "roles"
+             (names, by priority), "permissions" (union of the roles; [] while disabled), "vlan" (from the
+             lowest-priority-number role that sets one; None while disabled), "vlan_from" (that role or "").
+    Fails:   read_directory's /
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired) when it reads.
+    Feeds:   device_overview; webui/devserver.py (preview server).
+    """
     directory = directory or read_directory(v)
     out = []
     for d in sorted(directory["devices"], key=lambda d: d["name"]):

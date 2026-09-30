@@ -51,7 +51,7 @@ def changed_code(rev, paths):
         kind = "py" if path.endswith(".py") else "sh" if path.endswith(".sh") else None
         if not kind:
             continue
-        old = subprocess.run(["git", "-C", REPO, "show", f"{rev}:{path}"], capture_output=True, text=True)
+        old = subprocess.run(["git", "-C", REPO, "show", f"{rev}:{path}"], capture_output=True, encoding="utf-8")
         new_path = os.path.join(REPO, path)
         if old.returncode != 0 or not os.path.exists(new_path):
             out.append(path)

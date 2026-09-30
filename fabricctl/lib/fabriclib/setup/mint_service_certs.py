@@ -10,7 +10,14 @@ from fabriclib.setup.mint_extra_certs import mint_extra_certs
 
 
 def _targets(ctx):
-    """(cn, extra sans, [(dest dir, service user)], services to restart on change)"""
+    """Purpose: the service certificates this install needs and where each one goes.
+    Inputs:  ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr,
+             radius), domain, install_ldap (default True), install_keycloak, install_webui, install_freeradius.
+    Returns: list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")],
+             services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP,
+             Keycloak + Postgres, web UI and FreeRADIUS (EAP-TLS server cert) when installed.
+    Fails:   KeyError for a missing hostname_* var.
+    Feeds:   run."""
     v, p = ctx.vars, ctx.path
     nginx = lambda host: (p("nginx", "certs", host), "nginx")   # noqa: E731
     t = [
@@ -37,7 +44,14 @@ def _targets(ctx):
 
 
 def _install_dirsrv_tls(ctx, crt, key, root_ca, intermediate):
-    """389-DS imports /data/tls/server.{crt,key} and ca/*.crt on start."""
+    """Purpose: install a certificate the way 389-DS imports it on start: /data/tls/server.{crt,key} and the
+             CA certificates in ca/.
+    Inputs:  ctx — SetupContext (service user ldap, install root); crt, key — minted files; root_ca,
+             intermediate — Step-CA certificate paths.
+    Returns: None; <deploy_base>/dirsrv/data/tls/server.key, server.crt (the leaf only) and ca/*.crt, owned by
+             the ldap user.
+    Fails:   CalledProcessError from `openssl x509`; OSError from install_cert/chown.
+    Feeds:   run."""
     uid, gid = ctx.uid("ldap")
     tls = ctx.path("dirsrv", "data", "tls")
     install_cert(crt, key, root_ca, tls, uid, gid, names=(None, "server.key", None))
@@ -51,10 +65,17 @@ def _install_dirsrv_tls(ctx, crt, key, root_ca, intermediate):
 
 
 def run(ctx):
-    """Issue (or renew) every service certificate from Step-CA. Certs that
-    exist, cover their names and are valid for 30+ days are left alone
-    unless ctx.force_certs is set.
-    Adds the services that need a restart to ctx.restart_services."""
+    """Purpose: issue (or renew) every service certificate from Step-CA and the CA bundles that verify client
+             certificates, then the extra_certs.
+    Inputs:  ctx — SetupContext: vars (see _targets; install_webui, install_freeradius for the bundles),
+             force_certs (re-issue even when current), Step-CA certs under <deploy_base>/stepca/data/certs.
+    Returns: None. Certificates that exist, cover their names, chain to this CA and are valid for 30+ days
+             are left alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the
+             FreeRADIUS ca.pem only when changed. Services whose certificates changed are added to
+             ctx.restart_services.
+    Fails:   SetupError from mint_cert (step-ca refused); OSError/CalledProcessError installing files;
+             ValidationError from mint_extra_certs; KeyError for missing hostname vars.
+    Feeds:   setup step `certs`, run by run_setup via STEPS; renew_service_certs (`fabricctl certs`)."""
     certs_dir = ctx.path("stepca", "data", "certs")
     root_ca = os.path.join(certs_dir, "root_ca.crt")
     intermediate = os.path.join(certs_dir, "intermediate_ca.crt")

@@ -9,17 +9,30 @@ from fabriclib.secrets.load_secrets import load_secrets
 
 
 def _q(s):
+    """Purpose: URL-encode one path or query component for the Keycloak admin API (nothing kept, not "/").
+    Inputs:  s — str (a realm, user name, client id or role name).
+    Returns: the percent-encoded str.
+    Fails:   never for a str.
+    Feeds:   reset_sign_in.
+    """
     return urllib.parse.quote(s, safe="")
 
 
 def reset_sign_in(v, actor, uid, privileged=False, source="web"):
-    """Reset a person's sign-in (helpdesk, `people:reset`): a new one-time
-    password (changed at the next sign-in), their TOTP removed (enrolled
-    again), their sessions ended. Someone in a fabric group (admins,
-    auditors, operators, …) can only be reset with `privileged` (the admin
-    bundle): otherwise the helpdesk could take over an admin's single
-    sign-on (OpenBao's UI needs no client certificate). Returns the
-    password, shown once and stored nowhere."""
+    """Purpose: Helpdesk `people:reset`: give a person a new one-time password, remove their TOTP (they
+             enrol again) and end their sessions.
+    Inputs:  v — fabric vars (keycloak_admin, fabric_groups); actor — str, for the audit; uid — username
+             (exact match); privileged — bool: the caller is root or holds system:admin (admin bundle);
+             source — default "web". Reads Keycloak admin credentials via load_secrets.
+    Returns: the new one-time password (token_urlsafe(15)): shown once, stored nowhere.
+    Fails:   ValidationError "no user <uid>"; "<uid> is in a fabric group (...): only an admin can reset
+             their sign-in"; "Keycloak refused: ..." (admin API error or failed login); load_secrets'
+             ValidationError; OSError / ssl errors if Keycloak is unreachable.
+    Feeds:   agent route POST /v1/people/<uid>/reset -> webui agentclient.reset_sign_in -> People page.
+    Notes:   members of fabric groups (admins, auditors, operators, ...) need `privileged`: otherwise the
+             helpdesk could take over an admin's single sign-on (OpenBao's UI needs no client certificate).
+             Audited as PERSON_RESET.
+    """
     password = secrets.token_urlsafe(15)
     try:
         kc, realm = keycloak_admin(v, load_secrets())

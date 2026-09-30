@@ -21,7 +21,11 @@ CACHE = "/run/freeradius/fp"
 
 
 def _tlv(der, i):
-    """(tag, content start, content end) of the DER element at i."""
+    """Purpose: read one DER element header.
+    Inputs:  der — bytes; i — int offset of the element's tag.
+    Returns: (tag int, content start offset, content end offset). Handles short and long length forms.
+    Fails:   IndexError if der is truncated at the header.
+    Feeds:   serial_of."""
     tag, n = der[i], der[i + 1]
     i += 2
     if n & 0x80:
@@ -32,8 +36,13 @@ def _tlv(der, i):
 
 
 def serial_of(der):
-    """The certificate's serial as lowercase hex without leading zero bytes
-    (how FreeRADIUS prints TLS-Client-Cert-Serial)."""
+    """Purpose: the certificate's serial number as FreeRADIUS prints TLS-Client-Cert-Serial: lowercase hex
+             without leading zero bytes.
+    Inputs:  der — bytes, a DER X.509 certificate.
+    Returns: str hex serial ("00" for a zero serial).
+    Fails:   ValueError("no serial number") if the element after the optional version is not an INTEGER;
+             IndexError on truncated DER.
+    Feeds:   main."""
     _, cert, _ = _tlv(der, 0)                 # Certificate SEQUENCE
     _, tbs, _ = _tlv(der, cert)               # TBSCertificate SEQUENCE
     tag, start, end = _tlv(der, tbs)
@@ -45,6 +54,14 @@ def serial_of(der):
 
 
 def main(path):
+    """Purpose: record the presented client certificate's SHA-256 fingerprint under its serial so
+             fabric_radius can read it back in check-eap-tls; drop entries older than 10 minutes.
+    Inputs:  path — str, the PEM file FreeRADIUS wrote (%{TLS-Client-Cert-Filename}). Writes /run/freeradius/fp.
+    Returns: 0 (the process exit status: recorded).
+    Fails:   OSError, ValueError (bad PEM or DER); the __main__ wrapper prints the reason and exits 1, and exits 2
+             for a wrong argument count — EAP-TLS verification then fails.
+    Feeds:   FreeRADIUS mods/eap (tls verify `client = … record_fingerprint.py`); fabric_radius.authorize reads
+             the file."""
     with open(path) as f:
         der = ssl.PEM_cert_to_DER_cert(f.read())
     digest = hashlib.sha256(der).hexdigest().upper()

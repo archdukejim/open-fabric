@@ -3,8 +3,12 @@
 # Also callable directly: bash dirsrv.sh seed
 
 # -----------------------------------------------------------------------
-# dirsrv_wait_healthy [timeout_seconds]
-# -----------------------------------------------------------------------
+# Purpose: wait until the dirsrv container's Docker healthcheck reports "healthy".
+# Inputs:  $1 — timeout in seconds (optional, default 300); polls `docker inspect` every 5 s.
+# Returns: exit status 0 as soon as it is healthy.
+# Fails:   status 1 after the timeout, with "dirsrv did not become healthy within Ns (last status: ...)"
+#          on stderr (status "missing" if the container does not exist).
+# Feeds:   dirsrv_seed (before seeding and again after a restart).
 dirsrv_wait_healthy() {
     local timeout="${1:-300}" waited=0 status
     while [ "$waited" -lt "$timeout" ]; do
@@ -17,10 +21,16 @@ dirsrv_wait_healthy() {
 }
 
 # -----------------------------------------------------------------------
-# dirsrv_seed
-# Apply /seed/*.ldif idempotently inside the container and restart the
-# ldap service once if server configuration (cn=config) changed.
-# -----------------------------------------------------------------------
+# Purpose: seed 389-DS: create the suffix backend on first run, apply /seed/*.ldif idempotently inside the
+#          container (seed.py) and restart the ldap service once if server configuration (cn=config) changed.
+# Inputs:  none; needs the running dirsrv container with DS_SUFFIX_NAME set and the rendered seed files
+#          (deploy.py copies them to <base>/dirsrv/seed, mounted at /seed).
+# Returns: seed.py's output on stdout (plus a restart notice when it printed RESTART_REQUIRED); the exit status of
+#          the final dirsrv_wait_healthy after a restart, else 0.
+# Fails:   status 1 if dirsrv never becomes healthy, if the backend cannot be created after 12 tries (5 s apart,
+#          "389-DS backend could not be created" on stderr), or if seed.py fails (its output on stderr).
+# Feeds:   `bash dirsrv.sh seed`, run by apply_deployment (deploy.py) when seed files changed and by
+#          fabriclib/setup/start_services.py; tests/dirsrv/run.sh mirrors the same steps.
 dirsrv_seed() {
     dirsrv_wait_healthy || return 1
     local out

@@ -12,6 +12,11 @@ MIN_RAM_GB_WITH_KEYCLOAK = 3
 
 
 def _os_release():
+    """Purpose: parse /etc/os-release.
+    Inputs:  none (reads /etc/os-release).
+    Returns: dict of KEY -> value with quotes stripped; {} when the file is missing.
+    Fails:   never on a missing file; OSError for other read errors.
+    Feeds:   run."""
     info = {}
     try:
         with open("/etc/os-release") as f:
@@ -24,6 +29,11 @@ def _os_release():
 
 
 def _mem_gb():
+    """Purpose: total RAM in GiB.
+    Inputs:  none (reads /proc/meminfo).
+    Returns: MemTotal as float GiB; 0.0 if the line is absent.
+    Fails:   FileNotFoundError without /proc/meminfo.
+    Feeds:   run."""
     with open("/proc/meminfo") as f:
         for line in f:
             if line.startswith("MemTotal:"):
@@ -32,7 +42,12 @@ def _mem_gb():
 
 
 def _foreign_listeners():
-    """Processes other than Docker listening on fabric's published ports."""
+    """Purpose: processes other than Docker listening on fabric's published ports (PUBLISHED_PORTS).
+    Inputs:  none (runs `ss -H -ltnup`).
+    Returns: list of "<addr:port> <process>" strings; systemd-resolved's loopback stub (127.0.0.53/54) and
+             docker-proxy are ignored.
+    Fails:   FileNotFoundError if `ss` is missing; a failing ss yields [].
+    Feeds:   run (warnings only)."""
     res = subprocess.run(["ss", "-H", "-ltnup"], capture_output=True, text=True)
     found = []
     for line in res.stdout.splitlines():
@@ -50,7 +65,15 @@ def _foreign_listeners():
 
 
 def run(ctx):
-    """Refuse to install on a host that cannot run fabric correctly."""
+    """Purpose: refuse to install on a host that cannot run fabric correctly.
+    Inputs:  ctx — SetupContext: vars.install_keycloak (default True; RAM check), offline (Docker must exist).
+             Reads euid, platform, /etc/os-release, /proc/meminfo, /sys/fs/cgroup/cgroup.controllers, ss.
+    Returns: None; prints what passed. Nothing on the host is changed. An untested OS and ports in use by
+             other programs are warnings only.
+    Fails:   SetupError when not root; SetupError listing every problem: unsupported architecture (not
+             amd64/arm64), under MIN_RAM_GB_WITH_KEYCLOAK (less 0.3) with Keycloak, no cgroup v2 memory
+             controller, offline without Docker.
+    Feeds:   setup step `preflight`, run by run_setup via STEPS."""
     problems = []
     if os.geteuid() != 0:
         raise SetupError("Run as root: sudo fabricctl setup")

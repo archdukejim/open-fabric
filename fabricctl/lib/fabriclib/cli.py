@@ -59,16 +59,38 @@ from fabriclib.setup.uninstall import uninstall  # noqa: E402
 
 
 def _base(args):
+    """Purpose: the install root named on the command line.
+    Inputs:  args — the subcommand's arguments (list of str); "--deploy-base DIR" as two words picks DIR
+             ("--deploy-base=DIR" is not recognised).
+    Returns: DIR, or "/opt" when --deploy-base is absent.
+    Fails:   IndexError if --deploy-base is the last argument (no value follows).
+    Feeds:   main (the SetupContext of every command, restore and uninstall)."""
     return args[args.index("--deploy-base") + 1] if "--deploy-base" in args else "/opt"
 
 
 def _confirm(prompt, args):
+    """Purpose: ask the operator to confirm a destructive command unless --yes/-y was given.
+    Inputs:  prompt — text shown before "Type 'yes' to continue:"; args — the subcommand's arguments.
+    Returns: True when --yes/-y is in args or the answer is "yes" (any case); otherwise False.
+    Fails:   EOFError from input() when stdin is closed and --yes was not given.
+    Feeds:   main (`reinstall`)."""
     if "--yes" in args or "-y" in args:
         return True
     return input(f"{prompt} Type 'yes' to continue: ").strip().lower() == "yes"
 
 
 def main(argv):
+    """Purpose: route `fabricctl <command> ...` to the one function that implements it (routing only).
+    Inputs:  argv — command-line words after the program name; argv[0] is the command (none: help).
+             Every command except help needs root. --deploy-base DIR selects the install root.
+    Returns: exit status (int): the handler's status, 0 for help, 2 for an unknown command or missing
+             arguments (the module docstring is printed). `reinstall` never returns: after backup, uninstall
+             and restore it replaces the process with `cli.py setup --yes` from the staged source.
+    Fails:   SystemExit("Run as root ...") when not root. start/stop/restart/status: any exception is printed
+             as "error: ..." and 1 is returned. Other commands let their handlers' exceptions propagate as a
+             traceback (e.g. ValidationError, SetupError from `certs`, ValueError for a non-numeric --days).
+    Feeds:   `__main__` of this file, run by /usr/bin/fabricctl (package), manage.sh and certs.sh (`extra-cert`)
+             and the OpenBao unit (`vault unlock`/`wipe-key`); the exit status is the process's."""
     if os.geteuid() != 0:
         sys.exit("Run as root (sudo fabricctl ...)")
     cmd, args = (argv[0], argv[1:]) if argv else ("help", [])

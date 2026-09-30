@@ -16,8 +16,19 @@ out({"ok": True})
 
 
 def update_role(v, actor, name, fields, source="web"):
-    """Replace a role's description, permissions, VLAN and priority. Members
-    are managed from each device."""
+    """Purpose: Replace a device role's description, permissions, VLAN and priority; members are managed
+             from each device.
+    Inputs:  v — fabric vars; actor — str, for the audit; name — ROLE_NAME_RE; fields — as add_role
+             (check_role_fields); source — default "web".
+    Returns: None.
+    Fails:   ValidationError "invalid role name: ..."; check_role_fields' messages; "no such entry" (no
+             such role);
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   agent/server.py Handler.directory (POST /v1/roles/<name>) -> webui agentclient.save_role.
+    Notes:   audited as ROLE_UPDATE.
+    """
     if not ROLE_NAME_RE.match(str(name)):
         raise ValidationError(f"invalid role name: {name!r}")
     f = check_role_fields(fields)

@@ -5,7 +5,14 @@ from fabriclib.common.errors import ValidationError
 
 
 def _write(path, text, mode, uid=0, gid=0):
-    """Write if different; returns True if it changed."""
+    """Purpose: Write a file atomically with an owner and mode unless it already holds exactly that text.
+    Inputs:  path — str; text — str; mode — int permission bits for the new temp file; uid, gid — owner (default root).
+    Returns: True if written, False if unchanged.
+    Fails:   OSError from open, chown or replace.
+    Feeds:   deploy_fluentbit.
+    Notes:   duplicates fabriclib/common/write_file_if_changed.py without its chmod, so the mode is subject to umask and
+             not reset on a leftover .tmp file.
+    """
     if os.path.exists(path) and open(path).read() == text:
         return False
     fd = os.open(path + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
@@ -17,12 +24,19 @@ def _write(path, text, mode, uid=0, gid=0):
 
 
 def deploy_fluentbit(v, secrets, jinja_env):
-    """Fluent Bit's files under <deploy_base>/fluentbit: its config (from
-    fabric/jinja/fluentbit/fluent-bit.yaml.j2), the CA certificates that
-    verify each destination (the destination's own `ca_file`, else the
-    fabric root CA), the credentials file docker reads for the container
-    (root 0600, from fabric's secrets in OpenBao) and the disk buffer.
-    Returns True if anything changed (the service must restart)."""
+    """Purpose: Write Fluent Bit's files under <deploy_base>/fluentbit: its config, the CA certificates that verify each
+             destination, the credentials file docker reads for the container, and the disk buffer folder.
+    Inputs:  v — the rendered vars: deploy_base_dir, service_users.fluentbit uid/gid, log_forwarding (syslog / elastic,
+             each with an optional ca_file) and what the template uses.
+             secrets — fabric's secrets dict (log_elastic_password).
+             jinja_env — Jinja environment holding fluentbit/fluent-bit.yaml.j2 (fabricctl/jinja).
+    Returns: True if any file changed (the service must restart), else False.
+    Fails:   ValidationError "log_forwarding.<name>.ca_file … not found" (a destination's ca_file, or the fabric root CA
+             used by default, is missing); KeyError on missing vars; OSError; jinja2 errors.
+    Feeds:   deploy.py (apply), run_logs_command (set-password elastic); tests/fluentbit/run.py.
+    Notes:   config/ is root:fluentbit 0750 and buffer/ fluentbit 0750; the config and CA files are 0640, secrets.env
+             root 0600. Both CA files are written even for a destination that is not configured.
+    """
     base = os.path.join(v["deploy_base_dir"], "fluentbit")
     uid, gid = (int(v["service_users"]["fluentbit"][k]) for k in ("uid", "gid"))
     for sub, owner, mode in (("config", (0, gid), 0o750), ("buffer", (uid, gid), 0o750)):

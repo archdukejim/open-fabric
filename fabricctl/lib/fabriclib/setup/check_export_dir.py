@@ -5,9 +5,13 @@ from fabriclib.setup.uninstall import DIRS
 
 
 def check_export_dir(ctx, path):
-    """Where an uninstall may export fabric's data: an absolute path that
-    the uninstall will not delete (not under a fabric directory, the vault
-    key folder or /run) and that is new or empty. Returns the resolved path."""
+    """Purpose: decide whether an uninstall may export fabric's data to a folder: absolute, not something the
+             uninstall deletes, new or empty.
+    Inputs:  ctx — SetupContext with state loaded (DIRS under deploy_base, vars.openbao_key_dir); path — folder.
+    Returns: the resolved real path (str).
+    Fails:   ValidationError: not absolute; equal to, inside or a parent of a fabric folder, the key folder,
+             /run, /usr/lib/fabricctl, /proc, /sys or /dev; "/"; exists and is not an empty folder.
+    Feeds:   run_uninstall_command (checked before anything is touched, and again before export_install)."""
     if not path or not os.path.isabs(path):
         raise ValidationError("export folder: give an absolute path, e.g. /home/you/fabric-export")
     real = os.path.realpath(path)

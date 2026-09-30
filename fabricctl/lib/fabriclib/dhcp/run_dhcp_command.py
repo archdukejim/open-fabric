@@ -13,6 +13,12 @@ USAGE = """usage: fabricctl dhcp status                       subnets, pools, re
 
 
 def _apply(args):
+    """Purpose: Apply a just-recorded DHCP change now, unless --no-apply was given.
+    Inputs:  args — list of str (looks for "--no-apply"). Runs apply_changes as root (interactive.py --apply).
+    Returns: 0 if skipped or applied; 1 if apply failed (last 2000 characters of its output on stdout).
+    Fails:   subprocess.TimeoutExpired (900 s) and OSError from apply_changes propagate.
+    Feeds:   run_dhcp_command (reserve, unreserve).
+    """
     if "--no-apply" in args:
         print("recorded; apply with: sudo fabricctl --apply")
         return 0
@@ -22,7 +28,15 @@ def _apply(args):
 
 
 def run_dhcp_command(v, argv):
-    """`fabricctl dhcp …` — the Kea tab's operations, without the web UI."""
+    """Purpose: `fabricctl dhcp status | leases | reserve | unreserve` — the Kea tab's operations without the web UI.
+    Inputs:  v — the rendered vars (SetupContext.load_state().vars).
+             argv — list of str after "dhcp" (default status): reserve <mac> <ip> [<hostname>], unreserve <mac>, each
+             with optional --no-apply.
+    Returns: exit status: 0 success; 1 a ValidationError, unreadable leases or a failed apply; 2 usage (printed to
+             stderr).
+    Fails:   ValidationError is caught (exit 1); other exceptions propagate.
+    Feeds:   fabriclib/cli.py (`fabricctl dhcp`).
+    """
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
     pos = [a for a in args if not a.startswith("--")]
     try:

@@ -13,7 +13,13 @@ from fabriclib.system.apply_changes import apply_changes
 
 
 def _secret(args):
-    """An existing secret from --secret-file or a hidden prompt; None otherwise."""
+    """Purpose: Read an existing TSIG secret without putting it on the command line.
+    Inputs:  args — argparse namespace; uses secret_file (path) or secret_prompt (bool) when present.
+    Returns: the stripped secret (str) from the file or a hidden prompt; None when neither is given.
+    Fails:   OSError if the file cannot be read (caught by run_tsig_command); EOFError/KeyboardInterrupt from getpass
+             propagate.
+    Feeds:   run_tsig_command (add, set-secret).
+    """
     if getattr(args, "secret_file", None):
         with open(args.secret_file) as f:
             return f.read().strip()
@@ -23,19 +29,42 @@ def _secret(args):
 
 
 def _stored_key(name):
+    """Purpose: A TSIG key's entry as stored in vars.yaml.
+    Inputs:  name — str key name.
+    Returns: the tsig_keys dict, or None if there is no such key.
+    Fails:   OSError or yaml.YAMLError from load_vars.
+    Feeds:   run_tsig_command (update with only --acl / --drop-acl).
+    """
     from fabriclib.common.load_vars import load_vars
     return next((k for k in load_vars().get("tsig_keys") or [] if k.get("name") == name), None)
 
 
 def _ini(key):
+    """Purpose: The rfc2136.ini path to print for a key when list_tsig_keys does not list it.
+    Inputs:  key — dict with name and optional out.
+    Returns: the key's out, else "/opt/<name>/rfc2136.ini".
+    Fails:   KeyError if key has no name.
+    Feeds:   run_tsig_command (after-apply message).
+    Notes:   hard-codes /opt, while apply writes the file under the deploy base (deploy.py).
+    """
     return key.get("out") or f"/opt/{key['name']}/rfc2136.ini"
 
 
 def run_tsig_command(argv):
-    """`fabricctl tsig list | add | set-secret | rotate | update | remove` —
-    TSIG keys for RFC2136 dynamic updates (e.g. certbot's rfc2136 plugin in
-    nginx-proxy-manager). Secrets never appear in argv: an existing secret
-    comes from --secret-file or a hidden prompt (--secret-prompt)."""
+    """Purpose: `fabricctl tsig list | add | update | set-secret | rotate | remove` — TSIG keys for RFC2136 dynamic
+             updates (e.g. certbot's rfc2136 plugin in nginx-proxy-manager); a change is applied right away unless
+             --no-apply.
+    Inputs:  argv — list of str after "tsig". add/update: name, --domain, --record (repeatable), --any-name, --types,
+             --algorithm, --out, --acl (repeatable); update also --drop-acl; add and set-secret: --secret-file or
+             --secret-prompt. Reads vars.yaml.
+    Returns: exit status: 0 on success; 1 on a ValidationError or OSError ("error: …" on stderr), including a failed
+             apply.
+    Fails:   SystemExit 2 from argparse on bad arguments; "--record and --any-name exclude each other", "nothing to
+             change …", "no TSIG key named …", "give the secret with --secret-prompt or --secret-file" and callee
+             ValidationErrors become exit 1; other exceptions propagate.
+    Feeds:   fabriclib/cli.py (`fabricctl tsig`).
+    Notes:   secrets never appear in argv (world-readable): an existing secret comes from a file or a hidden prompt.
+    """
     ap = argparse.ArgumentParser(prog="fabricctl tsig")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("list")

@@ -2,11 +2,15 @@
 # Certificate management — source this file, do not execute directly.
 
 # -----------------------------------------------------------------------
-# _mint_extra_cert <json_entry>
-# Mint a single certificate described by a JSON entry (from extra_certs[]).
-# Reads runtime config (stepca image, step uid/gid, deploy_base_dir) from
-# the live vars.yaml deployed by fabric.
-# -----------------------------------------------------------------------
+# Purpose: mint one extra certificate described by a JSON entry (one item of extra_certs) and show it.
+# Inputs:  $1 — the entry as a JSON object (cn, sans, days, kty, size, optional is_ca/path_len/out_dir);
+#          reads $FABRIC_DIR. Must run as root.
+# Returns: prints the minted certificate path, its key path and the certificate's subject, dates, basic constraints
+#          and SANs; exit status 0.
+# Fails:   exits the whole script with 1: "Must be run as root." when not root, or when
+#          `fabriclib/cli.py extra-cert` (fabriclib/pki/mint_extra_cert.py, same code as setup) fails — its own
+#          error text is shown.
+# Feeds:   do_extra_certs (both --apply and interactive modes).
 _mint_extra_cert() {
     [[ "$(id -u)" -eq 0 ]] || { err "Must be run as root."; exit 1; }
     # One implementation for setup and this menu: fabriclib/pki/mint_extra_cert.py
@@ -17,10 +21,18 @@ _mint_extra_cert() {
 }
 
 # -----------------------------------------------------------------------
-# do_extra_certs
-# Interactive or --apply mode: mint an offline certificate via Step-CA
-# and record it in custom-vars.yaml.
-# -----------------------------------------------------------------------
+# Purpose: `fabricctl --mint-certs`: mint offline certificates via Step-CA. With --apply, mint every extra_certs
+#          entry in the vars file; otherwise prompt for one (leaf, or subordinate CA with --intermediate-ca),
+#          record it in the vars file and mint it.
+# Inputs:  none as arguments; reads globals from manage.sh: $VARS_FILE (<fabric>/config/vars.yaml — messages call it
+#          custom-vars.yaml), $SUB_MODE, $IS_CA, $PATH_LEN, $CERT_KTY, $CERT_SIZE; prompts on stdin.
+# Returns: progress on stdout; the vars file archived (_vars_archive) and the entry appended (_vars_list_append)
+#          in interactive mode; exit status 0. With --apply and no entries it warns and returns 0.
+# Fails:   exit 1 when the vars file is missing ("fabric not deployed"), when the Common Name is empty, or from
+#          _mint_extra_cert. Answering anything but y/Y at the review prompt exits 0 ("Cancelled."). The JSON entry is
+#          built by string concatenation, so a quote or backslash in CN, SAN or output directory makes it invalid
+#          (_vars_list_append then fails).
+# Feeds:   manage.sh (MODE mint-certs).
 do_extra_certs() {
     echo -e "${BOLD}fabric mint-certs${NC}"
     echo ""
@@ -142,10 +154,18 @@ for c in certs:
 }
 
 # -----------------------------------------------------------------------
-# do_service_cert
-# Interactive or --apply mode: re-issue TLS certificates for the four
-# core nginx-proxied services (dns, ldap, ca, certificates).
-# -----------------------------------------------------------------------
+# Purpose: `fabricctl --service-cert`: re-issue every core service certificate (`fabriclib/cli.py certs --force`,
+#          fabriclib/setup/mint_service_certs.py), which restarts the affected services. Interactive mode first
+#          lists expiry dates and asks for confirmation.
+# Inputs:  none as arguments; reads $VARS_FILE, $SUB_MODE and $FABRIC_DIR from manage.sh; deploy_base_dir and domain
+#          from the vars file; prompts on stdin.
+# Returns: progress and the expiry list on stdout; exit status 0.
+# Fails:   exit 1 when the vars file is missing ("fabric not deployed"); answering anything but y/Y exits 0
+#          ("Cancelled."); a failing `cli.py certs` ends the script through manage.sh's `set -e`.
+# Feeds:   manage.sh (MODE service-cert).
+# Notes:   the expiry list only looks at <base>/nginx/certs/{dns,ldap,ca,certificates}.<domain>/fullchain.pem.
+#          The issued set follows the hostname_* vars and has more services; by default ldap's certificate is in
+#          dirsrv/data/tls and the certs site is certs.<domain>, so those two always show "(not yet issued)".
 do_service_cert() {
     echo -e "${BOLD}fabric service-cert${NC}"
     echo ""

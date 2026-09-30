@@ -26,21 +26,38 @@ LOCAL_CLI = "/usr/local/bin/fabricctl"
 
 
 def _packaged():
-    """True when fabricctl is installed from the .deb (it owns /usr/bin/fabricctl)."""
+    """Purpose: whether fabricctl is installed from the .deb (it owns /usr/bin/fabricctl).
+    Inputs:  none (reads PACKAGED_CLI).
+    Returns: True when /usr/bin/fabricctl exists and contains "installed by the fabricctl package".
+    Fails:   OSError/UnicodeDecodeError if the file exists but cannot be read as text.
+    Feeds:   run."""
     return os.path.exists(PACKAGED_CLI) and "installed by the fabricctl package" in open(PACKAGED_CLI).read()
 
 
 def _write_exec(path, text):
+    """Purpose: write an executable script.
+    Inputs:  path — destination; text — file content.
+    Returns: None; the file is written and chmod 0755.
+    Fails:   OSError on write or chmod.
+    Feeds:   run (the /usr/local/bin/fabricctl wrapper)."""
     with open(path, "w") as f:
         f.write(text)
     os.chmod(path, 0o755)
 
 
 def run(ctx):
-    """Render every template from <config>/fabric.yaml and deploy config,
-    compose files, systemd units and web assets without starting anything
-    (deploy.py, start_services=False). From a checkout it installs the
-    fabricctl command; from the package, the package's command is used."""
+    """Purpose: render every template and deploy config, compose files, systemd units and web assets without
+             starting anything; make sure a `fabricctl` command exists.
+    Inputs:  ctx — SetupContext: vars (saved to <config>/fabric.yaml first, keeping plan choices), config_dir,
+             secrets_file, deploy_base, target_dir. Sets env DEPLOY_BASE_DIR, CUSTOM_VARS_PATH,
+             SECRETS_FILE_OVERRIDE, LINK_VARS_PATH and reloads lib/deploy.py (it reads them at import).
+    Returns: None. Leaves the rendered install, an empty 0600 secrets file unless the secrets are in OpenBao,
+             ctx.restart_services extended with services whose config, unit or image changed, ctx reloaded
+             (vars.yaml). From the package: an old /usr/local/bin wrapper is removed; from a checkout:
+             /usr/local/bin/fabricctl is written (runs <target>/lib/manage.sh).
+    Fails:   whatever deploy.apply_deployment raises (ValidationError, CalledProcessError, OSError) —
+             propagates; OSError writing files.
+    Feeds:   setup step `deploy`, run by run_setup via STEPS (run_setup then reloads ctx.vars)."""
     fabric_yaml = os.path.join(ctx.config_dir, "fabric.yaml")
     with open(fabric_yaml, "w") as f:           # persist plan choices made after collect_vars
         yaml.safe_dump(ctx.vars, f, sort_keys=False)

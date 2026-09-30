@@ -6,9 +6,12 @@ RENAMED = {"webui": "webui"}
 
 
 def retire_renamed_units():
-    """Upgrade step: stop, disable and remove units and containers that were
-    renamed (webui is now fabric-web), so the old one never runs next to the
-    new one or holds its socket. Idempotent. Returns the units retired."""
+    """Purpose: upgrade step: stop, disable and remove units and containers that were renamed (webui is now
+             fabric-web), so the old one never runs next to the new one or holds its socket.
+    Inputs:  none (RENAMED; /etc/systemd/system/<unit>.service).
+    Returns: list of unit names retired ([] when none was installed). Idempotent.
+    Fails:   OSError removing the unit file; systemctl/docker failures are ignored.
+    Feeds:   start_services.run (logs each)."""
     retired = []
     for unit, container in RENAMED.items():
         path = f"/etc/systemd/system/{unit}.service"

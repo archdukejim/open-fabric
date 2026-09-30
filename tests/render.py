@@ -275,7 +275,7 @@ frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").ren
 assert frj["uri"] == "ldaps://ldap.lan.j-j.family:3636" and frj["bind_dn"].startswith("cn=radius_reader,")
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
 assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "916:916", fc
-assert fc["ports"] == ["192.168.7.53:1812:1812/udp", "192.168.7.53:1813:1813/udp"], fc["ports"]
+assert fc["ports"] == [f"{v2['host_ip']}:1812:1812/udp", f"{v2['host_ip']}:1813:1813/udp"], fc["ports"]
 accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
 assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts
 assert v2["radius_people"] == [{"group": "network-staff", "vlan": None, "priority": 50},

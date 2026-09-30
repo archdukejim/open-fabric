@@ -18,12 +18,24 @@ class _RelativeEnvironment(jinja2.Environment):
     including template."""
 
     def join_path(self, template, parent):
+        """Purpose: let a template extend or include another by a path relative to itself
+                 (`{% extends "../shared/base.html.j2" %}`).
+        Inputs:  template — str, the name as written in the template; parent — str, the including template's name.
+        Returns: str, the normalized loader path for "./" or "../" names; any other name unchanged.
+        Fails:   never — string manipulation only.
+        Feeds:   jinja2's loader (called by Environment.get_template for extends/include/import)."""
         if template.startswith(("./", "../")):
             return posixpath.normpath(posixpath.join(posixpath.dirname(parent), template))
         return template
 
 
 def _unique(items, attribute=None):
+    """Purpose: the Ansible-style `unique` filter: drop repeated items, keeping the first of each.
+    Inputs:  items — iterable or None (None is treated as empty); attribute — optional str: for dict items,
+             compare on item[attribute] (the whole item when the key is missing).
+    Returns: list of the kept items in their original order.
+    Fails:   TypeError if an item (or its compared value) is unhashable and not a dict or list.
+    Feeds:   templates using `| unique` (rendered via jinja_env)."""
     seen, out = set(), []
     for item in items or []:
         val = item.get(attribute, item) if isinstance(item, dict) and attribute else item
@@ -35,6 +47,11 @@ def _unique(items, attribute=None):
 
 
 def _flatten(value):
+    """Purpose: the Ansible-style `flatten` filter: flatten nested lists and tuples to any depth.
+    Inputs:  value — iterable; strings, bytes and dicts are kept as single items.
+    Returns: list of the leaf items in order.
+    Fails:   TypeError if value is not iterable; RecursionError on a self-containing list.
+    Feeds:   templates using `| flatten`."""
     out = []
     for item in value:
         if isinstance(item, collections.abc.Iterable) and not isinstance(item, (str, bytes, dict)):
@@ -45,6 +62,12 @@ def _flatten(value):
 
 
 def _bool(value):
+    """Purpose: the Ansible-style `bool` filter.
+    Inputs:  value — any: bool as is; str true when one of true/yes/1/on/t/y (case-insensitive); other values
+             by Python truthiness.
+    Returns: bool.
+    Fails:   never.
+    Feeds:   templates using `| bool` (e.g. vars.yaml.j2)."""
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -53,15 +76,26 @@ def _bool(value):
 
 
 def _lookup(kind, arg):
-    """The one lookup() fabric's templates use: pipe('date +%s')."""
+    """Purpose: the one Ansible `lookup()` fabric's templates use: pipe('date +%s'), the current time.
+    Inputs:  kind — str, must be "pipe"; arg — str, must be "date +%s".
+    Returns: str, Unix time in seconds for that one call; "" for any other kind or argument (no command runs).
+    Fails:   never.
+    Feeds:   templates calling lookup(...) (global of jinja_env)."""
     if kind == "pipe" and arg == "date +%s":
         return str(int(time.time()))
     return ""
 
 
 def jinja_env(template_dir):
-    """The Jinja2 environment every fabric template is rendered with:
-    fabric's filters, relative extends, trim_blocks/lstrip_blocks."""
+    """Purpose: build the Jinja2 environment every fabric template is rendered with: fabric's Ansible-style
+             filters, the `match` test, relative extends, trim_blocks/lstrip_blocks, trailing newlines kept.
+    Inputs:  template_dir — str, the jinja folder (fabricctl/jinja); its parent must hold images.lock.yaml.
+    Returns: jinja2.Environment with globals images_lock ({name: ref}), packages_lock and lookup.
+    Fails:   yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is
+             unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest.
+             A missing lock file gives empty globals, not an error.
+    Feeds:   deploy.py, dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py,
+             radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites."""
     env = _RelativeEnvironment(loader=jinja2.FileSystemLoader(template_dir), keep_trailing_newline=True,
                                trim_blocks=True, lstrip_blocks=True)
     env.filters.update({

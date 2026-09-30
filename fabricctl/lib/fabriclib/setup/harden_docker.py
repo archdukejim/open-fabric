@@ -22,9 +22,16 @@ HARDENED = {
 
 
 def run(ctx):
-    """Merge the hardened daemon settings into /etc/docker/daemon.json
-    (existing keys are kept) and restart Docker if anything changed.
-    Relaxable with security.docker_daemon_hardening: false."""
+    """Purpose: merge the HARDENED settings into /etc/docker/daemon.json (existing keys kept) and restart Docker
+             if anything changed.
+    Inputs:  ctx — SetupContext: vars security.docker_daemon_hardening (default True). Reads DAEMON_JSON.
+    Returns: None; daemon.json converged and Docker restarted only when it changed. With the setting false it
+             only warns — settings written earlier are not removed.
+    Fails:   json.JSONDecodeError on an unparseable daemon.json; CalledProcessError from `systemctl restart
+             docker`; SetupError when Docker does not answer `docker info` within about 60 s; AttributeError
+             if vars `security` is null.
+    Feeds:   setup step `docker`, run by run_setup via STEPS.
+    Notes:   no-new-privileges, no icc on the default bridge, no userland proxy, live-restore, bounded logs."""
     if not ctx.vars.get("security", {}).get("docker_daemon_hardening", True):
         warn("Docker daemon hardening disabled (security.docker_daemon_hardening: false)")
         return

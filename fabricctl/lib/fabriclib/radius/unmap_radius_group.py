@@ -6,8 +6,17 @@ from fabriclib.common.write_audit import write_audit
 
 
 def unmap_radius_group(actor, group, source="cli"):
-    """Stop a group's members joining by password (applied by the next
-    apply; people already connected stay until they re-authenticate)."""
+    """Purpose: Stop a group's members joining by password. Applied by the next apply; people already connected stay
+             until they re-authenticate.
+    Inputs:  actor — str, who asks (audit).
+             group — str group name (matched case-insensitively).
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock.
+    Returns: None.
+    Fails:   ValidationError "group … is not mapped for 802.1X"; OSError or yaml.YAMLError from vars_lock / load_vars /
+             save_vars / write_audit.
+    Feeds:   agent route POST /v1/radius/people/<group>/delete (fabricctl/lib/agent/server.py, called by
+             webui/server.py); run_radius_command (unmap-group).
+    """
     with vars_lock():
         data = load_vars()
         people = data.get("radius_people") or []

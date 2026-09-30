@@ -11,7 +11,17 @@ USAGE = """usage: fabricctl logs status                    log forwarding: desti
 
 
 def run_logs_command(ctx, argv):
-    """`fabricctl logs …` (design D20)."""
+    """Purpose: `fabricctl logs status | set-password elastic` (design D20).
+    Inputs:  ctx — SetupContext after load_state (vars, secrets, secrets_file, target_dir).
+             argv — list of str after "logs" (default status). set-password reads the password from a hidden prompt, or
+             one line of stdin when stdin is not a terminal.
+    Returns: exit status: 0 success; 1 Fluent Bit not answering or a ValidationError (e.g. "empty password"); 2 usage.
+    Fails:   ValidationError (including a missing CA file from deploy_fluentbit) is caught (exit 1); errors from
+             save_secrets and other deploy_fluentbit errors (OSError, jinja2) propagate.
+    Feeds:   fabriclib/cli.py (`fabricctl logs`).
+    Notes:   the password never goes on argv; it is saved with save_secrets (the file or OpenBao), then, if Fluent Bit
+             is installed, its credentials file is rewritten and the service try-restarted.
+    """
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
     try:
         if cmd == "status" and not args:

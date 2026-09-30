@@ -10,11 +10,18 @@ SECRET_RE = re.compile(r"^[A-Za-z0-9!#%&()*+,./:;<=>?@\[\]^_{|}~-]{16,128}$")
 
 
 def normalize_radius_clients(clients):
-    """Check `radius_clients` (the switches and access points that may ask
-    FreeRADIUS): a unique name, an IPv4/IPv6 address or network, and
-    message_authenticator (default true). A `secret` given in the vars file
-    (a switch that already has one) is taken out and returned separately,
-    to be kept in OpenBao. Returns (clients, {name: secret})."""
+    """Purpose: Check radius_clients, the switches and access points that may ask FreeRADIUS.
+    Inputs:  clients — list of {name, address, message_authenticator (default true), secret (optional: one a switch
+             already has)}, or None.
+    Returns: (clients, {name: secret}): entries {"name" (lower case), "address" (a single IP or a network),
+             "message_authenticator" (bool)}, and the secrets taken out of them, to be kept in fabric's secrets.
+    Fails:   ValidationError: an entry that is not a dict, a bad name, a name listed twice, an address that is not an IP
+             or network (host bits must be zero), 0/0, overlapping clients, or a bad secret.
+    Feeds:   deploy.py (apply), add_radius_client; SECRET_RE is reused by rotate_radius_secret; tests/freeradius/run.py,
+             tests/render.py.
+    Notes:   SECRET_RE keeps a secret typeable on a switch CLI without quoting and free of `$` (FreeRADIUS expands
+             ${...} inside quoted strings).
+    """
     out, embedded, seen_names, seen_nets = [], {}, set(), []
     for c in clients or []:
         if not isinstance(c, dict):

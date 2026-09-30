@@ -9,6 +9,12 @@ HOST_RE = re.compile(rf"^{LABEL}(?:\.{LABEL})*\.?$")
 
 
 def _int(value, lo, hi, field):
+    """Purpose: Parse a numeric record field and check its range.
+    Inputs:  value — any; lo, hi — int bounds (inclusive); field — name used in the message.
+    Returns: the int.
+    Fails:   ValidationError "<field> must be a number" or "<field> must be between <lo> and <hi>".
+    Feeds:   validate_record (MX, SRV).
+    """
     try:
         n = int(value)
     except (TypeError, ValueError):
@@ -19,6 +25,12 @@ def _int(value, lo, hi, field):
 
 
 def _host(value, field):
+    """Purpose: Check a host name field (CNAME, MX or SRV target).
+    Inputs:  value — str or None (stripped); field — name used in the message.
+    Returns: the stripped host name (a trailing dot is allowed).
+    Fails:   ValidationError "invalid <field>".
+    Feeds:   validate_record.
+    """
     value = (value or "").strip()
     if not HOST_RE.match(value):
         raise ValidationError(f"invalid {field}")
@@ -26,8 +38,19 @@ def _host(value, field):
 
 
 def validate_record(rtype, form):
-    """Build a vars.yaml record from user input. Anything that could inject
-    zone-file syntax (quotes, newlines, `$INCLUDE`, bad labels) is rejected."""
+    """Purpose: Build a vars.yaml record from user input, rejecting anything that could inject zone-file syntax (quotes,
+             newlines, `$INCLUDE`, bad labels).
+    Inputs:  rtype — "A", "AAAA", "CNAME", "MX", "TXT" or "SRV".
+             form — dict of str: name (@, *, *.label or labels), plus ip (A/AAAA), target (CNAME, MX, SRV), priority
+             (MX/SRV, 0-65535), weight (0-65535), port (1-65535), text (TXT: 1-255 characters without quotes,
+             backslashes or newlines).
+    Returns: {"name", "ip"} | {"name", "canonical"} | {"name", "priority", "exchange"} | {"name", "text"} | {"name",
+             "priority", "weight", "port", "target"}.
+    Fails:   ValidationError "invalid record name", "invalid IPv4 address", "invalid IPv6 address", "invalid CNAME
+             target", "invalid mail exchange", "invalid SRV target", "TXT must be 1-255 chars …", the range messages of
+             _int, "unsupported record type"; AttributeError if a field is not a str.
+    Feeds:   add_record; HOST_RE is reused by fabricctl/lib/interactive.py.
+    """
     name = (form.get("name") or "").strip()
     if not NAME_RE.match(name):
         raise ValidationError("invalid record name")

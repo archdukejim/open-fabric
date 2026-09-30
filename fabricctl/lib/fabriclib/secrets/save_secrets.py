@@ -10,11 +10,19 @@ from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
 
 
 def save_secrets(update, path=SECRETS_FILE, v=None):
-    """Apply `update` to fabric's secrets where they live (see load_secrets):
-    top-level keys are set, a None value removes a key, and `tsig_secrets`
-    and `radius_secrets` are merged key by key (a None secret removes that key). OpenBao gets a new
-    version only if something changed (check-and-set against the version
-    read). Returns the full, updated secrets."""
+    """Purpose: Apply a change to fabric's secrets where they live (as load_secrets decides).
+    Inputs:  update — dict: top-level keys are set, a None value removes a key; tsig_secrets and
+             radius_secrets are merged key by key (a None secret removes that key); path — the secrets
+             file, default SECRETS_FILE; v — fabric vars for OpenBao, default from vars.yaml next to path.
+    Returns: the full, updated secrets dict (unchanged content: nothing is written).
+    Fails:   ValidationError from read_vault_secrets / write_vault_secrets (OpenBao unavailable, or a
+             check-and-set conflict with a concurrent change); yaml.YAMLError; OSError.
+    Feeds:   deploy.py apply_deployment, common/set_tsig_secrets, logs/run_logs_command,
+             radius/add_radius_client, radius/remove_radius_client, radius/rotate_radius_secret,
+             setup/collect_vars.
+    Notes:   OpenBao gets a new version only when something changed. The file is rewritten in place with
+             umask 077 and chmod 0600.
+    """
     in_vault = secrets_in_openbao(path) and not os.path.exists(path)
     if in_vault:
         v = v or load_vars(os.path.join(os.path.dirname(path), "vars.yaml"))

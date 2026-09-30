@@ -25,6 +25,17 @@ NEEDS_INPUT = {"preflight", "host", "docker", "deploy"}   # before the rendered 
 
 
 def main(argv=None):
+    """Purpose: `fabricctl setup` / `fabricctl doctor`: parse options, collect settings, show the plan and run
+             the selected steps of STEPS in order.
+    Inputs:  argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline,
+             --non-interactive, --yes/-y, --step NAME (repeatable), --list, --doctor (hidden, used by doctor).
+    Returns: exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted.
+             A full run leaves the install converged; the steps before deploy (preflight, host, docker,
+             deploy) collect vars first, and the plan is shown only when no --step is given.
+    Fails:   SystemExit(2) from argparse on bad options; SystemExit("setup cancelled") when Quit is chosen in the
+             plan; any exception other than SetupError/KeyboardInterrupt from a step (CalledProcessError,
+             CommandError, ValidationError, OSError) propagates as a traceback.
+    Feeds:   cli main (`setup`, `doctor`) and this file's `__main__`."""
     ap = argparse.ArgumentParser(prog="fabricctl setup", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--file", help="vars file (fabric.yaml / custom-vars.yaml)")

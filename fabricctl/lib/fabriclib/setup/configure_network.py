@@ -7,8 +7,16 @@ RESOLVED_DROPIN = "/etc/systemd/resolved.conf.d/fabric-dns.conf"
 
 
 def run(ctx):
-    """Docker network fabric_net (the services' private bridge) and, unless
-    use_host_dns, point the host resolver at dns_server during bootstrap."""
+    """Purpose: create the Docker network fabric_net (the services' private bridge) and, when use_host_dns is
+             false, point the host resolver at dns_server with the stub listener off (frees port 53).
+    Inputs:  ctx — SetupContext: vars fabric_subnet (default 10.255.0.0/24), use_host_dns (default True),
+             dns_server (default 8.8.8.8).
+    Returns: None; fabric_net exists (an existing one is not checked or changed). Without use_host_dns: the
+             resolved drop-in RESOLVED_DROPIN is written and /etc/resolv.conf re-linked to systemd-resolved's
+             file, restarting it — only when the drop-in changed.
+    Fails:   CalledProcessError from `docker network create` or `systemctl restart systemd-resolved`; OSError
+             on the files.
+    Feeds:   setup step `network`, run by run_setup via STEPS."""
     subnet = ctx.vars.get("fabric_subnet", "10.255.0.0/24")
     if subprocess.run(["docker", "network", "inspect", "fabric_net"], capture_output=True).returncode != 0:
         subprocess.run(["docker", "network", "create", "--subnet", subnet, "fabric_net"],

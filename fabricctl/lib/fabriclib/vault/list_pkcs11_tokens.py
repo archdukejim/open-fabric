@@ -5,9 +5,15 @@ from fabriclib.vault.common.pkcs11_modules import pkcs11_modules
 
 
 def list_pkcs11_tokens(v):
-    """Security keys / smart cards visible through the allowed PKCS#11
-    libraries: [{module, library, serial, label, manufacturer, model,
-    pin_state}]. Read-only: no login, nothing written."""
+    """Purpose: list the security keys / smart cards visible through the allowed PKCS#11 libraries; read-only.
+    Inputs:  v — vars (openbao_pkcs11_modules, through pkcs11_modules).
+    Returns: [{module, library, serial, label, manufacturer, model, pin_state}]; pin_state is "ok", "saw a wrong PIN",
+             "last try" or "locked". Uninitialised tokens (e.g. SoftHSM's spare slot) are left out.
+    Fails:   never — a library that cannot load or list (no PyKCS11, no pcscd or reader) or a slot that errors is
+             skipped. No login, nothing written.
+    Feeds:   `fabricctl vault tokens` and `add-key` (run_vault_command), detect_devices (given vars),
+             tests/openbao/run.py.
+    """
     out = []
     for module in pkcs11_modules(v):
         try:

@@ -2,10 +2,14 @@
 # YAML mutation helpers — source this file, do not execute directly.
 
 # -----------------------------------------------------------------------
-# _vars_list_append <key> <json_entry>
-# Append an entry to a top-level YAML list in custom-vars.yaml.
-# Tries ruamel.yaml first (preserves comments), falls back to PyYAML.
-# -----------------------------------------------------------------------
+# Purpose: append one entry to a top-level list in the vars file (e.g. extra_certs).
+# Inputs:  $1 — the top-level key; $2 — the entry as a JSON object string.
+#          Reads $VARS_FILE (manage.sh sets it to <fabric>/config/vars.yaml, not a custom-vars.yaml).
+# Returns: the file rewritten with the entry added (list created if missing); prints "[+] ... (comments preserved)"
+#          with ruamel.yaml, or "[!] ... comments may be reformatted" when it falls back to PyYAML; exit status 0.
+# Fails:   non-zero exit status with a Python traceback on invalid JSON, an unreadable/unwritable file or a
+#          vars file that is not a mapping. Does not lock the file and does not validate the entry.
+# Feeds:   do_extra_certs (certs.sh), which then mints the entry.
 _vars_list_append() {
     local key="$1" json_entry="$2"
     VARS_KEY="$key" VARS_ENTRY="$json_entry" VARS_FILE="$VARS_FILE" \
@@ -38,10 +42,11 @@ PYEOF
 }
 
 # -----------------------------------------------------------------------
-# _vars_archive <label>
-# Save a timestamped backup of custom-vars.yaml before modifying it.
-# Backups stored in $ARCHIVE_DIR/vars/<timestamp>_<label>.yaml
-# -----------------------------------------------------------------------
+# Purpose: save a timestamped copy of the vars file before it is changed.
+# Inputs:  $1 — a label for the file name; reads $VARS_FILE and $ARCHIVE_DIR (manage.sh: <base>/fabric/archive).
+# Returns: the copy at $ARCHIVE_DIR/vars/<UTC yyyymmdd-HHMMSS>_<label>.yaml; prints an ok line; exit status 0.
+# Fails:   non-zero status of mkdir/cp (e.g. $VARS_FILE missing); under manage.sh's `set -e` that ends the script.
+# Feeds:   do_extra_certs (certs.sh), before _vars_list_append.
 _vars_archive() {
     local label="$1"
     local timestamp; timestamp="$(date -u '+%Y%m%d-%H%M%S')"

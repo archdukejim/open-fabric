@@ -20,8 +20,19 @@ out({"ok": True})
 
 
 def add_role(v, actor, name, fields, source="web"):
-    """Create a device role: permissions it grants its member devices, an
-    optional VLAN, a priority (lower wins when roles set different VLANs)."""
+    """Purpose: Create a device role: the permissions it grants its member devices, an optional VLAN and a
+             priority (the lower number wins when roles set different VLANs).
+    Inputs:  v — fabric vars; actor — str, for the audit; name — stripped, lower-cased, ROLE_NAME_RE;
+             fields — {permissions, vlan, priority, description} (check_role_fields); source — default "web".
+    Returns: the normalised role name.
+    Fails:   ValidationError "role name: lowercase letters, digits, '-' and '_'"; check_role_fields'
+             messages; "that name is already taken";
+             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
+             entry", "that name is already taken", "the directory refused the change ...", "directory
+             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+    Feeds:   agent/server.py Handler.directory (POST /v1/roles) -> webui agentclient.save_role.
+    Notes:   audited as ROLE_ADD.
+    """
     name = str(name).strip().lower()
     if not ROLE_NAME_RE.match(name):
         raise ValidationError("role name: lowercase letters, digits, '-' and '_'")

@@ -4,10 +4,19 @@ from fabriclib.ldap.constants import DEVICE_TYPES, USER_RE
 
 
 def check_device_fields(fields, directory, name):
-    """Validate the editable fields of device `name` against the current
-    directory ({devices, roles}). Returns {type, macs, owner, description,
-    enabled, roles} normalised. A MAC may belong to one device only (MAC
-    authentication must be unambiguous); roles must exist."""
+    """Purpose: Validate and normalise the editable fields of a device against the current directory.
+    Inputs:  fields — dict: type (DEVICE_TYPES, default "other"), macs (list, any common spelling),
+             owner (username, optional), description, enabled (default True), roles (list of role names);
+             directory — read_directory result; name — the device being saved (its own MACs do not clash).
+    Returns: {"type", "macs" (normalised, de-duplicated), "owner", "description", "enabled" (bool),
+             "roles" (sorted, unique)}.
+    Fails:   ValidationError "type must be one of ..."; normalize_mac's "not a MAC address: ..." / "... is a
+             multicast address, not a device"; "MAC ... already belongs to device ..."; "invalid owner
+             username: ..."; "description: one line, at most 200 characters"; "no such role: ...".
+    Feeds:   add_device, update_device; webui/devserver.py (preview server).
+    Notes:   a MAC may belong to one device only, so MAC authentication stays unambiguous. The owner's
+             existence is checked later, in the directory.
+    """
     dtype = str(fields.get("type") or "other")
     if dtype not in DEVICE_TYPES:
         raise ValidationError(f"type must be one of {', '.join(DEVICE_TYPES)}")

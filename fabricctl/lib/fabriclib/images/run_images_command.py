@@ -17,6 +17,11 @@ USAGE = """usage: fabricctl images status                  each service: running
 
 
 def _short(ref):
+    """Purpose: a short display form of an image ref.
+    Inputs:  ref — str "repo:tag@sha256:…" or None/"".
+    Returns: str "repo:tag@<12 hex chars of the digest>", the ref unchanged without a digest, or "—" when empty.
+    Fails:   never.
+    Feeds:   run_images_command."""
     if not ref:
         return "—"
     name, _, digest = ref.partition("@")
@@ -24,15 +29,24 @@ def _short(ref):
 
 
 def _prune(ctx):
+    """Purpose: after an update, remove old images unless the admin turned it off.
+    Inputs:  ctx — SetupContext; reads vars image_prune (default true).
+    Returns: None; prints how many images were cleaned up.
+    Fails:   whatever prune_images raises.
+    Feeds:   run_images_command (update)."""
     if ctx.vars.get("image_prune", True):
         removed = prune_images(ctx)
         print(f"cleaned up {len(removed)} old image(s)" if removed else "no old images to clean up")
 
 
 def run_images_command(ctx, argv):
-    """`fabricctl images …` (design D21). Nothing here runs on its own:
-    fetching the validated list later only reports; applying is these
-    commands (or opt-in automatic applying)."""
+    """Purpose: route `fabricctl images status|update|rollback|prune` (design D21) and print the results.
+             Nothing here runs on its own; applying is these commands.
+    Inputs:  ctx — SetupContext with state loaded; argv — list of str after "images" (empty = status).
+    Returns: exit status int: 0 done, 1 ValidationError (printed to stderr), 2 usage error (usage printed).
+    Fails:   ValidationError is caught and becomes exit 1; other errors (Docker, YAML, SetupError from deploy)
+             propagate to the caller.
+    Feeds:   cli.py (`fabricctl images`)."""
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
     try:
         if cmd == "status" and not args:

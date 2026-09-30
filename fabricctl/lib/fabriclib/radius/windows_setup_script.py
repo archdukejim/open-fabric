@@ -53,11 +53,17 @@ Write-Host "Check: netsh lan show interfaces   (and Recent decisions on the Free
 
 
 def windows_setup_script(v, method, root_pem):
-    """A PowerShell script that sets a Windows PC up for 802.1X on this
-    fabric: Wired AutoConfig on, the fabric root CA (`root_pem`) trusted, for
-    "tls" the device's .p12 imported into the computer store, and the wired
-    profile (windows_lan_profile) added. Only public data goes in it.
-    Returns (file name, script with CRLF line ends)."""
+    """Purpose: A PowerShell script that sets a Windows PC up for 802.1X on this fabric: Wired AutoConfig on, the fabric
+             root CA trusted, for "tls" the device's .p12 imported into the computer store, and the wired profile
+             (windows_lan_profile) added.
+    Inputs:  v — the vars dict (hostname_radius, domain).
+             method — "tls" or "ttls".
+             root_pem — the fabric root CA certificate (PEM str).
+    Returns: (file name "fabric-8021x-<method>.ps1", script text with CRLF line ends).
+    Fails:   ValueError "unknown method …"; binascii.Error if the PEM body is not base64.
+    Feeds:   radius_guides.
+    Notes:   only public data goes in it; the .p12 password is asked when the script runs.
+    """
     pem = root_pem.replace("\r", "").strip()
     der = base64.b64decode("".join(line for line in pem.splitlines() if "-----" not in line))
     sha1 = hashlib.sha1(der).hexdigest()

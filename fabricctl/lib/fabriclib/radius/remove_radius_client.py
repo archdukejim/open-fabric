@@ -7,8 +7,16 @@ from fabriclib.secrets.save_secrets import save_secrets
 
 
 def remove_radius_client(actor, name, source="cli"):
-    """Remove a RADIUS client and delete its secret; FreeRADIUS stops
-    answering it at the next apply."""
+    """Purpose: Remove a RADIUS client and delete its secret; FreeRADIUS stops answering it at the next apply.
+    Inputs:  actor — str, who asks (audit).
+             name — str (lower-cased).
+             source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock; writes fabric's secrets.
+    Returns: None.
+    Fails:   ValidationError "no RADIUS client …"; errors from save_secrets; OSError or yaml.YAMLError from vars_lock /
+             load_vars / save_vars / write_audit.
+    Feeds:   agent route POST /v1/radius/clients/<name>/delete (fabricctl/lib/agent/server.py, called by
+             webui/server.py); run_radius_command (remove-client).
+    """
     name = str(name).strip().lower()
     with vars_lock():
         data = load_vars()

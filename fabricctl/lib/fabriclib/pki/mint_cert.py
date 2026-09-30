@@ -5,9 +5,19 @@ from fabriclib.setup.errors import SetupError
 
 
 def mint_cert(ctx, cn, sans, name):
-    """Issue a TLS server/client certificate from the running step-ca
-    (JWK provisioner `admin`). Returns (fullchain_path, key_path) in
-    <base>/stepca/data/artifacts; the chain includes the intermediate."""
+    """Purpose: Issue a service TLS certificate from the running step-ca through its JWK provisioner
+             `admin` (setup's service certificates).
+    Inputs:  ctx — SetupContext: vars (stepca_port default 9000, cert_service_days default 5475),
+             uid("step"), path(); cn — str; sans — list of names (cn is added first, duplicates dropped);
+             name — base name of the artifact files.
+    Returns: (crt_path, key_path) in <base>/stepca/data/artifacts; RSA 4096; the crt holds the leaf and
+             the intermediate (appended from intermediate_ca.crt when step did not bundle it).
+    Fails:   SetupError "minting <cn> failed: ..." if step ca certificate fails (e.g. the step-ca container
+             is not running); OSError reading or writing the files.
+    Feeds:   setup/mint_service_certs.py run.
+    Notes:   runs `docker exec step-ca step ca certificate` as the step user; the provisioner password is a
+             file path inside the container, never a value on argv.
+    """
     v = ctx.vars
     uid, gid = ctx.uid("step")
     artifacts = ctx.path("stepca", "data", "artifacts")

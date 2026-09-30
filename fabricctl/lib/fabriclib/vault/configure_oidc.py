@@ -6,6 +6,12 @@ from fabriclib.vault.constants import OIDC_BUNDLE_POLICIES, OIDC_CLIENT_ID, OIDC
 
 
 def _call(v, token, method, path, body=None):
+    """Purpose: one OpenBao call that must succeed.
+    Inputs:  v — vars; token — OpenBao token; method, path, body — as for bao_request.
+    Returns: the response data (dict).
+    Fails:   ValidationError "OpenBao <method> <path>: <errors>" for any status but 200/204; from bao_request.
+    Feeds:   configure_oidc.
+    """
     status, data = bao_request(v, method, path, token=token, body=body)
     if status not in (200, 204):
         raise ValidationError(f"OpenBao {method} {path}: {data.get('errors') or status}")
@@ -13,14 +19,23 @@ def _call(v, token, method, path, body=None):
 
 
 def configure_oidc(v, token, client_secret):
-    """Sign-in with Keycloak for people (OpenBao's own UI at
-    https://vault.<domain>/ui). Converges: OIDC auth at auth/oidc, discovery
-    at Keycloak's realm verified against the fabric root CA, one role
-    (TOTP is enforced by the Keycloak client's login flow). OpenBao checks the discovery document when the config is written, so
-    Keycloak must be up. The role admits the bundles in OIDC_BUNDLE_POLICIES
-    (the `roles` claim is also the groups claim); each bundle is an external
-    identity group carrying its policy, so a person gets exactly their
-    bundles' policies. Returns the changes made."""
+    """Purpose: converge sign-in with Keycloak (OIDC) for people using OpenBao's own UI, bundles mapped to policies.
+    Inputs:  v — vars: deploy_base_dir (reads stepca/data/certs/root_ca.crt), hostname_keycloak, webui_realm (else
+               domain), hostname_openbao (redirect URI), webui_admin_role (default "fabric-admin");
+             token — a fabric-setup token; client_secret — the fabric-openbao Keycloak client's secret.
+    Returns: list of changes made (str), e.g. "OIDC auth", "OIDC config", "group <bundle>"; empty when all was in
+             place (the config itself is always rewritten).
+    Fails:   ValidationError from _call when OpenBao refuses a step, incl. writing the config while Keycloak is down
+             (OpenBao fetches the discovery document then); from bao_request if OpenBao is unreachable; OSError if
+             the root CA file is missing; KeyError on an unexpected response.
+    Feeds:   setup/setup_openbao.
+    Notes:   OIDC auth at auth/oidc, discovery at Keycloak's realm verified against the fabric root CA, one role
+             (TOTP is enforced by the Keycloak client's login flow). The role admits the bundles in
+             OIDC_BUNDLE_POLICIES ("admin" means the web UI admin role; the `roles` claim is also the groups claim);
+             each bundle is an external identity group carrying its policy, so a person gets exactly their bundles'
+             policies. Tokens: 1 h, at most 8 h. The client secret is never read back, so the config is always
+             written (still idempotent).
+    """
     changes = []
     if f"{OIDC_MOUNT}/" not in _call(v, token, "GET", "sys/auth"):
         _call(v, token, "POST", f"sys/auth/{OIDC_MOUNT}",

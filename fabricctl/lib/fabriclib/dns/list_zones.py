@@ -3,8 +3,13 @@ from fabriclib.dns.zone_name import zone_name
 
 
 def list_zones():
-    """[{key, name, records, reverse}] for every zone in vars.yaml (reverse:
-    a hand-written in-addr.arpa / ip6.arpa zone)."""
+    """Purpose: Every zone in vars.yaml (`dns:`) with its record count, for the zone list.
+    Inputs:  none. Reads vars.yaml.
+    Returns: [{"key", "name", "records" (count over all list-valued fields), "reverse" (True for a hand-written
+             in-addr.arpa / ip6.arpa zone)}] in vars order.
+    Fails:   OSError or yaml.YAMLError from load_vars.
+    Feeds:   agent route GET /v1/zones (fabricctl/lib/agent/server.py, called by webui/server.py); create_zone_tsig_key.
+    """
     data = load_vars()
     zones = []
     for key, zone in (data.get("dns") or {}).items():

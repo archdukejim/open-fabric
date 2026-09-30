@@ -12,9 +12,14 @@ from fabriclib.setup.start_unit import start_unit
 
 
 def _apply(ctx, var, ref, services):
-    """Render and deploy with `var` = ref (local images rebuild on the new
-    base), then recreate each service (compose down/up through its systemd
-    unit) and wait until it is healthy."""
+    """Purpose: render and deploy with image var `var` set to `ref` (local images rebuild on the new base),
+             then restart each service through its systemd unit and wait until it is healthy.
+    Inputs:  ctx — SetupContext (ctx.vars is changed in place and persisted by deploy_config); var — str image var;
+             ref — str image ref; services — list of SERVICES entries to restart, in order.
+    Returns: None.
+    Fails:   SetupError from start_unit when a container does not become healthy; subprocess.CalledProcessError
+             from systemctl; anything deploy_config.run / deploy.py raises (SystemExit on a deploy failure).
+    Feeds:   switch_image (update and its rollback)."""
     ctx.vars[var] = ref
     deploy_config.run(ctx)
     for s in services:
@@ -22,11 +27,16 @@ def _apply(ctx, var, ref, services):
 
 
 def switch_image(ctx, var, target, actor="root", source="cli"):
-    """Move every service using image var `var` to `target` (a ref pinned by
-    digest), one service at a time in dependency order, health-gated. If a
-    service does not come back healthy, the previous ref is restored the
-    same way and ValidationError is raised. The previous ref is remembered
-    for `images rollback`. Returns the services moved."""
+    """Purpose: move every installed service using image var `var` to `target`, one at a time in dependency
+             order, health-gated; restore the previous ref the same way if one does not come back healthy, and
+             remember the previous ref for `images rollback`.
+    Inputs:  ctx — SetupContext with vars; var — str image var (e.g. "image_debian"); target — str ref pinned by
+             digest; actor, source — for the audit log. Writes STATE (/etc/fabric/images/state.json, 0600).
+    Returns: list of service names moved; [] if none is installed or var is already target.
+    Fails:   ValidationError if target is not pinned by digest, the pull fails (nothing touched), the update
+             failed and was rolled back, or the rollback failed too. Only SetupError, SystemExit and
+             CalledProcessError trigger the rollback; any other exception from _apply propagates with no rollback.
+    Feeds:   update_images, rollback_image."""
     if "@sha256:" not in (target or ""):
         raise ValidationError(f"{target!r} is not pinned by digest")
     previous = ctx.vars.get(var)
