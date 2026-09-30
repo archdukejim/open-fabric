@@ -8,7 +8,7 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 
-print(read_images_lock(os.path.join(REPO, "fabric"))[sys.argv[1]]["ref"])
+print(read_images_lock(os.path.join(REPO, "fabricctl"))[sys.argv[1]]["ref"])

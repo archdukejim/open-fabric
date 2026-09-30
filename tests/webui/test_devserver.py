@@ -10,8 +10,8 @@ import time
 import urllib.parse
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LIB = os.path.join(REPO, "fabric", "lib")
-sys.path.insert(0, LIB)
+WEBUI = os.path.join(REPO, "webui")
+sys.path.insert(0, REPO)
 from webui import views  # noqa: E402
 
 PORT = 18765
@@ -33,7 +33,7 @@ def req(method, path, form=None):
     return r.status, r.getheader("Location"), r.getheader("Content-Security-Policy"), data
 
 
-proc = subprocess.Popen([sys.executable, os.path.join(LIB, "webui", "devserver.py"), "--port", str(PORT)],
+proc = subprocess.Popen([sys.executable, os.path.join(WEBUI, "devserver.py"), "--port", str(PORT)],
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
     for _ in range(50):
@@ -166,7 +166,7 @@ finally:
     proc.wait(timeout=5)
 
 PORT += 1                                   # people: the helpdesk bundle
-proc = subprocess.Popen([sys.executable, os.path.join(LIB, "webui", "devserver.py"), "--port", str(PORT),
+proc = subprocess.Popen([sys.executable, os.path.join(WEBUI, "devserver.py"), "--port", str(PORT),
                          "--as", "fabric-helpdesk"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
     for _ in range(50):
@@ -189,7 +189,7 @@ finally:
     proc.wait(timeout=5)
 
 PORT += 1                                   # the preview as a role bundle sees it
-proc = subprocess.Popen([sys.executable, os.path.join(LIB, "webui", "devserver.py"), "--port", str(PORT),
+proc = subprocess.Popen([sys.executable, os.path.join(WEBUI, "devserver.py"), "--port", str(PORT),
                          "--as", "fabric-auditor"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
     for _ in range(50):
@@ -209,8 +209,8 @@ finally:
 
 prod = views.overview({"user": "u", "csrf": "x", "version": {"version": "1", "build": ""}}, [])
 check("production pages never show the banner", "DEV PREVIEW" not in prod)
-src = open(os.path.join(LIB, "webui", "server.py")).read()
+src = open(os.path.join(WEBUI, "server.py")).read()
 check("the production server has no dev switch", "devserver" not in src and '"dev"' not in src and "DEV" not in src)
 check("dev server listens on 127.0.0.1 unless told otherwise",
-      'default="127.0.0.1"' in open(os.path.join(LIB, "webui", "devserver.py")).read())
+      'default="127.0.0.1"' in open(os.path.join(WEBUI, "devserver.py")).read())
 sys.exit(1 if FAILED else 0)

@@ -32,7 +32,7 @@ Setup installs what it needs from apt: `openssl`, `ca-certificates`, `curl`, `gn
 Setup needs five values: `domain`, `hostname`, `host_ip`, `lan_cidr`, `lan_gateway`. Run interactively, it asks for any that are missing and suggests values detected from the default route. For everything else, start from the template:
 
 ```bash
-cp custom-vars-tpl.yml custom-vars.yaml
+cp fabricctl/examples/vars.yaml custom-vars.yaml
 ```
 
 Settings are read in this order, later wins:
@@ -90,7 +90,7 @@ Key tunables with their defaults:
 - [ ] `bind_dns_port` — change from `53` only if another DNS server must keep port 53 on `host_ip`
 - [ ] `webui_admin_user` — the first web UI admin setup creates (default: the account that ran `sudo`)
 - [ ] `webui_hostname` — the web UI's address (default `fabric.<domain>`; any host name)
-- [ ] `image_*` — every image is already pinned by digest (`fabric/images.lock.yaml`); override only to use a local registry (optional; `fabricctl images update` then leaves it alone)
+- [ ] `image_*` — every image is already pinned by digest (`fabricctl/images.lock.yaml`); override only to use a local registry (optional; `fabricctl images update` then leaves it alone)
 
 ---
 
@@ -118,11 +118,11 @@ sudo apt install ./fabricctl_<version>_all.deb    # installs the tool; changes n
 sudo fabricctl setup                              # installs fabric (or: --file vars.yaml)
 ```
 
-The package is built from the repository with `packaging/build-deb.sh` (one `_all.deb` for amd64 and arm64), until releases publish it. Installing it only adds `/usr/bin/fabricctl` and the code in `/usr/lib/fabricctl`; `fabricctl setup` does the rest. Example settings: `/usr/share/doc/fabricctl/examples/vars.yaml`.
+The package is built from the repository with `installers/deb/build-deb.sh` (one `_all.deb` for amd64 and arm64), until releases publish it. Installing it only adds `/usr/bin/fabricctl` and the code in `/usr/lib/fabricctl`; `fabricctl setup` does the rest. Example settings: `/usr/share/doc/fabricctl/examples/vars.yaml`.
 
 **Upgrade:** install the newer `.deb`, then `sudo fabricctl setup`; until you do, every other command reminds you. `apt remove fabricctl` removes the tool and leaves the running install alone.
 
-**From a git checkout (development):** `sudo ./setup.sh` does the same as `fabricctl setup` without the package.
+**From a git checkout (development):** `sudo installers/deb/install-from-checkout.sh` does the same as `fabricctl setup` without the package.
 
 Setup is idempotent: change a setting and run it again; finished steps are quick, and certificates are only re-issued when missing, expiring within 30 days, or missing a name.
 

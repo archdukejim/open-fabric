@@ -4,7 +4,7 @@ import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fabric", "lib"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fabricctl", "lib"))
 import deploy  # noqa: E402
 
 calls = []

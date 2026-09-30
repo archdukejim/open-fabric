@@ -11,7 +11,7 @@ PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 
 docker rm -f dstest >/dev/null 2>&1
-docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabric/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
+docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabricctl/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
 rm -rf "$W"; mkdir -p "$W/data/tls/ca" "$W/seed"
 cd "$W"
 
@@ -25,7 +25,7 @@ openssl req -newkey rsa:2048 -nodes -keyout ldap.key -out ldap.csr -subj '/CN=ld
 printf 'subjectAltName=DNS:ldap.lan.j-j.family\nextendedKeyUsage=serverAuth,clientAuth\n' > ldap.ext
 openssl x509 -req -in ldap.csr -CA int.crt -CAkey int.key -CAcreateserial -out ldap.crt -days 2 -extfile ldap.ext 2>/dev/null
 cp ldap.crt data/tls/server.crt; cp ldap.key data/tls/server.key; cp root.crt int.crt data/tls/ca/
-cp "$OUT"/rendered/dirsrv/seed/*.ldif seed/; cp "$REPO/fabric/jinja/dirsrv/seed.py" seed/
+cp "$OUT"/rendered/dirsrv/seed/*.ldif seed/; cp "$REPO/fabricctl/jinja/dirsrv/seed.py" seed/
 chown -R 911:911 data; chmod 750 seed; chown -R 0:911 seed; chmod 640 seed/*
 
 start() {

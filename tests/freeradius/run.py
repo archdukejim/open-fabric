@@ -33,7 +33,7 @@ DS_IP, RADIUS_IP, SWITCH_IP, STRANGER_IP = "10.254.24.50", "10.254.24.98", "10.2
 DOMAIN, BASE = "lan.j-j.family", "dc=lan,dc=j-j,dc=family"       # tests/render.py's install
 SECRET = "Sw1tchSecretForTests0123456789ab"
 FAILED = 0
-sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.pki.install_cert import install_cert  # noqa: E402
@@ -101,18 +101,18 @@ def leaf(name, ca, eku="clientAuth", cn=None):
 cleanup()
 shutil.rmtree(W, ignore_errors=True)
 os.makedirs(f"{W}/pki")
-DEBIAN = read_images_lock(os.path.join(REPO, "fabric"))["debian"]["ref"]
+DEBIAN = read_images_lock(os.path.join(REPO, "fabricctl"))["debian"]["ref"]
 
 # ------------------------------------------------------------------ images
 build = sh(["docker", "build", "-q", "-t", "fabric/freeradius:test", "--build-arg", f"BASE_IMAGE={DEBIAN}",
-            f"{REPO}/fabric/jinja/freeradius/build"], ok=False)
+            f"{REPO}/fabricctl/jinja/freeradius/build"], ok=False)
 check("FreeRADIUS image builds from Debian's packages on the pinned base", build.returncode == 0, build.stderr)
 if build.returncode:
     sys.exit(1)
 version = sh("docker run --rm --entrypoint /usr/sbin/freeradius fabric/freeradius:test -v", ok=False).stdout
 check("FreeRADIUS 3.2 inside", "FreeRADIUS Version 3.2." in version, version[:120])
 sh(["docker", "build", "-q", "-t", "fabric/dirsrv:test", "--build-arg", f"BASE_IMAGE={DEBIAN}",
-    "--build-arg", "DS_UID=911", "--build-arg", "DS_GID=911", f"{REPO}/fabric/jinja/dirsrv/build"])
+    "--build-arg", "DS_UID=911", "--build-arg", "DS_GID=911", f"{REPO}/fabricctl/jinja/dirsrv/build"])
 os.makedirs(f"{W}/client-build")
 with open(f"{W}/client-build/Dockerfile", "w") as f:        # the test's switch: eapol_test + radclient
     f.write("FROM fabric/freeradius:test\nUSER root\nRUN apt-get update && apt-get install -y "
@@ -149,7 +149,7 @@ for n in ("root.crt", "int.crt"):
     shutil.copy(f"{W}/pki/{n}", f"{W}/ds/data/tls/ca/{n}")
 for n in os.listdir(f"{W}/rendered/dirsrv/seed"):
     shutil.copy(f"{W}/rendered/dirsrv/seed/{n}", f"{W}/ds/seed/{n}")
-shutil.copy(f"{REPO}/fabric/jinja/dirsrv/seed.py", f"{W}/ds/seed/seed.py")
+shutil.copy(f"{REPO}/fabricctl/jinja/dirsrv/seed.py", f"{W}/ds/seed/seed.py")
 sh(f"chown -R 911:911 {W}/ds/data && chown -R 0:911 {W}/ds/seed && chmod 750 {W}/ds/seed && chmod 640 {W}/ds/seed/*")
 sh(f"docker network create --subnet {SUBNET} --gateway {GW} {NET}")
 
@@ -242,7 +242,7 @@ people_map = normalize_radius_people([{"group": "staff", "vlan": 20, "priority":
 rv = {"deploy_base_dir": W, "ldap_base_dn": BASE, "hostname_ldap": f"ldap.{DOMAIN}", "radius_clients": clients,
       "radius_people": people_map, "service_users": {"freeradius": {"uid": 916, "gid": 916}}}
 deploy_freeradius(rv, {"radius_secrets": embedded, "ldap_radius_password": "Rr1"},
-                  jinja_env(os.path.join(REPO, "fabric", "jinja")))
+                  jinja_env(os.path.join(REPO, "fabricctl", "jinja")))
 install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt", f"{W}/freeradius/certs", 916, 916,
              names=("server.pem", "server.key", None))
 with open(f"{W}/freeradius/certs/ca.pem", "w") as f:       # as setup's certificate step writes it

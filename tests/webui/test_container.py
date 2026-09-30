@@ -20,7 +20,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
 from fabriclib.rbac.permissions import BUNDLES  # noqa: E402
 
 
@@ -163,7 +163,7 @@ kc.socket = ctx.wrap_socket(kc.socket, server_side=True)
 threading.Thread(target=kc.serve_forever, daemon=True).start()
 
 # ------------------------------------------- fabric-agent (host, root)
-shutil.copytree(os.path.join(REPO, "fabric", "lib"), f"{W}/fabric/lib")
+subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.makedirs(f"{W}/fabric/config")
 open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
 open(f"{W}/fabric/config/vars.yaml", "w").write(
@@ -201,7 +201,7 @@ json.dump(cfg, open(f"{W}/webui/config/webui.json", "w"))
 os.chown(f"{W}/config/webui.json", UID, UID)
 os.chmod(f"{W}/config/webui.json", 0o400)
 os.makedirs(f"{W}/build")
-sh(f"cp -a {REPO}/fabric/jinja/webui/build/. {W}/build/ && cp -a {REPO}/fabric/lib/webui {W}/build/app")
+sh(f"cp -a {W}/fabric/jinja/webui/build/. {W}/build/ && cp -a {W}/fabric/lib/webui {W}/build/app")
 sh(f"docker build -q --build-arg BASE_IMAGE={DEBIAN} --build-arg WEBUI_UID={UID} --build-arg WEBUI_GID={UID} -t fabric/webui:test {W}/build >/dev/null")
 sh(f"docker run -d --name cwebui --network cwnet --ip 10.254.8.80 --user {UID}:{UID} --group-add 0 "
    f"--read-only --security-opt no-new-privileges:true --cap-drop ALL --tmpfs /tmp:noexec,nosuid,size=16m "

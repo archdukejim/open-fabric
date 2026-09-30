@@ -29,7 +29,7 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 LOGIN=$("${SSH[@]}" whoami); HOSTNAME_=$("${SSH[@]}" 'hostname -s')
 echo "--- target: $TARGET ($("${SSH[@]}" 'uname -m; . /etc/os-release; echo $PRETTY_NAME' | tr '\n' ' '))"
 
-DEB=$(OUT="$OUT/dist" bash "$REPO/packaging/build-deb.sh") || { echo "FAIL package build"; exit 1; }
+DEB=$(OUT="$OUT/dist" bash "$REPO/installers/deb/build-deb.sh") || { echo "FAIL package build"; exit 1; }
 put "$DEB"
 R "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/$(basename "$DEB")" > "$OUT/apt.log" 2>&1
 check "package installs with apt on the host" "R 'dpkg -s fabricctl' | grep -q '^Status: install ok installed'"

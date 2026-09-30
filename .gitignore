@@ -1,6 +1,4 @@
 fabric-secrets.yml
-fabric/pki/
-fabric/tests
 network_backup.txt
 custom-vars-picore.yaml
 custom-vars.yaml
@@ -9,9 +7,9 @@ become_pass
 test/
 custom-vars-test.yaml
 link-vars.yaml
-fabric/BUILD
+fabricctl/BUILD
 __pycache__/
 *.pyc
 
-# built packages (packaging/build-deb.sh)
+# built packages (installers/deb/build-deb.sh)
 dist/

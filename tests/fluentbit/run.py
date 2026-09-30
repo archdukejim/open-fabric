@@ -25,7 +25,7 @@ W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/fluentbit"
 NET, SUBNET, GW, IP = "fbtest_net", "10.254.21.0/24", "10.254.21.1", "10.254.21.95"
 SYSLOG_PORT, ES_PORT, PW = 16514, 19200, "Es-Secret-9"
 FAILED = 0
-sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit  # noqa: E402
@@ -127,14 +127,14 @@ es.socket = ectx.wrap_socket(es.socket, server_side=True)
 threading.Thread(target=es.serve_forever, daemon=True).start()
 
 # ------------------------------------------------------------------ fabric's files, rendered
-lock = read_images_lock(os.path.join(REPO, "fabric"))
+lock = read_images_lock(os.path.join(REPO, "fabricctl"))
 V = {"deploy_base_dir": W, "hostname": "pi-core", "install_fluentbit": True, "ip_fluentbit": IP,
      "fluentbit_mem_limit": "64m", "fluentbit_journal": False, "image_fluentbit": lock["fluentbit"]["ref"],
      "service_users": {"fluentbit": {"uid": 914, "gid": 914}, "openbao": {"uid": 913, "gid": 913}},
      "log_forwarding": {"syslog": {"host": "siem.test", "port": SYSLOG_PORT},
                         "elastic": {"url": f"https://es.test:{ES_PORT}", "user": "fabric", "index": "fabric"},
                         "hosts": {"siem.test": GW, "es.test": GW}}}
-env = jinja_env(os.path.join(REPO, "fabric", "jinja"))
+env = jinja_env(os.path.join(REPO, "fabricctl", "jinja"))
 os.makedirs(f"{W}/openbao/logs")
 audit = f"{W}/openbao/logs/audit-forward.log"
 open(audit, "w").close()

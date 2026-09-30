@@ -8,11 +8,11 @@ import glob
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(REPO, 'fabric', 'lib'))
+sys.path[0:0] = [os.path.join(REPO, 'fabricctl', 'lib'), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402  (the same env deploy.py uses)
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 
-env = jinja_env(os.path.join(REPO, 'fabric', 'jinja'))
+env = jinja_env(os.path.join(REPO, 'fabricctl', 'jinja'))
 
 secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
@@ -139,7 +139,7 @@ print('web UI host name (default, custom, same as host) and certs host rendered'
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
-lock = read_images_lock(os.path.join(REPO, 'fabric'))
+lock = read_images_lock(os.path.join(REPO, 'fabricctl'))
 assert lock and all(re.fullmatch(r'sha256:[0-9a-f]{64}', e['digest']) for e in lock.values()), 'bad images.lock.yaml'
 for e in lock.values():
     assert v2[e['var']] == e['ref'], f"{e['var']} default is not the lock's ref: {v2[e['var']]}"
@@ -151,7 +151,7 @@ for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui
     for name, spec in dc['services'].items():
         ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
         assert '@sha256:' in ref or (spec.get('build') and '@sha256:' in spec['build']['args'].get('BASE_IMAGE', '')),             f'{svc}/{name}: image not pinned: {ref}'
-for df in glob.glob(os.path.join(REPO, 'fabric', 'jinja', '*', 'build', 'Dockerfile')):
+for df in glob.glob(os.path.join(REPO, 'fabricctl', 'jinja', '*', 'build', 'Dockerfile')) + [os.path.join(REPO, 'webui', 'Dockerfile')]:
     text = open(df).read()
     assert not re.search(r'^ARG BASE_IMAGE=', text, re.M), f'{df}: BASE_IMAGE must have no default'
     assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')),         f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
@@ -231,7 +231,7 @@ print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, 
 
 # FreeRADIUS (802.1X): clients with their secrets, BlastRADIUS protection unless relaxed per client,
 # EAP-TLS only with the fabric CA, no session resumption, the policy module, a hardened container
-sys.path.insert(0, os.path.join(REPO, "fabric", "lib"))
+sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 rclients, rembedded = normalize_radius_clients([{"name": "Switch1", "address": "192.168.7.2"},
@@ -290,8 +290,8 @@ print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS, EAP
 # each systemd unit waits for its health check by container name: that name
 # must be a container_name in its compose template (else start hangs 10 min)
 for container, folder in re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'",
-                                    open(os.path.join(REPO, "fabric", "lib", "deploy.py")).read()):
-    text = open(os.path.join(REPO, "fabric", "jinja", folder, "docker-compose.yml.j2")).read()
+                                    open(os.path.join(REPO, "fabricctl", "lib", "deploy.py")).read()):
+    text = open(os.path.join(REPO, "fabricctl", "jinja", folder, "docker-compose.yml.j2")).read()
     assert re.search(rf"^\s+container_name: {re.escape(container)}\s*$", text, re.M), (folder, container)
 print('every unit waits on a container its compose file defines')
 print('all templates rendered')

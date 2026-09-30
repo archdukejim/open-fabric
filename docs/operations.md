@@ -216,7 +216,7 @@ fabric does not use: MSCHAPv2 needs NT hashes the directory does not keep).
 
 #### `fabricctl images`
 Every container image is pinned by digest (amd64 + arm64). The validated
-list is `fabric/images.lock.yaml` of the installed fabric. **A fabric
+list is `fabricctl/images.lock.yaml` of the installed fabric. **A fabric
 upgrade never changes a running image**: `fabricctl setup` keeps what each
 host runs; these commands move it.
 
@@ -248,7 +248,7 @@ sudo fabricctl images update --all
 ```
 
 #### `--version`
-Print the version from `fabric/VERSION` plus the build stamp in `fabric/BUILD` (git commit, `-dirty` if the tree had local changes, and UTC build time — written by `setup.sh` on each run).
+Print the version (`/opt/fabric/VERSION`, from the repository's `fabricctl/VERSION`) plus the build stamp in `/opt/fabric/BUILD` (git commit, `-dirty` if the tree had local changes, UTC build time and package version — written by `installers/deb/build-deb.sh`).
 
 ```bash
 sudo fabricctl --version
@@ -660,7 +660,7 @@ The following chart outlines the memory footprint and CPU impact of the deployed
 
 ## Lifecycle Commands
 
-Install, repair and removal are `fabricctl` subcommands (Python, `fabric/lib/fabriclib/setup/`). All are idempotent. See [install.md](install.md#run-the-installer) for options and the step list.
+Install, repair and removal are `fabricctl` subcommands (Python, `fabricctl/lib/fabriclib/setup/`). All are idempotent. See [install.md](install.md#run-the-installer) for options and the step list.
 
 | Command | What it does |
 |---|---|

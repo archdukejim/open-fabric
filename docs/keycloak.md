@@ -35,7 +35,7 @@ This document tracks connections, variables, configuration nuances, and gotchas 
 ## Phase 3: LDAP Federation Configuration
 
 ### Automated Configuration (`keycloak_bootstrap.py`)
-The `start` setup step (and `fabricctl --keycloak-sync`) runs `fabric/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from fabric's secrets (OpenBao) — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
+The `start` setup step (and `fabricctl --keycloak-sync`) runs `fabricctl/lib/keycloak_bootstrap.py`, which talks to the Keycloak admin REST API over TLS pinned to the core root CA. Credentials are read from fabric's secrets (OpenBao) — nothing is passed on a command line. It is idempotent (converges on every run) and can be re-run at any time:
 
 ```bash
 sudo fabricctl --keycloak-sync

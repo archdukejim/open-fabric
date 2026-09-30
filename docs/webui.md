@@ -1,6 +1,6 @@
 # Open Fabric — web control
 
-**Open Fabric** (subtitle *web control*) is the browser front end for `fabricctl`. It runs as an unprivileged container (`fabric-web`, systemd service `fabric-web`; the code lives in `fabric/lib/webui/`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
+**Open Fabric** (subtitle *web control*) is the browser front end for `fabricctl`. It runs as an unprivileged container (`fabric-web`, systemd service `fabric-web`; the code lives in `webui/`) and is reachable only through nginx at `https://fabric.<domain>` by default — any host name via `webui_hostname`. Every read and change it makes goes through `fabric-agent`, a small privileged host service with a fixed JSON API on a unix socket.
 
 ### Table of Contents
 - [Features](#features)
@@ -119,14 +119,14 @@ The web app (TLS header checks, OIDC, sessions, HTML) holds no privilege: no Doc
 
 | Item | Location |
 |------|----------|
-| Container | `fabric-web` — `/opt/webui/docker-compose.yml` from `fabric/jinja/webui/docker-compose.yml.j2`; image `image_webui` (`fabric/web:local`) built locally from `fabric/jinja/webui/build/Dockerfile` (the validated Debian base + `python3`, `python3-jinja2`, `openssl`, `tini`) |
-| Container code | `fabric/lib/webui/` (`server.py`, `oidc.py`, `tlsclient.py`, `agentclient.py`, `views.py`; stdlib + `jinja2`), copied to `/opt/webui/build/app/` at deploy time and baked into the image |
+| Container | `fabric-web` — `/opt/webui/docker-compose.yml` from `fabricctl/jinja/webui/docker-compose.yml.j2`; image `image_webui` (`fabric/web:local`) built locally from `webui/Dockerfile` (the validated Debian base + `python3`, `python3-jinja2`, `openssl`, `tini`) |
+| Container code | `webui/` (`server.py`, `oidc.py`, `tlsclient.py`, `agentclient.py`, `views.py`; stdlib + `jinja2`), copied to `/opt/webui/build/app/` at deploy time and baked into the image |
 | Container user | `service_users.webui` (default uid/gid `912`) + `group_add` nginx gid; `read_only`, `cap_drop: ALL`, `no-new-privileges`, tmpfs `/tmp`; `ip_webui` (default `10.255.0.80`) on `fabric_net` |
 | Container mounts | `/opt/webui/config` → `/config` (ro); `/opt/stepca/data/certs` → `/certs` (ro, public CA certs only); `/opt/webui/run` → `/run/webui`; `/opt/webui/agent` → `/agent` (ro) |
-| Config | `/opt/webui/config/webui.json` (webui uid, `0400`; contains the OIDC client secret; in-container paths incl. `agent_socket`) — from `fabric/jinja/webui/webui.json.j2` |
+| Config | `/opt/webui/config/webui.json` (webui uid, `0400`; contains the OIDC client secret; in-container paths incl. `agent_socket`) — from `fabricctl/jinja/webui/webui.json.j2` |
 | fabric-web unit | `/etc/systemd/system/fabric-web.service` — standard compose wrapper; requires `fabric-agent` (upgrades retire the old `webui` unit and container) |
 | Web socket | `/opt/webui/run/web.sock` (socket `0660`, group nginx; dir `webui:nginx 0750`), created by the container, mounted into nginx at `/srv/webui` |
-| fabric-agent | `/opt/fabric/lib/agent/server.py` (routes to `fabric/lib/fabriclib/`); unit `/etc/systemd/system/fabric-agent.service` from `fabric/jinja/systemd/fabric-agent.service.j2` (root, sandboxed, no network listener) |
+| fabric-agent | `/opt/fabric/lib/agent/server.py` (routes to `fabricctl/lib/fabriclib/`); unit `/etc/systemd/system/fabric-agent.service` from `fabricctl/jinja/systemd/fabric-agent.service.j2` (root, sandboxed, no network listener) |
 | Agent socket | `/opt/webui/agent/agent.sock` (`root:<webui gid> 0660`; dir `root:<webui gid> 0750`) |
 | nginx vhost | `server_name hostname_mgr`; `ssl_verify_client on`, `ssl_verify_depth 2`, trust `/opt/nginx/certs/client-ca/ca-bundle.pem` (intermediate + root) |
 | Server cert | `fabric.<domain>` offline Step-CA leaf, issued by the `certs` setup step (renew: `fabricctl certs`) |
@@ -272,7 +272,7 @@ Use **Logout** to end both the webui session and the Keycloak session.
 To look at the pages without a CA, client certificate, Keycloak or a running install:
 
 ```bash
-python3 fabric/lib/webui/devserver.py            # from a checkout (needs python3-jinja2) -> http://127.0.0.1:8080
+python3 webui/devserver.py            # from a checkout (needs python3-jinja2) -> http://127.0.0.1:8080
 docker run --rm -p 127.0.0.1:8080:8080 --entrypoint /usr/bin/python3 \
     fabric/web:local /app/webui/devserver.py --bind 0.0.0.0     # from the image, on a fabric host
 ```

@@ -24,7 +24,7 @@ This document outlines the testing strategy for an AI agent to execute, validate
   - `docker ps` shows all containers running.
   - `nslookup dns.<domain> localhost -port=<bind_dns_port>` returns the host IP.
   - `curl -kI https://ca.<domain>` returns an HTTP response indicating step-ca is up.
-  - `sudo fabricctl --version` prints the version from `fabric/VERSION` and the build stamp (commit + time).
+  - `sudo fabricctl --version` prints the version from `fabricctl/VERSION` and the build stamp (commit + time).
 
 ## 3. Subfunctionality Tests
 
@@ -35,9 +35,9 @@ This document outlines the testing strategy for an AI agent to execute, validate
 - [ ] **Validation**: Use `dig` to confirm the new records resolve correctly; `fabricctl --interactive` → DNS shows the zone `IN SYNC` and lists CNAME/MX/TXT/SRV values.
 
 ### 3.2 PKI / Bring Your Own Certs (BYOC)
-- [ ] **Action**: Conduct a teardown (`sudo ./setup.sh --uninstall --force`) to prepare a clean environment.
+- [ ] **Action**: Conduct a teardown (`sudo installers/deb/install-from-checkout.sh --uninstall --force`) to prepare a clean environment.
 - [ ] **Action**: Generate an offline Root CA, set `byoc: true` and specify paths in `custom-vars.yaml`.
-- [ ] **Action**: Run `sudo ./setup.sh --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox).
+- [ ] **Action**: Run `sudo installers/deb/install-from-checkout.sh --file vars.yaml --non-interactive --yes` (automated: `tests/sandbox/run.sh`, a disposable systemd + Docker sandbox).
 - [ ] **Expected**: Step-CA imports the offline CA and starts successfully.
 - [ ] **Validation**: Inspect `/opt/stepca/data/certs/` to confirm the BYOC intermediate cert is present.
 

@@ -17,7 +17,7 @@
 
 ## Synopsis
 
-**fabric** provisions the core services of a small network — the pieces every LAN needs and nobody wants to hand-wire — with one command: `sudo ./setup.sh` (which runs `fabricctl setup`). Managed day-to-day with `fabricctl` or the web UI. It stands up:
+**fabric** provisions the core services of a small network — the pieces every LAN needs and nobody wants to hand-wire — with one command: `sudo installers/deb/install-from-checkout.sh` (which runs `fabricctl setup`). Managed day-to-day with `fabricctl` or the web UI. It stands up:
 
 | Service | Container | Default CNAMEs | Purpose |
 |---------|-----------|----------------|---------|
@@ -39,7 +39,7 @@ Everything is rendered from Jinja2 templates. Settings come from a vars file (`-
 
 ### Required Images
 Every image is pinned by digest (amd64 + arm64) in
-[`fabric/images.lock.yaml`](fabric/images.lock.yaml); a fabric upgrade never
+[`fabricctl/images.lock.yaml`](fabricctl/images.lock.yaml); a fabric upgrade never
 changes a running image, `sudo fabricctl images update` does. Setup pulls or
 builds:
 - `nginx` (stable branch), `openbao/openbao`
@@ -81,8 +81,8 @@ The following gaps were identified while writing this document:
 - No LDAP user/group provisioning tooling — `vars.yaml` defines the OU structure but adding actual users requires manual `ldapadd` (as `super_admin`/`user_creator_admin` over StartTLS or LDAPS) or the Keycloak admin console (writable LDAP federation).
 
 **Documentation gaps:**
-- `fabric/lib/manage.sh --mint-certs` ACME mode references a Portainer webhook URL but its expected format and behavior are not documented.
-- IPv6 is not addressed in `vars.yaml` or `fabric/jinja/docker-compose.yml.j2`, despite BIND9 listening on `listen-on-v6 { any; }`.
+- `fabricctl/lib/manage.sh --mint-certs` ACME mode references a Portainer webhook URL but its expected format and behavior are not documented.
+- IPv6 is not addressed in `vars.yaml` or `fabricctl/jinja/docker-compose.yml.j2`, despite BIND9 listening on `listen-on-v6 { any; }`.
 - No monitoring or alerting integration — cert expiry requires manual verification.
 
 <!-- readme-version: cdab97e -->

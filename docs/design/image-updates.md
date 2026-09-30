@@ -31,7 +31,7 @@ D7), updating Docker or the host OS.
   `repo:tag@sha256:<index digest>`; the multi-arch index digest covers
   amd64 and arm64. `:latest` or a bare tag never runs. An upstream push can
   never change what a host runs.
-- **One source of truth in git**: `fabric/images.lock.yaml` (ships with fabric). The validated list
+- **One source of truth in git**: `fabricctl/images.lock.yaml` (ships with fabric). The validated list
   hosts fetch is generated from it and signed.
 - **Nothing untested ships**: a digest reaches the list only after the full
   suites passed on both architectures with exactly that digest.
@@ -99,7 +99,7 @@ images:
     ("Keycloak 27 available") and a person changes `track`.
 - **policy: manual** freezes an image (known upstream problem): the watcher
   reports but proposes nothing.
-- `fabric/jinja/vars.yaml.j2` defaults and the build files are **generated
+- `fabricctl/jinja/vars.yaml.j2` defaults and the build files are **generated
   from this file** (a render test fails if any image is unpinned or differs
   from the lock). This file replaces today's hand-written `image_*` defaults.
 
@@ -309,7 +309,7 @@ GitHub redirects git and web URLs after a rename, but not Pages URLs, and
 hosts will have the list's URL built in.
 
 **Built (steps 1–2):** everything pinned by digest in
-`fabric/images.lock.yaml` (render test refuses anything else), setup keeps
+`fabricctl/images.lock.yaml` (render test refuses anything else), setup keeps
 running images across upgrades, `fabricctl images status / update /
 rollback / prune` (sandbox: update, setup keeps it, rollback, a broken
 image rolled back by itself, prune keeps the rollback image).

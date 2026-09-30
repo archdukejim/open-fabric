@@ -11,6 +11,6 @@
 | `subordinate.md` | Using an existing CA (subordinate Step-CA) |
 | `disk-encryption.md` | Manual: LUKS for fabric's data, unlocked by the same YubiKey or USB stick |
 | `testplan.md` | Manual test plan (and which parts are automated) |
-| `lib-doc.md` | `fabric/lib` scripts at a glance |
+| `lib-doc.md` | `fabricctl/lib` scripts at a glance |
 | [design/](design/) | Designs and decisions: `fabricctl-package.md` (D1–D21), `image-updates.md` (D21) |
 | [maintenance/](maintenance/) | `stale-code.md`: code kept for later, and what was removed |

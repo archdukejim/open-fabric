@@ -3,12 +3,13 @@
 Run by tests/dirsrv/run.sh after seeding and the admin-user test."""
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 
 REPO, BASE = os.environ["REPO"], os.environ["BASE"]
 W = tempfile.mkdtemp(prefix="fabric-devices-")
-shutil.copytree(os.path.join(REPO, "fabric", "lib"), f"{W}/fabric/lib")
+subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.makedirs(f"{W}/fabric/config")
 with open(f"{W}/fabric/config/fabric-secrets.yml", "w") as f:
     f.write("ldap_device_admin_password: Da1\n")        # what tests/render.py seeded

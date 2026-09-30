@@ -2,7 +2,7 @@
 
 This document details all available configuration variables that can be defined in your `custom-vars.yaml` file. 
 
-The `custom-vars.yaml` file acts as the single source of truth for rendering the infrastructure environment. While only a handful of variables are required (and included in the default `custom-vars-tpl.yml`), you may optionally define any of the variables below to override the backend system defaults.
+The `custom-vars.yaml` file acts as the single source of truth for rendering the infrastructure environment. While only a handful of variables are required (and included in the default `fabricctl/examples/vars.yaml`), you may optionally define any of the variables below to override the backend system defaults.
 
 ---
 
@@ -577,7 +577,7 @@ Allows deep customization of the container orchestration, including overriding i
 ### Container Images
 | Variable | Default | Notes |
 |---|---|---|
-| `image_nginx` | validated `nginx:1.30.x@sha256:…` | from `fabric/images.lock.yaml` |
+| `image_nginx` | validated `nginx:1.30.x@sha256:…` | from `fabricctl/images.lock.yaml` |
 | `image_stepca` | validated `smallstep/step-ca:0.30.x@sha256:…` | base of `fabric/stepca:local` |
 | `image_keycloak` | validated `keycloak/keycloak:26.x@sha256:…` | base of the pre-built layer `fabric/keycloak:local` (`kc.sh build`, `start --optimized`) |
 | `image_postgres` | validated `postgres:18.x@sha256:…` | a new major is never automatic (data upgrade) |
@@ -587,7 +587,7 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_prune` | `true` | after `fabricctl images update`, remove old images of fabric's repositories (never the rollback image or anything in use) |
 
 **Every image is pinned by digest** (amd64 + arm64); the defaults come from
-`fabric/images.lock.yaml`. **Upgrades never change running images:**
+`fabricctl/images.lock.yaml`. **Upgrades never change running images:**
 re-running `fabricctl setup` keeps the image each host runs;
 `sudo fabricctl images update` moves it to the validated list (see
 operations.md). Refs that are not pinned by digest (`nginx:latest`, from
@@ -736,7 +736,7 @@ Built-in folders always come from these defaults; user-added folders are kept.
 | `openbao_pkcs11_modules` | `[]` → ykcs11, OpenSC, SoftHSM2 at their Debian/Ubuntu paths | PKCS#11 libraries (paths or globs) fabric may load for security-key unlock methods. They run as root: list only libraries you trust |
 
 ## 6. 389 Directory Server (LDAP) Specifics
-If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabric/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
+If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabricctl/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 
 ### `ldap_base_dn`
 **Description:** Base distinguished name (389-DS suffix), automatically computed from `domain`.

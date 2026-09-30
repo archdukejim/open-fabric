@@ -15,6 +15,18 @@ file is about *how* we build.
 - One repo, two artifacts. Targets: **arm64 and amd64**; reference hardware
   is a **4 GB Raspberry Pi on Ubuntu Server 24.04**.
 
+The repository has three product folders (design D25):
+
+| Folder | What goes there |
+|---|---|
+| `fabricctl/` | Everything that runs on the Linux host: `fabriclib`, `fabric-agent`, the deploy engine, service templates, `images.lock.yaml`, `VERSION` |
+| `webui/` | The control-plane container: its Python app and `Dockerfile`. It never imports `fabriclib` at runtime (the dev preview may, from a checkout) |
+| `installers/<format>/` | Wrappers that package the two for a platform — today only `installers/deb/` |
+
+The installed layout is assembled by `installers/deb/assemble-tree.sh` and
+did not change with the split: never make a runtime path depend on the
+repository layout.
+
 ## 2. Layout: one function per file, grouped by folder
 
 The repo must stay easy to navigate. For all of our own code:
@@ -30,7 +42,7 @@ The repo must stay easy to navigate. For all of our own code:
 - **Group files by domain in folders** (`dns/`, `dhcp/`, `pki/`, `ldap/`,
   `keycloak/`, `vault/`, `images/`, `security/`, `setup/`, `agent/`,
   `webui/`, `common/`). Prefer a new folder over a crowded one.
-- Python domain code lives in **`fabric/lib/fabriclib/<domain>/`** and is
+- Python domain code lives in **`fabricctl/lib/fabriclib/<domain>/`** and is
   imported as `fabriclib.<domain>.<file>` — namespaced so it can never
   collide with system packages (e.g. dnspython is also `dns`).
 - **Entry points only route.** CLI dispatchers (`fabricctl`), API routers
@@ -38,7 +50,7 @@ The repo must stay easy to navigate. For all of our own code:
   business logic in them.
 - **Every folder has a `README.md`**: one line per file saying what it does.
   Update it in the same change that adds, renames or removes a file.
-- Templates stay under `fabric/jinja/<service>/`; tests mirror the code
+- Templates stay under `fabricctl/jinja/<service>/`; tests mirror the code
   layout under `tests/<domain>/`; docs under `docs/`, designs under
   `docs/design/`.
 - Existing large files (`deploy.py`, `interactive.py`, `manage.sh`,

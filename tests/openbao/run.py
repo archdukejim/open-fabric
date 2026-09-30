@@ -57,7 +57,7 @@ sh(f"docker network rm {NET} >/dev/null 2>&1; true", ok=False)
 shutil.rmtree(W, ignore_errors=True)
 for d in ("stepca/data/certs", "openbao/config", "openbao/data", "openbao/logs", "openbao/certs"):
     os.makedirs(f"{W}/{d}")
-shutil.copytree(f"{REPO}/fabric/lib", f"{W}/fabric/lib")
+subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.chdir(W)
 sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout root.key -out root.crt -days 2 -subj '/CN=Test Root' "
    "-addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign")
@@ -78,7 +78,7 @@ V = {"deploy_base_dir": W, "domain": "lan.test", "hostname_openbao": HOST, "ip_o
      "image_openbao": sh([sys.executable, f"{REPO}/tests/image_ref.py", "openbao"]).stdout.strip()}
 env = jinja2.Environment()
 for tpl, dest in (("docker-compose.yml.j2", "openbao/docker-compose.yml"), ("openbao.hcl.j2", "openbao/config/openbao.hcl")):
-    text = env.from_string(open(f"{REPO}/fabric/jinja/openbao/{tpl}").read()).render(**V)
+    text = env.from_string(open(f"{REPO}/fabricctl/jinja/openbao/{tpl}").read()).render(**V)
     open(dest, "w").write(text.replace("name: fabric_net", f"name: {NET}"))
 sh(["chown", "-R", "913:913", "openbao/data", "openbao/logs"])
 sh(["chmod", "-R", "a+rX", "openbao/config", "openbao/certs"])

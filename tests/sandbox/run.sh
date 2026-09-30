@@ -46,7 +46,7 @@ for _ in $(seq 1 30); do in_box 'systemctl is-system-running 2>/dev/null' | grep
 in_box 'mkdir -p /etc/docker && echo "{\"features\": {\"containerd-snapshotter\": false}, \"storage-driver\": \"overlay2\"}" > /etc/docker/daemon.json'
 
 # The package, built from the working tree exactly as a release would be.
-DEB=$(OUT="$OUT/dist" bash "$REPO/packaging/build-deb.sh") || { echo "FAIL package build"; exit 1; }
+DEB=$(OUT="$OUT/dist" bash "$REPO/installers/deb/build-deb.sh") || { echo "FAIL package build"; exit 1; }
 docker cp "$DEB" "$NAME:/root/fabricctl.deb"
 echo "--- apt install ./$(basename "$DEB")"
 in_box 'apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl.deb' > "$OUT/apt.log" 2>&1
@@ -390,7 +390,7 @@ check "the npm key is unaffected" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 p
 
 echo "--- package upgrade and removal"
 sleep 2    # a later build timestamp = a newer package version
-DEB2=$(OUT="$OUT/dist2" bash "$REPO/packaging/build-deb.sh")
+DEB2=$(OUT="$OUT/dist2" bash "$REPO/installers/deb/build-deb.sh")
 docker cp "$DEB2" "$NAME:/root/fabricctl-new.deb"
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > "$OUT/apt2.log" 2>&1
 check "newer package installs over the old one" "grep -q 'package updated' '$OUT/apt2.log'"

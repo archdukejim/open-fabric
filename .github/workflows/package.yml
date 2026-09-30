@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Check the tag matches fabric/VERSION
+      - name: Check the tag matches fabricctl/VERSION
         if: startsWith(github.ref, 'refs/tags/v')
-        run: test "v$(tr -d ' \n' < fabric/VERSION)" = "${GITHUB_REF_NAME}"
+        run: test "v$(tr -d ' \n' < fabricctl/VERSION)" = "${GITHUB_REF_NAME}"
       - name: Build
         id: build
-        run: echo "deb=$(bash packaging/build-deb.sh)" >> "$GITHUB_OUTPUT"
+        run: echo "deb=$(bash installers/deb/build-deb.sh)" >> "$GITHUB_OUTPUT"
       - name: Inspect
         run: |
           dpkg-deb -I "${{ steps.build.outputs.deb }}"

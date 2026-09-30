@@ -1,8 +1,8 @@
-# fabric library (`fabric/lib/`)
+# fabric library (`fabricctl/lib/`)
 
 Index of the code behind `fabricctl`, `fabric-agent` and the web UI. New code
 follows [AGENTS.md](../AGENTS.md): one operation per file, grouped in domain
-folders under `fabric/lib/fabriclib/`, each folder with its own `README.md`
+folders under `fabricctl/lib/fabriclib/`, each folder with its own `README.md`
 listing its files. The flat files further down predate that rule and are
 split as they are touched (see [stale-code register](maintenance/stale-code.md) S6–S7).
 

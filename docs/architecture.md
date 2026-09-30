@@ -20,46 +20,32 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 
 ```text
 .
-├── fabric
-│   ├── jinja
-│   │   ├── bind9
-│   │   ├── webui         # docker-compose.yml.j2, webui.json.j2, build/Dockerfile
-│   │   ├── dirsrv          # docker-compose.yml.j2, seed.py, seed/*.ldif.j2
-│   │   ├── docker-compose.yml.j2
-│   │   ├── nginx
-│   │   ├── stepca
-│   │   ├── systemd         # wrapper.service.j2, fabric-agent.service.j2
-│   │   └── vars.yaml.j2
-│   ├── lib
-│   │   ├── fabriclib/    # domain code, one operation per file (common/, dns/, system/, pki/, security/)
-│   │   │   ├── setup/    # fabricctl setup/doctor/certs/reinstall/uninstall: one step per file
-│   │   │   └── cli.py    # lifecycle command router
-│   │   ├── agent/        # fabric-agent: privileged host API for webui (routes to fabriclib)
-│   │   ├── webui/        # webui container app (server, oidc, tlsclient, agentclient, views)
-│   │   ├── certs.sh
-│   │   ├── deploy.py
-│   │   ├── dirsrv.sh
-│   │   ├── interactive.py
-│   │   ├── keycloak_bootstrap.py
-│   │   ├── manage.sh
-│   │   ├── output.sh
-│   │   └── vars.sh
-│   └── VERSION             # fabricctl version (BUILD is stamped by the package build or setup.sh, git-ignored)
-├── custom-vars.yaml
-├── docs
-│   ├── architecture.md
-│   ├── webui.md
-│   ├── install.md
-│   ├── keycloak.md
-│   ├── lib-doc.md
-│   ├── operations.md
-│   ├── subordinate.md
-│   ├── testplan.md
-│   └── vars.md
-├── packaging/        # build-deb.sh -> fabricctl_<version>_all.deb
-├── setup.sh          # development: install from a checkout
-└── tests
+├── fabricctl/            # the Linux host side: fabricctl, fabric-agent, setup, service templates
+│   ├── lib/
+│   │   ├── fabriclib/    # domain code, one operation per file (setup/, dns/, dhcp/, radius/, vault/, …)
+│   │   ├── agent/        # fabric-agent: the privileged host API behind the web UI
+│   │   ├── deploy.py     # render every template from vars.yaml and apply changes
+│   │   ├── interactive.py, keycloak_bootstrap.py
+│   │   └── manage.sh, certs.sh, dirsrv.sh, vars.sh, output.sh
+│   ├── jinja/            # one folder per service (config, compose file, local image build/)
+│   ├── examples/vars.yaml
+│   ├── images.lock.yaml  # validated images (by digest) and pinned packages
+│   ├── link-vars-template.yaml
+│   └── VERSION
+├── webui/                # Open Fabric, the control-plane web UI (its own container)
+│   ├── server.py, views.py, agentclient.py, oidc.py, tlsclient.py, devserver.py
+│   └── Dockerfile
+├── installers/
+│   └── deb/              # the Debian package: assemble-tree.sh, build-deb.sh, install-from-checkout.sh
+├── docs/
+└── tests/                # one folder per suite; run-all.sh
 ```
+
+The package assembles the installed tree from `fabricctl/` and `webui/`
+(`installers/deb/assemble-tree.sh`): `fabricctl/` becomes
+`/usr/lib/fabricctl/fabric/`, `webui/` its `lib/webui/`, and `fabricctl setup`
+copies that to `/opt/fabric/`. The installed layout did not change when the
+repository was split (design D25).
 
 ---
 
@@ -84,7 +70,7 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   └── vars.yaml       # User-managed: Safely merged and preserved
 ├── webui             # Managed (only when install_webui)
 │   ├── docker-compose.yml # Managed: unprivileged webui container
-│   ├── build/        # Managed: image build context (Dockerfile + app/ = fabric/lib/webui)
+│   ├── build/        # Managed: image build context (Dockerfile + app/ = webui)
 │   ├── config/webui.json # Managed: webui config incl. OIDC client secret (webui uid, 0400; dir root:webui 0750)
 │   ├── run/web.sock    # Runtime: created by the container (dir webui:nginx 0750), mounted into nginx at /srv/webui
 │   └── agent/agent.sock # Runtime: fabric-agent socket (0660 root:webui; dir root:webui 0750), mounted ro into webui
@@ -159,7 +145,7 @@ graph TB
 
 Every container runs non-root, with `cap_drop: ALL` and **no** capabilities added back, `no-new-privileges`, a read-only root filesystem (writable paths are volumes or small tmpfs mounts), and a memory limit. Proven by the `hardening` test suite (`sudo tests/run-all.sh hardening`), which starts the real rendered compose files and checks each process from the host, including zero effective capabilities.
 
-Where an upstream image fights these settings, a thin **local build layer** (`fabric/jinja/<svc>/build/Dockerfile`, deployed to `/opt/<svc>/build`, image `fabric/<svc>:local`) fixes it once at build time instead of as root at every start. It always builds `FROM` the image given in `image_<svc>` (to be a pinned digest from the image channel).
+Where an upstream image fights these settings, a thin **local build layer** (`fabricctl/jinja/<svc>/build/Dockerfile`, deployed to `/opt/<svc>/build`, image `fabric/<svc>:local`) fixes it once at build time instead of as root at every start. It always builds `FROM` the image given in `image_<svc>` (to be a pinned digest from the image channel).
 
 | Container | User | Local layer | Writable paths |
 |---|---|---|---|
@@ -174,7 +160,7 @@ Where an upstream image fights these settings, a thin **local build layer** (`fa
 
 Low ports need no capability: Docker sets `net.ipv4.ip_unprivileged_port_start=0` inside each container's network namespace.
 
-`apply` rebuilds a local layer only when its build context changed or it was built from another base than its pinned one; every base is pinned by digest (`fabric/images.lock.yaml`), and `fabricctl images update` moves bases and pulled images to the validated list (health-gated, with rollback).
+`apply` rebuilds a local layer only when its build context changed or it was built from another base than its pinned one; every base is pinned by digest (`fabricctl/images.lock.yaml`), and `fabricctl images update` moves bases and pulled images to the validated list (health-gated, with rollback).
 
 ---
 
@@ -183,7 +169,7 @@ Low ports need no capability: Docker sets `net.ipv4.ip_unprivileged_port_start=0
 To guarantee stability on resource-constrained hardware (e.g. Raspberry Pi), `fabric` natively enforces dynamic memory ceilings (`mem_limit`) and staggered boot sequences across its Docker containers via the `host_ram_capacity` variable.
 
 ### Validation Enforcement
-The minimum supported value for `host_ram_capacity` is **3** (GB). If defined (i.e. `> 0`) but less than 3, the `setup.sh` installer and `fabricctl` interactive Python engine will hard-fail to prevent the system from entering an unstable state. A value of `0` denotes an unlimited capacity (the default).
+The minimum supported value for `host_ram_capacity` is **3** (GB). If defined (i.e. `> 0`) but less than 3, `fabricctl setup` and the `fabricctl` interactive engine hard-fail to prevent the system from entering an unstable state. A value of `0` denotes an unlimited capacity (the default).
 
 ### Docker Compose Memory Ceilings
 When `host_ram_capacity` is enabled, Jinja2 automatically injects memory constraints into the `docker-compose.yml` templates for all active services.
@@ -300,22 +286,22 @@ sequenceDiagram
 
 ## Jinja2 Templates
 
-All `.j2` files in this repo are rendered by the `fabricctl` deployment engine (`fabric/lib/deploy.py`, shared Jinja environment `fabriclib/common/jinja_env.py`) into `/opt/<service>/`. The `.j2` source files are removed from `/opt` after rendering — only rendered outputs remain on the host.
+All `.j2` files in this repo are rendered by the `fabricctl` deployment engine (`fabricctl/lib/deploy.py`, shared Jinja environment `fabriclib/common/jinja_env.py`) into `/opt/<service>/`. The `.j2` source files are removed from `/opt` after rendering — only rendered outputs remain on the host.
 
 | Template | Rendered to |
 |----------|------------|
-| `fabric/jinja/vars.yaml.j2` | `/tmp/fabric-render/vars.yaml` (resolved vars — merged at run time) |
-| `fabric/jinja/<service>/docker-compose.yml.j2` | `/opt/<service>/docker-compose.yml` (e.g. nginx, bind9) |
-| `fabric/jinja/nginx/nginx.conf.j2` | `/opt/nginx/config/nginx.conf` |
-| `fabric/jinja/nginx/www/certs/index.html.j2` | `/opt/nginx/www/certs/index.html` (served at `certs.<domain>` and `http://<host_ip>/certs/`) |
-| `fabric/jinja/nginx/www/ldap/index.html.j2` | `/opt/nginx/www/ldap/index.html` |
-| `fabric/jinja/bind9/config/named.conf*.j2` | `/opt/bind9/config/named.conf*` |
-| `fabric/jinja/bind9/data/zone.j2` | `/opt/bind9/data/db.<zone>` (forward zones) |
-| `fabric/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<octet3>.<octet2>.<octet1>.in-addr.arpa` (PTR — auto-generated) |
-| `fabric/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
-| `fabric/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
-| `fabric/jinja/webui/webui.json.j2` | `/opt/webui/config/webui.json` |
-| `fabric/jinja/webui/build/*` + `fabric/lib/webui/` | `/opt/webui/build/` (+ `app/`) — copied, not rendered; image `fabric/web:local` (container and unit `fabric-web`) |
-| `fabric/jinja/systemd/fabric-agent.service.j2` | `/etc/systemd/system/fabric-agent.service` |
-| `fabric/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
-| `fabric/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |
+| `fabricctl/jinja/vars.yaml.j2` | `/tmp/fabric-render/vars.yaml` (resolved vars — merged at run time) |
+| `fabricctl/jinja/<service>/docker-compose.yml.j2` | `/opt/<service>/docker-compose.yml` (e.g. nginx, bind9) |
+| `fabricctl/jinja/nginx/nginx.conf.j2` | `/opt/nginx/config/nginx.conf` |
+| `fabricctl/jinja/nginx/www/certs/index.html.j2` | `/opt/nginx/www/certs/index.html` (served at `certs.<domain>` and `http://<host_ip>/certs/`) |
+| `fabricctl/jinja/nginx/www/ldap/index.html.j2` | `/opt/nginx/www/ldap/index.html` |
+| `fabricctl/jinja/bind9/config/named.conf*.j2` | `/opt/bind9/config/named.conf*` |
+| `fabricctl/jinja/bind9/data/zone.j2` | `/opt/bind9/data/db.<zone>` (forward zones) |
+| `fabricctl/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<octet3>.<octet2>.<octet1>.in-addr.arpa` (PTR — auto-generated) |
+| `fabricctl/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
+| `fabricctl/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
+| `fabricctl/jinja/webui/webui.json.j2` | `/opt/webui/config/webui.json` |
+| `fabricctl/jinja/webui/build/*` + `webui/` | `/opt/webui/build/` (+ `app/`) — copied, not rendered; image `fabric/web:local` (container and unit `fabric-web`) |
+| `fabricctl/jinja/systemd/fabric-agent.service.j2` | `/etc/systemd/system/fabric-agent.service` |
+| `fabricctl/jinja/stepca/leaf.tpl.j2` | `/opt/stepca/data/templates/certs/leaf.tpl` |
+| `fabricctl/jinja/stepca/subca.tpl.j2` | `/opt/stepca/data/templates/certs/subca.tpl` |

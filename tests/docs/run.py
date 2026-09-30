@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""The docs suite: the documentation says what the code does.
+
+  - every product function has a structured docstring (check_docstrings.py)
+  - docs/lib-doc/ is what those docstrings say (gen_lib_doc.py --check)
+  - docs and code agree on settings, commands, routes, permissions, suites,
+    setup steps, READMEs and links (check_consistency.py)
+  - every file in the repository has been reviewed (review_ledger.py)
+
+    python3 tests/docs/run.py        (no Docker, no root)
+"""
+import os
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+STEPS = [("every function has a structured docstring", ["check_docstrings.py", "--summary"]),
+         ("docs/lib-doc/ matches the code", ["gen_lib_doc.py", "--check"]),
+         ("docs and code agree", ["check_consistency.py"]),
+         ("every file has been reviewed", ["review_ledger.py"])]
+
+
+def main():
+    """Purpose: run the four checks and report each as PASS/FAIL.
+    Inputs:  none.
+    Returns: exit status: 0 all passed, 1 any failed.
+    Fails:   never raises; a check that crashes counts as FAIL (its output is shown).
+    Feeds:   tests/run-all.sh (suite `docs`)."""
+    failed = 0
+    for name, cmd in STEPS:
+        res = subprocess.run([sys.executable, os.path.join(HERE, cmd[0]), *cmd[1:]], cwd=HERE,
+                             capture_output=True, text=True)
+        ok = res.returncode == 0
+        failed += not ok
+        print(f"{'PASS' if ok else 'FAIL'} {name}")
+        if not ok:
+            print("    " + "\n    ".join((res.stdout + res.stderr).strip().splitlines()[-40:]))
+    print(f"\n{'all passed' if not failed else 'FAILED'} ({failed} failures)")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

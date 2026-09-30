@@ -6,7 +6,7 @@ Status: **in progress.** Done: phase 0 (rename), container hardening, and phase 
 
 Installing fabric used to mean cloning the repo on a controller, installing
 Ansible and running 12 playbooks (~3,000 lines) against the target over SSH.
-Today it is `git clone` + `sudo ./setup.sh` on the host itself (native
+Today it is `git clone` + `sudo installers/deb/install-from-checkout.sh` on the host itself (native
 Python, §4). The goal:
 
 ```bash
@@ -92,9 +92,9 @@ Every setting can be changed later (`fabricctl security …`,
 
 | Today | Reuse |
 |---|---|
-| `fabric/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
-| `fabric/lib/webui/` (container app), `fabric/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh` | Ship as-is inside the package |
-| `fabric/jinja/**` templates | Ship as-is (package data) |
+| `fabricctl/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
+| `webui/` (container app), `fabricctl/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh` | Ship as-is inside the package |
+| `fabricctl/jinja/**` templates | Ship as-is (package data) |
 | `fabriclib/setup/` — the native installer (§4) | Ships as-is |
 | `fabriclib/` (one operation per file) | The package's library layout from day one |
 
@@ -105,8 +105,8 @@ Both the first-install and day-2 halves are native Python.
 ```
 fabricctl_<ver>_<arch>.deb
   /usr/bin/fabricctl                      entry point (Python)
-  /usr/lib/fabricctl/                     fabric/lib (deploy, agent, webui build context, seeders, bootstrap)
-  /usr/share/fabricctl/templates/         fabric/jinja
+  /usr/lib/fabricctl/                     fabricctl/lib (deploy, agent, webui build context, seeders, bootstrap)
+  /usr/share/fabricctl/templates/         fabricctl/jinja
   /usr/share/fabricctl/images/            (optional, "fabricctl-images" package) docker save tarballs
   /lib/systemd/system/fabric-agent.service shipped static, config in /etc
   /lib/systemd/system/fabric-web.service  compose wrapper for the fabric-web container
@@ -166,7 +166,7 @@ fabricctl_<ver>_<arch>.deb
 ## 4. Porting the playbooks ✅
 
 Done: each playbook became an idempotent, individually re-runnable step in
-`fabric/lib/fabriclib/setup/` (`fabricctl setup --step pki`), and the
+`fabricctl/lib/fabriclib/setup/` (`fabricctl setup --step pki`), and the
 playbooks were deleted. Mapping:
 
 | Playbook | `fabricctl` step | Notes |
@@ -190,7 +190,7 @@ playbooks were deleted. Mapping:
 ssh admin@pi 'sudo apt install -y fabricctl && sudo fabricctl setup --file /dev/stdin --non-interactive --yes' < fabric.yaml
 ```
 
-Until then: clone the repo on the host and run `sudo ./setup.sh`; it is a
+Until then: clone the repo on the host and run `sudo installers/deb/install-from-checkout.sh`; it is a
 thin bootstrap into `fabricctl setup`.
 
 ## 5. Kea DHCP
@@ -667,6 +667,7 @@ containers in CI (389-DS, Keycloak, Kea, FreeRADIUS with `eapol_test`).
 | D19 ✅ | Who may do what (people) | RBAC: per-area permissions as Keycloak realm roles, bundles (Admin, Network operator without device management, Equipment operator for 802.1X + 389-DS hardware, PKI operator, Helpdesk, Auditor); the agent verifies the user's signed token on every call; OpenBao policies follow the same roles (§7e) |
 | D20 ✅ | Central logging | Fluent Bit as an optional stack component (`install_fluentbit`, chosen at setup, hot-addable): forwards all logs to syslog (RFC 5424, TLS) and/or Elasticsearch/OpenSearch, disk-buffered, credentials in OpenBao (§7f) |
 | D21 | Image updates (validation pipeline and host side) | Daily watcher → regression on amd64 + arm64 incl. an upgrade test → pass: PR auto-merged, signed list published; fail: GitHub issue. Hosts fetch the list automatically unless offline, apply only on command (or opt-in auto-apply), prune old fabric images ([image-updates.md](image-updates.md)) |
+| D25 ✅ | Repository layout | Three product folders: `fabricctl/` (the Linux host side), `webui/` (the control-plane container) and `installers/deb/` (the Debian package wrapper; more formats as siblings). The installed tree (`/usr/lib/fabricctl/fabric`, `/opt/fabric`) is unchanged: `installers/deb/assemble-tree.sh` maps the folders onto it, so installs upgrade in place. The web UI stays in this repository (it changes together with the agent API it calls; split only once that API is versioned and CI publishes images). `setup.sh` became `installers/deb/install-from-checkout.sh`: a checkout installs through the same .deb as a release |
 | D24 ✅ | Names | The repository is `open-fabric` and the web UI is shown as "Open Fabric" (subtitle *web control*). Everything else keeps its name: the package and command `fabricctl`, `/opt/fabric`, `/etc/fabric`, `fabric.target` and the `fabric-*` units, `fabriclib`, the Keycloak `fabric:*` roles, OpenBao's `fabric/` path, the image names — renaming those would need migration code on every install for no user benefit. The root daemon is `fabric-agent`, never `fabricd` (FRRouting's OpenFabric daemon). The repository is renamed before the image channel and APT repository are published on GitHub Pages (Pages URLs do not redirect) |
 | D23 ✅ | How FreeRADIUS decides | fabric's own policy (python3 module) asks 389-DS on every request, as the read-only `cn=radius_reader`, over verified LDAPS: nothing is cached or exported, so a disabled device or an unlinked certificate is refused at its next authentication. EAP-TLS devices are found by the SHA-256 fingerprint of the presented certificate (recorded during verification, keyed by serial, since FreeRADIUS exposes no fingerprint); MAB by MAC. People (EAP-TTLS/PAP) are checked by binding as the person, then by membership of a mapped group (`radius_people`). The directory unreachable means Reject (fail closed) |
 | D22 ✅ | Which upstream line | LTS or extended-support wherever the project has one (BIND 9.20 ESV, Kea 3.0 LTS, Postgres majors, nginx stable, Debian stable, Ubuntu LTS). Projects without one (OpenBao, Keycloak, Step-CA, Fluent Bit) support only their latest release: follow it, patch releases automatically, never a major by itself (D21). A distro package that lags the upstream LTS (Kea: Debian 2.6 vs 3.0) comes from the upstream's signed repository instead |
