@@ -5,6 +5,14 @@ key "kea-ddns" {
     secret "{{ kea_ddns_secret }}";
 };
 {% endif %}
+{% set fl = federation_links | default({'children': [], 'upstream': none}) %}
+{% for link in fl.children + ([fl.upstream] if fl.upstream else []) %}
+// Federation link to site {{ link.site }}: signs zone transfers both ways (design federation.md M4)
+key "{{ link.key }}" {
+    algorithm {{ link.algorithm }};
+    secret "{{ link.secret }}";
+};
+{% endfor %}
 {% for key in tsig_keys %}
 key "{{ key.name }}" {
     algorithm {{ key.algorithm }};

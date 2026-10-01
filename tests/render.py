@@ -164,6 +164,22 @@ for base, oc in (('dc=lan', 'objectClass: domain\ndc: lan'), ('o=acme,dc=lan', '
     assert f'dn: {base}\nobjectClass: top\n{oc}' in tree, tree[:400]
     assert f'dn: ou=pi-core,{base}\nobjectClass: top\nobjectClass: organizationalUnit\nou: pi-core' in tree
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
+# DNS links (design federation.md M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
+plain = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
+assert 'type secondary' not in plain and 'also-notify' not in plain, 'no federation links: no secondaries, no notify'
+links = {'children': [{'site': 'lab', 'key': 'fed-lab', 'algorithm': 'hmac-sha256', 'secret': 'c2VjcmV0', 'delegate': True,
+                       'label': 'lab', 'domain': 'lab.lan.j-j.family', 'address': '192.168.9.9'}],
+         'upstream': {'site': 'hq', 'key': 'fed-pi-core', 'algorithm': 'hmac-sha256', 'secret': 'dXBzdHJlYW0=',
+                      'domain': 'hq.example.org', 'address': '192.168.8.8'}}
+zones = env.get_template('bind9/config/named.conf.zones.j2').render(**full, federation_links=links)
+keys = env.get_template('bind9/config/named.conf.keys.j2').render(**full, federation_links=links)
+assert 'allow-transfer { key "fed-lab"; key "fed-pi-core"; };' in zones and 'notify explicit;' in zones, zones[:600]
+assert 'zone "lab.lan.j-j.family" {\n    type secondary;\n    primaries { 192.168.9.9 key "fed-lab"; };' in zones
+assert 'zone "hq.example.org" {\n    type secondary;' in zones and 'key "fed-lab" {' in keys and 'key "fed-pi-core" {' in keys
+db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=links, zone_name=v2['domain'],
+                                                   zone_records=v2['dns']['dynamic_zone_var'])
+assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
+print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
 # Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402

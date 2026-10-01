@@ -1,4 +1,6 @@
+import base64
 import datetime
+import os
 import hashlib
 import hmac
 import ipaddress
@@ -30,7 +32,9 @@ def accept_join(v, req, client_ip="", now=None):
              client_ip — str for the audit; now — epoch seconds, default time.time().
     Returns: {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain":
              PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its
-             parents when this is a site and the new one is nested under it), "org": {"org_domain", "ldap_base_dn",
+             parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>",
+             "algorithm", "secret"} — the TSIG key both sites sign zone transfers with (kept here in fabric's
+             secrets as federation_tsig[site]; design federation.md M4), "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
     Fails:   ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
@@ -69,7 +73,10 @@ def accept_join(v, req, client_ip="", now=None):
         cap = signing_capacity(v)
         signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation",
                               nest=int(entry.get("nest") or 0), as_parent=cap["as_parent"])
-        save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]}}, v=v)
+        tsig = base64.b64encode(os.urandom(32)).decode()       # the DNS link to this site (zone transfers)
+        keys = dict(load_secrets(v=v).get("federation_tsig") or {}, **{site: tsig})
+        save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]},
+                      "federation_tsig": keys}, v=v)
         registry["sites"][site] = {
             "domain": domain, "address": req["address"],
             "joined": datetime.datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
@@ -83,5 +90,6 @@ def accept_join(v, req, client_ip="", now=None):
     org = {"org_domain": v.get("org_domain") or v["domain"], "ldap_base_dn": v["ldap_base_dn"],
            **{k: v.get(k) for k in _ORG_KEYS if v.get(k)}}
     return {"root": signed["root"], "cert": signed["cert"], "chain": signed["chain"], "org": org,
+            "dns": {"key": f"fed-{site}", "algorithm": "hmac-sha256", "secret": tsig},
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
                          "address": v["host_ip"]}}

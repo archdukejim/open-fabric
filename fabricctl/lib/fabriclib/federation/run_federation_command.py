@@ -11,6 +11,7 @@ from fabriclib.federation.reparent_site import reparent_site
 from fabriclib.federation.revoke_invitation import revoke_invitation
 from fabriclib.federation.set_federation_endpoint import set_federation_endpoint
 from fabriclib.setup.errors import SetupError
+from fabriclib.system.apply_changes import apply_changes
 from fabriclib.setup.read_join_invitation import read_join_invitation
 
 USAGE = """usage: fabricctl federation status                 this install's place in its fabric: upstream, sites, invitations
@@ -99,9 +100,11 @@ def run_federation_command(ctx, argv):
             print(f"relay {relay.get('site')} dropped: this site talks to its upstream directly")
             return 0
         if cmd == "remove" and len(args) == 1:
-            remove_site("root", args[0])
-            print(f"{args[0]} removed; its CA stays valid until it expires (revocation is not built yet)")
-            return 0
+            remove_site("root", args[0], v=v)
+            ok, output = apply_changes("root", "cli")
+            print(f"{args[0]} removed (its delegation and secondary zone too); its CA stays valid until it expires "
+                  "(revocation is not built yet)" if ok else output[-2000:])
+            return 0 if ok else 1
         if cmd == "reparent" and len(args) <= 1:
             res = reparent_site(ctx, "root", read_join_invitation(args[0] if args else ""))
             print(f"now under {res['parent']} ({res['site_ca_depth']} CA(s) between this site's CA and the root); "

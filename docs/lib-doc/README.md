@@ -8,12 +8,12 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 |---|---|---|---|
 | [fabricctl-agent](fabricctl-agent.md) | fabric-agent: the permission-checked host API behind the web UI | 17 | 1 |
 | [fabricctl-jinja](fabricctl-jinja.md) | Code that runs inside service containers (389-DS seeding, FreeRADIUS policy) | 24 | 8 |
-| [fabricctl-lib](fabricctl-lib.md) | The deploy engine, the interactive editor, Keycloak bootstrap, shell helpers | 62 | 9 |
+| [fabricctl-lib](fabricctl-lib.md) | The deploy engine, the interactive editor, Keycloak bootstrap, shell helpers | 63 | 9 |
 | [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 25 | 15 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 3 | 1 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 11 | 9 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 36 | 27 |
-| [fabriclib-federation](fabriclib-federation.md) |  | 26 | 21 |
+| [fabriclib-federation](fabriclib-federation.md) |  | 28 | 22 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 15 | 9 |
 | [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 20 | 20 |

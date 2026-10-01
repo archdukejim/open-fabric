@@ -34,7 +34,9 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     Returns: {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path,
              site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's
              friendly_name / cert_* —, "upstream": {"site_name",
-             "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had}.
+             "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had,
+             "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller
+             keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry)}.
     Fails:   ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the
              upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered
              with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError.
@@ -75,7 +77,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
           "ldap_base_dn": org.get("ldap_base_dn") or inv["ldap_base_dn"],
           "root_sha256": inv["root_sha256"], "site_ca_depth": staged["site_ca_depth"],
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
-          "org": {k: org[k] for k in ORG_KEYS if org.get(k)}}
+          "org": {k: org[k] for k in ORG_KEYS if org.get(k)},
+          "dns_key": (answer.get("dns") or {}).get("key") or f"fed-{inv['site']}"}
     if https_port != 443 and not inv["via"]:
         up["port"] = https_port                   # the upstream's endpoint is not on 443 (tests)
     if inv["via"]:                                # joined through a relay: later traffic goes the same way
@@ -87,7 +90,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     write_audit("root", "FED_JOINED", f"upstream={up.get('site_name')} site={inv['site']} domain={domain}", "cli",
                 path=audit_path or AUDIT_FILE)
     return {"vars": _vars(inv, up, work_dir), "upstream": {k: up.get(k) for k in ("site_name", "domain", "host", "address")},
-            "joined": True}
+            "joined": True, "dns_secret": (answer.get("dns") or {}).get("secret")}
 
 
 def _vars(inv, up, work_dir):

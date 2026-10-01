@@ -3,13 +3,17 @@ from fabriclib.common.write_audit import write_audit
 from fabriclib.federation.common.federation_lock import federation_lock
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.common.save_registry import save_registry
+from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.secrets.save_secrets import save_secrets
 
 
-def remove_site(actor, site, source="cli"):
+def remove_site(actor, site, source="cli", v=None):
     """Purpose: on a site's parent (the root, or the site it is nested under): forget a site that joined here —
              a disposable lab torn down, or one moved elsewhere (design federation.md §6).
-    Inputs:  actor — str (audit); site — its name; source — default "cli".
-    Returns: the removed record (dict).
+    Inputs:  actor — str (audit); site — its name; source — default "cli"; v — fabric vars for OpenBao
+             (default: read from vars.yaml).
+    Returns: the removed record (dict); its DNS link key (federation_tsig[site]) is deleted too. The caller
+             applies, so the delegation and the secondary zone go.
     Fails:   ValidationError "no site <x> joined here"; OSError / yaml errors from the registry.
     Feeds:   run_federation_command (remove).
     Notes:   the site's CA stays valid until it expires: revocation (a CRL, design F7) is not built yet, so a
@@ -21,5 +25,8 @@ def remove_site(actor, site, source="cli"):
         if record is None:
             raise ValidationError(f"no site {site} joined here")
         save_registry(registry)
+        keys = dict(load_secrets(v=v).get("federation_tsig") or {})
+        if keys.pop(site, None) is not None:
+            save_secrets({"federation_tsig": keys}, v=v)
     write_audit(actor, "FED_SITE_REMOVE", f"site={site} ca_serial={record.get('ca_serial', '')}", source)
     return record

@@ -531,6 +531,13 @@ sudo fabricctl federation reparent         # paste the new parent's invitation a
 It keeps its name, directory part and data; it gets a new CA, Step-CA switches to it and every service
 certificate is re-issued. People's web UI certificates must then be re-issued (`fabricctl client-cert`).
 
+**DNS between sites.** Each join creates a TSIG key for that link (kept in both sites' secrets). The
+parent delegates the site's domain when it lies below its own (`lab.<domain>`: NS + glue), and each side
+keeps a read-only secondary copy of the other's zone: transfers are signed with the link's key, changes
+are pushed with NOTIFY. The parent applies this right after the join; `remove` takes it away again. The
+two sites must reach each other on TCP/UDP 53. Sites that joined before this existed have no key: they
+get one when they join again (or are re-parented).
+
 **Relay nodes.** `--via edge1` names a site that joined this install (with its endpoint enabled) as the
 new site's way in: the invitation points at edge1, edge1 forwards the join to the root, and the root
 signs. edge1 signs nothing and keeps nothing of the new site, but it terminates TLS, so it sees the join

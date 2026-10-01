@@ -218,6 +218,17 @@
 
 ## `fabricctl/lib/federation/server.py`
 
+### `Handler.after_join(site)`
+
+| | |
+|---|---|
+| Purpose | after a site joined here: apply in the background, so its DNS delegation, secondary zone and TSIG key take effect (design federation.md M4). The join was answered already. |
+| Inputs | site — str, the site that joined (the apply's actor is "site:<site>"). |
+| Returns | None; a daemon thread runs apply_changes. |
+| Fails | never here (the apply's own result is audited by apply_changes). |
+| Feeds | do_POST. Tests set Handler.after_join = None: they run this handler outside an install. |
+| Called by | `federation.server.Handler.do_POST` |
+
 ### `Handler.log_message(self, fmt, *args)`
 
 | | |
@@ -268,7 +279,7 @@
 |---|---|
 | Purpose | POST /v1/join — an invited site joins (accept_join). |
 | Inputs | a JSON body of at most JOIN_BODY_MAX bytes. |
-| Returns | None; 200 with accept_join's answer (or relay_join's, when the request's via names this site); 400 {"error": message} for a refusal (ValidationError) or a bad body; 413 when too large; 404 for any other path; 500 {"error": "internal error"} otherwise (details only in the journal). |
+| Returns | None; 200 with accept_join's answer (or relay_join's, when the request's via names this site), then an apply in the background after a join here (the new site's DNS delegation and zones); 400 {"error": message} for a refusal (ValidationError) or a bad body; 413 when too large; 404 for any other path; 500 {"error": "internal error"} otherwise (details only in the journal). |
 | Fails | OSError writing the reply. |
 | Feeds | nginx (federation.<domain>) <- join_upstream on the joining node. |
 | Called by | — (no static caller) |

@@ -45,6 +45,8 @@ elif action == "capacity":
 elif action == "serve":
     import server as fed_server  # noqa: E402
 
+    fed_server.Handler.after_join = None      # no apply: these installs are test trees
+
     https, port_http, crt, key, www = int(sys.argv[3]), int(sys.argv[4]), sys.argv[5], sys.argv[6], sys.argv[7]
 
     class TLSServer(socketserver.ThreadingMixIn, socketserver.TCPServer):

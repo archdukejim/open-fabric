@@ -1,10 +1,21 @@
+{% set fl = federation_links | default({'children': [], 'upstream': none}) %}
+{% set peers = fl.children + ([fl.upstream] if fl.upstream else []) %}
+{% set local_zones = [] %}
 {% for zone_key, zone_records in dns.items() %}
 {% set zone_name = domain if zone_key == 'dynamic_zone_var' else zone_key %}
+{% set _ = local_zones.append(zone_name) %}
 zone "{{ zone_name }}" {
     type master;
     file "/var/lib/bind/db.{{ zone_name }}";
     allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+{% if zone_name == domain and peers %}
+    // Federation: the sites next to this one keep a secondary copy (TSIG-signed transfers, design federation.md M4)
+    allow-transfer { {% for link in peers %}key "{{ link.key }}"; {% endfor %}};
+    notify explicit;
+    also-notify { {% for link in peers %}{{ link.address }} key "{{ link.key }}"; {% endfor %}};
+{% else %}
     allow-transfer { none; };
+{% endif %}
     update-policy {
 {# Update rights are deny-by-default; a TSIG key may change only what is
    granted here (validated by fabriclib/dns/normalize_tsig_keys.py and
@@ -66,6 +77,17 @@ zone "{{ ddns_zone }}" {
 };
 
 {% endif %}
+{% for link in peers if link.domain not in local_zones %}
+// Federation: a secondary copy of site {{ link.site }}'s zone, transferred from it with its key
+zone "{{ link.domain }}" {
+    type secondary;
+    primaries { {{ link.address }} key "{{ link.key }}"; };
+    file "/var/lib/bind/sec.{{ link.domain }}";
+    allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+    allow-transfer { none; };
+};
+
+{% endfor %}
 {% for rev_zone in reverse_zone_names | default([]) %}
 zone "{{ rev_zone }}" {
     type master;

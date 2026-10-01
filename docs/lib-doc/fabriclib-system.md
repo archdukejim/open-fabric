@@ -13,7 +13,7 @@
 | Returns | (ok: bool, output: str) — ok when `interactive.py --apply` exited 0; output is its stdout+stderr without colour codes. An APPLY audit entry with the exit code is written either way. |
 | Fails | subprocess.TimeoutExpired after 900 s (no audit entry then); OSError from the lock or audit log. |
 | Feeds | fabric-agent (agent/server.py, source "web"); dns run_tsig_command and run_acl_command, dhcp run_dhcp_command, radius run_radius_command. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dhcp.run_dhcp_command._apply`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command.run_tsig_command`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.run_radius_command._apply` |
+| Called by | `agent.server.Handler.dispatch`, `fabriclib.dhcp.run_dhcp_command._apply`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command.run_tsig_command`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.run_federation_command.run_federation_command`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.run_radius_command._apply` |
 
 ## `fabricctl/lib/fabriclib/system/control_stack.py`
 

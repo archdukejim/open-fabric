@@ -20,6 +20,7 @@ import socket
 import socketserver
 import struct
 import sys
+import threading
 import traceback
 from http.server import BaseHTTPRequestHandler
 
@@ -29,10 +30,21 @@ from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.federation.accept_join import accept_join  # noqa: E402
 from fabriclib.federation.constants import JOIN_BODY_MAX  # noqa: E402
 from fabriclib.federation.relay_join import relay_join  # noqa: E402
+from fabriclib.system.apply_changes import apply_changes  # noqa: E402
 
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "fabric-federation"
+
+    @staticmethod
+    def after_join(site):
+        """Purpose: after a site joined here: apply in the background, so its DNS delegation, secondary zone and
+                 TSIG key take effect (design federation.md M4). The join was answered already.
+        Inputs:  site — str, the site that joined (the apply's actor is "site:<site>").
+        Returns: None; a daemon thread runs apply_changes.
+        Fails:   never here (the apply's own result is audited by apply_changes).
+        Feeds:   do_POST. Tests set Handler.after_join = None: they run this handler outside an install."""
+        threading.Thread(target=apply_changes, args=(f"site:{site}", "federation"), daemon=True).start()
     sys_version = ""
 
     def log_message(self, fmt, *args):
@@ -83,7 +95,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         """Purpose: POST /v1/join — an invited site joins (accept_join).
         Inputs:  a JSON body of at most JOIN_BODY_MAX bytes.
-        Returns: None; 200 with accept_join's answer (or relay_join's, when the request's via names this site); 400 {"error": message} for a refusal (ValidationError) or a
+        Returns: None; 200 with accept_join's answer (or relay_join's, when the request's via names this site), then
+                 an apply in the background after a join here (the new site's DNS delegation and zones); 400 {"error": message} for a refusal (ValidationError) or a
                  bad body; 413 when too large; 404 for any other path; 500 {"error": "internal error"} otherwise
                  (details only in the journal).
         Fails:   OSError writing the reply.
@@ -101,6 +114,8 @@ class Handler(BaseHTTPRequestHandler):
             v = load_vars()
             relay = isinstance(req, dict) and req.get("via") and req.get("via") == v.get("site_name")
             self.reply(200, (relay_join if relay else accept_join)(v, req, client_ip=self.client_ip()))
+            if not relay and self.after_join:     # the new site's delegation, secondary zone and key
+                self.after_join(req.get("site", "?"))
         except (ValidationError, ValueError) as e:
             self.reply(400, {"error": str(e) if isinstance(e, ValidationError) else "the body is not JSON"})
         except Exception:  # noqa: BLE001 — never leak details to the network

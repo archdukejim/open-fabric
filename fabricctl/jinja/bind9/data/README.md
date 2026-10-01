@@ -7,5 +7,5 @@ swap, thaw, checked by serial).
 
 | File | What |
 |---|---|
-| `zone.j2` | A forward zone from `dns` in vars.yaml (SOA, NS, records) → `db.<zone>` |
+| `zone.j2` | A forward zone from `dns` in vars.yaml (SOA, NS, records; NS + glue for federation sites below this domain) → `db.<zone>` |
 | `reverse-zone.j2` | A reverse zone with PTRs derived from the forward A records (`fabriclib/dns/reverse_zones.py`) → `db.<c>.<b>.<a>.in-addr.arpa` |

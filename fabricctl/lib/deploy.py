@@ -18,6 +18,7 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.federation.common.site_name_problem import site_name_problem  # noqa: E402
 from fabriclib.federation.constants import BASE_DN_RE  # noqa: E402
 from fabriclib.federation.deploy_federation_endpoint import deploy_federation_endpoint  # noqa: E402
+from fabriclib.federation.dns_links import dns_links  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
@@ -574,6 +575,9 @@ def apply_deployment(start_services=True):
     # Reverse zones and their PTRs come from the forward A/AAAA records.
     reverse = reverse_zones(final_vars)
     merged_context['reverse_zone_names'] = list(reverse['zones'])
+    # Federation (design federation.md M4): delegations, secondary zones and TSIG keys for the sites next to this one
+    merged_context['federation_links'] = dns_links(final_vars, secrets,
+                                                   os.path.join(TARGET_FABRIC, "config", "federation.yaml"))
     for f in ['named.conf', 'named.conf.acl', 'named.conf.logs', 'named.conf.options', 'named.conf.tls', 'named.conf.zones', 'named.conf.keys', 'rndc.key']:
         render_file(f'bind9/config/{f}.j2', f'bind9/config/{f}')
         

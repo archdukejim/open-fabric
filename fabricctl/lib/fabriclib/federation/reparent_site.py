@@ -13,6 +13,7 @@ from fabriclib.pki.common.ca_files import ca_files
 from fabriclib.pki.common.describe_cert import describe_cert
 from fabriclib.pki.replace_site_ca import replace_site_ca
 from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.renew_service_certs import renew_service_certs
 from fabriclib.system.apply_changes import apply_changes
 
@@ -51,6 +52,9 @@ def reparent_site(ctx, actor, invitation):
     res = join_upstream(v, invitation, password, work_dir, v["domain"], v["host_ip"], config_dir=ctx.config_dir,
                         audit_path=ctx.path("fabric", "archive", "audit.log"), replace=True)
     new = res["vars"]
+    if res.get("dns_secret"):                # the DNS link to the new parent
+        keys = dict(load_secrets(v=v).get("federation_tsig") or {}, upstream=res["dns_secret"])
+        save_secrets({"federation_tsig": keys}, v=v)
     replace_site_ca(v, new)
     with vars_lock():
         data = load_vars()

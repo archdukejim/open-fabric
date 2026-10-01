@@ -115,6 +115,8 @@ from fabriclib.pki.common.describe_cert import describe_cert  # noqa: E402
 sys.path.insert(0, f"{W}/fabric/lib/federation")
 import server as fed_server  # noqa: E402
 
+fed_server.Handler.after_join = None          # no apply: this is not an install
+
 SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
 
 # ---------------------------------------------------------------- invitations
@@ -238,6 +240,11 @@ b1_reg = yaml.safe_load(open(f"{B1}/config/federation.yaml"))
 check("join: the site records its upstream", b1_reg["upstream"]["site_name"] == "hq"
       and b1_reg["upstream"]["root_sha256"] == body["root_sha256"], b1_reg)
 check("join: the invitation is used up", "branch1" not in [i["site"] for i in list_invitations(HQ)])
+hq_keys = yaml.safe_load(open(SECRETS)).get("federation_tsig") or {}
+check("join: both sites hold the DNS link's TSIG key (the upstream in its secrets, never in the registry)",
+      res.get("dns_secret") and hq_keys.get("branch1") == res["dns_secret"]
+      and b1_reg["upstream"]["dns_key"] == "fed-branch1" and res["dns_secret"] not in open(f"{B1}/config/federation.yaml").read(),
+      (hq_keys.keys(), b1_reg["upstream"].get("dns_key")))
 check("join: audited on both sides", "FED_JOIN " in open(f"{W}/fabric/archive/audit.log").read()
       and "FED_JOINED" in open(f"{B1}/audit.log").read())
 st, page = raw("POST", "/v1/join", json.dumps({"id": body["id"], "secret": body["secret"], "site": "branch1",
@@ -282,6 +289,14 @@ except SetupError as e:
     missing = "cannot read" in str(e)
 check("setup --join @FILE: a missing file is refused", missing)
 
+# ---------------------------------------------------------------- remove: the site, its record and its DNS key go
+from fabriclib.federation.remove_site import remove_site  # noqa: E402
+removed = remove_site("alice", "branch1", v=HQ)
+check("remove: the site's record and its DNS link key are gone",
+      removed.get("domain") == "branch1.hq.test" and "branch1" not in yaml.safe_load(open(f"{W}/fabric/config/federation.yaml"))["sites"]
+      and "branch1" not in (yaml.safe_load(open(SECRETS)).get("federation_tsig") or {}))
+check("remove: an unknown site is refused", refused(remove_site, "alice", "branch1", v=HQ, match="no site branch1"))
+
 # ---------------------------------------------------------------- the unix socket accepts only listed uids
 sock_path = f"{W}/fed.sock"
 srv = fed_server.UnixServer(sock_path, fed_server.Handler)
@@ -309,6 +324,13 @@ check("socket: an unlisted uid gets nothing", over_socket() == "")
 srv.shutdown()
 for s_ in (web, evil):
     s_.shutdown()
+
+# ---------------------------------------------------------------- DNS between sites (two real BIND servers)
+print("--- DNS between sites (dns.py)")
+dnst = subprocess.run([sys.executable, os.path.join(REPO, "tests", "federation", "dns.py")], capture_output=True, text=True)
+print("\n".join(line for line in dnst.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+      or dnst.stdout[-2000:] + dnst.stderr[-2000:])
+check("DNS between sites: dns.py passed", dnst.returncode == 0, dnst.stderr[-400:])
 
 # ---------------------------------------------------------------- nested sites and re-parenting (own installs)
 print("--- nested sites (nested.py)")
