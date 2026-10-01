@@ -13,17 +13,17 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 3 | 1 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 11 | 9 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 36 | 27 |
-| [fabriclib-federation](fabriclib-federation.md) |  | 21 | 16 |
+| [fabriclib-federation](fabriclib-federation.md) |  | 24 | 19 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 15 | 9 |
 | [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 20 | 20 |
 | [fabriclib-logs](fabriclib-logs.md) | Optional log forwarding (Fluent Bit) | 4 | 3 |
-| [fabriclib-pki](fabriclib-pki.md) | Certificates: service certificates, manual issuing, CSR signing, conversion | 37 | 30 |
+| [fabriclib-pki](fabriclib-pki.md) | Certificates: service certificates, manual issuing, CSR signing, conversion | 40 | 33 |
 | [fabriclib-radius](fabriclib-radius.md) | Optional 802.1X (FreeRADIUS): clients, groups, setup guides, decisions | 16 | 14 |
 | [fabriclib-rbac](fabriclib-rbac.md) | Who may do what: permissions, bundles, route table | 2 | 2 |
 | [fabriclib-secrets](fabriclib-secrets.md) | fabric's own secrets: file or OpenBao | 10 | 8 |
 | [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 2 | 1 |
-| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 79 | 34 |
+| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 80 | 34 |
 | [fabriclib-system](fabriclib-system.md) | Service status, start/stop, apply, version | 5 | 4 |
 | [fabriclib-vault](fabriclib-vault.md) | OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass | 81 | 43 |
 | [installers](installers.md) | The Debian package wrapper | 2 | 1 |

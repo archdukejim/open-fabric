@@ -82,6 +82,8 @@ def run(ctx):
     certs_dir = ctx.path("stepca", "data", "certs")
     root_ca = os.path.join(certs_dir, "root_ca.crt")
     intermediate = os.path.join(certs_dir, "intermediate_ca.crt")
+    parents = os.path.join(certs_dir, "ca_parents.crt")           # a nested site's parent CAs (else empty/absent)
+    chain_cas = [intermediate] + ([parents] if os.path.exists(parents) else [])
     restart = set()
 
     for cn, sans, dests, services in _targets(ctx):
@@ -110,7 +112,7 @@ def run(ctx):
         os.makedirs(os.path.dirname(bundle), mode=0o750, exist_ok=True)
         os.chown(os.path.dirname(bundle), uid, gid)
         with open(bundle, "w") as out:
-            for src in (intermediate, root_ca):
+            for src in (*chain_cas, root_ca):
                 out.write(open(src).read())
         os.chown(bundle, uid, gid)
         os.chmod(bundle, 0o644)
@@ -119,7 +121,7 @@ def run(ctx):
         # EAP-TLS accepts client certificates from the fabric CA only; the same
         # bundle verifies 389-DS for the policy's directory lookups
         uid, gid = ctx.uid("freeradius")
-        bundle = "".join(open(src).read() for src in (root_ca, intermediate))
+        bundle = "".join(open(src).read() for src in (root_ca, *chain_cas))
         os.makedirs(ctx.path("freeradius", "certs"), mode=0o750, exist_ok=True)
         if write_file_if_changed(ctx.path("freeradius", "certs", "ca.pem"), bundle, 0o644, uid, gid):
             restart.add("freeradius")

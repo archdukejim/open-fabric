@@ -9,6 +9,7 @@ from fabriclib.common.write_audit import write_audit
 from fabriclib.federation.common.federation_lock import federation_lock
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.common.save_registry import save_registry
+from fabriclib.federation.common.signing_capacity import signing_capacity
 from fabriclib.federation.constants import DOMAIN_RE, SITE_NAME_RE
 from fabriclib.pki.sign_site_ca import sign_site_ca
 from fabriclib.secrets.load_secrets import load_secrets
@@ -27,7 +28,9 @@ def accept_join(v, req, client_ip="", now=None):
              the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join
              request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)};
              client_ip — str for the audit; now — epoch seconds, default time.time().
-    Returns: {"root": PEM, "cert": PEM of the site's intermediate, "org": {"org_domain", "ldap_base_dn",
+    Returns: {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain":
+             PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its
+             parents when this is a site and the new one is nested under it), "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
     Fails:   ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
@@ -62,18 +65,20 @@ def accept_join(v, req, client_ip="", now=None):
         registry = load_registry()
         if site in registry["sites"]:
             raise ValidationError(f"site {site} has joined already")
-        signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation")
+        cap = signing_capacity(v)
+        signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation",
+                              nest=int(entry.get("nest") or 0), as_parent=cap["as_parent"])
         save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]}}, v=v)
         registry["sites"][site] = {
             "domain": domain, "address": req["address"],
             "joined": datetime.datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
             "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
-            "invited_by": entry.get("actor", "")}
+            "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0)}
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
                                             f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")
     org = {"org_domain": v.get("org_domain") or v["domain"], "ldap_base_dn": v["ldap_base_dn"],
            **{k: v.get(k) for k in _ORG_KEYS if v.get(k)}}
-    return {"root": signed["root"], "cert": signed["cert"], "org": org,
+    return {"root": signed["root"], "cert": signed["cert"], "chain": signed["chain"], "org": org,
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
                          "address": v["host_ip"]}}

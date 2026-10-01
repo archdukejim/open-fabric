@@ -12,6 +12,8 @@ their own local network (design [federation.md](../../../../docs/design/federati
 | `accept_join.py` | Upstream: an invited site joins — check the invitation, sign the site's CA with the root key, record the site |
 | `decode_invitation.py` | Joining node: read and check an invitation (no network) |
 | `join_upstream.py` | Joining node: make the site CA request, pin the upstream's root, join over verified TLS, stage the CA, record the upstream |
+| `remove_site.py` | On a parent: forget a site that joined here (its CA stays valid until it expires: no revocation yet) |
+| `reparent_site.py` | On a site: move under another parent with its invitation — new CA, Step-CA switched, certificates re-issued |
 | `federation_status.py` | Standalone, upstream or site; the endpoint; joined sites; open invitations |
 | `set_federation_endpoint.py` | Turn the federation endpoint on or off (certificate first) and apply |
 | `deploy_federation_endpoint.py` | Deploy step: the `fabric-federation` unit and the socket directory nginx mounts (or their removal) |

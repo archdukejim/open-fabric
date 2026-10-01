@@ -1,0 +1,25 @@
+from fabriclib.common.errors import ValidationError
+from fabriclib.common.write_audit import write_audit
+from fabriclib.federation.common.federation_lock import federation_lock
+from fabriclib.federation.common.load_registry import load_registry
+from fabriclib.federation.common.save_registry import save_registry
+
+
+def remove_site(actor, site, source="cli"):
+    """Purpose: on a site's parent (the root, or the site it is nested under): forget a site that joined here —
+             a disposable lab torn down, or one moved elsewhere (design federation.md §6).
+    Inputs:  actor — str (audit); site — its name; source — default "cli".
+    Returns: the removed record (dict).
+    Fails:   ValidationError "no site <x> joined here"; OSError / yaml errors from the registry.
+    Feeds:   run_federation_command (remove).
+    Notes:   the site's CA stays valid until it expires: revocation (a CRL, design F7) is not built yet, so a
+             removed site's certificates are still trusted by the organisation. A site invited again under the
+             same name gets a new CA. Audited as FED_SITE_REMOVE."""
+    with federation_lock():
+        registry = load_registry()
+        record = registry["sites"].pop(site, None)
+        if record is None:
+            raise ValidationError(f"no site {site} joined here")
+        save_registry(registry)
+    write_audit(actor, "FED_SITE_REMOVE", f"site={site} ca_serial={record.get('ca_serial', '')}", source)
+    return record

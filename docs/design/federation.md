@@ -161,10 +161,15 @@ made highly available); other sites may be disposable (a `lab` rebuilt for
 each round of testing, more labs added).
 
 ```
-fabricctl federation invite lab                  # flat: lab links straight to the root site
-fabricctl federation invite lab --via edge1      # flat through a node: edge1 only relays
-fabricctl federation invite lab2 --under lab     # nested: lab owns lab2 (run on lab, or on the root)
+fabricctl federation invite lab                  # on the root: flat, lab links straight to the root site
+fabricctl federation invite lab --nest 1         # on the root: flat, and lab may hold one level of sites
+fabricctl federation invite lab2                 # on lab: nested, lab owns lab2 (lab signs its CA)
+fabricctl federation invite lab3 --via edge1     # flat through a node: edge1 only relays (step 3)
 ```
+
+Nested invitations are made on the parent, because only the parent holds its
+CA key; a site can make them only if it was invited with `--nest` (its CA's
+path length ≥ 1).
 
 | | Flat | Flat through a node | Nested |
 |---|---|---|---|

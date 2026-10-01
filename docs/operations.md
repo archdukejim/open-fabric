@@ -508,11 +508,27 @@ their own network (design [federation.md](design/federation.md)). On the upstrea
 ```bash
 sudo fabricctl federation status            # standalone, upstream or site; joined sites; open invitations
 sudo fabricctl federation enable            # the endpoint sites join through: https://federation.<domain>
-sudo fabricctl federation invite branch1    # one-time invitation (one hour); prints the setup command
+sudo fabricctl federation invite lab        # one-time invitation (one hour); lab attaches flat
+sudo fabricctl federation invite lab --nest 1   # lab may hold one level of sites of its own
 sudo fabricctl federation invitations       # open invitations
 sudo fabricctl federation revoke branch1    # withdraw one (by id or site)
+sudo fabricctl federation remove lab        # forget a site that joined here (a lab torn down)
 sudo fabricctl federation disable           # no new joins; sites that joined stay
 ```
+
+**Nesting.** An invitation made on the root site attaches the new site flat (its CA signed by the root).
+Made on a site that was invited with `--nest 1` or more (and has its endpoint enabled), it nests the new
+site under that site: the site signs its CA, and every chain the nested site hands out carries its
+parent's CA. How deep sites may nest is capped by the root's path length (`ca_nest_depth`, default 1,
+chosen when the root site is installed). A nested site whose parent is gone for good moves under another
+parent with that parent's invitation — on the site itself:
+
+```bash
+sudo fabricctl federation reparent         # paste the new parent's invitation at the prompt
+```
+
+It keeps its name, directory part and data; it gets a new CA, Step-CA switches to it and every service
+certificate is re-issued. People's web UI certificates must then be re-issued (`fabricctl client-cert`).
 
 The new site runs `sudo fabricctl setup --join` and pastes it at the prompt (or `--join @FILE`; see
 [install.md](install.md#joining-an-existing-fabric-a-new-site)). The invitation carries the endpoint's
@@ -767,7 +783,7 @@ Every `fabricctl` subcommand (Python, `fabricctl/lib/fabriclib/`; `sudo fabricct
 | `sudo fabricctl radius status/log/add-client/rotate-secret/remove-client/map-group/unmap-group` | 802.1X (FreeRADIUS) — see [802.1X](#8021x-optional-freeradius) |
 | `sudo fabricctl logs status` / `logs set-password elastic` | Log forwarding (Fluent Bit) — see [Log forwarding](#log-forwarding-optional-fluent-bit) |
 | `sudo fabricctl images status/update/rollback/prune` | Container images — see [`fabricctl images`](#fabricctl-images) |
-| `sudo fabricctl federation status/enable/disable/invite/invitations/revoke` | Sites joining this install — see [Federation](#federation-sites) |
+| `sudo fabricctl federation status/enable/disable/invite/invitations/revoke/remove/reparent` | Sites joining this install — see [Federation](#federation-sites) |
 | `sudo fabricctl vault …` | OpenBao and its unlock methods — see [OpenBao](#openbao-secrets) |
 | `sudo fabricctl secrets list` / `secrets show <name>` | fabric's own secrets (in OpenBao); `show` is audited |
 | `sudo fabricctl client-cert <user> [--days N]` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`, default 365 days) |

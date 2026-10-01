@@ -3,6 +3,7 @@ import re
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.pki.common.artifacts_dir import artifacts_dir
+from fabriclib.pki.common.ca_parents_pem import ca_parents_pem
 from fabriclib.pki.common.run_step import run_step
 
 CN_RE = re.compile(r"^[A-Za-z0-9*][A-Za-z0-9._@*-]{0,252}$")
@@ -17,7 +18,8 @@ def mint_offline_cert(v, cn, sans=(), days=365, kty="RSA", size=4096, is_ca=Fals
              CA (subca template, pathLen=path_len) instead of a leaf (leaf template); crv — curve for EC /
              OKP (P-256, P-384, Ed25519), step's default when None.
     Returns: (crt_path, key_path) in stepca/data/artifacts, named after cn with ". / space @ *" as "-";
-             the crt carries the chain (--bundle), the key is unencrypted. The caller moves or deletes both.
+             the crt carries the chain (--bundle, plus a nested site's parent CAs), the key is unencrypted.
+             The caller moves or deletes both.
     Fails:   ValidationError "invalid certificate name: ..."; run_step's "step-ca refused: ..."; ValueError
              if days / size / path_len are not numbers; KeyError / OSError from artifacts_dir.
     Feeds:   issue_client_cert, issue_key_pair, mint_extra_cert.
@@ -43,4 +45,8 @@ def mint_offline_cert(v, cn, sans=(), days=365, kty="RSA", size=4096, is_ca=Fals
         for san in dict.fromkeys([cn, *sans]):
             cmd += ["--san", san]
     run_step(v, cmd)
+    parents = ca_parents_pem(v)                  # a nested site: its parent CAs complete the chain
+    if parents:
+        with open(os.path.join(artifacts, f"{name}.crt"), "a") as f:
+            f.write(parents)
     return os.path.join(artifacts, f"{name}.crt"), os.path.join(artifacts, f"{name}.key")

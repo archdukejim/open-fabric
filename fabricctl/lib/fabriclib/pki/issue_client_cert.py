@@ -30,7 +30,10 @@ def issue_client_cert(v, user, out_dir, owner=(0, 0), days=365):
     p12 = os.path.join(out_dir, f"{user}.p12")
     password = secrets.token_urlsafe(18)
     try:
-        export_p12(crt, key, [os.path.join(certs, "intermediate_ca.crt"), os.path.join(certs, "root_ca.crt")],
+        parents = os.path.join(certs, "ca_parents.crt")         # a nested site's parent CAs (empty otherwise)
+        chain = [os.path.join(certs, "intermediate_ca.crt")] + ([parents] if os.path.exists(parents)
+                                                                and os.path.getsize(parents) else [])
+        export_p12(crt, key, chain + [os.path.join(certs, "root_ca.crt")],
                    f"{user} (fabric)", password, p12)
     finally:
         for path in (crt, key):

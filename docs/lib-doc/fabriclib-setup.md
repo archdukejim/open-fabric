@@ -516,7 +516,7 @@
 | Returns | None; path and everything below it chowned (symlinks followed). |
 | Fails | OSError from os.chown. |
 | Feeds | run (Step-CA's data folder to the step user). |
-| Called by | `fabriclib.setup.init_pki.run` |
+| Called by | `fabriclib.setup.init_pki._make_root`, `fabriclib.setup.init_pki.run` |
 
 ### `_configure_ca_json(ca_json, v)`
 
@@ -524,7 +524,7 @@
 |---|---|
 | Purpose | converge Step-CA's ca.json after `step ca init`: bring-your-own chain paths, DNS names, certificate lifetimes, an ACME provisioner with fabric's leaf template. |
 | Inputs | ca_json — path to ca.json; v — vars: byoc, hostname_stepca, stepca_cert_max_lifetime_hours (default 131400h), stepca_cert_allow_subordinate_ca, cert_acme_lifetime_hours (default 2160h). |
-| Returns | None; ca.json rewritten (tab-indented). With stepca_cert_allow_subordinate_ca the JWK provisioner may issue the basicConstraints extension (2.5.29.19). |
+| Returns | None; ca.json rewritten (tab-indented); with byoc its crt is certs/intermediate_chain.crt (the intermediate followed by its parent CAs, so a nested site's certificates carry the whole chain). With stepca_cert_allow_subordinate_ca the JWK provisioner may issue the basicConstraints extension (2.5.29.19). |
 | Fails | OSError/json.JSONDecodeError reading ca.json; KeyError without hostname_stepca or "authority" in ca.json. |
 | Feeds | run. |
 | Called by | `fabriclib.setup.init_pki.run` |
@@ -538,6 +538,17 @@
 | Returns | True if the file held more than one certificate and was rewritten with the first one. |
 | Fails | OSError reading or writing the file. |
 | Feeds | run (first initialisation with byoc, and every later run, so existing installs converge). |
+| Called by | `fabriclib.setup.init_pki.run` |
+
+### `_make_root(ctx, data, uid, gid)`
+
+| | |
+|---|---|
+| Purpose | make this install's own root CA before `step ca init`, with the path length that decides how deeply sites may nest below it (design federation.md §6): ca_nest_depth + 1. `step ca init` alone makes path length 1 (flat sites only). |
+| Inputs | ctx — SetupContext: vars ca_name, ca_nest_depth (0..4, default 1), image_stepca; data — Step-CA's data folder (secrets/password written); uid, gid — the step user. |
+| Returns | (root certificate path, root key path) in <data>/root-new (as /home/step/... for the container); EC P-256, ten years, subject "O=<ca_name>, CN=<ca_name> Root CA" like step's own. |
+| Fails | SetupError when ca_nest_depth is not 0..4 or step refuses. |
+| Feeds | run (own root only). |
 | Called by | `fabriclib.setup.init_pki.run` |
 
 ### `_publish_ca_certs(ctx, certs_dir)`
@@ -567,8 +578,8 @@
 | | |
 |---|---|
 | Purpose | initialise Step-CA once (its own root, or a bring-your-own root + intermediate when byoc), configure ca.json, publish the CA certificates and trust them on the host. |
-| Inputs | ctx — SetupContext: vars byoc, ca_crt_path, ica_crt_path, ica_key_path (default: the .crt path with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json settings; secrets.ca_password; service user step. |
-| Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the permissions, publishing and trust are (re)done. |
+| Inputs | ctx — SetupContext: vars byoc, ca_crt_path, ica_crt_path, ica_key_path (default: the .crt path with .key), ica_parents_path (a nested site's parent CAs), ca_nest_depth (own root: how many levels sites may nest; default 1), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json settings; secrets.ca_password; service user step. |
+| Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step; an own root made with path length ca_nest_depth + 1 by _make_root; with byoc, certs/ca_parents.crt and certs/intermediate_chain.crt for the parent CAs) and ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the permissions, publishing and trust are (re)done. |
 | Fails | SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars. |
 | Feeds | setup step `pki`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -692,7 +703,7 @@
 | Returns | the invitation text (stripped), or None without --join. |
 | Fails | SetupError "do not put the invitation on the command line ..." when the value is the invitation itself; "cannot read the invitation from <path>: ..."; "no invitation given" (empty input, or a terminal with --non-interactive). |
 | Feeds | run_setup main (ctx.join_invitation). |
-| Called by | `fabriclib.setup.run_setup.main` |
+| Called by | `fabriclib.federation.run_federation_command.run_federation_command`, `fabriclib.setup.run_setup.main` |
 
 ## `fabricctl/lib/fabriclib/setup/renew_service_certs.py`
 
@@ -705,7 +716,7 @@
 | Returns | None. Changed services that are active are restarted; inactive ones are left for their next start. |
 | Fails | as mint_service_certs.run (SetupError, ValidationError, CalledProcessError); CalledProcessError from `systemctl restart`. |
 | Feeds | cli main (`certs`). |
-| Called by | `fabriclib.cli.main`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint` |
+| Called by | `fabriclib.cli.main`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint` |
 
 ## `fabricctl/lib/fabriclib/setup/restore_install.py`
 

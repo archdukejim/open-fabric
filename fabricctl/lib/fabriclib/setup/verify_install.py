@@ -125,8 +125,10 @@ def checks(ctx):
             crt = os.path.join(sudo_owner()[1], "fabric-admin", f"{admin}.crt")
             if os.path.exists(crt):
                 certs = ctx.path("stepca", "data", "certs")
+                chain = os.path.join(certs, "intermediate_chain.crt")     # byoc: the intermediate + parent CAs
                 res = subprocess.run(["openssl", "verify", "-CAfile", os.path.join(certs, "root_ca.crt"),
-                                      "-untrusted", os.path.join(certs, "intermediate_ca.crt"), crt],
+                                      "-untrusted", chain if os.path.exists(chain)
+                                      else os.path.join(certs, "intermediate_ca.crt"), crt],
                                      capture_output=True, text=True)
                 subj = subprocess.run(["openssl", "x509", "-in", crt, "-noout", "-subject", "-nameopt", "RFC2253"],
                                       capture_output=True, text=True).stdout

@@ -89,6 +89,7 @@ Paths are relative to `fabricctl/lib/` unless they start with `fabricctl/`,
 - Never asserted: the host firewall and Docker daemon hardening, certificate renewal, the offline path, relaxations in `status`, arm64 images, `needs_rebuild` on a new base.
 - Only in their own suites (not in the full install): EAP-TLS, log forwarding; the web UI's Kea/RADIUS pages against a real agent.
 - Weak checks: `tests/freeradius/run.py:397` (PAP outside the tunnel uses a wrong password), `:433` and `tests/kea/run.py:194` (hardening checks inspect flags the test itself set), `tests/dirsrv/run.sh:74` (TLS < 1.2 may be refused by the client), `tests/fluentbit/run.py` logs-status counter (fails consistently: investigate).
+- Intermittent service starts (2026-09-30 / 10-01, each passed on rerun, none tied to the change under test): `dirsrv` "Can't contact LDAP server" while seeding in `hardening`; `systemctl start postgres` failing during the sandbox's reinstall; `systemctl start nginx` failing during the sandbox's image rollback. Likely a start racing a container that is still stopping or a slow host; capture `journalctl -u <unit>` on failure in the suites, then fix the start path (`start_unit`, the wrapper unit's health wait).
 
 ## Decisions for the owner
 

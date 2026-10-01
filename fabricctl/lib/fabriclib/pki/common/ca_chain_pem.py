@@ -1,4 +1,5 @@
 from fabriclib.pki.common.ca_files import ca_files
+from fabriclib.pki.common.ca_parents_pem import ca_parents_pem
 from fabriclib.pki.common.to_pem import to_pem
 
 
@@ -17,4 +18,4 @@ def ca_chain_pem(v):
     with open(intermediate) as f:
         inter = to_pem(f.read(), "cert")[0]
     with open(root) as f:
-        return inter + to_pem(f.read(), "cert")[0]
+        return inter + ca_parents_pem(v) + to_pem(f.read(), "cert")[0]

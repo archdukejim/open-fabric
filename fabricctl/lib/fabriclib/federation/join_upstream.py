@@ -18,7 +18,7 @@ ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert
 
 
 def join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None,
-                  http_port=80, https_port=443):
+                  http_port=80, https_port=443, replace=False):
     """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (design
              federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root,
              send the join over TLS verified against that root, check and stage the signed intermediate, and
@@ -29,9 +29,11 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder
              for federation.yaml and its lock (default: next to this code — setup runs from the package, so it
              passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the
-             upstream's ports, default 80 and 443 (tests).
-    Returns: {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path (stage_site_ca),
-             site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name",
+             upstream's ports, default 80 and 443 (tests); replace — join although an upstream is recorded
+             (re-parenting: the invitation's upstream becomes this site's parent), default False.
+    Returns: {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path,
+             site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's
+             friendly_name / cert_* —, "upstream": {"site_name",
              "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had}.
     Fails:   ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the
              upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered
@@ -44,11 +46,11 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     domain = str(domain).strip().lower().rstrip(".")
     if not DOMAIN_RE.match(domain):
         raise ValidationError(f"this site's domain is not valid: {domain!r}")
-    staged_files = [os.path.join(work_dir, n) for n in ("root_ca.crt", "site_ca.crt", "site_ca_key")]
+    staged_files = [os.path.join(work_dir, n) for n in ("root_ca.crt", "site_ca.crt", "site_ca_key", "ca_parents.crt")]
     reg_path = os.path.join(config_dir, "federation.yaml") if config_dir else FEDERATION_FILE
     lock_path = os.path.join(config_dir, ".federation.lock") if config_dir else FEDERATION_LOCK_FILE
     registry = load_registry(reg_path)
-    if registry["upstream"]:
+    if registry["upstream"] and not replace:
         up = registry["upstream"]
         if up.get("site_name") != inv["upstream"] or up.get("site") != inv["site"]:
             raise ValidationError(f"this node already joined {up.get('site_name')} as {up.get('site')}, "
@@ -65,11 +67,12 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
                             "domain": domain, "address": address}, port=https_port)
     if not isinstance(answer, dict) or answer.get("root", "").strip() != root.strip():
         raise ValidationError("the upstream answered with a different root")
-    stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"])
+    staged = stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"],
+                           chain=answer.get("chain") or "")
     org = answer.get("org") or {}
     up = {**(answer.get("upstream") or {}), "site": inv["site"], "org_domain": org.get("org_domain") or inv["org_domain"],
           "ldap_base_dn": org.get("ldap_base_dn") or inv["ldap_base_dn"],
-          "root_sha256": inv["root_sha256"],
+          "root_sha256": inv["root_sha256"], "site_ca_depth": staged["site_ca_depth"],
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "org": {k: org[k] for k in ORG_KEYS if org.get(k)}}
     with federation_lock(lock_path):
@@ -85,11 +88,13 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
 def _vars(inv, up, work_dir):
     """Purpose: the settings a joined site is rendered with, from the invitation and the recorded upstream.
     Inputs:  inv — decode_invitation's dict; up — the registry's upstream record; work_dir — the staged files.
-    Returns: dict: byoc True, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain, ldap_base_dn
+    Returns: dict: byoc True, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path, site_ca_depth (CAs
+             between the site's CA and the root), site_name, org_domain, ldap_base_dn
              and the organisation's settings (friendly_name, cert_*).
     Fails:   never.
     Feeds:   join_upstream (both the first join and a re-run)."""
     return {"byoc": True, "ca_crt_path": os.path.join(work_dir, "root_ca.crt"),
             "ica_crt_path": os.path.join(work_dir, "site_ca.crt"), "ica_key_path": os.path.join(work_dir, "site_ca_key"),
+            "ica_parents_path": os.path.join(work_dir, "ca_parents.crt"), "site_ca_depth": int(up.get("site_ca_depth") or 0),
             "site_name": inv["site"], "org_domain": up.get("org_domain") or inv["org_domain"],
             "ldap_base_dn": up.get("ldap_base_dn") or inv["ldap_base_dn"], **(up.get("org") or {})}

@@ -223,6 +223,13 @@ ica_crt_path: {{ ica_crt_path | default('/home/default_admin/output/ica.crt') }}
 {% if ica_key_path is defined and ica_key_path | length > 0 %}
 ica_key_path: {{ ica_key_path }}
 {% endif %}
+{# Federation (design federation.md §6): a nested site's parent CAs (setup --join stages them) and how many
+   there are; how many levels of sites may nest below a site, decided when this install makes its own root. #}
+{% if ica_parents_path is defined and ica_parents_path | length > 0 %}
+ica_parents_path: {{ ica_parents_path }}
+{% endif %}
+site_ca_depth: {{ site_ca_depth | default(0) | int }}
+ca_nest_depth: {{ ca_nest_depth | default(1) | int }}
 ca_name: {{ ca_name | default(friendly_name ~ ' CA') }}
 cert_country: {{ cert_country | default('US') }}
 cert_province: {{ cert_province | default('State') }}

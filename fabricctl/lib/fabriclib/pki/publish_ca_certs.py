@@ -92,7 +92,9 @@ def publish_ca_certs(certs_dir, www_dir, uid, gid, trust_prefix):
             with open(tmp_pem, "w") as f:
                 f.write(pem)
             info[name] = _info(tmp_pem)
-        chain = pems["intermediate-ca"] + pems["root-ca"]
+        parents_file = os.path.join(certs_dir, "ca_parents.crt")     # a nested site's parent CAs
+        parents = open(parents_file).read() if os.path.exists(parents_file) else ""
+        chain = pems["intermediate-ca"] + parents + pems["root-ca"]
         changed |= _write_if_changed(os.path.join(www_dir, "ca-chain.pem"), chain, uid, gid)
         chain_path = os.path.join(tmp, "chain.pem")
         with open(chain_path, "w") as f:

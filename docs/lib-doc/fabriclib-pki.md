@@ -53,7 +53,33 @@
 | Returns | (root_path, intermediate_path): <deploy_base_dir>/stepca/data/certs/root_ca.crt and intermediate_ca.crt; existence is not checked. |
 | Fails | KeyError if deploy_base_dir is missing. |
 | Feeds | ca_summary, common/ca_chain_pem, convert_cert, inspect_pem, radius/radius_guides, sign_site_ca. |
-| Called by | `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.radius.radius_guides.radius_guides` |
+| Called by | `fabriclib.federation.common.signing_capacity.signing_capacity`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.radius.radius_guides.radius_guides` |
+
+## `fabricctl/lib/fabriclib/pki/common/ca_parents_pem.py`
+
+### `ca_parents_pem(v)`
+
+| | |
+|---|---|
+| Purpose | the CA certificates between this site's intermediate and the root — empty for the root site and for flat sites, the parent site's CA (and its parents) for a nested site (design federation.md §6). |
+| Inputs | v — fabric vars: deploy_base_dir. |
+| Returns | str PEM of zero or more certificates (stepca/data/certs/ca_parents.crt), "" when there is none. |
+| Fails | OSError when the file exists but cannot be read. |
+| Feeds | ca_chain_pem, mint_offline_cert, issue_client_cert, sign_site_ca, publish/verify helpers. |
+| Called by | `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.mint_offline_cert.mint_offline_cert`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
+
+## `fabricctl/lib/fabriclib/pki/common/ca_path_len.py`
+
+### `ca_path_len(pem)`
+
+| | |
+|---|---|
+| Purpose | how many levels of CAs a CA certificate may still sign below it (its basicConstraints path length). |
+| Inputs | pem — str, a PEM certificate (the first one is read). |
+| Returns | int path length; None for a CA without a limit; -1 when the certificate is not a CA. |
+| Fails | ValidationError from openssl when the PEM cannot be parsed. |
+| Feeds | sign_site_ca (what the signer may give), create_invitation (whether this install may nest), stage_site_ca, init_pki (report a brought-in root's depth). |
+| Called by | `fabriclib.federation.common.signing_capacity.signing_capacity`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.pki.stage_site_ca.stage_site_ca`, `fabriclib.setup.init_pki.run` |
 
 ## `fabricctl/lib/fabriclib/pki/common/describe_cert.py`
 
@@ -66,7 +92,7 @@
 | Returns | {"subject", "issuer" (RFC 2253), "serial" (hex), "not_before", "not_after" (openssl dates, e.g. "Sep 30 12:00:00 2027 GMT"), "sha256" (colon hex fingerprint), "sans" (["DNS:x", "IP Address:y", ...]), "usage" (extended key usage text or ""), "key" (e.g. "RSA 2048", "EC 256"; "?" if unrecognised), "is_ca" (bool: CA:TRUE present)}. |
 | Fails | ValidationError with openssl's first error line if pem is not a certificate (openssl helper). |
 | Feeds | ca_summary, convert_cert, inspect_pem, issue_key_pair, sign_csr, sign_site_ca, stage_site_ca (their "info"; record_issued keeps part of it). |
-| Called by | `fabriclib.federation.common.fetch_pinned_root.fetch_pinned_root`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
+| Called by | `fabriclib.federation.common.fetch_pinned_root.fetch_pinned_root`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/openssl.py`
 
@@ -79,7 +105,7 @@
 | Returns | openssl's stdout: bytes if data is bytes, else str. |
 | Fails | ValidationError with openssl's first non-empty stderr line (at most 200 characters; "openssl failed" if stderr is empty) on a non-zero exit when check; FileNotFoundError if openssl is not installed. |
 | Feeds | common/describe_cert, common/to_pem, describe_csr, inspect_pem, convert_cert, issue_key_pair, sign_csr, stage_site_ca. |
-| Called by | `fabriclib.pki.common.describe_cert.describe_cert`, `fabriclib.pki.common.to_pem.to_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.describe_csr.describe_csr`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
+| Called by | `fabriclib.pki.common.ca_path_len.ca_path_len`, `fabriclib.pki.common.describe_cert.describe_cert`, `fabriclib.pki.common.to_pem.to_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.describe_csr.describe_csr`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/record_issued.py`
 
@@ -354,7 +380,7 @@
 |---|---|
 | Purpose | Sign a certificate directly with the Step-CA intermediate key, whether or not step-ca is running. |
 | Inputs | v — fabric vars (artifacts_dir, run_step); cn — ^[A-Za-z0-9*][A-Za-z0-9._@*-]{0,252}$; sans — extra names (leaf only; cn is always included); days — validity, default 365 (no cap here); kty — "RSA" \| "EC" \| "OKP"; size — RSA bits, default 4096; is_ca — issue a subordinate CA (subca template, pathLen=path_len) instead of a leaf (leaf template); crv — curve for EC / OKP (P-256, P-384, Ed25519), step's default when None. |
-| Returns | (crt_path, key_path) in stepca/data/artifacts, named after cn with ". / space @ *" as "-"; the crt carries the chain (--bundle), the key is unencrypted. The caller moves or deletes both. |
+| Returns | (crt_path, key_path) in stepca/data/artifacts, named after cn with ". / space @ *" as "-"; the crt carries the chain (--bundle, plus a nested site's parent CAs), the key is unencrypted. The caller moves or deletes both. |
 | Fails | ValidationError "invalid certificate name: ..."; run_step's "step-ca refused: ..."; ValueError if days / size / path_len are not numbers; KeyError / OSError from artifacts_dir. |
 | Feeds | issue_client_cert, issue_key_pair, mint_extra_cert. |
 | Notes | the intermediate key's password is a file path inside the container, never a value on argv. |
@@ -421,6 +447,19 @@
 | Notes | update-ca-certificates --fresh runs only when a trust-store file changed. Files published: root-ca.crt / intermediate-ca.crt   PEM   Linux, macOS, iOS, Android root-ca.cer / intermediate-ca.cer   DER   Windows root-ca.pem / intermediate-ca.pem   PEM   shown as text (paste into devices) root-ca.der / intermediate-ca.der   DER   devices that want binary DER ca-chain.pem                        PEM   intermediate + root bundle ca-chain.p7b                        PKCS#7 (DER) root + intermediate ca-certs.json                       subject, validity, SHA-256/SHA-1 fingerprints |
 | Called by | `fabriclib.setup.init_pki._publish_ca_certs` |
 
+## `fabricctl/lib/fabriclib/pki/replace_site_ca.py`
+
+### `replace_site_ca(v, staged)`
+
+| | |
+|---|---|
+| Purpose | switch this site's running Step-CA to a new intermediate (a site re-parented under another site or the root, design federation.md §6): the new CA certificate, its parent CAs and key replace the old ones; the root stays. |
+| Inputs | v — fabric vars: deploy_base_dir, service_users.step; staged — stage_site_ca's result (ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path). |
+| Returns | None. stepca/data: certs/intermediate_ca.crt (the new CA alone), certs/ca_parents.crt, certs/intermediate_chain.crt (the two together, what ca.json's crt names), secrets/intermediate_ca_key (0600), all owned by the step user; the old ones kept as *.old-<n>. The caller restarts stepca and re-issues the certificates that came from the old intermediate. |
+| Fails | ValidationError "the new CA is for another root" when the staged root is not this site's root; OSError; json errors reading ca.json. |
+| Feeds | federation/reparent_site.py. |
+| Called by | `fabriclib.federation.reparent_site.reparent_site` |
+
 ## `fabricctl/lib/fabriclib/pki/sign_csr.py`
 
 ### `sign_csr(v, actor, csr, days, device='', source='web')`
@@ -459,27 +498,27 @@
 | Feeds | sign_site_ca (the CSR, and a root key and password brought in for a byoc root). |
 | Called by | `fabriclib.pki.sign_site_ca.sign_site_ca` |
 
-### `sign_site_ca(v, actor, site_name, csr, root_key='', root_password_file='', source='cli')`
+### `sign_site_ca(v, actor, site_name, csr, root_key='', root_password_file='', source='cli', nest=0, as_parent=False)`
 
 | | |
 |---|---|
-| Purpose | On the root site: sign a joining site's intermediate CA with this fabric's root key. The site made the key itself (make_site_ca_request); only the request travels. |
-| Inputs | v — fabric vars: deploy_base_dir, service_users.step, image_stepca, site_name (this site), byoc, cert_intermediate_days (default 1095); actor — str (audit, ledger); site_name — the joining site, SITE_NAME_RE, not this site's own; csr — PEM/DER/base64 request whose only name is CN "<site_name> Intermediate CA" (step's copy of the CN as a DNS name is ignored); root_key, root_password_file — the root key and its password file, needed when this install's CA was brought in (byoc: its root key is not on this host); otherwise Step-CA's own secrets/root_ca_key and secrets/password; source — default "cli". |
-| Returns | {"cert": PEM of the site's intermediate CA, "root": PEM of the root, "info": describe_cert dict}. The certificate, from a fixed template: subject CN "<site_name> Intermediate CA" and no other names, CA:TRUE with path length 0 (signs leaves only), certificate and CRL signing, the request's key; valid cert_intermediate_days but never past the root's own expiry. |
-| Fails | ValidationError "invalid site name: ..."; "<name> is this site's own name"; "cannot sign: ..." (signature, key strength, or a name other than the expected CN); "this install's root key is not on this host ..." (byoc without root_key) or "no such file: ..."; "the root CA expires in under 30 days"; "step-ca refused: ..." (wrong key or password); "refusing: ..." when the result is not a path-length-0 CA chaining to this root; OSError. |
-| Feeds | the federation endpoint's join (M3), `fabricctl federation sign-csr` for a byoc root (M3). |
+| Purpose | Sign a joining site's intermediate CA (design federation.md §6): with the root key (a flat site, or one allowed to hold nested sites), or — as_parent — with this site's own CA, for a site nested under this one. The joining site made the key itself (make_site_ca_request); only the request travels. |
+| Inputs | v — fabric vars: deploy_base_dir, service_users.step, image_stepca, site_name (this site), byoc, cert_intermediate_days (default 1095); actor — str (audit, ledger); site_name — the joining site, SITE_NAME_RE, not this site's own; csr — PEM/DER/base64 request whose only name is CN "<site_name> Intermediate CA" (step's copy of the CN as a DNS name is ignored); root_key, root_password_file — the root key and its password file, needed when this install's CA was brought in (byoc: its root key is not on this host); otherwise Step-CA's own secrets/root_ca_key and secrets/password; source — default "cli"; nest — the new CA's path length: how many levels of sites it may hold below it, default 0; as_parent — sign with this site's intermediate (secrets/intermediate_ca_key) instead of the root key. |
+| Returns | {"cert": PEM of the site's intermediate CA, "root": PEM of the root, "chain": PEM of the CAs between the new CA and the root ("" when the root signed; this site's CA and its parents when as_parent), "info": describe_cert dict}. The certificate, from a fixed template: subject CN "<site_name> Intermediate CA" and no other names, CA:TRUE with path length `nest`, certificate and CRL signing, the request's key; valid cert_intermediate_days but never past the root's own expiry. |
+| Fails | ValidationError "invalid site name: ..."; "<name> is this site's own name"; "cannot sign: ..." (signature, key strength, or a name other than the expected CN); "nest must be 0 or more"; "this site's CA cannot hold sites below it" / "the root allows ... levels" / "this site's CA allows ..." when nest is more than the signer's path length permits; "this install's root key is not on this host ..." (byoc without root_key) or "no such file: ..."; "the root CA expires in under 30 days"; "step-ca refused: ..." (wrong key or password); "refusing: ..." when the result is not a CA of path length `nest` chaining to this root; OSError. |
+| Feeds | accept_join (the federation endpoint's join), `fabricctl federation sign-csr` for a byoc root. |
 | Notes | ledger kind "site-ca"; audited as FED_SIGN_SITE_CA. Files given to step are copied into the artifacts directory under random names (0600, step user) and removed afterwards. |
 | Called by | `fabriclib.federation.accept_join.accept_join` |
 
 ## `fabricctl/lib/fabriclib/pki/stage_site_ca.py`
 
-### `stage_site_ca(work_dir, cert, root, root_sha256='')`
+### `stage_site_ca(work_dir, cert, root, root_sha256='', chain='')`
 
 | | |
 |---|---|
 | Purpose | On a joining site: check the root site's answer to make_site_ca_request and lay it out for Step-CA's bring-your-own-CA path (setup step `pki`, init_pki with byoc). |
-| Inputs | work_dir — the directory make_site_ca_request used (holds site_ca_key and site_ca.csr); cert — PEM of the signed site intermediate; root — PEM of the root; root_sha256 — the root's SHA-256 fingerprint the invitation pinned ("AA:BB:..."; empty skips the pin). |
-| Returns | vars for setup: {"byoc": True, "ca_crt_path": <work_dir>/root_ca.crt, "ica_crt_path": <work_dir>/site_ca.crt, "ica_key_path": <work_dir>/site_ca_key}; both certificates written 0644. |
-| Fails | ValidationError "give exactly one certificate" (cert or root); "the root's fingerprint is not the one in the invitation"; "the root is not a self-signed CA"; "the site certificate does not chain to the root"; "the site certificate is not a path-length-0 CA"; "the site certificate is not for this site's key"; "no key/request in <work_dir>: make the request first"; to_pem's messages. |
+| Inputs | work_dir — the directory make_site_ca_request used (holds site_ca_key and site_ca.csr); cert — PEM of the signed site intermediate; root — PEM of the root; root_sha256 — the root's SHA-256 fingerprint the invitation pinned ("AA:BB:..."; empty skips the pin); chain — PEM of the CAs between the site's CA and the root (a nested site: its parent's CA and the parent's parents), default "". The site's CA may be of any path length (a site allowed to hold sites below it). |
+| Returns | vars for setup: {"byoc": True, "ca_crt_path": <work_dir>/root_ca.crt, "ica_crt_path": <work_dir>/site_ca.crt, "ica_key_path": <work_dir>/site_ca_key, "ica_parents_path": <work_dir>/ca_parents.crt (empty for a flat site), "site_ca_depth": number of CAs in the chain}; the certificates written 0644. |
+| Fails | ValidationError "give exactly one certificate" (cert or root); "the root's fingerprint is not the one in the invitation"; "the root is not a self-signed CA"; "the site certificate does not chain to the root"; "the site certificate is not a CA"; "the site certificate is not for this site's key"; "no key/request in <work_dir>: make the request first"; to_pem's messages. |
 | Feeds | setup --join (federation M3), before the `pki` step. |
 | Called by | `fabriclib.federation.join_upstream.join_upstream` |

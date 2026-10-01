@@ -5,13 +5,22 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.federation.create_invitation import create_invitation
 from fabriclib.federation.federation_status import federation_status
 from fabriclib.federation.list_invitations import list_invitations
+from fabriclib.federation.remove_site import remove_site
+from fabriclib.federation.reparent_site import reparent_site
 from fabriclib.federation.revoke_invitation import revoke_invitation
 from fabriclib.federation.set_federation_endpoint import set_federation_endpoint
+from fabriclib.setup.errors import SetupError
+from fabriclib.setup.read_join_invitation import read_join_invitation
 
 USAGE = """usage: fabricctl federation status                 this install's place in its fabric: upstream, sites, invitations
        fabricctl federation enable | disable       the endpoint sites join through (https://federation.<domain>)
-       fabricctl federation invite <site>          a one-time invitation for a new site (good for one hour)
+       fabricctl federation invite <site> [--nest N]
+                                                   a one-time invitation for a new site (good for one hour); on the
+                                                   root it attaches flat, on a site nested under it; --nest N lets
+                                                   it hold N levels of sites below it
        fabricctl federation invitations            open invitations
+       fabricctl federation remove <site>          forget a site that joined here (its CA stays valid until it expires)
+       fabricctl federation reparent [@FILE|-]     on a site: move under the parent whose invitation you paste
        fabricctl federation revoke <id|site>       withdraw an open invitation
   On the new site: sudo fabricctl setup --join   (a fresh install; paste the invitation at the prompt)"""
 
@@ -26,7 +35,8 @@ def _when(epoch):
 
 
 def run_federation_command(ctx, argv):
-    """Purpose: `fabricctl federation status | enable | disable | invite | invitations | revoke` — joining sites to
+    """Purpose: `fabricctl federation status | enable | disable | invite | invitations | revoke | remove | reparent` —
+             joining sites to
              this install without the web UI (design federation.md §4).
     Inputs:  ctx — SetupContext with state loaded (ctx.vars: the rendered vars); argv — list of str after
              "federation" (default status).
@@ -59,9 +69,11 @@ def run_federation_command(ctx, argv):
                   f"federation endpoint {'on' if cmd == 'enable' else 'off'}"
                   + (f": https://{v.get('hostname_federation')}" if cmd == "enable" else " (sites that joined stay)"))
             return 0 if ok else 1
-        if cmd == "invite" and len(args) == 1:
-            inv = create_invitation(v, "root", args[0])
-            print(f"Invitation for site {inv['site']} (one use, until {_when(inv['expires'])}):\n")
+        if cmd == "invite" and (len(args) == 1 or (len(args) == 3 and args[1] == "--nest" and args[2].isdigit())):
+            inv = create_invitation(v, "root", args[0], nest=int(args[2]) if len(args) == 3 else 0)
+            how = (f"nested under {v.get('site_name')}" if inv["nested"] else "flat, under the root site")
+            print(f"Invitation for site {inv['site']} ({how}; may hold {inv['nest']} level(s) of sites below it; "
+                  f"one use, until {_when(inv['expires'])}):\n")
             print(f"  {inv['invitation']}\n")
             print("On the new site run `sudo fabricctl setup --join` and paste it at the prompt (or save it to a\n"
                   "file and use --join @FILE). It carries a secret: send it over a channel you trust and never put\n"
@@ -74,10 +86,21 @@ def run_federation_command(ctx, argv):
             if not rows:
                 print("no open invitations")
             return 0
+        if cmd == "remove" and len(args) == 1:
+            remove_site("root", args[0])
+            print(f"{args[0]} removed; its CA stays valid until it expires (revocation is not built yet)")
+            return 0
+        if cmd == "reparent" and len(args) <= 1:
+            res = reparent_site(ctx, "root", read_join_invitation(args[0] if args else ""))
+            print(f"now under {res['parent']} ({res['site_ca_depth']} CA(s) between this site's CA and the root); "
+                  "service certificates re-issued. Re-issue people's web UI certificates: fabricctl client-cert <user>")
+            if not res["applied"]:
+                print(res["output"])
+            return 0 if res["applied"] else 1
         if cmd == "revoke" and len(args) == 1:
             print(f"withdrawn: {revoke_invitation(v, 'root', args[0])} invitation(s)")
             return 0
-    except ValidationError as e:
+    except (ValidationError, SetupError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
     print(USAGE, file=sys.stderr)

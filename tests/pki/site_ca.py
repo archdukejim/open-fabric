@@ -204,6 +204,7 @@ check("byoc: an intermediate_ca.crt carrying the root is converged to the interm
       and _single_intermediate(f"{data}/certs/intermediate_ca.crt") is False)
 shutil.copy2(staged["ica_key_path"], f"{data}/secrets/intermediate_ca_key")
 os.remove(f"{data}/secrets/root_ca_key")
+shutil.copy2(f"{data}/certs/intermediate_ca.crt", f"{data}/certs/intermediate_chain.crt")   # a flat site: no parents
 _configure_ca_json(f"{data}/config/ca.json", {"byoc": True, "hostname_stepca": "ca.branch1.test"})
 sh(["chown", "-R", f"{STEP_UID}:{STEP_UID}", data])
 sh(["docker", "rm", "-f", "sitecatest"], ok=False)

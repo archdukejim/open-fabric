@@ -310,5 +310,13 @@ srv.shutdown()
 for s_ in (web, evil):
     s_.shutdown()
 
+# ---------------------------------------------------------------- nested sites and re-parenting (own installs)
+print("--- nested sites (nested.py)")
+nested = subprocess.run([sys.executable, os.path.join(REPO, "tests", "federation", "nested.py")], capture_output=True,
+                        text=True)
+print("\n".join(line for line in nested.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+      or nested.stdout[-2000:] + nested.stderr[-2000:])
+check("nested sites: nested.py passed", nested.returncode == 0, nested.stderr[-400:])
+
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
 sys.exit(1 if FAILED else 0)

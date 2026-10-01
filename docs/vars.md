@@ -515,6 +515,25 @@ If you already possess a securely offline-generated Root and Intermediate CA, yo
 
 **Immutable:** Yes 🔒
 
+### `ca_nest_depth`
+**Description:** How many levels of federation sites may nest below a site (design [federation.md](design/federation.md) §6). Used once, when this install makes its own root CA: the root gets path length `ca_nest_depth + 1` (0 allows flat sites only, 1 lets a site invited with `--nest 1` hold sites of its own). 0..4. A brought-in root (`byoc`) has its own path length, which setup reports. Fixed once the root exists.
+
+**Default Value:** `1`
+
+**Immutable:** Yes 🔒
+
+**Effected Jinja Templates:**
+- `vars.yaml.j2`; read by `fabriclib/setup/init_pki.py`
+
+### `ica_parents_path` / `site_ca_depth`
+**Description:** Set by `fabricctl setup --join` (and `federation reparent`), not by hand: a nested site's parent CAs (the CA certificates between its intermediate and the root, copied to `stepca/data/certs/ca_parents.crt`) and how many there are. 0 for the root site and flat sites. Every certificate chain this site hands out carries the parents, and nginx's client-certificate depth for the web UI grows by `site_ca_depth`.
+
+**Default Value:** unset / `0`
+
+**Effected Jinja Templates:**
+- `nginx/nginx.conf.j2` (`ssl_verify_depth`)
+- `vars.yaml.j2`; read by `fabriclib/setup/init_pki.py`
+
 
 ## 4. Docker Infrastructure
 Allows deep customization of the container orchestration, including overriding images and statically assigning internal IPs on the Docker bridge.

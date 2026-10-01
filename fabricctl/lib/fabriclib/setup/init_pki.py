@@ -4,6 +4,7 @@ import shutil
 import subprocess
 
 from fabriclib.common.console import info, ok
+from fabriclib.pki.common.ca_path_len import ca_path_len
 from fabriclib.pki.publish_ca_certs import publish_ca_certs
 from fabriclib.setup.errors import SetupError
 
@@ -24,7 +25,9 @@ def _configure_ca_json(ca_json, v):
              certificate lifetimes, an ACME provisioner with fabric's leaf template.
     Inputs:  ca_json — path to ca.json; v — vars: byoc, hostname_stepca, stepca_cert_max_lifetime_hours
              (default 131400h), stepca_cert_allow_subordinate_ca, cert_acme_lifetime_hours (default 2160h).
-    Returns: None; ca.json rewritten (tab-indented). With stepca_cert_allow_subordinate_ca the JWK provisioner
+    Returns: None; ca.json rewritten (tab-indented); with byoc its crt is certs/intermediate_chain.crt (the
+             intermediate followed by its parent CAs, so a nested site's certificates carry the whole chain).
+             With stepca_cert_allow_subordinate_ca the JWK provisioner
              may issue the basicConstraints extension (2.5.29.19).
     Fails:   OSError/json.JSONDecodeError reading ca.json; KeyError without hostname_stepca or
              "authority" in ca.json.
@@ -33,7 +36,7 @@ def _configure_ca_json(ca_json, v):
         cfg = json.load(f)
     if v.get("byoc"):
         cfg["root"] = "/home/step/certs/root_ca.crt"
-        cfg["crt"] = "/home/step/certs/intermediate_ca.crt"
+        cfg["crt"] = "/home/step/certs/intermediate_chain.crt"      # the intermediate + its parent CAs (nested site)
         cfg["key"] = "/home/step/secrets/intermediate_ca_key"
     cfg["dnsNames"] = [v["hostname_stepca"], "localhost", "127.0.0.1"]
     auth = cfg["authority"]
@@ -70,6 +73,38 @@ def _single_intermediate(path):
     return True
 
 
+def _make_root(ctx, data, uid, gid):
+    """Purpose: make this install's own root CA before `step ca init`, with the path length that decides how
+             deeply sites may nest below it (design federation.md §6): ca_nest_depth + 1. `step ca init` alone
+             makes path length 1 (flat sites only).
+    Inputs:  ctx — SetupContext: vars ca_name, ca_nest_depth (0..4, default 1), image_stepca; data — Step-CA's
+             data folder (secrets/password written); uid, gid — the step user.
+    Returns: (root certificate path, root key path) in <data>/root-new (as /home/step/... for the container);
+             EC P-256, ten years, subject "O=<ca_name>, CN=<ca_name> Root CA" like step's own.
+    Fails:   SetupError when ca_nest_depth is not 0..4 or step refuses.
+    Feeds:   run (own root only)."""
+    depth = ctx.vars.get("ca_nest_depth", 1)
+    if not str(depth).isdigit() or not 0 <= int(depth) <= 4:
+        raise SetupError(f"ca_nest_depth must be 0..4 (got {depth!r})")
+    name = ctx.vars["ca_name"]
+    os.makedirs(os.path.join(data, "root-new"), mode=0o700, exist_ok=True)
+    with open(os.path.join(data, "root-new", "root.tpl"), "w") as f:
+        json.dump({"subject": {"commonName": f"{name} Root CA", "organization": [name]},
+                   "issuer": {"commonName": f"{name} Root CA", "organization": [name]},
+                   "keyUsage": ["certSign", "crlSign"],
+                   "basicConstraints": {"isCA": True, "maxPathLen": int(depth) + 1}}, f)
+    _chown_tree(data, uid, gid)
+    res = subprocess.run(["docker", "run", "--rm", "--network", "none", "-v", f"{data}:/home/step", "-u", f"{uid}:{gid}",
+                          "--entrypoint", "/usr/local/bin/step", ctx.vars["image_stepca"], "certificate", "create",
+                          f"{name} Root CA", "/home/step/root-new/root_ca.crt", "/home/step/root-new/root_ca_key",
+                          "--template", "/home/step/root-new/root.tpl", "--kty", "EC", "--curve", "P-256",
+                          "--not-after", "87600h", "--password-file", "/home/step/secrets/password"],
+                         capture_output=True, text=True)
+    if res.returncode != 0:
+        raise SetupError(f"making the root CA failed: {(res.stderr or res.stdout)[-600:]}")
+    return "/home/step/root-new/root_ca.crt", "/home/step/root-new/root_ca_key"
+
+
 def _publish_ca_certs(ctx, certs_dir):
     """Purpose: publish every CA format on certs.<domain> and trust the CA on this host; done on every
              setup, since a reinstall keeps the CA but not /opt/nginx or the host trust entries.
@@ -100,9 +135,12 @@ def run(ctx):
     """Purpose: initialise Step-CA once (its own root, or a bring-your-own root + intermediate when byoc),
              configure ca.json, publish the CA certificates and trust them on the host.
     Inputs:  ctx — SetupContext: vars byoc, ca_crt_path, ica_crt_path, ica_key_path (default: the .crt path
-             with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json
-             settings; secrets.ca_password; service user step.
-    Returns: None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and
+             with .key), ica_parents_path (a nested site's parent CAs), ca_nest_depth (own root: how many levels
+             sites may nest; default 1), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and
+             the ca.json settings; secrets.ca_password; service user step.
+    Returns: None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step; an own
+             root made with path length ca_nest_depth + 1 by _make_root; with byoc, certs/ca_parents.crt and
+             certs/intermediate_chain.crt for the parent CAs) and
              ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the
              intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate
              key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca
@@ -138,6 +176,10 @@ def run(ctx):
     os.chmod(pw, 0o600)
     _chown_tree(data, uid, gid)
 
+    own_root = []
+    if not v.get("byoc"):
+        root_crt, root_key = _make_root(ctx, data, uid, gid)
+        own_root = [f"--root={root_crt}", f"--key={root_key}", "--key-password-file=/home/step/secrets/password"]
     info("initialising Step-CA")
     res = subprocess.run(["docker", "run", "--rm", "-v", f"{data}:/home/step", "-e", "STEPPATH=/home/step",
                           "-u", f"{uid}:{gid}", "--entrypoint", "/usr/local/bin/step", v["image_stepca"],
@@ -145,16 +187,28 @@ def run(ctx):
                           f"--dns={v['hostname_stepca']},localhost,127.0.0.1",
                           f"--address=:{v.get('stepca_port', 9000)}", "--provisioner=admin",
                           "--password-file=/home/step/secrets/password",
-                          "--provisioner-password-file=/home/step/secrets/password"],
+                          "--provisioner-password-file=/home/step/secrets/password", *own_root],
                          capture_output=True, text=True)
     if res.returncode != 0 or not os.path.exists(ca_json):
         raise SetupError(f"step ca init failed: {(res.stderr or res.stdout)[-600:]}")
+    if own_root:              # the root key goes where sign_site_ca and step's own layout expect it
+        shutil.move(os.path.join(data, "root-new", "root_ca_key"), os.path.join(data, "secrets", "root_ca_key"))
+        shutil.rmtree(os.path.join(data, "root-new"))
 
     certs = os.path.join(data, "certs")
     if v.get("byoc"):
         shutil.copy2(v["ca_crt_path"], os.path.join(certs, "root_ca.crt"))
         shutil.copy2(v["ica_crt_path"], os.path.join(certs, "intermediate_ca.crt"))
         _single_intermediate(os.path.join(certs, "intermediate_ca.crt"))
+        parents = ""
+        if v.get("ica_parents_path") and os.path.exists(v["ica_parents_path"]):
+            with open(v["ica_parents_path"]) as f:
+                parents = f.read().strip()
+        with open(os.path.join(certs, "ca_parents.crt"), "w") as f:          # empty for a flat site
+            f.write(parents + "\n" if parents else "")
+        with open(os.path.join(certs, "intermediate_ca.crt")) as f, \
+                open(os.path.join(certs, "intermediate_chain.crt"), "w") as out:
+            out.write(f.read().strip() + "\n" + (parents + "\n" if parents else ""))
         shutil.copy2(ica_key, os.path.join(data, "secrets", "intermediate_ca_key"))
         os.chmod(os.path.join(data, "secrets", "intermediate_ca_key"), 0o600)
         # `step ca init` made a root of its own: its key signs nothing that chains to the brought-in root
@@ -163,7 +217,13 @@ def run(ctx):
     _configure_ca_json(ca_json, v)
     _chown_tree(data, uid, gid)
     _public_certs_readable(certs)
-    subprocess.run(["openssl", "verify", "-CAfile", os.path.join(certs, "root_ca.crt"),
+    parents_file = os.path.join(certs, "ca_parents.crt")
+    untrusted = ["-untrusted", parents_file] if os.path.exists(parents_file) and os.path.getsize(parents_file) else []
+    subprocess.run(["openssl", "verify", "-CAfile", os.path.join(certs, "root_ca.crt"), *untrusted,
                     os.path.join(certs, "intermediate_ca.crt")], check=True, capture_output=True)
     _publish_ca_certs(ctx, certs)
-    ok(f"Step-CA initialised ({'bring-your-own root' if v.get('byoc') else 'own root'}), CA certs published and trusted")
+    with open(os.path.join(certs, "root_ca.crt")) as f:
+        depth = ca_path_len(f.read())
+    nest = "no limit" if depth is None else max(depth - 1, 0)
+    ok(f"Step-CA initialised ({'bring-your-own root' if v.get('byoc') else 'own root'}; the root lets sites nest "
+       f"{nest} level(s) below a site), CA certs published and trusted")
