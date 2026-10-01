@@ -243,7 +243,8 @@ def apply_deployment(start_services=True):
              restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them.
     Fails:   sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys,
              ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is
-             set with install_ldap false; host_ram_capacity is 1 or 2; vars.yaml.j2 or any template fails to render; an
+             set with install_ldap false; host_ram_capacity is 1 or 2; site_name differs from the one recorded in
+             config/.site-name (it names the local directory suffix, fixed once installed); vars.yaml.j2 or any template fails to render; an
              image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad
              link-vars file is only printed. OSError from file operations propagates.
     Feeds:   fabriclib/setup/deploy_config.py (setup, images/switch_image.py); interactive.apply_mode (`fabricctl
@@ -421,7 +422,21 @@ def apply_deployment(start_services=True):
         shutil.copy(deployed_vars_path, os.path.join(archive_dir, f"{stamp}-vars.yaml"))
     else:
         final_vars = fresh_vars
-        
+
+    # The site name names the local directory suffix (its devices and service accounts): fixed once
+    # installed. Recorded on first deploy (an install from before sites gets its current name).
+    site_marker = os.path.join(TARGET_FABRIC, "config", ".site-name")
+    if os.path.exists(site_marker):
+        recorded = open(site_marker).read().strip()
+        if recorded and recorded != final_vars.get('site_name'):
+            print(f"Error: site_name is '{recorded}' on this install and cannot change "
+                  f"(asked: '{final_vars.get('site_name')}'); set site_name: {recorded}")
+            sys.exit(1)
+    else:
+        ensure_dir(os.path.dirname(site_marker))
+        with open(site_marker, "w") as f:
+            f.write(final_vars.get('site_name', '') + "\n")
+
     render_tmp = "/tmp/fabric-render"
     if os.path.exists(render_tmp):
         shutil.rmtree(render_tmp)

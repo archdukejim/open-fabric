@@ -228,7 +228,7 @@
 | | |
 |---|---|
 | Purpose | find the device whose `attribute` is `value` in 389-DS and judge it for `permission`: access is the union of its roles' permissions, nothing while it is disabled; the VLAN comes from the role with the lowest priority number that sets one (ties by name) — the same rules as the web UI (list_devices). |
-| Inputs | attribute — "fabricCertFingerprint" or "macAddress"; value — str (escaped into the filter); permission — "network:eap-tls" or "network:mab". Reads ou=devices and ou=device-roles. |
+| Inputs | attribute — "fabricCertFingerprint" or "macAddress"; value — str (escaped into the filter); permission — "network:eap-tls" or "network:mab". Reads ou=devices of this site's local suffix and the roles each device names (fabricRoleName) from ou=device-roles of the organisation. |
 | Returns | dict {device, allowed, vlan, reason}; device is None if no device, or more than one, has the value. A device without fabricEnabled counts as enabled. |
 | Fails | ldap errors from search; ValueError if a role's fabricVlan or fabricPriority is not a number; load_config errors. The caller turns any of these into Access-Reject. |
 | Feeds | fabric_radius._decide. |

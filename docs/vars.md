@@ -810,6 +810,24 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 - `freeradius/config/fabric-radius.json.j2`
 - `nginx/www/ldap/index.html.j2`, `nginx/www/ldap/install-ldap.sh.j2`
 
+### `site_name`
+**Description:** This install's site name (design [federation.md](design/federation.md)): names its local directory suffix `o=<site_name>`. Lower-cased. Fixed at install: setup refuses to change it on a live install (marker `config/.site-name`).
+
+**Default Value:** `hostname`
+
+**Effected Jinja Templates:**
+- `vars.yaml.j2` (`ldap_local_dn`)
+
+### `ldap_local_dn`
+**Description:** The install's local suffix, a second 389-DS backend (`sitelocal`) holding what belongs to this install only: its service accounts (`ou=admins`) and its devices (`ou=devices`). Always computed (it cannot be set). The organisation suffix (`ldap_base_dn`) holds people, groups and device roles. Installs from before the split are moved on upgrade (`fabriclib/ldap/migrate_local_suffix.py`).
+
+**Default Value:** `o=<site_name>`
+
+**Effected Jinja Templates:**
+- `dirsrv/docker-compose.yml.j2` (`DS_LOCAL_SUFFIX`)
+- `dirsrv/seed/10-tree.ldif.j2`, `dirsrv/seed/20-accounts.ldif.j2`, `dirsrv/seed/30-aci.ldif.j2`
+- `freeradius/config/fabric-radius.json.j2`
+
 ### `ldap_domain_components`
 **Description:** The labels of `domain` as a list, always computed (it cannot be set). The first one is the `dc:` attribute of the suffix entry.
 
@@ -841,7 +859,7 @@ name replaces it, and defaults cannot be removed.
 ### `ldap_organizational_units`
 **Description:** Defines the tree structure/OUs to pre-provision. Merged with the defaults by `name`, like `ldap_groups`.
 
-**Default Value:** `[{name: accounts, description: User Accounts}, ...]` — `accounts`, `groups`, `admins` and `users` (under `accounts`), `hosts`, `devices` and `device-roles` (fabric device RBAC)
+**Default Value:** `[{name: accounts, description: User Accounts}, ...]` — `accounts`, `groups`, `users` (under `accounts`), `hosts` and `device-roles` (fabric device RBAC). `admins` and `devices` are not organisation OUs: they live in the local suffix (`ldap_local_dn`), and an entry with either name is dropped
 
 **Effected Jinja Templates:**
 - `dirsrv/seed/10-tree.ldif.j2`
@@ -856,7 +874,7 @@ name replaces it, and defaults cannot be removed.
 | `dirsrv_errorlog_level` | `8192` | `dirsrv/docker-compose.yml.j2` |
 
 ### Role Accounts
-Created under `ou=admins,ou=accounts,<base_dn>` by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated with fabric's secrets (OpenBao; `fabricctl secrets show <name>`; there is no shared default password):
+Created under `ou=admins,<ldap_local_dn>` (this install's local suffix) by `dirsrv/seed/20-accounts.ldif.j2`, each with its own password generated with fabric's secrets (OpenBao; `fabricctl secrets show <name>`; there is no shared default password):
 
 | Account | Secret |
 |---------|--------|

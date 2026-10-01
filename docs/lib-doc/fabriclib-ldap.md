@@ -8,7 +8,7 @@
 
 | | |
 |---|---|
-| Purpose | Add a device under ou=devices and put it into its roles. |
+| Purpose | Add a device under ou=devices of the local suffix, naming its roles on the device (fabricRoleName). |
 | Inputs | v — fabric vars; actor — str, for the audit; name — host-name label (stripped, lower-cased, DEVICE_NAME_RE); fields — {type, macs, owner (username), description, enabled (default True), roles} (check_device_fields); source — default "web". |
 | Returns | the normalised device name. |
 | Fails | ValidationError "device name: a host name label — ..."; "device <name> already exists"; check_device_fields' messages; "no such user: <owner>" (from the directory); run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
@@ -76,9 +76,9 @@
 
 | | |
 |---|---|
-| Purpose | Every device and device role, raw, in one directory read. |
+| Purpose | Every device (this install's, in the local suffix) and device role (the organisation's), raw, in one directory read. |
 | Inputs | v — fabric vars (run_dirsrv). |
-| Returns | {"devices": [{name, type, enabled, macs, owner (DN or ""), description, certs (SHA-256 fingerprints)}], "roles": [{name, description, permissions, vlan (int or None), priority (int, default 100), members (device names)}]}. |
+| Returns | {"devices": [{name, type, enabled, macs, owner (DN or ""), description, certs (SHA-256 fingerprints), roles (the role names the device carries, fabricRoleName)}], "roles": [{name, description, permissions, vlan (int or None), priority (int, default 100), members (device names, computed from the devices' roles)}]}. |
 | Fails | run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
 | Feeds | add_device, update_device, remove_device, require_device, device_overview, list_devices, list_roles. |
 | Called by | `fabriclib.ldap.add_device.add_device`, `fabriclib.ldap.device_overview.device_overview`, `fabriclib.ldap.list_devices.list_devices`, `fabriclib.ldap.list_roles.list_roles`, `fabriclib.ldap.remove_device.remove_device`, `fabriclib.ldap.require_device.require_device`, `fabriclib.ldap.update_device.update_device` |
@@ -90,7 +90,7 @@
 | | |
 |---|---|
 | Purpose | Run one directory operation (a Python snippet) inside the dirsrv container, bound over LDAPI as the least-privilege cn=device_admin. |
-| Inputs | v — fabric vars: ldap_base_dn, dirsrv_container (default "dirsrv"); snippet — Python source using c (the bound connection), IN (payload), out(obj), Refused, DEV, ROLES, USERS, GROUPS; payload — JSON-serialisable input, default {}. Reads ldap_device_admin_password via load_secrets. |
+| Inputs | v — fabric vars: ldap_base_dn (organisation suffix), ldap_local_dn (this install's local suffix, where cn=device_admin and the devices live), dirsrv_container (default "dirsrv"); snippet — Python source using c (the bound connection), IN (payload), out(obj), Refused, BASE, LOCAL, DEV (devices, local suffix), ROLES (device roles, organisation), USERS, GROUPS; payload — JSON-serialisable input, default {}. Reads ldap_device_admin_password via load_secrets. |
 | Returns | the object the snippet passed to out() (dict or list). |
 | Fails | ValidationError "ldap_device_admin_password is missing: re-run `sudo fabricctl setup`"; "389-DS (dirsrv) is not running — ..."; the snippet's Refused(message); an LDAP refusal: "that name is already taken", "no such entry", "the directory refused the change (not permitted for cn=device_admin)", "directory error: ..."; RuntimeError "directory operation failed: ..." (other docker or Python failures, no output); subprocess.TimeoutExpired after 60 s; json.JSONDecodeError if the last line is not JSON; load_secrets' ValidationError. |
 | Feeds | common/read_directory, add_device, update_device, remove_device, link_device_cert, add_role, update_role, remove_role, list_people. |
@@ -191,13 +191,27 @@
 | Feeds | device_overview. |
 | Called by | `fabriclib.ldap.device_overview.device_overview` |
 
+## `fabricctl/lib/fabriclib/ldap/migrate_local_suffix.py`
+
+### `migrate_local_suffix(v, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | Move an install from before the directory split (design federation.md, M1) to the split layout: its devices from ou=devices of the organisation suffix to ou=devices of its local suffix, each naming its roles (fabricRoleName, taken from the roles' old member lists); roles' member lists removed; the old service accounts (ou=admins,ou=accounts) and their OU deleted. |
+| Inputs | v — fabric vars: ldap_base_dn, ldap_local_dn; container — dirsrv container name, default "dirsrv". The local suffix and its new service accounts must already exist (the seed made them). |
+| Returns | {"devices": moved, "role_members": role memberships carried over (counted from the member lists when old devices were found), "accounts": old accounts deleted} — all 0 on an install already migrated (idempotent; a run interrupted part-way finishes on the next). |
+| Fails | ValidationError "moving the directory to the local suffix failed: <stderr tail>" (an LDAP error inside the container); subprocess.TimeoutExpired after 180 s. |
+| Feeds | setup/start_services.py run (after Keycloak is bound to its new account). |
+| Notes | binds as Directory Manager with the container's DS_DM_PASSWORD. Run after keycloak_bootstrap has moved Keycloak's LDAP bind to the new keycloak_admin: deleting the old accounts earlier would break sign-in until then. A device already present in the local suffix is not overwritten. Deleting an old device lets 389-DS referential integrity drop it from the roles, so member values are removed from a fresh read. |
+| Called by | `fabriclib.setup.start_services.run` |
+
 ## `fabricctl/lib/fabriclib/ldap/remove_device.py`
 
 ### `remove_device(v, actor, name, source='web')`
 
 | | |
 |---|---|
-| Purpose | Delete a device and take it out of every role. |
+| Purpose | Delete a device (its roles go with it: they are the device's own attribute). |
 | Inputs | v — fabric vars; actor — str, for the audit; name — an existing device; source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "no device named ..."; run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
@@ -211,7 +225,7 @@
 
 | | |
 |---|---|
-| Purpose | Delete a device role, refused while devices are still in it so no device silently loses (or keeps) access. |
+| Purpose | Delete a device role, refused while any of this install's devices still names it (fabricRoleName) so no device silently loses (or keeps) access. |
 | Inputs | v — fabric vars; actor — str, for the audit; name — ROLE_NAME_RE; source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "invalid role name: ..."; "role <name> still has <n> device(s); take them out first"; "no such entry"; run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
@@ -238,12 +252,12 @@
 
 | | |
 |---|---|
-| Purpose | Replace a device's type, MACs, owner, description, enabled flag and role memberships. |
+| Purpose | Replace a device's type, MACs, owner, description, enabled flag and roles (fabricRoleName on the device; a device from before the directory split gains the fabricDeviceRoles class). |
 | Inputs | v — fabric vars; actor — str, for the audit; name — an existing device; fields — same shape as add_device (check_device_fields); source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "no device named ..."; check_device_fields' messages; "no such user: <owner>" (from the directory); run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
 | Feeds | agent/server.py Handler.directory (POST /v1/devices/<name>) -> webui agentclient.save_device. |
-| Notes | only role memberships that change are touched. Audited as DEVICE_UPDATE. |
+| Notes | the roles are the device's own attribute, so no role entry is written. Audited as DEVICE_UPDATE. |
 | Called by | — (no static caller) |
 
 ## `fabricctl/lib/fabriclib/ldap/update_role.py`

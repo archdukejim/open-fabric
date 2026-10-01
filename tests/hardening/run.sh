@@ -187,6 +187,7 @@ check "dirsrv builds and becomes healthy" "up dirsrv && wait_healthy dirsrv"
 check "dirsrv hardened: $(hardened dirsrv 1 | tr -d '\n')" "hardened dirsrv 1 >/dev/null"
 seed() {
     docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null &&
+    docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal' >/dev/null &&
     docker exec dirsrv sh -c 'python3 /seed/seed.py /seed/*.ldif'
 }
 check "dirsrv seeds on a read-only root" "seed | tee '$W/seed.log' | grep -q 'seed: '"

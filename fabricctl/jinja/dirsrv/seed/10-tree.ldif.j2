@@ -27,6 +27,25 @@ description: {{ ou.description }}
 {% endif %}
 {% endfor %}
 {% endfor %}
+
+# This install's local suffix: its service accounts and its devices (design federation.md)
+dn: {{ ldap_local_dn }}
+objectClass: top
+objectClass: organization
+o: {{ site_name }}
+description: fabric site {{ site_name }}: its service accounts and devices
+
+dn: ou=admins,{{ ldap_local_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: admins
+description: This install's service accounts
+
+dn: ou=devices,{{ ldap_local_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: devices
+description: Network devices enrolled at this site (fabric device RBAC)
 {% for grp in ldap_groups %}
 
 dn: cn={{ grp.name }},ou=groups,{{ ldap_base_dn }}

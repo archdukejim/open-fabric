@@ -47,7 +47,7 @@ This document outlines the manual testing strategy (for a person or an AI agent)
 - [ ] **Expected**: Configuration templates are re-rendered and only affected services are restarted or reloaded.
 
 ### 3.4 LDAP (389 Directory Server)
-- [ ] **Action**: `LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,ou=accounts,<base_dn>" -W` (password: `sudo fabricctl secrets show ldap_super_admin_password`).
+- [ ] **Action**: `LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,o=<site_name>" -W` (password: `sudo fabricctl secrets show ldap_super_admin_password`).
 - [ ] **Expected**: Bind succeeds on 636, and on 389 with `-ZZ`; the same bind on 389 **without** `-ZZ` is refused.
 - [ ] **Action**: Anonymous `ldapsearch -ZZ -H ldap://ldap.<domain> -x -b <base_dn> "(uid=*)" uid uidNumber userPassword`.
 - [ ] **Expected**: POSIX attributes are returned; `userPassword` is never returned.

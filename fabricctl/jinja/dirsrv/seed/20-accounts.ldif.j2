@@ -1,5 +1,6 @@
-# Role and service accounts. Passwords come from fabric's secrets (OpenBao) and are
-# re-applied on every deploy, so rotating a secret there rotates it here.
+# Role and service accounts, in this install's local suffix (ou=admins,o=<site>): each
+# install has its own, with its own passwords. Passwords come from fabric's secrets
+# (OpenBao) and are re-applied on every deploy, so rotating a secret there rotates it here.
 {% set accounts = [
   ('super_admin', 'Directory super administrator', ldap_super_admin_password),
   ('group_admin', 'Group administrator', ldap_group_admin_password),
@@ -11,7 +12,7 @@
 ] %}
 {% for name, desc, pw in accounts %}
 
-dn: cn={{ name }},ou=admins,ou=accounts,{{ ldap_base_dn }}
+dn: cn={{ name }},ou=admins,{{ ldap_local_dn }}
 objectClass: top
 objectClass: person
 objectClass: organizationalPerson
@@ -20,7 +21,7 @@ cn: {{ name }}
 sn: {{ desc }}
 userPassword: {{ pw }}
 
-dn: cn={{ name }},ou=admins,ou=accounts,{{ ldap_base_dn }}
+dn: cn={{ name }},ou=admins,{{ ldap_local_dn }}
 changetype: modify
 replace: userPassword
 userPassword: {{ pw }}

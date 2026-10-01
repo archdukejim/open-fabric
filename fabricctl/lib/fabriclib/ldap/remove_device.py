@@ -4,16 +4,13 @@ from fabriclib.ldap.common.read_directory import read_directory
 from fabriclib.ldap.common.run_dirsrv import run_dirsrv
 
 _REMOVE = r'''
-dn = "cn=%s,%s" % (IN["name"], DEV)
-for r in IN["roles"]:
-    c.modify_s("cn=%s,%s" % (r, ROLES), [(ldap.MOD_DELETE, "member", [dn.encode()])])
-c.delete_s(dn)
+c.delete_s("cn=%s,%s" % (IN["name"], DEV))
 out({"ok": True})
 '''
 
 
 def remove_device(v, actor, name, source="web"):
-    """Purpose: Delete a device and take it out of every role.
+    """Purpose: Delete a device (its roles go with it: they are the device's own attribute).
     Inputs:  v — fabric vars; actor — str, for the audit; name — an existing device; source — default "web".
     Returns: None.
     Fails:   ValidationError "no device named ...";
@@ -27,6 +24,5 @@ def remove_device(v, actor, name, source="web"):
     directory = read_directory(v)
     if not any(d["name"] == name for d in directory["devices"]):
         raise ValidationError(f"no device named {name!r}")
-    roles = [r["name"] for r in directory["roles"] if name in r["members"]]
-    run_dirsrv(v, _REMOVE, {"name": name, "roles": roles})
+    run_dirsrv(v, _REMOVE, {"name": name})
     write_audit(actor, "DEVICE_REMOVE", f"device={name}", source)

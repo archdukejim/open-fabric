@@ -25,6 +25,7 @@ services:
       - /run:uid={{ service_users.ldap.uid }},gid={{ service_users.ldap.gid }},size=4m
     environment:
       DS_SUFFIX_NAME: "{{ ldap_base_dn }}"
+      DS_LOCAL_SUFFIX: "{{ ldap_local_dn }}"        # this install's service accounts and devices
       DS_DM_PASSWORD: "{{ ldap_admin_password }}"
       DS_ERRORLOG_LEVEL: "{{ dirsrv_errorlog_level | default(8192) }}"
 {% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}

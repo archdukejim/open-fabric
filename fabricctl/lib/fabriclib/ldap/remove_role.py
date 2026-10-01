@@ -5,7 +5,9 @@ from fabriclib.ldap.constants import ROLE_NAME_RE
 
 _REMOVE = r'''
 dn = "cn=%s,%s" % (IN["name"], ROLES)
-members = c.search_s(dn, ldap.SCOPE_BASE, "(objectClass=*)", ["member"])[0][1].get("member", [])
+c.search_s(dn, ldap.SCOPE_BASE, "(objectClass=*)", ["cn"])                    # NO_SUCH_OBJECT if missing
+members = c.search_s(DEV, ldap.SCOPE_ONELEVEL,
+                     "(fabricRoleName=%s)" % ldap.filter.escape_filter_chars(IN["name"]), ["cn"])
 if members:
     raise Refused("role %s still has %d device(s); take them out first" % (IN["name"], len(members)))
 c.delete_s(dn)
@@ -14,8 +16,8 @@ out({"ok": True})
 
 
 def remove_role(v, actor, name, source="web"):
-    """Purpose: Delete a device role, refused while devices are still in it so no device silently loses
-             (or keeps) access.
+    """Purpose: Delete a device role, refused while any of this install's devices still names it
+             (fabricRoleName) so no device silently loses (or keeps) access.
     Inputs:  v — fabric vars; actor — str, for the audit; name — ROLE_NAME_RE; source — default "web".
     Returns: None.
     Fails:   ValidationError "invalid role name: ..."; "role <name> still has <n> device(s); take them out

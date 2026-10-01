@@ -21,9 +21,10 @@ dirsrv_wait_healthy() {
 }
 
 # -----------------------------------------------------------------------
-# Purpose: seed 389-DS: create the suffix backend on first run, apply /seed/*.ldif idempotently inside the
-#          container (seed.py) and restart the ldap service once if server configuration (cn=config) changed.
-# Inputs:  none; needs the running dirsrv container with DS_SUFFIX_NAME set and the rendered seed files
+# Purpose: seed 389-DS: create the two suffix backends (organisation, local) on first run, apply /seed/*.ldif
+#          idempotently inside the container (seed.py) and restart the ldap service once if server configuration
+#          (cn=config) changed.
+# Inputs:  none; needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered seed files
 #          (deploy.py copies them to <base>/dirsrv/seed, mounted at /seed).
 # Returns: seed.py's output on stdout (plus a restart notice when it printed RESTART_REQUIRED); the exit status of
 #          the final dirsrv_wait_healthy after a restart, else 0.
@@ -34,11 +35,14 @@ dirsrv_wait_healthy() {
 dirsrv_seed() {
     dirsrv_wait_healthy || return 1
     local out
-    # dscontainer only records DS_SUFFIX_NAME in .dsrc; create the backend on first run.
+    # dscontainer only records DS_SUFFIX_NAME in .dsrc; create the backends on first run: the organisation
+    # suffix (people, groups, device roles) and this install's local suffix (its service accounts and devices).
     # The healthcheck can pass a moment before LDAPI accepts connections: retry.
     local tries=0
     until docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" \
-            || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot'; do
+            || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' \
+          && docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" \
+            || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal'; do
         tries=$((tries + 1))
         [ "$tries" -ge 12 ] && { echo "389-DS backend could not be created" >&2; return 1; }
         sleep 5

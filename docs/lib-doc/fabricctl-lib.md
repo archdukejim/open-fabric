@@ -189,7 +189,7 @@
 | Purpose | the deploy engine: render every template from the vars file and secrets into /tmp/fabric-render, copy what changed into DEPLOY_BASE_DIR and /etc/systemd/system, then reload or restart what is affected. Missing secrets (CA, rndc, LDAP, Keycloak, Kea, OIDC, TSIG, RADIUS) are generated once and saved. |
 | Inputs | start_services — bool, default True. False (first install, `fabricctl setup` via fabriclib/setup/deploy_config.py): files are deployed, changed images rebuilt and zones swapped safely, but no service is started, restarted or reloaded (certificates may not exist yet). Reads env CUSTOM_VARS_PATH (default <DEPLOY_BASE_DIR>/fabric/config/vars.yaml), SECRETS_FILE_OVERRIDE (default .../fabric-secrets.yml), LINK_VARS_PATH, DEPLOY_BASE_DIR (at import), and the fabric tree (FABRIC_DIR/jinja, docs). Must run as root. |
 | Returns | set of systemd service names whose configuration changed. With start_services=True they have already been restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them. |
-| Fails | sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys, ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is set with install_ldap false; host_ram_capacity is 1 or 2; vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad link-vars file is only printed. OSError from file operations propagates. |
+| Fails | sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys, ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is set with install_ldap false; host_ram_capacity is 1 or 2; site_name differs from the one recorded in config/.site-name (it names the local directory suffix, fixed once installed); vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad link-vars file is only printed. OSError from file operations propagates. |
 | Feeds | fabriclib/setup/deploy_config.py (setup, images/switch_image.py); interactive.apply_mode (`fabricctl --apply`, the menu, and fabriclib/system/apply_changes.py for the web UI); `python3 deploy.py`. |
 | Notes | no --pull on image builds: apply never takes a new base image implicitly. Old vars are archived to <fabric>/archive/<stamp>-vars.yaml before being replaced. |
 | Called by | `deploy.<module>`, `interactive.apply_mode` |
@@ -210,8 +210,8 @@
 
 | | |
 |---|---|
-| Purpose | seed 389-DS: create the suffix backend on first run, apply /seed/*.ldif idempotently inside the container (seed.py) and restart the ldap service once if server configuration (cn=config) changed. |
-| Inputs | none; needs the running dirsrv container with DS_SUFFIX_NAME set and the rendered seed files (deploy.py copies them to <base>/dirsrv/seed, mounted at /seed). |
+| Purpose | seed 389-DS: create the two suffix backends (organisation, local) on first run, apply /seed/*.ldif idempotently inside the container (seed.py) and restart the ldap service once if server configuration (cn=config) changed. |
+| Inputs | none; needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered seed files (deploy.py copies them to <base>/dirsrv/seed, mounted at /seed). |
 | Returns | seed.py's output on stdout (plus a restart notice when it printed RESTART_REQUIRED); the exit status of the final dirsrv_wait_healthy after a restart, else 0. |
 | Fails | status 1 if dirsrv never becomes healthy, if the backend cannot be created after 12 tries (5 s apart, "389-DS backend could not be created" on stderr), or if seed.py fails (its output on stderr). |
 | Feeds | `bash dirsrv.sh seed`, run by apply_deployment (deploy.py) when seed files changed and by fabriclib/setup/start_services.py; tests/dirsrv/run.sh mirrors the same steps. |
@@ -468,7 +468,7 @@
 
 | | |
 |---|---|
-| Purpose | create or update the realm's LDAP user federation to 389-DS ("389-DS": ldaps on port 3636, users under ou=users,ou=accounts, bound as cn=keycloak_admin, writable, imports users). |
+| Purpose | create or update the realm's LDAP user federation to 389-DS ("389-DS": ldaps on port 3636, users under ou=users,ou=accounts, bound as this install's cn=keycloak_admin (local suffix), writable, imports users). |
 | Inputs | kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ldap_base_dn, hostname_ldap); s — secrets (ldap_keycloak_password). |
 | Returns | str, the federation component id. An existing ldap provider is updated in place (fabric's settings win, other settings kept). |
 | Fails | SystemExit from Admin.call; KeyError if a needed var or secret is missing; StopIteration if a created provider cannot be found again. |

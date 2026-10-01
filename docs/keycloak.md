@@ -65,7 +65,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
     *   **Solution**: You must quote the keys: `-s 'config."groups.dn"=["ou=groups,{{ ldap_base_dn }}"]'`.
 
 ### LDAP Service Account Bind
-*   Keycloak is bound to 389-DS using the dedicated `cn=keycloak_admin,ou=admins,ou=accounts,{{ ldap_base_dn }}` service account, utilizing the isolated `ldap_keycloak_password`.
+*   Keycloak is bound to 389-DS using the dedicated `cn=keycloak_admin,ou=admins,{{ ldap_local_dn }}` (the install's local suffix) service account, utilizing the isolated `ldap_keycloak_password`.
 *   Users are searched in `ou=users,ou=accounts,{{ ldap_base_dn }}`.
 *   Groups are searched in `ou=groups,{{ ldap_base_dn }}`.
 *   **Gotcha**: Keycloak connects to the `dirsrv` container directly on `fabric_net` (not through nginx), so the URL must use the container-side port **3636** and the exact LDAP hostname: `ldaps://{{ hostname_ldap }}:3636`. The bare `ldap` name fails resolution (`UnknownHostException`) — only `hostname_ldap` is a Docker alias — and the hostname must match the certificate SAN.
@@ -87,7 +87,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 
 ```bash
 LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt \
-  ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,ou=accounts,<base_dn>" -W
+  ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,o=<site_name>" -W
 ```
 
 ### Access Control (ACIs)
@@ -95,7 +95,7 @@ LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt \
 *   **Authenticated users**: read everything except `userPassword` and `aci`; may change their own password.
 *   **`super_admin`**: full control. **`group_admin`**: manages `ou=groups`. **`user_creator_admin`** / **`user_modifier_admin`**: add / edit entries in `ou=users,ou=accounts`. Group `owner`s may edit membership.
 *   **`keycloak_admin`**: add, edit and delete users in `ou=users` and manage `ou=groups` — nothing else, so it cannot modify role accounts like `cn=super_admin`.
-*   **`device_admin`** (fabric-agent, for the web UI's devices and roles): manages `ou=devices` and `ou=device-roles` only. **`radius_reader`** (FreeRADIUS) only reads, like any authenticated account.
+*   **`device_admin`** (fabric-agent, for the web UI's devices and roles): manages `ou=devices` and `ou=device-roles` only. **`radius_reader`** (FreeRADIUS) only reads: the devices of this install's local suffix and, like any authenticated account, the organisation.
 
 ---
 *End of Phase 4 Notes*

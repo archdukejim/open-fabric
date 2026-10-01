@@ -6,6 +6,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 W=$OUT/dirsrv
 BASE="dc=lan,dc=j-j,dc=family"
+LOCAL="o=pi-core"            # the local suffix (tests/render.py's host name)
 DM_PW='DmPass1'
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
@@ -30,7 +31,7 @@ chown -R 911:911 data; chmod 750 seed; chown -R 0:911 seed; chmod 640 seed/*
 
 start() {
   docker run -d --name dstest --add-host ldap.lan.j-j.family:127.0.0.1 --user 911:911 --security-opt no-new-privileges:true --cap-drop ALL \
-    -e DS_SUFFIX_NAME="$BASE" -e DS_DM_PASSWORD="$DM_PW" \
+    -e DS_SUFFIX_NAME="$BASE" -e DS_LOCAL_SUFFIX="$LOCAL" -e DS_DM_PASSWORD="$DM_PW" \
     -v "$W/data:/data" -v "$W/seed:/seed:ro" \
     --health-cmd "/usr/libexec/dirsrv/dscontainer -H" --health-interval 5s --health-start-period 120s \
     fabric/dirsrv:test >/dev/null
@@ -41,7 +42,8 @@ start() {
 }
 seed() {  # same steps as dirsrv_seed in fabricctl/lib/dirsrv.sh
   for _ in $(seq 1 12); do
-    docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null 2>&1 && break
+    docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null 2>&1 &&
+      docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal' >/dev/null 2>&1 && break
     sleep 5
   done
   docker exec dstest sh -c 'python3 /seed/seed.py /seed/*.ldif'; }
@@ -66,7 +68,7 @@ for i in $(seq 1 40); do [ "$(docker inspect -f '{{.State.Health.Status}}' dstes
 out2=$(seed); echo "$out2" | sed 's/^/    /'
 check "second seed is a no-op (idempotent)" "grep -q 'seed: 0 added, 0 modified' <<<\"\$out2\" && ! grep -q RESTART <<<\"\$out2\""
 
-SA="cn=super_admin,ou=admins,ou=accounts,$BASE"
+SA="cn=super_admin,ou=admins,$LOCAL"
 check "role account binds over LDAPI with generated secret" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' '$SA' Sa1 | grep -q BOUND"
 check "role account binds over LDAPS (3636) with CA-verified cert" "pybind 'ldaps://ldap.lan.j-j.family:3636' '$SA' Sa1 | grep -q BOUND"
 check "plaintext simple bind on 3389 is refused" "pybind 'ldap://127.0.0.1:3389' '$SA' Sa1 | grep -q CONFIDENTIALITY_REQUIRED"
@@ -76,24 +78,20 @@ anon=$(docker exec dstest python3 -c "
 import ldap
 ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
 c = ldap.initialize('ldaps://127.0.0.1:3636'); c.simple_bind_s('', '')
-r = c.search_s('ou=admins,ou=accounts,$BASE', ldap.SCOPE_ONELEVEL, '(cn=super_admin)', ['cn', 'userPassword', 'sn'])
-print(r)" 2>&1)
-check "anonymous (TLS) sees POSIX attrs but not passwords or sn" "grep -q \"b'super_admin'\" <<<\"\$anon\" && ! grep -qi 'userPassword\|sn' <<<\"\$anon\""
+print('ORG', c.search_s('ou=groups,$BASE', ldap.SCOPE_ONELEVEL, '(cn=admins)', ['cn', 'gidNumber', 'sn']))
+print('LOCAL', c.search_s('ou=admins,$LOCAL', ldap.SCOPE_ONELEVEL, '(cn=super_admin)', ['cn', 'userPassword']))" 2>&1)
+check "anonymous (TLS) sees the organisation's POSIX attrs but not sn" "grep -q \"ORG.*b'admins'.*gidNumber\" <<<\"\$anon\" && ! grep -q \"'sn'\" <<<\"\$anon\""
+check "anonymous (TLS) sees none of the local service accounts" "grep -q '^LOCAL \[\]' <<<\"\$anon\""
 aci=$(docker exec -e P=Ga1 dstest python3 -c "
 import ldap, os
 c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket')
-c.simple_bind_s('cn=group_admin,ou=admins,ou=accounts,$BASE', os.environ['P'])
+c.simple_bind_s('cn=group_admin,ou=admins,$LOCAL', os.environ['P'])
 c.modify_s('cn=admins,ou=groups,$BASE', [(ldap.MOD_ADD, 'member', [b'$SA'])]); print('GROUP_OK')
 try:
     c.modify_s('$SA', [(ldap.MOD_REPLACE, 'sn', [b'pwned'])]); print('ESCALATED')
 except ldap.INSUFFICIENT_ACCESS: print('DENIED')" 2>&1)
 check "group_admin can manage groups" "grep -q GROUP_OK <<<\"\$aci\""
 check "group_admin cannot modify admin accounts" "grep -q DENIED <<<\"\$aci\""
-mo=$(docker exec -e P=Sa1 dstest python3 -c "
-import ldap, os
-c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$SA', os.environ['P'])
-print(c.search_s('$SA', ldap.SCOPE_BASE, attrlist=['memberOf', 'entryUUID']))" 2>&1)
-check "memberOf and entryUUID plugins active" "grep -q 'cn=admins' <<<\"\$mo\" && grep -q entryUUID <<<\"\$mo\""
 
 # ---- first admin (fabriclib/ldap/ensure_admin_user.py, setup's admin step)
 echo "--- admin user"
@@ -105,6 +103,11 @@ check "admin user is a member of cn=admins" "docker exec -e P=Sa1 dstest python3
 import ldap, os
 c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$SA', os.environ['P'])
 print(c.search_s('cn=admins,ou=groups,$BASE', ldap.SCOPE_BASE, attrlist=['member']))\" | grep -qi 'uid=jim'"
+mo=$(docker exec -e P=Sa1 dstest python3 -c "
+import ldap, os
+c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$SA', os.environ['P'])
+print(c.search_s('$USERDN', ldap.SCOPE_BASE, attrlist=['memberOf', 'entryUUID']))" 2>&1)
+check "memberOf and entryUUID plugins active" "grep -q 'cn=admins' <<<\"\$mo\" && grep -q entryUUID <<<\"\$mo\""
 second=$(REPO="$REPO" BASE="$BASE" PW='Other!pw9' python3 "$REPO/tests/dirsrv/admin_user.py" 2>&1)
 check "re-run leaves an existing user alone" "[ \"\$second\" = exists ]"
 check "re-run did not change the password" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' '$USERDN' 'JimPass!23' | grep -q BOUND"
@@ -113,6 +116,11 @@ check "re-run did not change the password" "pybind 'ldapi://%2Fdata%2Frun%2Fslap
 echo "--- devices and roles"
 REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/devices.py" | tee "$W/devices.log"
 PASS=$((PASS + $(grep -c '^PASS' "$W/devices.log"))); FAIL=$((FAIL + $(grep -c '^FAIL' "$W/devices.log")))
+
+# ---- upgrade from before the directory split (fabriclib/ldap/migrate_local_suffix.py)
+echo "--- migration to the local suffix"
+REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/migrate.py" | tee "$W/migrate.log"
+PASS=$((PASS + $(grep -c '^PASS' "$W/migrate.log"))); FAIL=$((FAIL + $(grep -c '^FAIL' "$W/migrate.log")))
 
 echo; echo "$PASS passed, $FAIL failed"
 docker rm -f dstest >/dev/null 2>&1

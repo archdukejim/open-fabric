@@ -4,6 +4,7 @@ import time
 
 from fabriclib.common.console import info, ok
 from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles
+from fabriclib.ldap.migrate_local_suffix import migrate_local_suffix
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
@@ -16,17 +17,19 @@ ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv
 
 
 def run(ctx):
-    """Purpose: start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, then fabric-agent
-             and the web UI, and activate fabric.target.
+    """Purpose: start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, move an older
+             directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate
+             fabric.target.
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
              install_fluentbit, install_kea, install_freeradius; restart_services (units to restart);
              target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6
-             tries, 15 s apart); fabric-agent and fabric-web running when the web UI is on.
+             tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web
+             running when the web UI is on.
     Fails:   SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration
              still fails after 6 tries; CalledProcessError from systemctl; ValidationError from
-             ensure_default_device_roles (propagates).
+             ensure_default_device_roles or migrate_local_suffix (propagates).
     Feeds:   setup step `start`, run by run_setup via STEPS."""
     v, lib = ctx.vars, os.path.join(ctx.target_dir, "lib")
     # fabric.target groups every unit: systemctl start|stop|restart fabric.target
@@ -59,6 +62,12 @@ def run(ctx):
         else:
             raise SetupError(f"Keycloak configuration failed:\n{res.stdout}{res.stderr}")
         ok("Keycloak configured (realm, LDAP federation" + (", web UI client, TOTP)" if v.get("install_webui") else ")"))
+
+    if v.get("install_ldap", True):             # after Keycloak moved to its new bind account
+        moved = migrate_local_suffix(v)
+        if any(moved.values()):
+            ok(f"directory moved to the local suffix {v['ldap_local_dn']}: {moved['devices']} device(s), "
+               f"{moved['role_members']} role membership(s), {moved['accounts']} old service account(s) removed")
 
     if v.get("install_webui"):
         subprocess.run(["systemctl", "enable", "--now", "fabric-agent"], check=True, capture_output=True)

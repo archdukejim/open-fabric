@@ -74,11 +74,13 @@ set from the people's fabric permissions in [Who may do what](#who-may-do-what):
 they say what a device may do on the network, not what a person may do in
 this web UI.
 
-- **Device** (`cn=<name>,ou=devices,<base>`): type, MAC addresses (each MAC
-  belongs to one device only), owner (a user), description, enabled flag,
+- **Device** (`cn=<name>,ou=devices,o=<site_name>` — the install's local
+  suffix): type, MAC addresses (each MAC belongs to one device only), owner
+  (a user), description, enabled flag, the roles it is in (`fabricRoleName`)
   and the SHA-256 fingerprints of certificates issued to it.
-- **Role** (`cn=<name>,ou=device-roles,<base>`, a group of devices):
-  permissions, an optional VLAN and a priority.
+- **Role** (`cn=<name>,ou=device-roles,<base>`, organisation-wide):
+  permissions, an optional VLAN and a priority. Its members are the devices
+  that name it.
 - **Default roles** (created once by setup, then yours to edit or delete):
   `workstations`, `phones-tablets`, `servers` (`network:eap-tls`,
   workstations and servers also `pki:acme`), `printers`, `iot`

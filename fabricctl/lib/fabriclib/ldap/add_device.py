@@ -8,7 +8,8 @@ from fabriclib.ldap.constants import DEVICE_NAME_RE
 _ADD = r'''
 d = IN
 dn = "cn=%s,%s" % (d["name"], DEV)
-attrs = {"objectClass": [b"top", b"device", b"ieee802Device", b"fabricDevice"], "cn": [d["name"].encode()],
+attrs = {"objectClass": [b"top", b"device", b"ieee802Device", b"fabricDevice", b"fabricDeviceRoles"],
+         "cn": [d["name"].encode()],
          "fabricDeviceType": [d["type"].encode()], "fabricEnabled": [b"TRUE" if d["enabled"] else b"FALSE"]}
 if d["owner"]:
     owner = "uid=%s,%s" % (d["owner"], USERS)
@@ -21,15 +22,16 @@ if d["macs"]:
     attrs["macAddress"] = [m.encode() for m in d["macs"]]
 if d["description"]:
     attrs["description"] = [d["description"].encode()]
+if d["roles"]:
+    attrs["fabricRoleName"] = [r.encode() for r in d["roles"]]
 c.add_s(dn, list(attrs.items()))
-for r in d["roles"]:
-    c.modify_s("cn=%s,%s" % (r, ROLES), [(ldap.MOD_ADD, "member", [dn.encode()])])
 out({"ok": True})
 '''
 
 
 def add_device(v, actor, name, fields, source="web"):
-    """Purpose: Add a device under ou=devices and put it into its roles.
+    """Purpose: Add a device under ou=devices of the local suffix, naming its roles on the device
+             (fabricRoleName).
     Inputs:  v — fabric vars; actor — str, for the audit; name — host-name label (stripped, lower-cased,
              DEVICE_NAME_RE); fields — {type, macs, owner (username), description, enabled (default True),
              roles} (check_device_fields); source — default "web".

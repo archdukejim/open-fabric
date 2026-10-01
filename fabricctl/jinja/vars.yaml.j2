@@ -329,6 +329,11 @@ nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (st
 # LDAP — base DN computed from domain
 # ============================================================
 ldap_base_dn: {{ domain.split('.') | map('regex_replace', '^', 'dc=') | join(',') }}
+# This install's site (design federation.md): names its local directory suffix, which holds this
+# install's service accounts and its devices (the organisation suffix above holds people, groups and
+# device roles). Defaults to the host name; fixed once installed (setup refuses a change).
+site_name: {{ (site_name | default(hostname, true)) | lower }}
+ldap_local_dn: o={{ (site_name | default(hostname, true)) | lower }}
 ldap_domain_components:
 {{ domain.split('.') | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
@@ -352,12 +357,12 @@ ldap_groups:
 {% set default_ldap_ous = [
   { 'name': 'accounts', 'description': 'User Accounts' },
   { 'name': 'groups', 'description': 'Security Groups' },
-  { 'name': 'admins', 'description': 'Privileged accounts', 'parent': 'accounts', 'uid_range': '1101-1999' },
   { 'name': 'users', 'description': 'Regular User accounts', 'parent': 'accounts', 'uid_range': '5001-50000' },
   { 'name': 'hosts', 'description': 'Computer objects', 'uid_range': '2000-4900' },
-  { 'name': 'devices', 'description': 'Network devices (fabric device RBAC)' },
   { 'name': 'device-roles', 'description': 'What member devices may do (fabric device RBAC)' }
 ] %}
-{% set _merged_ous = (ldap_organizational_units | default([]) + default_ldap_ous) | unique(attribute='name') | list %}
+{# admins and devices live in the local suffix (o=<site_name>), not here: dropped even if an older vars.yaml lists them #}
+{% set _merged_ous = (ldap_organizational_units | default([]) + default_ldap_ous) | unique(attribute='name')
+                     | rejectattr('name', 'in', ['admins', 'devices']) | list %}
 ldap_organizational_units:
 {{ _merged_ous | to_nice_yaml(indent=2) | indent(2, first=True) }}

@@ -11,11 +11,11 @@ from fabriclib.secrets.load_secrets import load_secrets
 # directory's ACIs, not this code, decide what can change. Inputs arrive as
 # JSON in an environment variable; the password too. Nothing is on argv.
 _PRELUDE = r'''
-import json, os, time, ldap, ldap.modlist
+import json, os, time, ldap, ldap.filter, ldap.modlist
 e = os.environ
 IN = json.loads(e["F_JSON"])
-BASE = e["F_BASE"]
-DEV, ROLES = "ou=devices," + BASE, "ou=device-roles," + BASE
+BASE, LOCAL = e["F_BASE"], e["F_LOCAL"]           # the organisation suffix, this install's local suffix
+DEV, ROLES = "ou=devices," + LOCAL, "ou=device-roles," + BASE
 USERS, GROUPS = "ou=users,ou=accounts," + BASE, "ou=groups," + BASE
 class Refused(Exception):
     pass
@@ -28,7 +28,7 @@ def out(obj):
 for _ in range(20):
     try:
         c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
-        c.simple_bind_s("cn=device_admin,ou=admins,ou=accounts," + BASE, e["F_PW"])
+        c.simple_bind_s("cn=device_admin,ou=admins," + LOCAL, e["F_PW"])
         break
     except ldap.SERVER_DOWN:
         time.sleep(1)
@@ -50,8 +50,10 @@ except ldap.LDAPError as x:
 def run_dirsrv(v, snippet, payload=None):
     """Purpose: Run one directory operation (a Python snippet) inside the dirsrv container, bound over LDAPI
              as the least-privilege cn=device_admin.
-    Inputs:  v — fabric vars: ldap_base_dn, dirsrv_container (default "dirsrv"); snippet — Python source
-             using c (the bound connection), IN (payload), out(obj), Refused, DEV, ROLES, USERS, GROUPS;
+    Inputs:  v — fabric vars: ldap_base_dn (organisation suffix), ldap_local_dn (this install's local suffix,
+             where cn=device_admin and the devices live), dirsrv_container (default "dirsrv"); snippet — Python
+             source using c (the bound connection), IN (payload), out(obj), Refused, BASE, LOCAL, DEV (devices,
+             local suffix), ROLES (device roles, organisation), USERS, GROUPS;
              payload — JSON-serialisable input, default {}. Reads ldap_device_admin_password via load_secrets.
     Returns: the object the snippet passed to out() (dict or list).
     Fails:   ValidationError "ldap_device_admin_password is missing: re-run `sudo fabricctl setup`"; "389-DS
@@ -70,8 +72,9 @@ def run_dirsrv(v, snippet, payload=None):
     if not password:
         raise ValidationError("ldap_device_admin_password is missing: re-run `sudo fabricctl setup`")
     script = _PRELUDE + "try:\n" + textwrap.indent(textwrap.dedent(snippet), "    ") + _EPILOGUE
-    env = {**os.environ, "F_JSON": json.dumps(payload or {}), "F_BASE": v["ldap_base_dn"], "F_PW": password}
-    res = subprocess.run(["docker", "exec", "-i", "-e", "F_JSON", "-e", "F_BASE", "-e", "F_PW",
+    env = {**os.environ, "F_JSON": json.dumps(payload or {}), "F_BASE": v["ldap_base_dn"],
+           "F_LOCAL": v["ldap_local_dn"], "F_PW": password}
+    res = subprocess.run(["docker", "exec", "-i", "-e", "F_JSON", "-e", "F_BASE", "-e", "F_LOCAL", "-e", "F_PW",
                           v.get("dirsrv_container", "dirsrv"), "python3", "-"],
                          input=script, env=env, capture_output=True, text=True, timeout=60)
     if res.returncode != 0 and ("No such container" in res.stderr or "is not running" in res.stderr):

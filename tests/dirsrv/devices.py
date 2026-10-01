@@ -27,7 +27,7 @@ from fabriclib.ldap.remove_role import remove_role  # noqa: E402
 from fabriclib.ldap.update_device import update_device  # noqa: E402
 from fabriclib.ldap.update_role import update_role  # noqa: E402
 
-V = {"ldap_base_dn": BASE, "dirsrv_container": "dstest"}
+V = {"ldap_base_dn": BASE, "ldap_local_dn": "o=pi-core", "dirsrv_container": "dstest"}
 FAILED = 0
 
 
@@ -130,7 +130,7 @@ check("device_admin cannot change security groups",
       refused(run_dirsrv, V, 'c.modify_s("cn=admins," + GROUPS, [(ldap.MOD_ADD, "member", [b"cn=x"])])\n'
                              'out({"ok": True})', match="not permitted"))
 check("device_admin cannot read passwords",
-      "userPassword" not in str(run_dirsrv(V, 'out(str(c.search_s("cn=super_admin,ou=admins,ou=accounts," + BASE, '
+      "userPassword" not in str(run_dirsrv(V, 'out(str(c.search_s("cn=super_admin,ou=admins," + LOCAL, '
                                              'ldap.SCOPE_BASE)))')))
 audit = open(f"{W}/fabric/archive/audit.log").read()
 check("every change audited", all(a in audit for a in ("ROLE_ADD", "DEVICE_ADD", "DEVICE_UPDATE", "DEVICE_CERT_LINK",

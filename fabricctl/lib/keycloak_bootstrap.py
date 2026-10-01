@@ -131,7 +131,7 @@ def ensure_realm(kc, realm, display):
 
 def ensure_ldap(kc, realm, realm_id, v, s):
     """Purpose: create or update the realm's LDAP user federation to 389-DS ("389-DS": ldaps on port 3636, users under
-             ou=users,ou=accounts, bound as cn=keycloak_admin, writable, imports users).
+             ou=users,ou=accounts, bound as this install's cn=keycloak_admin (local suffix), writable, imports users).
     Inputs:  kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ldap_base_dn,
              hostname_ldap); s — secrets (ldap_keycloak_password).
     Returns: str, the federation component id. An existing ldap provider is updated in place (fabric's settings win,
@@ -153,7 +153,7 @@ def ensure_ldap(kc, realm, realm_id, v, s):
         "connectionUrl": [f"ldaps://{v['hostname_ldap']}:3636"],
         "usersDn": [f"ou=users,ou=accounts,{base}"],
         "authType": ["simple"],
-        "bindDn": [f"cn=keycloak_admin,ou=admins,ou=accounts,{base}"],
+        "bindDn": [f"cn=keycloak_admin,ou=admins,{v['ldap_local_dn']}"],
         "bindCredential": [s["ldap_keycloak_password"]],
         "searchScope": ["1"],
         "useTruststoreSpi": ["always"],

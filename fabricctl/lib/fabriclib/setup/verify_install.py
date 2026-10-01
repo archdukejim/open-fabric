@@ -97,12 +97,12 @@ def checks(ctx):
                               "-servername", v["hostname_ldap"], "-verify_hostname", v["hostname_ldap"],
                               "-CAfile", root_ca], input="", capture_output=True, text=True, timeout=15)
         add("LDAPS certificate", "Verify return code: 0 (ok)" in res.stdout)
-        base = v["ldap_base_dn"]
+        local = v["ldap_local_dn"]                     # this install's service accounts
         for role, secret in (("super_admin", "ldap_super_admin_password"), ("keycloak_admin", "ldap_keycloak_password")):
             add(f"LDAP {role} binds", _ldap_bind("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket",
-                                                 f"cn={role},ou=admins,ou=accounts,{base}", s.get(secret, "")) == "BOUND")
+                                                 f"cn={role},ou=admins,{local}", s.get(secret, "")) == "BOUND")
         add("LDAP refuses plaintext binds",
-            _ldap_bind("ldap://127.0.0.1:3389", f"cn=super_admin,ou=admins,ou=accounts,{base}",
+            _ldap_bind("ldap://127.0.0.1:3389", f"cn=super_admin,ou=admins,{local}",
                        s.get("ldap_super_admin_password", "")) == "CONFIDENTIALITY_REQUIRED")
 
     if v.get("install_webui"):

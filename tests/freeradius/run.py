@@ -31,6 +31,7 @@ W = OUT + "/freeradius"
 NET, SUBNET, GW = "radtest_net", "10.254.24.0/24", "10.254.24.1"
 DS_IP, RADIUS_IP, SWITCH_IP, STRANGER_IP = "10.254.24.50", "10.254.24.98", "10.254.24.10", "10.254.24.11"
 DOMAIN, BASE = "lan.j-j.family", "dc=lan,dc=j-j,dc=family"       # tests/render.py's install
+LOCAL = "o=pi-core"                                                # its local suffix
 SECRET = "Sw1tchSecretForTests0123456789ab"
 FAILED = 0
 sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
@@ -52,7 +53,7 @@ import fabriclib.ldap.update_device as update_device_mod  # noqa: E402
 run_dirsrv_mod.load_secrets = lambda: {"ldap_device_admin_password": "Da1"}
 for m in (add_device_mod, add_role_mod, link_mod, update_device_mod):
     m.write_audit = lambda *a, **k: None
-V = {"ldap_base_dn": BASE, "dirsrv_container": "rt-ds"}
+V = {"ldap_base_dn": BASE, "ldap_local_dn": LOCAL, "dirsrv_container": "rt-ds"}
 
 
 def check(name, cond, detail=""):
@@ -157,7 +158,7 @@ sh(f"docker network create --subnet {SUBNET} --gateway {GW} {NET}")
 def start_ds():
     sh(["docker", "run", "-d", "--name", "rt-ds", "--network", NET, "--ip", DS_IP, "--network-alias", f"ldap.{DOMAIN}",
         "--hostname", f"ldap.{DOMAIN}", "--user", "911:911", "--cap-drop", "ALL",
-        "--security-opt", "no-new-privileges:true", "-e", f"DS_SUFFIX_NAME={BASE}", "-e", "DS_DM_PASSWORD=DmPass1",
+        "--security-opt", "no-new-privileges:true", "-e", f"DS_SUFFIX_NAME={BASE}", "-e", f"DS_LOCAL_SUFFIX={LOCAL}", "-e", "DS_DM_PASSWORD=DmPass1",
         "-v", f"{W}/ds/data:/data", "-v", f"{W}/ds/seed:/seed:ro",
         "--health-cmd", "/usr/libexec/dirsrv/dscontainer -H", "--health-interval", "5s",
         "--health-start-period", "120s", "fabric/dirsrv:test"])
@@ -168,7 +169,10 @@ def start_ds():
 def seed():
     for _ in range(12):
         if sh("docker exec rt-ds sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF \"$DS_SUFFIX_NAME (\" "
-              "|| dsconf localhost backend create --suffix \"$DS_SUFFIX_NAME\" --be-name userroot'", ok=False).returncode == 0:
+              "|| dsconf localhost backend create --suffix \"$DS_SUFFIX_NAME\" --be-name userroot'", ok=False).returncode == 0 \
+                and sh("docker exec rt-ds sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF \"$DS_LOCAL_SUFFIX (\" "
+                       "|| dsconf localhost backend create --suffix \"$DS_LOCAL_SUFFIX\" --be-name sitelocal'",
+                       ok=False).returncode == 0:
             break
         time.sleep(5)
     return sh("docker exec rt-ds sh -c 'python3 /seed/seed.py /seed/*.ldif'", ok=False).stdout
@@ -191,7 +195,7 @@ check("default device roles created (six, no VLANs), MAB ones only network:mab",
 sh(["docker", "exec", "-i", "rt-ds", "python3", "-"], input=f"""
 import ldap
 c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
-c.simple_bind_s("cn=super_admin,ou=admins,ou=accounts,{BASE}", "Sa1")
+c.simple_bind_s("cn=super_admin,ou=admins,{LOCAL}", "Sa1")
 c.delete_s("cn=iot,ou=device-roles,{BASE}")
 """)
 again = ensure_default_device_roles(V, marker, container="rt-ds")
@@ -219,7 +223,7 @@ PEOPLE = {"alice": ["staff"], "gina": ["staff", "guests"], "sam": ["contractors"
 seed_people = f"""
 import ldap, ldap.modlist
 c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
-c.simple_bind_s("cn=super_admin,ou=admins,ou=accounts,{BASE}", "Sa1")
+c.simple_bind_s("cn=super_admin,ou=admins,{LOCAL}", "Sa1")
 people = {PEOPLE!r}
 for uid in people:
     c.add_s("uid=%s,ou=users,ou=accounts,{BASE}" % uid, ldap.modlist.addModlist({{
@@ -239,7 +243,7 @@ clients, embedded = normalize_radius_clients([{"name": "switch1", "address": SWI
 people_map = normalize_radius_people([{"group": "staff", "vlan": 20, "priority": 50},
                                       {"group": "guests", "vlan": 50, "priority": 60},
                                       {"group": "contractors", "priority": 70}])
-rv = {"deploy_base_dir": W, "ldap_base_dn": BASE, "hostname_ldap": f"ldap.{DOMAIN}", "radius_clients": clients,
+rv = {"deploy_base_dir": W, "ldap_base_dn": BASE, "ldap_local_dn": LOCAL, "hostname_ldap": f"ldap.{DOMAIN}", "radius_clients": clients,
       "radius_people": people_map, "service_users": {"freeradius": {"uid": 916, "gid": 916}}}
 deploy_freeradius(rv, {"radius_secrets": embedded, "ldap_radius_password": "Rr1"},
                   jinja_env(os.path.join(REPO, "fabricctl", "jinja")))

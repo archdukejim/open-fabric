@@ -15,7 +15,7 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 36 | 27 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 15 | 9 |
-| [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 19 | 19 |
+| [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 20 | 20 |
 | [fabriclib-logs](fabriclib-logs.md) | Optional log forwarding (Fluent Bit) | 4 | 3 |
 | [fabriclib-pki](fabriclib-pki.md) | Certificates: service certificates, manual issuing, CSR signing, conversion | 32 | 27 |
 | [fabriclib-radius](fabriclib-radius.md) | Optional 802.1X (FreeRADIUS): clients, groups, setup guides, decisions | 16 | 14 |
