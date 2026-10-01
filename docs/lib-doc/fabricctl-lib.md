@@ -189,7 +189,7 @@
 | Purpose | the deploy engine: render every template from the vars file and secrets into /tmp/fabric-render, copy what changed into DEPLOY_BASE_DIR and /etc/systemd/system, then reload or restart what is affected. Missing secrets (CA, rndc, LDAP, Keycloak, Kea, OIDC, TSIG, RADIUS) are generated once and saved. |
 | Inputs | start_services — bool, default True. False (first install, `fabricctl setup` via fabriclib/setup/deploy_config.py): files are deployed, changed images rebuilt and zones swapped safely, but no service is started, restarted or reloaded (certificates may not exist yet). Reads env CUSTOM_VARS_PATH (default <DEPLOY_BASE_DIR>/fabric/config/vars.yaml), SECRETS_FILE_OVERRIDE (default .../fabric-secrets.yml), LINK_VARS_PATH, DEPLOY_BASE_DIR (at import), and the fabric tree (FABRIC_DIR/jinja, docs). Must run as root. |
 | Returns | set of systemd service names whose configuration changed. With start_services=True they have already been restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them. |
-| Fails | sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys, ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is set with install_ldap false; host_ram_capacity is 1 or 2; site_name differs from the one recorded in config/.site-name (it names the local directory suffix, fixed once installed); vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad link-vars file is only printed. OSError from file operations propagates. |
+| Fails | sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys, ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is set with install_ldap false; host_ram_capacity is 1 or 2; site_name is not one host-name label, or site_name / org_domain differ from config/.site-name / .org-domain (they name the directory's suffixes, fixed once installed); vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad link-vars file is only printed. OSError from file operations propagates. |
 | Feeds | fabriclib/setup/deploy_config.py (setup, images/switch_image.py); interactive.apply_mode (`fabricctl --apply`, the menu, and fabriclib/system/apply_changes.py for the web UI); `python3 deploy.py`. |
 | Notes | no --pull on image builds: apply never takes a new base image implicitly. Old vars are archived to <fabric>/archive/<stamp>-vars.yaml before being replaced. |
 | Called by | `deploy.<module>`, `interactive.apply_mode` |
@@ -215,6 +215,86 @@
 | Returns | seed.py's output on stdout (plus a restart notice when it printed RESTART_REQUIRED); the exit status of the final dirsrv_wait_healthy after a restart, else 0. |
 | Fails | status 1 if dirsrv never becomes healthy, if the backend cannot be created after 12 tries (5 s apart, "389-DS backend could not be created" on stderr), or if seed.py fails (its output on stderr). |
 | Feeds | `bash dirsrv.sh seed`, run by apply_deployment (deploy.py) when seed files changed and by fabriclib/setup/start_services.py; tests/dirsrv/run.sh mirrors the same steps. |
+
+## `fabricctl/lib/federation/server.py`
+
+### `Handler.log_message(self, fmt, *args)`
+
+| | |
+|---|---|
+| Purpose | write one request log line to stderr (the systemd journal), with the client nginx saw. |
+| Inputs | fmt — %-format string; args — its values (from BaseHTTPRequestHandler). |
+| Returns | None. |
+| Fails | never in practice. |
+| Feeds | BaseHTTPRequestHandler (every request and error). |
+| Called by | — (no static caller) |
+
+### `Handler.client_ip(self)`
+
+| | |
+|---|---|
+| Purpose | the network client's address: X-Real-IP, which nginx always overwrites. |
+| Inputs | none (self.headers, when parsed). |
+| Returns | str, "-" when unknown. |
+| Fails | never. |
+| Feeds | log_message, do_POST (the audit's from=). |
+| Called by | `federation.server.Handler.do_POST`, `federation.server.Handler.log_message` |
+
+### `Handler.reply(self, status, obj)`
+
+| | |
+|---|---|
+| Purpose | send a complete JSON response. |
+| Inputs | status — int HTTP status; obj — JSON-serialisable. |
+| Returns | None. |
+| Fails | OSError (BrokenPipeError) if the peer has gone. |
+| Feeds | do_GET, do_POST. |
+| Called by | `federation.server.Handler.do_GET`, `federation.server.Handler.do_POST` |
+
+### `Handler.do_GET(self)`
+
+| | |
+|---|---|
+| Purpose | GET /v1/health — is the endpoint up, and which site answers. |
+| Inputs | the request path. |
+| Returns | None; 200 {"ok": true, "site"} or 404 {"error": "not found"}. |
+| Fails | OSError writing the reply; yaml/OSError from load_vars become a 500. |
+| Feeds | nginx (federation.<domain>), joining sites and `fabricctl doctor` later. |
+| Called by | — (no static caller) |
+
+### `Handler.do_POST(self)`
+
+| | |
+|---|---|
+| Purpose | POST /v1/join — an invited site joins (accept_join). |
+| Inputs | a JSON body of at most JOIN_BODY_MAX bytes. |
+| Returns | None; 200 with accept_join's answer; 400 {"error": message} for a refusal (ValidationError) or a bad body; 413 when too large; 404 for any other path; 500 {"error": "internal error"} otherwise (details only in the journal). |
+| Fails | OSError writing the reply. |
+| Feeds | nginx (federation.<domain>) <- join_upstream on the joining node. |
+| Called by | — (no static caller) |
+
+### `UnixServer.verify_request(self, request, client_address)`
+
+| | |
+|---|---|
+| Purpose | accept a connection only from root or nginx's uid (SO_PEERCRED, kernel-supplied). |
+| Inputs | request — the connected socket; client_address — unused (unix sockets have none). |
+| Returns | bool. |
+| Fails | never: an unreadable peer is refused. |
+| Feeds | socketserver, before each request is handled. |
+| Called by | — (no static caller) |
+
+### `main()`
+
+| | |
+|---|---|
+| Purpose | start fabric-federation: listen on the unix socket and serve requests, one thread each. |
+| Inputs | command-line --socket (path, required; an existing file there is removed), --socket-gid (int, required: nginx's group), --allow-uid (int, repeatable: nginx's uid). Set by systemd/fabric-federation.service.j2. |
+| Returns | never returns normally (serve_forever). |
+| Fails | argparse exits 2 on bad arguments; OSError if the socket cannot be created, chowned or chmodded. |
+| Feeds | the fabric-federation systemd unit; nginx's federation.<domain> vhost proxies to it. |
+| Notes | the socket is created under umask 0117, then set to root:<socket-gid> 0660. |
+| Called by | `federation.server.<module>` |
 
 ## `fabricctl/lib/interactive.py`
 

@@ -169,8 +169,29 @@ sudo fabricctl setup --file vars.yaml --non-interactive --yes
 | `--deploy-base <dir>` | Install root (default `/opt`) |
 | `--step <name>` | Run only this step (repeatable); the plan is not shown. An unknown name is refused |
 | `--list` | List the steps |
+| `--join <invitation>` | Join an existing fabric as a new site (a fresh install only): see [Joining an existing fabric](#joining-an-existing-fabric-a-new-site) |
 
 After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time. When a step fails, setup stops there with the reason (exit 1; some errors show a Python traceback instead): fix it and run setup again. Interrupted, it exits 130.
+
+### Joining an existing fabric (a new site)
+
+On the fabric this site joins (its upstream; design [federation.md](design/federation.md)):
+
+```bash
+sudo fabricctl federation enable          # once: the endpoint sites join through
+sudo fabricctl federation invite branch1  # one-time invitation, good for one hour
+```
+
+On the new host, a fresh install:
+
+```bash
+sudo fabricctl setup --join 'fabric-join-1.…'
+```
+
+The site's name comes from the invitation; its domain defaults to `<site>.<organisation domain>`
+(set `domain` in a `--file` to choose another). Its certificate authority is an intermediate signed by
+the organisation's root (the key is made on the site and never leaves it), and it shares the
+organisation's directory suffix. Directory and DNS links between the sites follow in later milestones.
 
 ### CA certificates for your devices
 
@@ -215,6 +236,7 @@ Units: `bind9`, `stepca`, `nginx`, `ldap`, `postgres`, `keycloak`, `openbao`, `f
 | `preflight` | Root, architecture, RAM, cgroup memory controller (refused if wrong); OS and other programs on fabric's ports (warnings). Changes nothing |
 | `host` | Host packages; Docker Engine with compose and buildx if missing (never downloads with `--offline`) |
 | `docker` | Docker daemon hardening |
+| `join` | Only with `--join`: join the upstream — this site's CA key and request (the key stays here), the upstream's root pinned by the invitation's fingerprint, the join over TLS verified against it, the signed intermediate checked and set up as this install's CA (bring-your-own path), the organisation's settings. A re-run reuses what was staged |
 | `deploy` | Save the settings to `fabric.yaml`; render and deploy all configuration (nothing started); the `fabricctl` command (the package's, or `/usr/local/bin/fabricctl` when run from a checkout) |
 | `accounts` | Service users and groups with fixed uids |
 | `network` | Docker network `fabric_net`; resolver drop-in unless `use_host_dns` |

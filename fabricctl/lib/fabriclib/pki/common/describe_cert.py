@@ -11,8 +11,8 @@ def describe_cert(pem):
              "IP Address:y", ...]), "usage" (extended key usage text or ""), "key" (e.g. "RSA 2048",
              "EC 256"; "?" if unrecognised), "is_ca" (bool: CA:TRUE present)}.
     Fails:   ValidationError with openssl's first error line if pem is not a certificate (openssl helper).
-    Feeds:   ca_summary, convert_cert, inspect_pem, issue_key_pair, sign_csr (their "info"; record_issued
-             keeps part of it).
+    Feeds:   ca_summary, convert_cert, inspect_pem, issue_key_pair, sign_csr, sign_site_ca, stage_site_ca (their
+             "info"; record_issued keeps part of it).
     """
     out = openssl("x509", "-noout", "-subject", "-issuer", "-serial", "-startdate", "-enddate",
                   "-fingerprint", "-sha256", "-nameopt", "RFC2253", data=pem)

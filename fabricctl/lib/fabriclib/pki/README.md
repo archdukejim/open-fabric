@@ -19,5 +19,8 @@ Certificates from fabric's Step-CA.
 | `convert_cert.py` | Certificate → PEM, DER, full chain (`.pem`, `.p7b`) and, with its key, a `.p12` (audited; key not kept) |
 | `list_issued.py` | Hand-issued certificates from the ledger, newest first, with valid / expires soon / expired |
 | `ca_summary.py` | Root and intermediate CA details, the certs page URL and the manual validity cap |
+| `make_site_ca_request.py` | Federation: a joining site's intermediate key (stays here, encrypted) and its signing request |
+| `sign_site_ca.py` | Federation: sign a site's intermediate with the root key (path length 0, never outliving the root); ledger + audit |
+| `stage_site_ca.py` | Federation: check the root site's answer (pinned root, chain, path length, our key) and lay it out for the bring-your-own-CA path |
 | `publish_ca_certs.py` | Root + intermediate for every system on `certs.<domain>` (PEM `.crt`/`.pem`, DER `.cer`/`.der`, chain `.pem`/`.p7b`, fingerprints JSON); trust them on this host |
 | `common/` | Helpers shared by the operations above (see its README) |

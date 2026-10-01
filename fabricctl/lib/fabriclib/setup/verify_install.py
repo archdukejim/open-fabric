@@ -43,9 +43,10 @@ def _ldap_bind(uri, dn, password):
 def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
              trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin
-             (Keycloak role, client certificate), OpenBao state and every installed service.
+             (Keycloak role, client certificate), OpenBao state, the federation endpoint when on and every
+             installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port,
-             install_ldap/webui/keycloak, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA
+             install_ldap/webui/keycloak, federation_endpoint, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA
              root, the agent socket, ~/fabric-admin of the sudo user.
     Returns: list of (name, passed: bool, detail: str).
     Fails:   ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading
@@ -140,9 +141,13 @@ def checks(ctx):
         {"fabric/", "apps/"} <= {m["path"] for m in bao.get("mounts", [])}, bao.get("error", ""))
     code = _curl(f"https://{v['hostname_openbao']}/v1/sys/health", v["hostname_openbao"], v["ip_nginx"], 443, root_ca)
     add(f"https://{v['hostname_openbao']} (OpenBao via nginx, TLS verified)", code == (0, "200"), code)
+    if v.get("federation_endpoint"):
+        code = _curl(f"https://{v['hostname_federation']}/v1/health", v["hostname_federation"], v["ip_nginx"], 443,
+                     root_ca)
+        add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
     for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "kea", "freeradius", "fluentbit",
-                 "fabric-agent", "fabric-web", "fabric-firewall"):
+                 "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()
             add(f"service {unit}", active == "active", active)

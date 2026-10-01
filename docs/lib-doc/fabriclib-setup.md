@@ -132,12 +132,23 @@
 | Feeds | collect_vars. |
 | Called by | `fabriclib.setup.collect_vars.collect_vars` |
 
+### `_join_defaults(ctx, data)`
+
+| | |
+|---|---|
+| Purpose | settings a site joining an upstream (setup --join) starts from: the invitation's site name and organisation domain, and a domain of its own, by default <site>.<organisation domain>. |
+| Inputs | ctx — SetupContext: join_invitation, vars_file, config_dir; data — the settings so far (changed). |
+| Returns | None; data gets site_name, org_domain and (unless set) domain. |
+| Fails | SetupError when the invitation is damaged (decode_invitation), when this host already has a fabric that is not a member of that upstream (only fresh installs join: design F1), or when site_name is set to another name than the invitation's. |
+| Feeds | collect_vars. |
+| Called by | `fabriclib.setup.collect_vars.collect_vars` |
+
 ### `collect_vars(ctx)`
 
 | | |
 |---|---|
 | Purpose | work out the settings this install is rendered from and save them as <config>/fabric.yaml. |
-| Inputs | ctx — SetupContext: user_vars_file (--file), non_interactive, vars_file (existing install), source_dir (a checkout's ../custom-vars.yaml), config_dir, secrets_file, deploy_base; env SUDO_USER (default admin name). |
+| Inputs | ctx — SetupContext: user_vars_file (--file), join_invitation (--join: _join_defaults), non_interactive, vars_file (existing install), source_dir (a checkout's ../custom-vars.yaml), config_dir, secrets_file, deploy_base; env SUDO_USER (default admin name). |
 | Returns | path of fabric.yaml (str). Leaves ctx.vars = the data written. Precedence: an existing vars.yaml is the base and --file overrides the keys it sets; on a fresh install without --file a checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required values are asked for (defaults from detect_network); webui_admin_user is chosen once. Embedded TSIG secrets go to the secrets file, never into fabric.yaml. |
 | Fails | SetupError for missing/invalid required values with --non-interactive, invalid tsig_keys, or a secrets file that cannot be written (ValidationError converted); OSError/yaml errors on files. |
 | Feeds | run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps before deploy; deploy_config renders from fabric.yaml. |
@@ -546,9 +557,23 @@
 |---|---|
 | Purpose | initialise Step-CA once (its own root, or a bring-your-own root + intermediate when byoc), configure ca.json, publish the CA certificates and trust them on the host. |
 | Inputs | ctx — SetupContext: vars byoc, ca_crt_path, ica_crt_path, ica_key_path (default: the .crt path with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json settings; secrets.ca_password; service user step. |
-| Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and ca.json configured, chain verified, published and trusted. With an existing ca.json only the permissions, publishing and trust are (re)done. |
+| Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and ca.json configured, chain verified, published and trusted. With byoc the brought-in intermediate key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the permissions, publishing and trust are (re)done. |
 | Fails | SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars. |
 | Feeds | setup step `pki`, run by run_setup via STEPS. |
+| Called by | — (no static caller) |
+
+## `fabricctl/lib/fabriclib/setup/join_federation.py`
+
+### `run(ctx)`
+
+| | |
+|---|---|
+| Purpose | setup step `join` (only with `fabricctl setup --join '<invitation>'`): join the upstream before anything is rendered, so this install is set up as a site of that fabric — its CA an intermediate signed by the organisation's root (bring-your-own-CA path), its organisation suffix the upstream's (design federation.md §4). |
+| Inputs | ctx — SetupContext: join_invitation, vars (from collect_vars: domain, host_ip, image_stepca if set), secrets / secrets_file (ca_password, created here if missing), config_dir, source_dir (images.lock). |
+| Returns | None. ctx.vars gains byoc, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain and the organisation's cert_* settings (friendly_name only when unset); the deploy step saves them. The site CA key and certificates are kept in <base>/fabric/config/site-ca (0700). |
+| Fails | SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or unreachable, the root not the pinned one, a certificate that does not fit). |
+| Feeds | setup STEPS, after `docker` (the key is made with the pinned Step-CA image) and before `deploy`. |
+| Notes | without --join it does nothing. A re-run after a successful join reuses what was staged and does not contact the upstream again (the invitation is single-use). The key is made as root: the step user does not exist yet; the pki step copies it into Step-CA's data and gives it to that user. |
 | Called by | — (no static caller) |
 
 ## `fabricctl/lib/fabriclib/setup/mint_extra_certs.py`
@@ -571,8 +596,8 @@
 | | |
 |---|---|
 | Purpose | the service certificates this install needs and where each one goes. |
-| Inputs | ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr, radius), domain, install_ldap (default True), install_keycloak, install_webui, install_freeradius. |
-| Returns | list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")], services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP, Keycloak + Postgres, web UI and FreeRADIUS (EAP-TLS server cert) when installed. |
+| Inputs | ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr, radius, federation), domain, install_ldap (default True), install_keycloak, install_webui, install_freeradius, federation_endpoint. |
+| Returns | list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")], services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP, Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert) and the federation endpoint when on. |
 | Fails | KeyError for a missing hostname_* var. |
 | Feeds | run. |
 | Called by | `fabriclib.setup.mint_service_certs.run` |
@@ -656,7 +681,7 @@
 | Returns | None. Changed services that are active are restarted; inactive ones are left for their next start. |
 | Fails | as mint_service_certs.run (SetupError, ValidationError, CalledProcessError); CalledProcessError from `systemctl restart`. |
 | Feeds | cli main (`certs`). |
-| Called by | `fabriclib.cli.main` |
+| Called by | `fabriclib.cli.main`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint` |
 
 ## `fabricctl/lib/fabriclib/setup/restore_install.py`
 
@@ -704,7 +729,7 @@
 | | |
 |---|---|
 | Purpose | `fabricctl setup` / `fabricctl doctor`: parse options, collect settings, show the plan and run the selected steps of STEPS in order. |
-| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --step NAME (repeatable), --list, --doctor (hidden, used by doctor). |
+| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --step NAME (repeatable), --join INVITATION (join an upstream fabric), --list, --doctor (hidden, used by doctor). |
 | Returns | exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted. A full run leaves the install converged; the steps before deploy (preflight, host, docker, deploy) collect vars first, and the plan is shown only when no --step is given. |
 | Fails | SystemExit(2) from argparse on bad options; SystemExit("setup cancelled") when Quit is chosen in the plan; any exception other than SetupError/KeyboardInterrupt from a step (CalledProcessError, CommandError, ValidationError, OSError) propagates as a traceback. |
 | Feeds | cli main (`setup`, `doctor`) and this file's `__main__`. |
@@ -803,8 +828,8 @@
 | | |
 |---|---|
 | Purpose | start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, move an older directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate fabric.target. |
-| Inputs | ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui, install_fluentbit, install_kea, install_freeradius; restart_services (units to restart); target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file. |
-| Returns | None. fabric.target enabled and started; renamed units retired; every enabled unit running and its container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6 tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web running when the web UI is on. |
+| Inputs | ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui, install_fluentbit, install_kea, install_freeradius, federation_endpoint; restart_services (units to restart); target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file. |
+| Returns | None. fabric.target enabled and started; renamed units retired; every enabled unit running and its container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6 tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web running when the web UI is on; fabric-federation running when federation_endpoint is on. |
 | Fails | SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration still fails after 6 tries; CalledProcessError from systemctl; ValidationError from ensure_default_device_roles or migrate_local_suffix (propagates). |
 | Feeds | setup step `start`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -877,8 +902,8 @@
 
 | | |
 |---|---|
-| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state and every installed service. |
-| Inputs | ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port, install_ldap/webui/keycloak, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA root, the agent socket, ~/fabric-admin of the sudo user. |
+| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint when on and every installed service. |
+| Inputs | ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port, install_ldap/webui/keycloak, federation_endpoint, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA root, the agent socket, ~/fabric-admin of the sudo user. |
 | Returns | list of (name, passed: bool, detail: str). |
 | Fails | ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading root_ca.crt; subprocess.TimeoutExpired from the LDAPS probe (15 s); struct.error/IndexError from dns_query on a malformed reply. Check failures are results, not exceptions. |
 | Feeds | run. |

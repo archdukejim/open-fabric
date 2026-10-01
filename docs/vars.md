@@ -478,14 +478,13 @@ The subject fields `cert_country`, `cert_province`, `cert_city`, `cert_org` and 
 If you already possess a securely offline-generated Root and Intermediate CA, you can import them instead of letting Step-CA mint its own.
 
 ### `byoc`
-**Description:** Set to `true` to import your own root and intermediate at the first Step-CA initialisation (setup stops if any of the three files is missing).
+**Description:** Set to `true` to import your own root and intermediate at the first Step-CA initialisation (setup stops if any of the three files is missing). The intermediate key may be unencrypted or encrypted with fabric's `ca_password` (a federation site's is: [federation.md](design/federation.md)); Step-CA always gets its password file. The root key `step ca init` generated is removed, since it does not belong to your root.
 
 **Default Value:** `false`
 
 **Immutable:** Yes 🔒
 
 **Effected Jinja Templates:**
-- `stepca/docker-compose.yml.j2`
 - `vars.yaml.j2`
 - read by `fabriclib/setup/init_pki.py`
 
@@ -798,9 +797,9 @@ Built-in folders always come from these defaults; user-added folders are kept.
 If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabricctl/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 
 ### `ldap_base_dn`
-**Description:** Base distinguished name (389-DS suffix), always computed from `domain` (it cannot be set).
+**Description:** Base distinguished name of the organisation suffix (389-DS), always computed from `org_domain` (it cannot be set; `org_domain` is `domain` unless the install joined an upstream).
 
-**Default Value:** one `dc=` per label of `domain`, e.g. `dc=lan,dc=example,dc=com` for `lan.example.com`
+**Default Value:** one `dc=` per label of `org_domain`, e.g. `dc=lan,dc=example,dc=com` for `lan.example.com`
 
 **Effected Jinja Templates:**
 - `dirsrv/docker-compose.yml.j2`
@@ -828,8 +827,35 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 - `dirsrv/seed/10-tree.ldif.j2`, `dirsrv/seed/20-accounts.ldif.j2`, `dirsrv/seed/30-aci.ldif.j2`
 - `freeradius/config/fabric-radius.json.j2`
 
+### `org_domain`
+**Description:** The organisation's domain: names the organisation suffix (`ldap_base_dn`) and is shared by every site of a fabric (design [federation.md](design/federation.md)). A standalone install's is its own `domain`; a site that joined an upstream (`fabricctl setup --join`) gets the upstream's. Fixed at install: setup refuses to change it on a live install (marker `config/.org-domain`).
+
+**Default Value:** `domain`
+
+**Effected Jinja Templates:**
+- `vars.yaml.j2` (`ldap_base_dn`, `ldap_domain_components`)
+
+### `federation_endpoint`
+**Description:** Run the federation endpoint other sites join through: the `fabric-federation` service (unix socket), an nginx vhost at `hostname_federation` (join route rate- and size-limited), its certificate and a CNAME. Turn it on and off with `fabricctl federation enable|disable` (which also issues the certificate). Off: no new site can join; sites that joined stay.
+
+**Default Value:** `false`
+
+**Effected Jinja Templates:**
+- `nginx/nginx.conf.j2`, `nginx/docker-compose.yml.j2` (socket mount)
+- `systemd/fabric-federation.service.j2`
+- `vars.yaml.j2` (the CNAME)
+
+### `hostname_federation`
+**Description:** The endpoint's name, always computed: `cname_federation` (default `federation`; it can be set but is not written to `vars.yaml`) + `.` + `domain`. An invitation carries it; joining sites connect by address and check this name on the certificate.
+
+**Default Value:** `federation.<domain>`
+
+**Effected Jinja Templates:**
+- `nginx/nginx.conf.j2`
+- `vars.yaml.j2`
+
 ### `ldap_domain_components`
-**Description:** The labels of `domain` as a list, always computed (it cannot be set). The first one is the `dc:` attribute of the suffix entry.
+**Description:** The labels of `org_domain` as a list, always computed (it cannot be set). The first one is the `dc:` attribute of the suffix entry.
 
 **Default Value:** e.g. `[lan, example, com]` for `lan.example.com`
 

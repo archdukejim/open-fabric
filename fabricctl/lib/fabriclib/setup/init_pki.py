@@ -85,7 +85,9 @@ def run(ctx):
              with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json
              settings; secrets.ca_password; service user step.
     Returns: None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and
-             ca.json configured, chain verified, published and trusted. With an existing ca.json only the
+             ca.json configured, chain verified, published and trusted. With byoc the brought-in intermediate
+             key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca
+             init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the
              permissions, publishing and trust are (re)done.
     Fails:   SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when
              `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets
@@ -134,6 +136,8 @@ def run(ctx):
                 out.write(open(p).read())
         shutil.copy2(ica_key, os.path.join(data, "secrets", "intermediate_ca_key"))
         os.chmod(os.path.join(data, "secrets", "intermediate_ca_key"), 0o600)
+        # `step ca init` made a root of its own: its key signs nothing that chains to the brought-in root
+        os.remove(os.path.join(data, "secrets", "root_ca_key"))
 
     _configure_ca_json(ca_json, v)
     _chown_tree(data, uid, gid)

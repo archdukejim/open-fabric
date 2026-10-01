@@ -30,6 +30,7 @@ The same DNS and apply operations are also available in the browser through webu
   - [TSIG Keys (RFC2136)](#tsig-keys-rfc2136-dynamic-updates)
   - [ACLs](#acls)
   - [Landing Page Links](#landing-page-links)
+- [Federation (sites)](#federation-sites)
 - [OpenBao (secrets)](#openbao-secrets)
 - [Lifecycle Commands](#lifecycle-commands)
 - [Service Ports](#service-ports)
@@ -41,7 +42,7 @@ The same DNS and apply operations are also available in the browser through webu
 The infrastructure variables in `/opt/fabric/config/vars.yaml` can be managed with the `fabricctl` subcommands below, the interactive menu, or by editing the YAML by hand and running `--apply`. Setup keeps these edits: a re-run starts from this file.
 
 #### `--interactive`
-Launch the interactive configuration menu (also what `fabricctl` with no arguments does). Its categories are DNS Configuration, Mint Certificates, Docker & Services, TSIG Keys, Landing Page Links and Advanced Configuration (every other key); `a` adds a variable, `d` deletes one, `apply` saves and applies, `q` quits without applying. Each change is saved to `vars.yaml` at once and audit-logged. Immutable variables (the CA settings, `byoc` and its paths, `extra_certs`, `stepca_port`, `deploy_base_dir`, `domain`) cannot be edited or deleted here. Changes to `hostname`, `host_ip`, `lan_cidr`, `lan_gateway` or `fabric_subnet` are marked with a warning.
+Launch the interactive configuration menu (also what `fabricctl` with no arguments does). Its categories are DNS Configuration, Mint Certificates, Docker & Services, TSIG Keys, Landing Page Links and Advanced Configuration (every other key); `a` adds a variable, `d` deletes one, `apply` saves and applies, `q` quits without applying. Each change is saved to `vars.yaml` at once and audit-logged. Immutable variables (the CA settings, `byoc` and its paths, `extra_certs`, `stepca_port`, `deploy_base_dir`, `domain`, `org_domain`, `site_name`) cannot be edited or deleted here. Changes to `hostname`, `host_ip`, `lan_cidr`, `lan_gateway` or `fabric_subnet` are marked with a warning.
 
 ```bash
 sudo fabricctl --interactive
@@ -499,6 +500,31 @@ gets its reverse record at apply, in a zone fabric creates:
   `.in-addr.arpa` / `.ip6.arpa`) replaces the generated one for that range.
 - Change or delete the forward record and apply: the PTR follows.
 
+## Federation (sites)
+
+Several fabrics can form one: an **upstream** owns identity and the root CA, **sites** join it and run
+their own network (design [federation.md](design/federation.md)). On the upstream:
+
+```bash
+sudo fabricctl federation status            # standalone, upstream or site; joined sites; open invitations
+sudo fabricctl federation enable            # the endpoint sites join through: https://federation.<domain>
+sudo fabricctl federation invite branch1    # one-time invitation (one hour); prints the setup command
+sudo fabricctl federation invitations       # open invitations
+sudo fabricctl federation revoke branch1    # withdraw one (by id or site)
+sudo fabricctl federation disable           # no new joins; sites that joined stay
+```
+
+The new site runs `sudo fabricctl setup --join '<invitation>'` (see
+[install.md](install.md#joining-an-existing-fabric-a-new-site)). The invitation carries the endpoint's
+name and address, the root CA's fingerprint and a single-use secret — send it over a channel you trust;
+only a hash of the secret is kept. The joining node fetches the root over plain HTTP, accepts it only if
+it matches the fingerprint, then joins over TLS verified against that root. The upstream signs the
+site's intermediate CA (path length 0, never outliving the root) with its root key; the site's key never
+leaves the site. Joins, refusals and invitations are audited (`FED_*`).
+
+An upstream whose CA was brought in (`byoc`) has no root key on the host and cannot sign a site's CA
+online yet.
+
 ## OpenBao (secrets)
 
 OpenBao is a core service: installed by `fabricctl setup` (step `vault`),
@@ -741,6 +767,7 @@ Every `fabricctl` subcommand (Python, `fabricctl/lib/fabriclib/`; `sudo fabricct
 | `sudo fabricctl radius status/log/add-client/rotate-secret/remove-client/map-group/unmap-group` | 802.1X (FreeRADIUS) — see [802.1X](#8021x-optional-freeradius) |
 | `sudo fabricctl logs status` / `logs set-password elastic` | Log forwarding (Fluent Bit) — see [Log forwarding](#log-forwarding-optional-fluent-bit) |
 | `sudo fabricctl images status/update/rollback/prune` | Container images — see [`fabricctl images`](#fabricctl-images) |
+| `sudo fabricctl federation status/enable/disable/invite/invitations/revoke` | Sites joining this install — see [Federation](#federation-sites) |
 | `sudo fabricctl vault …` | OpenBao and its unlock methods — see [OpenBao](#openbao-secrets) |
 | `sudo fabricctl secrets list` / `secrets show <name>` | fabric's own secrets (in OpenBao); `show` is audited |
 | `sudo fabricctl client-cert <user> [--days N]` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`, default 365 days) |

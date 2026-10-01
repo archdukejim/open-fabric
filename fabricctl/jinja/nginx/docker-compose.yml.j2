@@ -31,6 +31,10 @@ services:
       - {{ deploy_base_dir }}/nginx/config/conf.d:/etc/nginx/conf.d:ro
       - {{ deploy_base_dir }}/nginx/certs:/etc/nginx/certs:ro
       - {{ deploy_base_dir }}/nginx/www:/srv/www:ro
+{% if federation_endpoint | default(false) | bool %}
+      # fabric-federation's unix socket (dir root:nginx 0750, socket 0660)
+      - {{ deploy_base_dir }}/federation/run:/srv/federation:ro
+{% endif %}
 {% if install_webui | default(false) | bool %}
       # webui container's unix socket (dir webui:nginx 0750, socket 0660)
       - {{ deploy_base_dir }}/webui/run:/srv/webui:ro

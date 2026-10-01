@@ -2,7 +2,7 @@ import os
 import subprocess
 
 SERVICES = ["nginx", "bind9", "stepca", "ldap", "postgres", "keycloak", "openbao", "kea", "freeradius",
-            "fluentbit", "fabric-web", "fabric-agent"]
+            "fluentbit", "fabric-web", "fabric-agent", "fabric-federation"]
 # systemd unit -> its container (units without one run on the host)
 CONTAINERS = {"nginx": "nginx", "bind9": "bind9", "stepca": "step-ca", "ldap": "dirsrv", "postgres": "postgres",
               "keycloak": "keycloak", "openbao": "openbao", "kea": "kea-dhcp4", "freeradius": "freeradius",

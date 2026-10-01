@@ -74,6 +74,10 @@ hostname_mgr: {{ _hostname_mgr }}
 hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
 hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower }}
 hostname_radius: {{ ((cname_radius | default('radius')) ~ '.' ~ domain) | lower }}
+{# The federation endpoint (design federation.md §5): sites join this install through it. Off until
+   `fabricctl federation enable`; the name is always computed. #}
+federation_endpoint: {{ federation_endpoint | default(false) | bool | lower }}
+hostname_federation: {{ ((cname_federation | default('federation')) ~ '.' ~ domain) | lower }}
 
 # ============================================================
 # DOCKER IMAGES
@@ -297,6 +301,9 @@ bind_acl_policies:
 {% if landing_page_cname | default('', true) %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname }) %}
 {% endif %}
+{% if federation_endpoint | default(false) | bool %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_federation | default('federation') }) %}
+{% endif %}
 {% set default_a = [
   { 'ip': host_ip, 'name': hostname }
 ] %}
@@ -326,16 +333,21 @@ nginx_backend_ldaps: {{ nginx_backend_ldaps | default('dirsrv:3636') }}
 nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (stepca_port | default(9000))) }}
 
 # ============================================================
-# LDAP — base DN computed from domain
+# LDAP — base DN computed from the organisation's domain
 # ============================================================
-ldap_base_dn: {{ domain.split('.') | map('regex_replace', '^', 'dc=') | join(',') }}
+{# The organisation's domain: this install's own domain unless it joined an upstream (design
+   federation.md), whose organisation it then shares. Names the organisation suffix; fixed once
+   installed (setup refuses a change). #}
+{% set _org_domain = (org_domain | default(domain, true)) | lower %}
+org_domain: {{ _org_domain }}
+ldap_base_dn: {{ _org_domain.split('.') | map('regex_replace', '^', 'dc=') | join(',') }}
 # This install's site (design federation.md): names its local directory suffix, which holds this
 # install's service accounts and its devices (the organisation suffix above holds people, groups and
 # device roles). Defaults to the host name; fixed once installed (setup refuses a change).
 site_name: {{ (site_name | default(hostname, true)) | lower }}
 ldap_local_dn: o={{ (site_name | default(hostname, true)) | lower }}
 ldap_domain_components:
-{{ domain.split('.') | to_nice_yaml(indent=2) | indent(2, first=True) }}
+{{ _org_domain.split('.') | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
 {# `bundle`: the fabric role bundle Keycloak grants to members (design D19); admins get
    webui_admin_role through webui_admin_group. #}

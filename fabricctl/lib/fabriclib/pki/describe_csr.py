@@ -23,7 +23,7 @@ def describe_csr(data):
     Fails:   ValidationError "give exactly one certificate signing request"; to_pem's messages; openssl's
              first error line if the request cannot be parsed.
     Feeds:   agent route POST /v1/pki/describe-csr -> webui agentclient.describe_csr; inspect_pem;
-             sign_csr (refuses unless problems is empty).
+             sign_csr (refuses unless problems is empty); sign_site_ca (key and signature checks).
     Notes:   CA:TRUE is only reported: the CSR's own extensions are never copied, fabric issues a leaf
              (serverAuth + clientAuth) from its template whatever the CSR asks for.
     """

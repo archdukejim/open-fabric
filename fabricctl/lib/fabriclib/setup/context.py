@@ -17,6 +17,7 @@ class SetupContext:
     offline: bool = False
     non_interactive: bool = False
     assume_yes: bool = False
+    join_invitation: str = None                   # setup --join: the upstream's invitation
     vars: dict = field(default_factory=dict)      # rendered vars (after deploy)
     _secrets: dict = None                         # loaded on first use (see secrets)
     restart_services: set = field(default_factory=set)   # certs/config changed this run

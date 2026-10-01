@@ -25,8 +25,8 @@
 | Inputs | v — fabric vars (dict): deploy_base_dir, service_users.step.uid / .gid. |
 | Returns | path (str) <deploy_base_dir>/stepca/data/artifacts, mode 0750 when created, chowned to the step user on every call. |
 | Fails | KeyError if deploy_base_dir or service_users.step is missing; OSError (PermissionError) from makedirs/chown when not run as root. |
-| Feeds | mint_offline_cert, sign_csr. |
-| Called by | `fabriclib.pki.mint_offline_cert.mint_offline_cert`, `fabriclib.pki.sign_csr.sign_csr` |
+| Feeds | mint_offline_cert, sign_csr, sign_site_ca. |
+| Called by | `fabriclib.pki.mint_offline_cert.mint_offline_cert`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/ca_chain_pem.py`
 
@@ -52,8 +52,8 @@
 | Inputs | v — fabric vars: deploy_base_dir. |
 | Returns | (root_path, intermediate_path): <deploy_base_dir>/stepca/data/certs/root_ca.crt and intermediate_ca.crt; existence is not checked. |
 | Fails | KeyError if deploy_base_dir is missing. |
-| Feeds | ca_summary, common/ca_chain_pem, convert_cert, inspect_pem, radius/radius_guides. |
-| Called by | `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.radius.radius_guides.radius_guides` |
+| Feeds | ca_summary, common/ca_chain_pem, convert_cert, inspect_pem, radius/radius_guides, sign_site_ca. |
+| Called by | `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.radius.radius_guides.radius_guides` |
 
 ## `fabricctl/lib/fabriclib/pki/common/describe_cert.py`
 
@@ -65,8 +65,8 @@
 | Inputs | pem — str, a PEM certificate (only the first one is read). |
 | Returns | {"subject", "issuer" (RFC 2253), "serial" (hex), "not_before", "not_after" (openssl dates, e.g. "Sep 30 12:00:00 2027 GMT"), "sha256" (colon hex fingerprint), "sans" (["DNS:x", "IP Address:y", ...]), "usage" (extended key usage text or ""), "key" (e.g. "RSA 2048", "EC 256"; "?" if unrecognised), "is_ca" (bool: CA:TRUE present)}. |
 | Fails | ValidationError with openssl's first error line if pem is not a certificate (openssl helper). |
-| Feeds | ca_summary, convert_cert, inspect_pem, issue_key_pair, sign_csr (their "info"; record_issued keeps part of it). |
-| Called by | `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
+| Feeds | ca_summary, convert_cert, inspect_pem, issue_key_pair, sign_csr, sign_site_ca, stage_site_ca (their "info"; record_issued keeps part of it). |
+| Called by | `fabriclib.federation.common.fetch_pinned_root.fetch_pinned_root`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/openssl.py`
 
@@ -78,8 +78,8 @@
 | Inputs | args — openssl arguments (str; never secrets: argv is world-readable); data — str or bytes fed on stdin, default None (no input); check — bool, default True: raise on a non-zero exit. |
 | Returns | openssl's stdout: bytes if data is bytes, else str. |
 | Fails | ValidationError with openssl's first non-empty stderr line (at most 200 characters; "openssl failed" if stderr is empty) on a non-zero exit when check; FileNotFoundError if openssl is not installed. |
-| Feeds | common/describe_cert, common/to_pem, describe_csr, inspect_pem, convert_cert, issue_key_pair, sign_csr. |
-| Called by | `fabriclib.pki.common.describe_cert.describe_cert`, `fabriclib.pki.common.to_pem.to_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.describe_csr.describe_csr`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
+| Feeds | common/describe_cert, common/to_pem, describe_csr, inspect_pem, convert_cert, issue_key_pair, sign_csr, stage_site_ca. |
+| Called by | `fabriclib.pki.common.describe_cert.describe_cert`, `fabriclib.pki.common.to_pem.to_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.describe_csr.describe_csr`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/record_issued.py`
 
@@ -88,25 +88,25 @@
 | | |
 |---|---|
 | Purpose | Append one hand-issued certificate to the issued-certificate ledger (JSON lines), never its private key. |
-| Inputs | actor — str, who issued it; kind — "csr" \| "keypair"; info — describe_cert dict plus "device" (only subject, sans, serial, not_after, sha256, key and device are kept); source — "web" (default) \| "cli"; path — the ledger, default ISSUED_CERTS_FILE (/opt/fabric/archive/issued-certs.jsonl): file created 0600, its directory 0700. |
+| Inputs | actor — str, who issued it; kind — "csr" \| "keypair" \| "site-ca"; info — describe_cert dict plus "device" (only subject, sans, serial, not_after, sha256, key and device are kept); source — "web" (default) \| "cli"; path — the ledger, default ISSUED_CERTS_FILE (/opt/fabric/archive/issued-certs.jsonl): file created 0600, its directory 0700. |
 | Returns | None; the entry also carries "when" (local time, seconds). |
 | Fails | OSError if the ledger or its directory cannot be created or written. |
-| Feeds | issue_key_pair, sign_csr; read back by list_issued. |
-| Called by | `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
+| Feeds | issue_key_pair, sign_csr, sign_site_ca; read back by list_issued. |
+| Called by | `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/run_step.py`
 
-### `run_step(v, args)`
+### `run_step(v, args, home=None)`
 
 | | |
 |---|---|
-| Purpose | Run the step CLI from the pinned Step-CA image in a throwaway container, as the step user, with the CA data directory mounted at /home/step and no network. |
-| Inputs | v — fabric vars: deploy_base_dir, service_users.step.uid / .gid, image_stepca (the pinned image); args — list of step arguments, paths as seen inside the container (passwords only as *-password-file paths, never values). |
+| Purpose | Run the step CLI from the pinned Step-CA image in a throwaway container, as the step user, with the CA data directory (or `home`) mounted at /home/step and no network. |
+| Inputs | v — fabric vars: deploy_base_dir, service_users.step.uid / .gid, image_stepca (the pinned image); args — list of step arguments, paths as seen inside the container (passwords only as *-password-file paths, never values); home — a directory to mount at /home/step instead of <deploy_base_dir>/stepca/data (a joining site has no CA yet), default None. |
 | Returns | step's stdout (str). |
 | Fails | ValidationError "step-ca refused: <last 300 characters of stderr/stdout>" on any non-zero exit (step or docker); KeyError on missing vars; FileNotFoundError if docker is not installed. |
-| Feeds | mint_offline_cert, sign_csr. |
+| Feeds | mint_offline_cert, sign_csr, sign_site_ca, make_site_ca_request (with home). |
 | Notes | the CA keys never leave the host and the signing container has no network (--network none). |
-| Called by | `fabriclib.pki.mint_offline_cert.mint_offline_cert`, `fabriclib.pki.sign_csr.sign_csr` |
+| Called by | `fabriclib.pki.make_site_ca_request.make_site_ca_request`, `fabriclib.pki.mint_offline_cert.mint_offline_cert`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/safe_name.py`
 
@@ -131,8 +131,8 @@
 | Inputs | data — str (PEM, or bare base64 DER as some devices show it) or bytes (a DER upload, or PEM sent as bytes); kind — "cert" \| "csr" \| "key" (PRIVATE KEY, RSA PRIVATE KEY, EC PRIVATE KEY; encrypted keys are not matched). |
 | Returns | list of PEM blocks (str, each ending in a newline) of that kind in input order (a chain gives several; blocks of other kinds are ignored); [] for empty or blank text. |
 | Fails | ValidationError "no <kind> found in the input" (PEM without a block of that kind); "not a PEM or DER <kind>" (neither PEM nor base64 DER openssl accepts); openssl's first error line for non-ASCII bytes openssl cannot parse as DER; KeyError for an unknown kind. |
-| Feeds | ca_summary, common/ca_chain_pem, convert_cert, describe_csr, inspect_pem, issue_key_pair, sign_csr. |
-| Called by | `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.describe_csr.describe_csr`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
+| Feeds | ca_summary, common/ca_chain_pem, convert_cert, describe_csr, inspect_pem, issue_key_pair, sign_csr, sign_site_ca, stage_site_ca. |
+| Called by | `fabriclib.federation.common.fetch_pinned_root.fetch_pinned_root`, `fabriclib.pki.ca_summary.ca_summary`, `fabriclib.pki.common.ca_chain_pem.ca_chain_pem`, `fabriclib.pki.convert_cert.convert_cert`, `fabriclib.pki.describe_csr.describe_csr`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca`, `fabriclib.pki.stage_site_ca.stage_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/common/valid_days.py`
 
@@ -195,9 +195,9 @@
 | Inputs | data — exactly one CSR as PEM, DER bytes or bare base64. |
 | Returns | {"pem", "subject" (RFC 2253), "cn", "sans" (values without their type), "key" ("RSA <bits>", "EC <curve>", "Ed25519" or the algorithm), "ca_requested" (bool), "problems" (list of str), "text" (openssl -text)}. Empty problems means it may be signed. Recorded as problems, not raised: a signature that does not verify; a SAN other than DNS / IP / e-mail or malformed; no CN and no SAN; a CN-only request whose CN is not a host, IP or e-mail; RSA under 2048 bits; an EC curve other than P-256/384/521; any other key algorithm. |
 | Fails | ValidationError "give exactly one certificate signing request"; to_pem's messages; openssl's first error line if the request cannot be parsed. |
-| Feeds | agent route POST /v1/pki/describe-csr -> webui agentclient.describe_csr; inspect_pem; sign_csr (refuses unless problems is empty). |
+| Feeds | agent route POST /v1/pki/describe-csr -> webui agentclient.describe_csr; inspect_pem; sign_csr (refuses unless problems is empty); sign_site_ca (key and signature checks). |
 | Notes | CA:TRUE is only reported: the CSR's own extensions are never copied, fabric issues a leaf (serverAuth + clientAuth) from its template whatever the CSR asks for. |
-| Called by | `agent.server.Handler.pki`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_csr.sign_csr` |
+| Called by | `agent.server.Handler.pki`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/export_p12.py`
 
@@ -293,6 +293,20 @@
 | Fails | OSError if the ledger exists but cannot be read. |
 | Feeds | agent route GET /v1/pki/issued -> webui agentclient.list_issued -> PKI page (issued view). |
 | Called by | `agent.server.Handler.dispatch` |
+
+## `fabricctl/lib/fabriclib/pki/make_site_ca_request.py`
+
+### `make_site_ca_request(v, site_name, password, work_dir)`
+
+| | |
+|---|---|
+| Purpose | On a site that is joining: make the key of its intermediate CA and a certificate signing request for the root site to sign (sign_site_ca). The key never leaves this host. |
+| Inputs | v — fabric vars: service_users.step.uid / .gid, image_stepca; site_name — SITE_NAME_RE; password — this site's ca_password (the key is encrypted with it, as `step ca init` does, so Step-CA opens it with its usual password file); work_dir — where the key and request are kept (created 0700, owned by the step user). |
+| Returns | {"csr": PEM str, CN "<site_name> Intermediate CA", "key_path": <work_dir>/site_ca_key (EC P-256, encrypted, 0600), "csr_path": <work_dir>/site_ca.csr}. A key and request already in work_dir are returned as they are, so a retried join keeps its key. |
+| Fails | ValidationError "invalid site name: ..."; "the CA password is missing"; "step-ca refused: ..." (run_step); OSError (PermissionError when not root). |
+| Feeds | setup --join (federation M3), then stage_site_ca with the root site's answer. |
+| Notes | the password reaches step through a 0600 file in work_dir, removed afterwards, never argv. |
+| Called by | `fabriclib.federation.join_upstream.join_upstream` |
 
 ## `fabricctl/lib/fabriclib/pki/mint_cert.py`
 
@@ -420,3 +434,52 @@
 | Feeds | agent route POST /v1/pki/sign -> webui agentclient.sign_csr -> PKI page. |
 | Notes | the leaf template sets serverAuth + clientAuth, the CSR's names and fabric's subject defaults; the CSR's own extensions are ignored. The CSR goes to a random-named artifact file (O_EXCL, 0640, step user) that is removed afterwards. Ledger kind "csr"; audited as PKI_SIGN_CSR. |
 | Called by | `agent.server.Handler.pki` |
+
+## `fabricctl/lib/fabriclib/pki/sign_site_ca.py`
+
+### `_hours_left(not_after)`
+
+| | |
+|---|---|
+| Purpose | whole hours from now until an openssl notAfter date. |
+| Inputs | not_after — e.g. "Sep 30 12:00:00 2036 GMT". |
+| Returns | int (negative once passed). |
+| Fails | ValueError for another date format. |
+| Feeds | sign_site_ca (a site's CA never outlives the root). |
+| Called by | `fabriclib.pki.sign_site_ca.sign_site_ca` |
+
+### `_stage(src, dst, uid, gid)`
+
+| | |
+|---|---|
+| Purpose | copy a file into the step user's artifacts directory for one signing, 0600. |
+| Inputs | src, dst — paths; uid, gid — the step user. |
+| Returns | None. |
+| Fails | OSError. |
+| Feeds | sign_site_ca (the CSR, and a root key and password brought in for a byoc root). |
+| Called by | `fabriclib.pki.sign_site_ca.sign_site_ca` |
+
+### `sign_site_ca(v, actor, site_name, csr, root_key='', root_password_file='', source='cli')`
+
+| | |
+|---|---|
+| Purpose | On the root site: sign a joining site's intermediate CA with this fabric's root key. The site made the key itself (make_site_ca_request); only the request travels. |
+| Inputs | v — fabric vars: deploy_base_dir, service_users.step, image_stepca, site_name (this site), byoc, cert_intermediate_days (default 1095); actor — str (audit, ledger); site_name — the joining site, SITE_NAME_RE, not this site's own; csr — PEM/DER/base64 request whose only name is CN "<site_name> Intermediate CA" (step's copy of the CN as a DNS name is ignored); root_key, root_password_file — the root key and its password file, needed when this install's CA was brought in (byoc: its root key is not on this host); otherwise Step-CA's own secrets/root_ca_key and secrets/password; source — default "cli". |
+| Returns | {"cert": PEM of the site's intermediate CA, "root": PEM of the root, "info": describe_cert dict}. The certificate, from a fixed template: subject CN "<site_name> Intermediate CA" and no other names, CA:TRUE with path length 0 (signs leaves only), certificate and CRL signing, the request's key; valid cert_intermediate_days but never past the root's own expiry. |
+| Fails | ValidationError "invalid site name: ..."; "<name> is this site's own name"; "cannot sign: ..." (signature, key strength, or a name other than the expected CN); "this install's root key is not on this host ..." (byoc without root_key) or "no such file: ..."; "the root CA expires in under 30 days"; "step-ca refused: ..." (wrong key or password); "refusing: ..." when the result is not a path-length-0 CA chaining to this root; OSError. |
+| Feeds | the federation endpoint's join (M3), `fabricctl federation sign-csr` for a byoc root (M3). |
+| Notes | ledger kind "site-ca"; audited as FED_SIGN_SITE_CA. Files given to step are copied into the artifacts directory under random names (0600, step user) and removed afterwards. |
+| Called by | `fabriclib.federation.accept_join.accept_join` |
+
+## `fabricctl/lib/fabriclib/pki/stage_site_ca.py`
+
+### `stage_site_ca(work_dir, cert, root, root_sha256='')`
+
+| | |
+|---|---|
+| Purpose | On a joining site: check the root site's answer to make_site_ca_request and lay it out for Step-CA's bring-your-own-CA path (setup step `pki`, init_pki with byoc). |
+| Inputs | work_dir — the directory make_site_ca_request used (holds site_ca_key and site_ca.csr); cert — PEM of the signed site intermediate; root — PEM of the root; root_sha256 — the root's SHA-256 fingerprint the invitation pinned ("AA:BB:..."; empty skips the pin). |
+| Returns | vars for setup: {"byoc": True, "ca_crt_path": <work_dir>/root_ca.crt, "ica_crt_path": <work_dir>/site_ca.crt, "ica_key_path": <work_dir>/site_ca_key}; both certificates written 0644. |
+| Fails | ValidationError "give exactly one certificate" (cert or root); "the root's fingerprint is not the one in the invitation"; "the root is not a self-signed CA"; "the site certificate does not chain to the root"; "the site certificate is not a path-length-0 CA"; "the site certificate is not for this site's key"; "no key/request in <work_dir>: make the request first"; to_pem's messages. |
+| Feeds | setup --join (federation M3), before the `pki` step. |
+| Called by | `fabriclib.federation.join_upstream.join_upstream` |

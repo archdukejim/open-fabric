@@ -321,6 +321,10 @@ if os.environ.get("CAROL_PW"):
 # NEW_PERSON: a reused host (tests/host) already has the previous run's person
 NEW = os.environ.get("NEW_PERSON", "dave")
 st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
+if st == 303:       # the admin's session went idle (session_idle, 900 s) during the slower checks above
+    print("    (admin session idle-expired; signing in again)")
+    login(b, ADMIN, NEW_PW.get(ADMIN, ""))
+    st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
 csrf = page.split('name="csrf" value="')[1].split('"')[0] if 'name="csrf"' in page else ""
 st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/_new",
                         {"csrf": csrf, "uid": NEW, "first": "Dave", "last": "Doe", "email": f"{NEW}@lan.test"})
@@ -328,7 +332,8 @@ check(f"people: the admin adds {NEW} -> one-time password shown once", st == 200
       (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/dirsrv?view=people")
 check(f"people: {NEW} is in the directory (written by Keycloak)", f"{NEW}@lan.test" in page, page[:200])
-st, _, page = b.request("POST", f"https://{MGR}/dirsrv/people/{NEW}/reset", {"csrf": csrf})
-check(f"people: the admin resets {NEW}'s sign-in", st == 200 and "sign-in reset" in page, (st, page[:300]))
+st, loc, page = b.request("POST", f"https://{MGR}/dirsrv/people/{NEW}/reset", {"csrf": csrf})
+check(f"people: the admin resets {NEW}'s sign-in", st == 200 and "sign-in reset" in page,
+      (st, urllib.parse.unquote_plus(loc or ""), page[:300]))
 
 sys.exit(1 if FAILED else 0)

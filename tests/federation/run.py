@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""Federation invitations and joining (design federation.md, M3) with the real Step-CA image:
+
+an upstream ("hq") enables nothing but what the code needs here: its root CA (made with the pinned step
+CLI), its vars and secrets files, the federation endpoint's Handler (lib/federation/server.py) behind TLS
+with a certificate from that root, and a plain-HTTP certificates page. A site ("branch1") joins it with
+join_upstream exactly as `fabricctl setup --join` does. Includes what must be refused.
+
+    sudo python3 tests/federation/run.py         (needs Docker, openssl, root)
+"""
+import base64
+import http.client
+import http.server
+import json
+import os
+import shutil
+import socket
+import socketserver
+import ssl
+import subprocess
+import sys
+import threading
+import time
+
+import yaml
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/federation"
+IMAGE = subprocess.run([sys.executable, os.path.join(REPO, "tests", "image_ref.py"), "stepca"],
+                       capture_output=True, text=True, check=True).stdout.strip()
+STEP_UID = 1912
+FAILED = 0
+
+
+def check(name, cond, detail=""):
+    global FAILED
+    FAILED += not cond
+    print(("PASS " if cond else "FAIL ") + name + ("" if cond else f"  -> {str(detail)[:400]}"))
+
+
+def sh(cmd, ok=True):
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    if ok and res.returncode != 0:
+        raise SystemExit(f"command failed: {cmd}\n{res.stderr}")
+    return res
+
+
+def step(home, *args):
+    return sh(["docker", "run", "--rm", "--network", "none", "-v", f"{home}:/home/step", "--user",
+               f"{STEP_UID}:{STEP_UID}", "--entrypoint", "/usr/local/bin/step", IMAGE, *args])
+
+
+def refused(fn, *args, match="", **kw):
+    try:
+        fn(*args, **kw)
+    except ValidationError as exc:
+        if match.lower() in str(exc).lower():
+            return True
+        print(f"    refused, but not for {match!r}: {exc}")
+    return False
+
+
+def free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+# ---------------------------------------------------------------- the upstream: tree, root CA, vars
+shutil.rmtree(W, ignore_errors=True)
+subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)     # the installed tree
+os.makedirs(f"{W}/fabric/config")
+data = f"{W}/hq/stepca/data"
+for d in ("certs", "secrets", "artifacts"):
+    os.makedirs(f"{data}/{d}")
+with open(f"{data}/secrets/password", "w") as f:
+    f.write("Root-Pw-1")
+sh(["chown", "-R", f"{STEP_UID}:{STEP_UID}", f"{W}/hq"])
+step(data, "certificate", "create", "Fed Test Root CA", "/home/step/certs/root_ca.crt", "/home/step/secrets/root_ca_key",
+     "--profile", "root-ca", "--password-file", "/home/step/secrets/password")
+FED_HOST = "federation.hq.test"
+step(data, "certificate", "create", FED_HOST, "/home/step/fed.crt", "/home/step/fed.key", "--profile", "leaf",
+     "--ca", "/home/step/certs/root_ca.crt", "--ca-key", "/home/step/secrets/root_ca_key",
+     "--ca-password-file", "/home/step/secrets/password", "--no-password", "--insecure", "--san", FED_HOST)
+step(data, "certificate", "create", "evil.test", "/home/step/evil.crt", "/home/step/evil.key", "--profile", "leaf",
+     "--ca", "/home/step/certs/root_ca.crt", "--ca-key", "/home/step/secrets/root_ca_key",
+     "--ca-password-file", "/home/step/secrets/password", "--no-password", "--insecure", "--san", "evil.test")
+ROOT_PEM = open(f"{data}/certs/root_ca.crt").read()
+
+HTTP_PORT, HTTPS_PORT, EVIL_PORT = free_port(), free_port(), free_port()
+HQ = {"deploy_base_dir": f"{W}/hq", "image_stepca": IMAGE, "service_users": {"step": {"uid": STEP_UID, "gid": STEP_UID}},
+      "site_name": "hq", "domain": "hq.test", "org_domain": "hq.test", "host_ip": "127.0.0.1",
+      "hostname_federation": FED_HOST, "federation_endpoint": False, "cert_intermediate_days": 1095,
+      "friendly_name": "Fed Test Org", "cert_org": "Fed Test Org", "cert_country": "US"}
+
+
+def save_hq(**changes):
+    HQ.update(changes)
+    with open(f"{W}/fabric/config/vars.yaml", "w") as f:
+        yaml.safe_dump(HQ, f)
+
+
+save_hq()
+sys.path.insert(0, f"{W}/fabric/lib")
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.federation.accept_join import accept_join  # noqa: E402
+from fabriclib.federation.create_invitation import create_invitation  # noqa: E402
+from fabriclib.federation.decode_invitation import decode_invitation  # noqa: E402
+from fabriclib.federation.federation_status import federation_status  # noqa: E402
+from fabriclib.federation.join_upstream import join_upstream  # noqa: E402
+from fabriclib.federation.list_invitations import list_invitations  # noqa: E402
+from fabriclib.federation.revoke_invitation import revoke_invitation  # noqa: E402
+from fabriclib.pki.common.describe_cert import describe_cert  # noqa: E402
+sys.path.insert(0, f"{W}/fabric/lib/federation")
+import server as fed_server  # noqa: E402
+
+SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
+
+# ---------------------------------------------------------------- invitations
+check("invite: refused while the endpoint is off",
+      refused(create_invitation, HQ, "alice", "branch1", match="endpoint is off"))
+save_hq(federation_endpoint=True)
+inv = create_invitation(HQ, "alice", "branch1")
+body = decode_invitation(inv["invitation"])
+check("invite: decodes to the site, the endpoint and the root's fingerprint",
+      body["site"] == "branch1" and body["host"] == FED_HOST and body["address"] == "127.0.0.1"
+      and body["root_sha256"] == describe_cert(ROOT_PEM)["sha256"] and body["org_domain"] == "hq.test", body)
+stored = open(SECRETS).read()
+check("invite: only a hash of the secret is kept", body["secret"] not in stored and "sha256" in stored)
+check("invite: the secret is not in the audit log", body["secret"] not in open(f"{W}/fabric/archive/audit.log").read())
+check("invite: listed as open", [i["site"] for i in list_invitations(HQ)] == ["branch1"])
+check("invite: this site's own name refused", refused(create_invitation, HQ, "alice", "hq", match="own name"))
+check("invite: invalid site name refused", refused(create_invitation, HQ, "alice", "Bad_Site", match="invalid site"))
+check("decode: not an invitation refused", refused(decode_invitation, "hello", match="not a fabric invitation"))
+check("decode: a damaged invitation refused", refused(decode_invitation, inv["invitation"][:-9] + "!!!!", match="damaged"))
+forged = json.loads(base64.urlsafe_b64decode(inv["invitation"].split(".", 1)[1] + "==="))
+forged["address"] = "not-an-ip"
+forged_text = "fabric-join-1." + base64.urlsafe_b64encode(json.dumps(forged).encode()).decode()
+check("decode: a bad field refused", refused(decode_invitation, forged_text, match="bad address"))
+inv_b2 = create_invitation(HQ, "alice", "branch2")
+check("revoke: by site name", revoke_invitation(HQ, "alice", "branch2") == 1
+      and "branch2" not in [i["site"] for i in list_invitations(HQ)])
+check("revoke: nothing open refused", refused(revoke_invitation, HQ, "alice", "branch2", match="no open invitation"))
+old = create_invitation(HQ, "alice", "branch3", now=time.time() - 7200)
+check("invite: an expired invitation is not listed", "branch3" not in [i["site"] for i in list_invitations(HQ)])
+
+
+# ---------------------------------------------------------------- the upstream's endpoint and certs page
+class TLSServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def __init__(self, addr, cert, key):
+        super().__init__(addr, fed_server.Handler)
+        self.ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self.ctx.load_cert_chain(cert, key)
+
+    def get_request(self):
+        sock, addr = super().get_request()
+        return self.ctx.wrap_socket(sock, server_side=True), addr
+
+
+os.makedirs(f"{W}/www/certs")
+shutil.copy(f"{data}/certs/root_ca.crt", f"{W}/www/certs/root-ca.crt")
+web = socketserver.TCPServer(("127.0.0.1", HTTP_PORT),
+                             lambda *a: http.server.SimpleHTTPRequestHandler(*a, directory=f"{W}/www"))
+tls = TLSServer(("127.0.0.1", HTTPS_PORT), f"{data}/fed.crt", f"{data}/fed.key")
+evil = TLSServer(("127.0.0.1", EVIL_PORT), f"{data}/evil.crt", f"{data}/evil.key")
+for srv in (web, tls, evil):
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+
+def raw(method, path, body=b"", port=HTTPS_PORT):
+    ctx = ssl.create_default_context(cadata=ROOT_PEM)
+    ctx.check_hostname = False                 # the test talks to 127.0.0.1; join_upstream checks the name
+    c = http.client.HTTPSConnection("127.0.0.1", port, context=ctx, timeout=60)
+    c.request(method, path, body=body, headers={"Content-Type": "application/json"})
+    r = c.getresponse()
+    return r.status, r.read().decode()
+
+
+st, page = raw("GET", "/v1/health")
+check("endpoint: health answers with this site", st == 200 and json.loads(page)["site"] == "hq", (st, page))
+check("endpoint: unknown paths are 404", raw("GET", "/v1/secrets")[0] == 404 and raw("POST", "/v1/admin")[0] == 404)
+check("endpoint: a body that is not JSON is refused", raw("POST", "/v1/join", b"not json")[0] == 400)
+check("endpoint: an oversized body is refused", raw("POST", "/v1/join", b"x" * 20000)[0] == 413)
+st, page = raw("POST", "/v1/join", json.dumps({"id": body["id"], "secret": "x" * 43, "site": "branch1", "csr": "x",
+                                                "domain": "branch1.hq.test", "address": "127.0.0.2"}).encode())
+check("endpoint: a wrong secret is refused, without saying why", st == 400 and "not valid" in page, (st, page))
+check("endpoint: the refusal is audited", "FED_JOIN_REFUSED" in open(f"{W}/fabric/archive/audit.log").read())
+
+# ---------------------------------------------------------------- a site joins
+SITE = {"image_stepca": IMAGE, "service_users": {"step": {"uid": STEP_UID, "gid": STEP_UID}}}
+B1 = f"{W}/branch1"
+os.makedirs(f"{B1}/config")
+J = dict(config_dir=f"{B1}/config", audit_path=f"{B1}/audit.log", http_port=HTTP_PORT, https_port=HTTPS_PORT)
+
+bad_pin = dict(forged, address="127.0.0.1", root_sha256="AA:" + body["root_sha256"][3:])
+bad_pin_text = "fabric-join-1." + base64.urlsafe_b64encode(json.dumps(bad_pin).encode()).decode()
+check("join: a root other than the pinned one is refused before anything is sent",
+      refused(join_upstream, SITE, bad_pin_text, "Site-Pw-1", f"{B1}/site-ca", "branch1.hq.test", "127.0.0.2",
+              **J, match="not the one in the invitation"))
+check("join: an endpoint whose certificate does not name the federation host is refused",
+      refused(join_upstream, SITE, inv["invitation"], "Site-Pw-1", f"{B1}/site-ca", "branch1.hq.test", "127.0.0.2",
+              **dict(J, https_port=EVIL_PORT), match="cannot reach"))
+check("join: the upstream's own domain is refused for a site",
+      refused(join_upstream, SITE, inv["invitation"], "Site-Pw-1", f"{B1}/site-ca", "hq.test", "127.0.0.2", **J,
+              match="cannot use this site's domain"))
+check("join: an invitation for another site refused (branch1's used as branch9)",
+      refused(accept_join, HQ, {"id": body["id"], "secret": body["secret"], "site": "branch9", "csr": "x",
+                                "domain": "b9.hq.test", "address": "127.0.0.9"}, match="made for site branch1"))
+check("join: an expired invitation is refused",
+      refused(accept_join, HQ, {**{k: decode_invitation(old["invitation"])[k] for k in ("id", "secret", "site")},
+                                "csr": "x", "domain": "b3.hq.test", "address": "127.0.0.3"}, match="not valid"))
+
+res = join_upstream(SITE, inv["invitation"], "Site-Pw-1", f"{B1}/site-ca", "branch1.hq.test", "127.0.0.2", **J)
+jv = res["vars"]
+check("join: the site gets the bring-your-own-CA settings and the organisation",
+      res["joined"] and jv["byoc"] and jv["site_name"] == "branch1" and jv["org_domain"] == "hq.test"
+      and jv["cert_org"] == "Fed Test Org" and all(os.path.isfile(jv[k]) for k in ("ca_crt_path", "ica_crt_path",
+                                                                                    "ica_key_path")), res)
+site_ca = open(jv["ica_crt_path"]).read()
+check("join: the site's CA is signed by the organisation's root, path length 0",
+      sh(["openssl", "verify", "-CAfile", jv["ca_crt_path"], jv["ica_crt_path"]], ok=False).returncode == 0
+      and "pathlen:0" in sh(["openssl", "x509", "-in", jv["ica_crt_path"], "-noout", "-text"]).stdout)
+check("join: the site's key never left it (only the request travelled)",
+      "PRIVATE" not in open(f"{W}/fabric/archive/issued-certs.jsonl").read()
+      and "ENCRYPTED" in open(jv["ica_key_path"]).read(80))
+hq_reg = yaml.safe_load(open(f"{W}/fabric/config/federation.yaml"))
+check("join: the upstream records the site", hq_reg["sites"]["branch1"]["domain"] == "branch1.hq.test"
+      and hq_reg["sites"]["branch1"]["address"] == "127.0.0.2", hq_reg)
+b1_reg = yaml.safe_load(open(f"{B1}/config/federation.yaml"))
+check("join: the site records its upstream", b1_reg["upstream"]["site_name"] == "hq"
+      and b1_reg["upstream"]["root_sha256"] == body["root_sha256"], b1_reg)
+check("join: the invitation is used up", "branch1" not in [i["site"] for i in list_invitations(HQ)])
+check("join: audited on both sides", "FED_JOIN " in open(f"{W}/fabric/archive/audit.log").read()
+      and "FED_JOINED" in open(f"{B1}/audit.log").read())
+st, page = raw("POST", "/v1/join", json.dumps({"id": body["id"], "secret": body["secret"], "site": "branch1",
+                                                "csr": "x", "domain": "branch1.hq.test", "address": "127.0.0.2"}).encode())
+check("join: the same invitation cannot be used twice", st == 400 and "not valid" in page, (st, page))
+check("invite: a site that joined cannot be invited again",
+      refused(create_invitation, HQ, "alice", "branch1", match="joined already"))
+s = federation_status(HQ)
+check("status: the upstream lists its site", s["role"] == "upstream" and "branch1" in s["sites"] and s["endpoint"], s)
+
+tls.shutdown()
+again = join_upstream(SITE, inv["invitation"], "Site-Pw-1", f"{B1}/site-ca", "branch1.hq.test", "127.0.0.2", **J)
+check("join: a re-run (setup repeated) reuses what was staged, without the network",
+      again["joined"] is False and again["vars"] == jv, again)
+inv_other = create_invitation(dict(HQ, site_name="hq2"), "alice", "branch1x")
+check("join: a node that joined one upstream refuses another's invitation",
+      refused(join_upstream, SITE, inv_other["invitation"], "Site-Pw-1", f"{B1}/site-ca", "branch1.hq.test",
+              "127.0.0.2", **J, match="already joined"))
+
+# ---------------------------------------------------------------- the unix socket accepts only listed uids
+sock_path = f"{W}/fed.sock"
+srv = fed_server.UnixServer(sock_path, fed_server.Handler)
+threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+
+def over_socket():
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(10)
+    s.connect(sock_path)
+    s.sendall(b"GET /v1/health HTTP/1.0\r\n\r\n")
+    out = b""
+    try:
+        while chunk := s.recv(4096):
+            out += chunk
+    except ConnectionResetError:          # refused peers are cut off
+        pass
+    return out.decode(errors="replace")
+
+
+fed_server.UnixServer.allowed_uids = {0}
+check("socket: root (a listed uid) is answered", " 200 " in over_socket().splitlines()[0])
+fed_server.UnixServer.allowed_uids = {12345}
+check("socket: an unlisted uid gets nothing", over_socket() == "")
+srv.shutdown()
+for s_ in (web, evil):
+    s_.shutdown()
+
+print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
+sys.exit(1 if FAILED else 0)

@@ -135,9 +135,11 @@ intermediate revoked (F7). The site keeps its copies and becomes standalone.
 ## 5. The federation endpoint
 
 A new small API on each node, served by nginx on 443 (`federation.<site>.<domain>`)
-and handled by fabric-agent: **mutual TLS** with node certificates from the
+and handled by its own minimal root service, `fabric-federation` (not
+fabric-agent: it is the only fabric API peers on the network reach, so it
+serves only what they need): **mutual TLS** with node certificates from the
 fabric CA chain (a node proves which site it is), plus the invitation secret
-for the one join call. Routes: join, renew intermediate, status (for the
+for the one join call (built: the join alone, authenticated by the secret). Routes: join, renew intermediate, status (for the
 upstream's dashboard), and — later — site-local administration from the
 upstream (F5). Firewall: peers are allowed to exactly the ports they need
 (443 federation, 636 replication, 53 TCP zone transfers; within a site also
@@ -188,13 +190,20 @@ leaves the site); a branch's domain is **free, default `<site>.<domain>`**;
 the directory is **split into an organisation part and a local part, and
 existing installs are migrated**.
 
+**A root site whose CA was brought in** (`byoc`, like an offline root) has no
+root key on the host, so it cannot sign a site's CA during an online join.
+`sign_site_ca` then needs the root key and its password file handed to it for
+that one signing; M3 gives this an offline path (`fabricctl federation
+sign-csr`): the join waits for the signed answer instead of getting it
+from the endpoint.
+
 Milestones, each tested before the next:
 
 | M | What | Notes |
 |---|---|---|
-| M1 | **Directory split** on every install (standalone too): the organisation suffix (`ldap_base_dn`: people, groups, device roles) and a **local suffix** `o=<site_name>` (this install's service accounts, its devices). A device names its roles (`fabricRole`) instead of roles listing members, so a site can put its devices into roles it only has a read-only copy of. Existing installs migrated on upgrade (devices and service accounts moved, role members turned into `fabricRole`). `site_name` defaults to the host name and is fixed after install | Everything that binds or searches: fabric-agent, Keycloak federation, FreeRADIUS, the web UI, OpenBao's LDAP, the seed and ACIs, tests |
-| M2 | **Site CAs**: signing a site's intermediate with the root key (subca template, path length); setup `--join` feeds it into the bring-your-own-CA path | |
-| M3 | **Invite and join**: `fabricctl federation invite|join|status`, one-time invitations kept hashed in fabric's secrets, the federation endpoint (a separate minimal root handler behind nginx, `federation.<domain>`) | |
+| M1 | **Directory split** on every install (standalone too): the organisation suffix (`ldap_base_dn`: people, groups, device roles) and a **local suffix** `o=<site_name>` (this install's service accounts, its devices). A device names its roles (`fabricRoleName`) instead of roles listing members, so a site can put its devices into roles it only has a read-only copy of. Existing installs migrated on upgrade (devices and service accounts moved, role members turned into `fabricRoleName`). `site_name` defaults to the host name and is fixed after install | **Done.** Everything that binds or searches: fabric-agent, Keycloak federation, FreeRADIUS, the web UI, the seed and ACIs, tests (`fabriclib/ldap/migrate_local_suffix.py`, `tests/dirsrv/migrate.py`) |
+| M2 | **Site CAs**: signing a site's intermediate with the root key (fixed template, path length 0); setup `--join` feeds it into the bring-your-own-CA path | **Done** (the operations; `--join` comes with M3): `pki/make_site_ca_request` (site: EC P-256 key encrypted with its `ca_password`, never leaves), `pki/sign_site_ca` (root: subject `<site> Intermediate CA`, no other names, never past the root's expiry), `pki/stage_site_ca` (site: pinned root fingerprint, chain, path length, its own key) → `byoc`. Step-CA now always gets its password file. `tests/pki/site_ca.py` |
+| M3 | **Invite and join**: `fabricctl federation invite|join|status`, one-time invitations kept hashed in fabric's secrets, the federation endpoint (a separate minimal root handler behind nginx, `federation.<domain>`) | **Done**: `fabricctl federation status/enable/disable/invite/invitations/revoke`; `setup --join` (step `join`, before `deploy`; fresh installs only; idempotent). The joining node fetches the root over plain HTTP and accepts it only by the invitation's fingerprint, then joins over TLS verified against it (by address, checking the endpoint's name). `org_domain` names the organisation suffix, so a site with its own domain shares it. Endpoint: `fabric-federation` (`lib/federation/server.py`, socket for nginx's uid only), `/v1/join` rate- and size-limited. `tests/federation/run.py`. Not yet: mutual TLS routes (status, renew), an offline signing path for a byoc root |
 | M4 | **DNS**: delegation (NS + glue) for sub-domain sites, secondary zones both ways with TSIG | |
 | M5 | **Identity replication**: 389-DS changelog and replicas; organisation suffix supplied by the root site, read-only at sites; each site's local suffix replicated up; site Keycloak read-only on the organisation (no people created at a site) | |
 | M6 | Web UI Federation tab, docs, a two-site sandbox test, the Pi | |

@@ -303,5 +303,12 @@ remove_tsig_key("alice", "legacy", source="web")
 check("remove: key and secret gone", "legacy" not in open(f"{W}/fabric/config/vars.yaml").read()
       and kept not in open(f"{W}/fabric/config/fabric-secrets.yml").read())
 
+# ---------------------------------------------------------------- federation site CAs (own throwaway root)
+print("--- site CAs (site_ca.py)")
+site = subprocess.run([sys.executable, os.path.join(REPO, "tests", "pki", "site_ca.py")], capture_output=True, text=True)
+print("\n".join(line for line in site.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+      or site.stdout[-2000:] + site.stderr[-2000:])
+check("site CAs: site_ca.py passed", site.returncode == 0, site.stderr[-400:])
+
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
 sys.exit(1 if FAILED else 0)

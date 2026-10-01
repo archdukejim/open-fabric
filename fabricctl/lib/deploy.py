@@ -15,6 +15,8 @@ from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.federation.constants import SITE_NAME_RE  # noqa: E402
+from fabriclib.federation.deploy_federation_endpoint import deploy_federation_endpoint  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
@@ -243,9 +245,9 @@ def apply_deployment(start_services=True):
              restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them.
     Fails:   sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys,
              ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is
-             set with install_ldap false; host_ram_capacity is 1 or 2; site_name differs from the one recorded in
-             config/.site-name (it names the local directory suffix, fixed once installed); vars.yaml.j2 or any template fails to render; an
-             image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad
+             set with install_ldap false; host_ram_capacity is 1 or 2; site_name is not one host-name label, or
+             site_name / org_domain differ from config/.site-name / .org-domain (they name the directory's
+             suffixes, fixed once installed); vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad
              link-vars file is only printed. OSError from file operations propagates.
     Feeds:   fabriclib/setup/deploy_config.py (setup, images/switch_image.py); interactive.apply_mode (`fabricctl
              --apply`, the menu, and fabriclib/system/apply_changes.py for the web UI); `python3 deploy.py`.
@@ -423,19 +425,24 @@ def apply_deployment(start_services=True):
     else:
         final_vars = fresh_vars
 
-    # The site name names the local directory suffix (its devices and service accounts): fixed once
-    # installed. Recorded on first deploy (an install from before sites gets its current name).
-    site_marker = os.path.join(TARGET_FABRIC, "config", ".site-name")
-    if os.path.exists(site_marker):
-        recorded = open(site_marker).read().strip()
-        if recorded and recorded != final_vars.get('site_name'):
-            print(f"Error: site_name is '{recorded}' on this install and cannot change "
-                  f"(asked: '{final_vars.get('site_name')}'); set site_name: {recorded}")
-            sys.exit(1)
-    else:
-        ensure_dir(os.path.dirname(site_marker))
-        with open(site_marker, "w") as f:
-            f.write(final_vars.get('site_name', '') + "\n")
+    # The site name names the local directory suffix (its devices and service accounts) and the
+    # organisation domain names the organisation suffix: both fixed once installed. Recorded on first
+    # deploy (an install from before sites gets its current values).
+    if not SITE_NAME_RE.match(str(final_vars.get('site_name', ''))):
+        print(f"Error: site_name '{final_vars.get('site_name')}' is not one host-name label (a-z, 0-9, -)")
+        sys.exit(1)
+    for key, marker in (('site_name', '.site-name'), ('org_domain', '.org-domain')):
+        marker = os.path.join(TARGET_FABRIC, "config", marker)
+        if os.path.exists(marker):
+            recorded = open(marker).read().strip()
+            if recorded and recorded != final_vars.get(key):
+                print(f"Error: {key} is '{recorded}' on this install and cannot change "
+                      f"(asked: '{final_vars.get(key)}'); set {key}: {recorded}")
+                sys.exit(1)
+        else:
+            ensure_dir(os.path.dirname(marker))
+            with open(marker, "w") as f:
+                f.write(str(final_vars.get(key, '')) + "\n")
 
     render_tmp = "/tmp/fabric-render"
     if os.path.exists(render_tmp):
@@ -590,6 +597,10 @@ def apply_deployment(start_services=True):
     if final_vars.get('install_webui'):
         render_file('webui/webui.json.j2', 'webui/webui.json')
         render_file('systemd/fabric-agent.service.j2', 'systemd/fabric-agent.service')
+
+    # federation endpoint (sites join through it)
+    if final_vars.get('federation_endpoint'):
+        render_file('systemd/fabric-federation.service.j2', 'systemd/fabric-federation.service')
 
     # OpenBao
     render_file('openbao/openbao.hcl.j2', 'openbao/config/openbao.hcl')
@@ -809,6 +820,11 @@ def apply_deployment(start_services=True):
             os.chmod(unit_dst, 0o644)
             agent_unit_changed = daemon_reload_needed = True
 
+    # federation endpoint host unit + the socket directory nginx mounts (or their removal)
+    fed = deploy_federation_endpoint(final_vars, render_tmp, DEPLOY_BASE_DIR)
+    if fed["unit_changed"] or fed["removed"]:
+        daemon_reload_needed = True
+
     # Step-CA Files
     step_uid, step_gid = get_service_user(final_vars, 'step')
     ensure_dir(os.path.join(DEPLOY_BASE_DIR, "stepca/data"), 0o750, step_uid, step_gid)
@@ -861,6 +877,8 @@ def apply_deployment(start_services=True):
             services_to_restart.add("fabric-web")
         if agent_unit_changed:
             services_to_restart.add("fabric-agent")
+        if fed["unit_changed"]:
+            services_to_restart.add("fabric-federation")
         if daemon_reload_needed:
             subprocess.run(["systemctl", "daemon-reload"], timeout=30)
         # No --pull: setup never takes a new base image implicitly.
@@ -951,6 +969,12 @@ def apply_deployment(start_services=True):
         # --no-block: this apply may itself be running inside fabric-agent.
         print("Restarting fabric-agent (queued)...")
         subprocess.run(["systemctl", "restart", "--no-block", "fabric-agent"], timeout=15)
+
+    if final_vars.get('federation_endpoint') and (fed["unit_changed"] or subprocess.run(
+            ["systemctl", "is-active", "--quiet", "fabric-federation"]).returncode != 0):
+        print("Starting the federation endpoint...")
+        subprocess.run(["systemctl", "enable", "fabric-federation"], capture_output=True, timeout=30)
+        subprocess.run(["systemctl", "restart", "fabric-federation"], timeout=30)
 
     if restart_webui and subprocess.run(["systemctl", "is-enabled", "--quiet", "fabric-web"]).returncode == 0:
         print("Restarting webui (queued)...")

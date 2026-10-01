@@ -140,6 +140,6 @@ ica_crt_path: /path/to/transferred/region-a-ica-internal.crt
 ica_key_path: /path/to/transferred/region-a-ica-internal.key   # default: ica_crt_path with .key
 ```
 
-BYOC is read only on the first setup (while Step-CA has no `ca.json`); changing `byoc` or the paths later has no effect. The `pki` step refuses when a file is missing, copies them into `/opt/stepca/data`, and checks the intermediate with `openssl verify` against `ca_crt_path`. *Not tested by the fabric project:* that check is given only the root, so an intermediate signed by another intermediate (a Second Level ICA and deeper) may be refused there.
+BYOC is read only on the first setup (while Step-CA has no `ca.json`); changing `byoc` or the paths later has no effect. The `pki` step refuses when a file is missing, copies them into `/opt/stepca/data` (the intermediate key unencrypted or encrypted with fabric's `ca_password`; the unused root key `step ca init` made is removed), and checks the intermediate with `openssl verify` against `ca_crt_path`. *Not tested by the fabric project:* that check is given only the root, so an intermediate signed by another intermediate (a Second Level ICA and deeper) may be refused there.
 
 *(A hardware key is not supported by setup: the `pki` step requires a key file at `ica_key_path`. Moving Step-CA to a PKCS#11 key means editing its `ca.json` KMS settings by hand after deployment.)*

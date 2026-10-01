@@ -13,7 +13,7 @@ def openssl(*args, data=None, check=True):
              failed" if stderr is empty) on a non-zero exit when check; FileNotFoundError if openssl is not
              installed.
     Feeds:   common/describe_cert, common/to_pem, describe_csr, inspect_pem, convert_cert, issue_key_pair,
-             sign_csr.
+             sign_csr, stage_site_ca.
     """
     text = not isinstance(data, bytes)
     res = subprocess.run(["openssl", *args], input=data, capture_output=True, text=text)

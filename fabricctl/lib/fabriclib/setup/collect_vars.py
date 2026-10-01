@@ -7,6 +7,8 @@ import yaml
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
+from fabriclib.federation.common.load_registry import load_registry
+from fabriclib.federation.decode_invitation import decode_invitation
 from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.errors import SetupError
@@ -73,9 +75,35 @@ def _ask(key, default):
         print(f"    not a valid {key}")
 
 
+def _join_defaults(ctx, data):
+    """Purpose: settings a site joining an upstream (setup --join) starts from: the invitation's site name and
+             organisation domain, and a domain of its own, by default <site>.<organisation domain>.
+    Inputs:  ctx — SetupContext: join_invitation, vars_file, config_dir; data — the settings so far (changed).
+    Returns: None; data gets site_name, org_domain and (unless set) domain.
+    Fails:   SetupError when the invitation is damaged (decode_invitation), when this host already has a fabric
+             that is not a member of that upstream (only fresh installs join: design F1), or when site_name is
+             set to another name than the invitation's.
+    Feeds:   collect_vars."""
+    try:
+        inv = decode_invitation(ctx.join_invitation)
+    except ValidationError as e:
+        raise SetupError(str(e)) from None
+    upstream = load_registry(os.path.join(ctx.config_dir, "federation.yaml"))["upstream"]
+    if os.path.exists(ctx.vars_file) and not (upstream and upstream.get("site_name") == inv["upstream"]):
+        raise SetupError("only a fresh install can join a fabric: this host already has one "
+                         "(fabricctl uninstall first, or invite it later when existing installs can join)")
+    if data.get("site_name") and str(data["site_name"]).lower() != inv["site"]:
+        raise SetupError(f"the invitation is for site {inv['site']}, but site_name is {data['site_name']}")
+    data["site_name"], data["org_domain"] = inv["site"], inv["org_domain"]
+    if not data.get("domain"):
+        data["domain"] = f"{inv['site']}.{inv['org_domain']}"
+    info(f"joining {inv['upstream']} ({inv['org_domain']}) as site {inv['site']}, domain {data['domain']}")
+
+
 def collect_vars(ctx):
     """Purpose: work out the settings this install is rendered from and save them as <config>/fabric.yaml.
-    Inputs:  ctx — SetupContext: user_vars_file (--file), non_interactive, vars_file (existing install),
+    Inputs:  ctx — SetupContext: user_vars_file (--file), join_invitation (--join: _join_defaults), non_interactive,
+             vars_file (existing install),
              source_dir (a checkout's ../custom-vars.yaml), config_dir, secrets_file, deploy_base;
              env SUDO_USER (default admin name).
     Returns: path of fabric.yaml (str). Leaves ctx.vars = the data written. Precedence: an existing
@@ -113,6 +141,9 @@ def collect_vars(ctx):
     if user_file:
         data.update(user)
         info(f"overrides from {user_file}")
+
+    if ctx.join_invitation:
+        _join_defaults(ctx, data)
 
     bad = [k for k in REQUIRED if not _valid(k, str(data.get(k) or ""))]
     if bad:

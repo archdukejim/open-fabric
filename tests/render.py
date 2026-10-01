@@ -135,6 +135,27 @@ assert 'server_name admin.example.org;' in ngx and 'server_name certs.lan.j-j.fa
 same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'hostname': 'fabric'}))
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
+
+# Federation (design federation.md): the endpoint's vhost, socket mount, CNAME and unit only when it is
+# on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.
+assert v2['federation_endpoint'] is False and v2['org_domain'] == v2['domain'], (v2['federation_endpoint'], v2['org_domain'])
+assert v2['hostname_federation'] == 'federation.lan.j-j.family', v2['hostname_federation']
+assert 'federation' not in [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']], 'no CNAME while the endpoint is off'
+assert 'server_name federation.' not in env.get_template('nginx/nginx.conf.j2').render(**full), 'no vhost while off'
+assert '/srv/federation' not in env.get_template('nginx/docker-compose.yml.j2').render(**full), 'no socket mount while off'
+fed = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'federation_endpoint': True}))
+assert 'federation' in [r['name'] for r in fed['dns']['dynamic_zone_var']['CNAME']], 'CNAME for the endpoint'
+ngx = env.get_template('nginx/nginx.conf.j2').render(**{**secrets, **fed})
+assert 'server_name federation.lan.j-j.family;' in ngx and 'proxy_pass http://unix:/srv/federation/federation.sock:;' in ngx
+assert 'limit_req zone=federation' in ngx and 'client_max_body_size 16k;' in ngx, 'the join route is rate- and size-limited'
+assert 'federation/run:/srv/federation:ro' in env.get_template('nginx/docker-compose.yml.j2').render(**{**secrets, **fed})
+unit = env.get_template('systemd/fabric-federation.service.j2').render(**fed)
+assert f"--allow-uid {fed['service_users']['nginx']['uid']}" in unit and 'lib/federation/server.py' in unit, unit
+site = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'domain': 'branch1.lan.j-j.family',
+                                                                  'org_domain': 'lan.j-j.family', 'site_name': 'branch1'}))
+assert site['ldap_base_dn'] == v2['ldap_base_dn'] and site['ldap_domain_components'] == v2['ldap_domain_components']
+assert site['ldap_local_dn'] == 'o=branch1' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
+print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
 # Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402
@@ -331,3 +352,13 @@ for _m, _mode in (("tls", "machine"), ("ttls", "user")):
 assert "-Pfx" in _g["windows"]["tls"]["script"] and "<Type xmlns=\"http://www.microsoft.com/provisioning/EapCommon\">21<" \
     in _g["windows"]["ttls"]["script"] and "<PAPAuthentication />" in _g["windows"]["ttls"]["script"]
 print("802.1X guides: Windows scripts (CA, pinned server, well-formed profiles, CRLF, public data only)")
+
+# every command fabriclib/cli.py handles is handed to it by manage.sh (else `fabricctl <cmd>` says "Unknown flag")
+_cli = open(os.path.join(REPO, "fabricctl", "lib", "fabriclib", "cli.py")).read()
+_cmds = set(re.findall(r'cmd == "([a-z][a-z-]*)"', _cli)) | {c for t in re.findall(r"cmd in \(([^)]*)\)", _cli)
+                                                           for c in re.findall(r'"([a-z][a-z-]*)"', t)}
+_cmds -= {"help", "extra-cert", "restore"}      # fallback; internal (certs.sh); restore: the package wrapper (no install yet)
+_routed = set(re.search(r"^\s*([a-z|-]+)\) exec python3 \"\$FABRIC_DIR/lib/fabriclib/cli.py\"",
+                        open(os.path.join(REPO, "fabricctl", "lib", "manage.sh")).read(), re.M).group(1).split("|"))
+assert _cmds <= _routed, f"cli.py commands manage.sh does not route: {sorted(_cmds - _routed)}"
+print('every fabricctl subcommand reaches cli.py')

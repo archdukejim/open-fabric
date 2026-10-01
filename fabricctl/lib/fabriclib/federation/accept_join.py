@@ -1,0 +1,77 @@
+import datetime
+import hashlib
+import hmac
+import ipaddress
+import time
+
+from fabriclib.common.errors import ValidationError
+from fabriclib.common.write_audit import write_audit
+from fabriclib.federation.common.federation_lock import federation_lock
+from fabriclib.federation.common.load_registry import load_registry
+from fabriclib.federation.common.save_registry import save_registry
+from fabriclib.federation.constants import DOMAIN_RE, SITE_NAME_RE
+from fabriclib.pki.sign_site_ca import sign_site_ca
+from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.secrets.save_secrets import save_secrets
+
+_ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou")
+REFUSED = "the invitation is not valid (unknown, used, withdrawn or expired)"
+
+
+def accept_join(v, req, client_ip="", now=None):
+    """Purpose: On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time
+             invitation, sign the site's intermediate CA with the root key, record the site and use up the
+             invitation.
+    Inputs:  v — fabric vars: domain, org_domain (default domain), site_name, host_ip, hostname_federation and
+             the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join
+             request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)};
+             client_ip — str for the audit; now — epoch seconds, default time.time().
+    Returns: {"root": PEM, "cert": PEM of the site's intermediate, "org": {"org_domain", friendly_name,
+             cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
+    Fails:   ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or
+             "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
+             so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has
+             joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can
+             retry); ValidationError from load_secrets/save_secrets; OSError.
+    Feeds:   the federation endpoint (fabricctl/lib/federation/server.py, POST /v1/join).
+    Notes:   the secret is compared by its SHA-256 in constant time; audited as FED_JOIN (actor "site:<name>",
+             with the client address) and, on refusal, FED_JOIN_REFUSED."""
+    now = int(now if now is not None else time.time())
+    if not isinstance(req, dict) or not all(isinstance(req.get(k), str) and req.get(k)
+                                            for k in ("id", "secret", "site", "csr", "domain", "address")):
+        raise ValidationError("the join request is incomplete")
+    site, domain = req["site"].strip().lower(), req["domain"].strip().lower().rstrip(".")
+    if not SITE_NAME_RE.match(site) or not DOMAIN_RE.match(domain):
+        raise ValidationError("the site's name or domain is not valid")
+    if domain == v["domain"]:
+        raise ValidationError("a site cannot use this site's domain")
+    try:
+        ipaddress.ip_address(req["address"])
+    except ValueError:
+        raise ValidationError("the site's address is not valid") from None
+    with federation_lock():
+        invites = load_secrets(v=v).get("federation_invitations") or {}
+        entry = invites.get(req["id"]) or {}
+        digest = hashlib.sha256(req["secret"].encode()).hexdigest()
+        if not (entry and entry.get("expires", 0) > now and hmac.compare_digest(entry.get("sha256", ""), digest)):
+            write_audit(f"site:{site}", "FED_JOIN_REFUSED", f"id={req['id'][:16]} from={client_ip}", "federation")
+            raise ValidationError(REFUSED)
+        if entry.get("site") != site:
+            raise ValidationError(f"the invitation was made for site {entry.get('site')}")
+        registry = load_registry()
+        if site in registry["sites"]:
+            raise ValidationError(f"site {site} has joined already")
+        signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation")
+        save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]}}, v=v)
+        registry["sites"][site] = {
+            "domain": domain, "address": req["address"],
+            "joined": datetime.datetime.fromtimestamp(now).isoformat(timespec="seconds"),
+            "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
+            "invited_by": entry.get("actor", "")}
+        save_registry(registry)
+    write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
+                                            f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")
+    org = {"org_domain": v.get("org_domain") or v["domain"], **{k: v.get(k) for k in _ORG_KEYS if v.get(k)}}
+    return {"root": signed["root"], "cert": signed["cert"], "org": org,
+            "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
+                         "address": v["host_ip"]}}

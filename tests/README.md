@@ -13,6 +13,7 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `zone` | `zone_test.py` | `deploy.py`'s zone deployment with `rndc` stubbed: unchanged records ignored, changed zones found, fresh mtime, BIND's late write detected and the swap repeated, stale journal removed |
 | `webui` | [webui/](webui/) | The web UI container against a mock Keycloak and the real fabric-agent; the dev preview |
 | `pki` | [pki/](pki/) | Manual PKI against a real Step-CA |
+| `federation` | [federation/](federation/) | Invitations, the federation endpoint and a site joining an upstream (real Step-CA) |
 | `openbao` | [openbao/](openbao/) | OpenBao: unlock methods (key file, USB, security key, KMIP), rotation, fabric's secrets, policies, break glass |
 | `fluentbit` | [fluentbit/](fluentbit/) | Log forwarding to TLS syslog and Elasticsearch receivers |
 | `kea` | [kea/](kea/) | Kea DHCP with DDNS into BIND, real DHCP clients |

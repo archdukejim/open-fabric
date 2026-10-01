@@ -19,7 +19,7 @@ def to_pem(data, kind):
              or DER <kind>" (neither PEM nor base64 DER openssl accepts); openssl's first error line for
              non-ASCII bytes openssl cannot parse as DER; KeyError for an unknown kind.
     Feeds:   ca_summary, common/ca_chain_pem, convert_cert, describe_csr, inspect_pem, issue_key_pair,
-             sign_csr.
+             sign_csr, sign_site_ca, stage_site_ca.
     """
     if isinstance(data, bytes):
         try:

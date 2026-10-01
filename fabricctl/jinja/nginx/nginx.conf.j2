@@ -283,6 +283,39 @@ http {
         }
     }
 {% endif %}
+{% if federation_endpoint | default(false) | bool %}
+
+    # Federation endpoint (design federation.md §5): other sites join here. A join
+    # is authenticated by its one-time invitation secret; the joining node has no
+    # certificate yet. Small bodies, few requests.
+    limit_req_zone $binary_remote_addr zone=federation:1m rate=6r/m;
+    server {
+        listen 443 ssl;
+        server_name {{ hostname_federation }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_federation }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_federation }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+        ssl_session_tickets off;
+        client_max_body_size 16k;
+
+        location = /v1/health {
+            proxy_pass http://unix:/srv/federation/federation.sock:;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        location = /v1/join {
+            limit_req zone=federation burst=3 nodelay;
+            limit_req_status 429;
+            proxy_pass http://unix:/srv/federation/federation.sock:;
+            proxy_read_timeout 180s;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        location / {
+            return 404;
+        }
+    }
+{% endif %}
 {% if install_webui | default(false) | bool %}
 
     # webui management UI — mutual TLS, then Keycloak OIDC in the app.

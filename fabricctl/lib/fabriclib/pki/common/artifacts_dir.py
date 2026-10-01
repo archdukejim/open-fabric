@@ -9,7 +9,7 @@ def artifacts_dir(v):
              step user on every call.
     Fails:   KeyError if deploy_base_dir or service_users.step is missing; OSError (PermissionError) from
              makedirs/chown when not run as root.
-    Feeds:   mint_offline_cert, sign_csr.
+    Feeds:   mint_offline_cert, sign_csr, sign_site_ca.
     """
     uid, gid = (int(v["service_users"]["step"][k]) for k in ("uid", "gid"))
     path = os.path.join(v["deploy_base_dir"], "stepca", "data", "artifacts")

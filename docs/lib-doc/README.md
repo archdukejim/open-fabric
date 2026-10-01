@@ -8,21 +8,22 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 |---|---|---|---|
 | [fabricctl-agent](fabricctl-agent.md) | fabric-agent: the permission-checked host API behind the web UI | 17 | 1 |
 | [fabricctl-jinja](fabricctl-jinja.md) | Code that runs inside service containers (389-DS seeding, FreeRADIUS policy) | 24 | 8 |
-| [fabricctl-lib](fabricctl-lib.md) | The deploy engine, the interactive editor, Keycloak bootstrap, shell helpers | 55 | 8 |
+| [fabricctl-lib](fabricctl-lib.md) | The deploy engine, the interactive editor, Keycloak bootstrap, shell helpers | 62 | 9 |
 | [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 25 | 15 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 3 | 1 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 11 | 9 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 36 | 27 |
+| [fabriclib-federation](fabriclib-federation.md) |  | 19 | 15 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 15 | 9 |
 | [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 20 | 20 |
 | [fabriclib-logs](fabriclib-logs.md) | Optional log forwarding (Fluent Bit) | 4 | 3 |
-| [fabriclib-pki](fabriclib-pki.md) | Certificates: service certificates, manual issuing, CSR signing, conversion | 32 | 27 |
+| [fabriclib-pki](fabriclib-pki.md) | Certificates: service certificates, manual issuing, CSR signing, conversion | 37 | 30 |
 | [fabriclib-radius](fabriclib-radius.md) | Optional 802.1X (FreeRADIUS): clients, groups, setup guides, decisions | 16 | 14 |
 | [fabriclib-rbac](fabriclib-rbac.md) | Who may do what: permissions, bundles, route table | 2 | 2 |
 | [fabriclib-secrets](fabriclib-secrets.md) | fabric's own secrets: file or OpenBao | 10 | 8 |
 | [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 2 | 1 |
-| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 75 | 32 |
+| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 77 | 33 |
 | [fabriclib-system](fabriclib-system.md) | Service status, start/stop, apply, version | 5 | 4 |
 | [fabriclib-vault](fabriclib-vault.md) | OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass | 81 | 43 |
 | [installers](installers.md) | The Debian package wrapper | 2 | 1 |

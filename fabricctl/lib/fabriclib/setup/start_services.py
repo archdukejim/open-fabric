@@ -21,12 +21,12 @@ def run(ctx):
              directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate
              fabric.target.
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
-             install_fluentbit, install_kea, install_freeradius; restart_services (units to restart);
+             install_fluentbit, install_kea, install_freeradius, federation_endpoint; restart_services (units to restart);
              target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6
              tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web
-             running when the web UI is on.
+             running when the web UI is on; fabric-federation running when federation_endpoint is on.
     Fails:   SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration
              still fails after 6 tries; CalledProcessError from systemctl; ValidationError from
              ensure_default_device_roles or migrate_local_suffix (propagates).
@@ -75,6 +75,12 @@ def run(ctx):
             subprocess.run(["systemctl", "restart", "fabric-agent"], check=True)
         ok(f"fabric-agent: {'restarted' if 'fabric-agent' in ctx.restart_services else 'running'}")
         ok(f"fabric-web: {start_unit('fabric-web', 'fabric-web', 'fabric-web' in ctx.restart_services)}")
+
+    if v.get("federation_endpoint"):
+        subprocess.run(["systemctl", "enable", "--now", "fabric-federation"], check=True, capture_output=True)
+        if "fabric-federation" in ctx.restart_services:
+            subprocess.run(["systemctl", "restart", "fabric-federation"], check=True)
+        ok(f"fabric-federation: {'restarted' if 'fabric-federation' in ctx.restart_services else 'running'}")
 
     # Everything is up: activate the target now (it is enabled for boot), so
     # `fabricctl stop|restart` / `systemctl ... fabric.target` reach every unit.

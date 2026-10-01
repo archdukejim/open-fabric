@@ -29,10 +29,8 @@ services:
     command:
       - /usr/local/bin/step-ca
       - /home/step/config/ca.json
-{% if not byoc | default(false) | bool %}
       - --password-file
       - /home/step/secrets/password
-{% endif %}
     networks:
       fabric_net:
         ipv4_address: "{{ ip_stepca }}"

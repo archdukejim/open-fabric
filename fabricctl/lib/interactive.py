@@ -39,7 +39,7 @@ IMMUTABLE_KEYS = {
     "cert_intermediate_key_param", "cert_service_days", "cert_acme_lifetime_hours",
     "stepca_port", "stepca_cert_allow_subordinate_ca", "stepca_cert_max_lifetime_hours",
     "byoc", "ca_crt_path", "ica_crt_path", "ica_key_path", "extra_certs",
-    "deploy_base_dir", "domain"
+    "deploy_base_dir", "domain", "org_domain", "site_name"
 }
 
 WARNED_KEYS = {

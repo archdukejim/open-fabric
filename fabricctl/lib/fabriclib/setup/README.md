@@ -20,6 +20,7 @@
 | `create_accounts.py` | Service users and groups with the expected uid/gid |
 | `configure_network.py` | Docker network `fabric_net`; optional host resolver drop-in |
 | `configure_firewall.py` | UFW default-deny (SSH from the LAN) + LAN-only Docker-published ports; lockout guard |
+| `join_federation.py` | Step `join` (only with `--join`): join the upstream before anything is rendered — site CA signed by the organisation's root, organisation settings |
 | `init_pki.py` | Step-CA init (own root or bring-your-own), `ca.json`, CA certs published and trusted |
 | `start_bootstrap.py` | Start bind9 + step-ca; validate every zone |
 | `mint_service_certs.py` | Issue/renew service certificates (only what is missing, expiring or wrong); web UI and FreeRADIUS CA bundles |

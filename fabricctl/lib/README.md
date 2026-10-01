@@ -4,6 +4,7 @@
 |---|---|
 | [fabriclib/](fabriclib/) | fabric's Python library, one operation per file, grouped by domain (imported as `fabriclib.<domain>.<file>`); `fabriclib/cli.py` routes the `fabricctl` subcommands |
 | [agent/](agent/) | `fabric-agent`: the root daemon behind the web UI — a fixed, permission-checked JSON API over a unix socket |
+| [federation/](federation/) | `fabric-federation`: the federation endpoint sites join through (behind nginx, unix socket) |
 | `deploy.py` | The deploy engine (`apply_deployment`): render every template from `vars.yaml` and the secrets, deploy what changed, reload/restart what is affected; used by `fabricctl setup` and `--apply` (predates one-function-per-file: split when touched) |
 | `interactive.py` | `fabricctl --interactive` (menu-driven vars editor), `--print` (list the vars) and `--apply` (run `deploy.py`; also what the web UI's apply runs) (predates one-function-per-file) |
 | `keycloak_bootstrap.py` | Configure Keycloak idempotently: realm, LDAP federation and group sync, permission roles, TOTP flow, `fabric-webui` and `fabric-openbao` clients; its `Admin` client is reused by `fabriclib/keycloak/` (predates one-function-per-file) |

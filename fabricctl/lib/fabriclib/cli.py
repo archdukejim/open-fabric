@@ -13,6 +13,8 @@
                                  DHCP (optional Kea): subnets, leases, reservations
   fabricctl radius status|log|add-client|rotate-secret|remove-client
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
+  fabricctl federation status|enable|disable|invite|invitations|revoke
+                                 sites joining this install (setup --join on the new site)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
   fabricctl logs status|set-password elastic
                                  log forwarding (optional Fluent Bit): destinations, sent, errors
@@ -40,6 +42,7 @@ from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
+from fabriclib.federation.run_federation_command import run_federation_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
@@ -104,6 +107,8 @@ def main(argv):
         return run_logs_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "radius":
         return run_radius_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "federation":
+        return run_federation_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "dhcp":
         return run_dhcp_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "images":

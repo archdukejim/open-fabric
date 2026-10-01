@@ -137,6 +137,31 @@ check "DNS: certs.<domain> and fabric.<domain> resolve to the host" \
 check "web UI answers at fabric.<domain> (refuses without a client cert)" \
     "[ \"\$(in_box 'curl -s -o /dev/null -w %{http_code} --cacert /opt/stepca/data/certs/root_ca.crt --resolve fabric.lan.test:443:$IP https://fabric.lan.test/')\" = 400 ]"
 
+echo "--- federation endpoint: enable, invite, refuse a bad join, revoke, disable"
+FED_CURL="curl -s --cacert /opt/stepca/data/certs/root_ca.crt --resolve federation.lan.test:443:$IP"
+in_box 'fabricctl federation enable' > "$OUT/fed-enable.log" 2>&1
+check "federation: enable issues the endpoint's certificate and applies" \
+    "grep -q 'federation endpoint on: https://federation.lan.test' '$OUT/fed-enable.log' && in_box 'test -s /opt/nginx/certs/federation.lan.test/fullchain.pem'"
+check "federation: fabric-federation runs; its socket is root:nginx 0660 in a 0750 directory" \
+    "in_box 'systemctl is-active fabric-federation' | grep -qx active && [ \"\$(in_box 'stat -c %a:%U /opt/federation/run/federation.sock /opt/federation/run' | tr '\n' ' ')\" = '660:root 750:root ' ]"
+check "federation: federation.<domain> resolves and answers health over CA-verified TLS through nginx" \
+    "in_box 'dig +short @$IP federation.lan.test' | grep -qx $IP && in_box '$FED_CURL https://federation.lan.test/v1/health' | grep -q '\"ok\": true'"
+check "federation: only the federation routes are served there" \
+    "[ \"\$(in_box '$FED_CURL -o /dev/null -w %{http_code} https://federation.lan.test/v1/secrets')\" = 404 ]"
+INVITE=$(in_box 'fabricctl federation invite branch1' | grep -o 'fabric-join-1\.[A-Za-z0-9_-]*' | head -1)
+check "federation: invite prints a one-time invitation; status lists it" \
+    "[ -n '$INVITE' ] && in_box 'fabricctl federation status' | grep -q 'invitation .* for branch1'"
+printf '%s' '{"id":"000000000000","secret":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","site":"branch1","csr":"x","domain":"branch1.lan.test","address":"10.9.9.9"}' > "$OUT/badjoin.json"
+docker cp "$OUT/badjoin.json" "$NAME:/root/badjoin.json"
+check "federation: a join with a wrong secret is refused through nginx (400, no reason given)"     "in_box '$FED_CURL -w \" %{http_code}\" -H Content-Type:application/json --data @/root/badjoin.json https://federation.lan.test/v1/join' | grep -q 'not valid.* 400$'"
+check "federation: the invitation's secret is in neither vars nor the audit log" \
+    "secret=\$(python3 -c \"import base64,json,sys;t='$INVITE'.split('.',1)[1];print(json.loads(base64.urlsafe_b64decode(t+'==='))['secret'])\") && [ -n \"\$secret\" ] && ! in_box \"grep -rqF \$secret /opt/fabric/config /opt/fabric/archive\""
+check "federation: revoke withdraws it" "in_box 'fabricctl federation revoke branch1' | grep -q 'withdrawn: 1' && in_box 'fabricctl federation invitations' | grep -q 'no open invitations'"
+check "federation: doctor passes with the endpoint on" "in_box 'fabricctl doctor' 2>&1 | grep -q 'federation endpoint, TLS verified' && ! in_box 'fabricctl doctor' 2>&1 | grep -q '✗'"
+in_box 'fabricctl federation disable' > "$OUT/fed-disable.log" 2>&1
+check "federation: disable removes the unit, its socket and the vhost" \
+    "grep -q 'federation endpoint off' '$OUT/fed-disable.log' && ! in_box 'test -e /etc/systemd/system/fabric-federation.service' && ! in_box 'test -e /opt/federation' && ! in_box 'grep -q federation.lan.test /opt/nginx/config/nginx.conf'"
+
 echo "--- systemd control: fabric.target"
 check "fabric.target enabled and active" "in_box 'systemctl is-enabled fabric.target && systemctl is-active fabric.target' >/dev/null"
 check "every unit is part of fabric.target" \

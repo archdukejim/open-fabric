@@ -21,6 +21,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [ldap/](ldap/) | 389 Directory Server over LDAPI inside `dirsrv`: devices, device roles, certificate links, people and roles lists, admin user |
 | [vault/](vault/) | OpenBao: init, configure, status, unlock methods (key slots: USB, security key, KMIP), vault key rotation, root token |
 | [secrets/](secrets/) | fabric's own secrets: the 0600 file until the vault step, then OpenBao; load, save, import, export |
+| [federation/](federation/) | Sites: the site-name rule; invitations, joining and the federation endpoint as they are built |
 
 `cli.py` routes the `fabricctl` commands implemented here (setup, doctor, uninstall, reinstall, certs, tsig, acl,
 dhcp, radius, vault, logs, images, …) to one function each; `__init__.py` is empty (package marker).

@@ -11,7 +11,7 @@ Helpers shared by the manual PKI operations.
 | `ca_chain_pem.py` | Intermediate + root as one PEM bundle (first certificate of each file) |
 | `valid_days.py` | Validate a requested validity against `pki_manual_max_days` (default 1825) |
 | `record_issued.py` | Append a manually issued certificate (never its key) to the issued-certificate ledger |
-| `run_step.py` | Run the step CLI from the pinned Step-CA image as the step user, CA data at `/home/step`, no network |
+| `run_step.py` | Run the step CLI from the pinned Step-CA image as the step user, CA data (or another directory) at `/home/step`, no network |
 | `artifacts_dir.py` | The step user's scratch directory `stepca/data/artifacts` (created 0750) |
 | `valid_san.py` | Classify a subject alternative name as DNS / IP / e-mail, or reject it |
 | `safe_name.py` | Download file name from a certificate name |
