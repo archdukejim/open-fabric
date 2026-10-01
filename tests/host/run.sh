@@ -7,7 +7,8 @@
 #   embedded TSIG key, restricted sign-in (real Keycloak), re-run, stop/start.
 #
 #   TARGET=tempuser@192.168.4.57 HOST_IP=192.168.4.57 LAN_CIDR=192.168.4.0/22 \
-#   GATEWAY=192.168.4.1 [DOMAIN=pitest.home.arpa] [KEY=~/.ssh/id] tests/host/run.sh
+#   GATEWAY=192.168.4.1 [DOMAIN=pitest.home.arpa] [KEY=~/.ssh/id] [EXTRA_VARS=$'site_name: lan\nldap_base_dn: dc=lan'] \
+#   tests/host/run.sh
 #
 # It INSTALLS fabric on that host (Docker, firewall, services): use a
 # disposable machine. The install is left in place; CLEANUP=1 uninstalls it.
@@ -48,6 +49,8 @@ install_webui: true
 tsig_keys:
 - { name: npm, records: [npm], secret: "$TSIG_SECRET", acls: [npm-updaters] }
 EOF
+# EXTRA_VARS: more settings for a fresh install, one YAML line each (e.g. "site_name: lan" for a federation root)
+[ -n "${EXTRA_VARS:-}" ] && printf '%s\n' "$EXTRA_VARS" >> "$OUT/vars.yaml"
 put "$OUT/vars.yaml"
 
 echo "--- setup (this host builds its images; takes a while on a Pi)"

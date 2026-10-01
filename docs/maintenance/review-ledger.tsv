@@ -28,7 +28,7 @@ docs/lib-doc/fabriclib-images.md	d6a8cd15ed515df9bf5879e2e79c3f7088eb378e	2026-0
 docs/lib-doc/fabriclib-keycloak.md	b595f5e98f37b8cd7bff85be3f66b32d2e869a1a	2026-09-30	
 docs/lib-doc/fabriclib-ldap.md	073059f62d9e4b128c96245549539621b9272918	2026-10-01	
 docs/lib-doc/fabriclib-logs.md	db1f6d2d5013ef0943cada0b3ef5b988972398d8	2026-09-30	
-docs/lib-doc/fabriclib-pki.md	5cb0771b69f49a27d35e26a3de60b2401a3c7eee	2026-10-01	
+docs/lib-doc/fabriclib-pki.md	cdc886d394742ecf54739b7944a7ee9bfb4f7ad9	2026-10-01	
 docs/lib-doc/fabriclib-radius.md	e041de9bd1033f836c789a889663130987f537e8	2026-09-30	
 docs/lib-doc/fabriclib-rbac.md	ed2a9c970b6f38ce49b9c88214b13d38373e2195	2026-09-30	
 docs/lib-doc/fabriclib-secrets.md	0acb4af272c8c32750f9b55a06f2ab1d7404b763	2026-10-01	
@@ -346,8 +346,8 @@ fabricctl/lib/fabriclib/pki/needs_renewal.py	382d739b42b067e4d9f37bf9c144772b07f
 fabricctl/lib/fabriclib/pki/publish_ca_certs.py	674c4edca459e4510daa344683b7fe45889314fd	2026-10-01	
 fabricctl/lib/fabriclib/pki/replace_site_ca.py	f2ce052247450772ef34b68de75a5838f883be12	2026-10-01	
 fabricctl/lib/fabriclib/pki/sign_csr.py	741565d2452bce5110712145bbb82803b3cbd3f3	2026-09-30	
-fabricctl/lib/fabriclib/pki/sign_site_ca.py	893eb25ac4eca79fd5d124a80dc9346f64fabfe5	2026-10-01	
-fabricctl/lib/fabriclib/pki/stage_site_ca.py	5b9f235d29fa2195eae98497ab7fe71448dcc1c7	2026-10-01	
+fabricctl/lib/fabriclib/pki/sign_site_ca.py	73bfa87b350b34e6b9d693d325f6f0f36e9547e9	2026-10-01	
+fabricctl/lib/fabriclib/pki/stage_site_ca.py	bf45936f39fcc88c085247dd281e8fedc8813124	2026-10-01	
 fabricctl/lib/fabriclib/radius/README.md	cf8eecaa4605d794c608d6108a49953a095d5c09	2026-09-30	
 fabricctl/lib/fabriclib/radius/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
 fabricctl/lib/fabriclib/radius/add_radius_client.py	e74f51823ab9a14a9b352c90e2e71fcb3341e58a	2026-09-30	
@@ -524,7 +524,7 @@ tests/hardening/README.md	0de680e6f5267c3be3c6b48a9c98d8435604bac1	2026-09-30
 tests/hardening/run.sh	7da3468395945a9323b3ca8dc76924933b627f70	2026-10-01	
 tests/host/README.md	560b70e7b9a2008627d864d4b8833d6942c64406	2026-09-30	
 tests/host/reset_user.py	260ee906d1774b2763b4e4fcdb52c5814e21f832	2026-09-30	
-tests/host/run.sh	f1116166a7e11acab3e47a32962b13389edc2644	2026-09-30	
+tests/host/run.sh	da281d5ba3c43e35c4c0a08f0a0d0afb935382aa	2026-10-01	
 tests/image_ref.py	1e95f54aa1b5f3e6e46a443632844aa3a42fac22	2026-09-30	
 tests/kea/README.md	52798fa09f42627932561ee3f3d11135f0fc1ec0	2026-09-30	
 tests/kea/run.py	1efa8104fd4428e2a93c0422a06c9232e7de0c74	2026-09-30	

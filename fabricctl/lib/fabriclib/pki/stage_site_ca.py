@@ -24,7 +24,7 @@ def stage_site_ca(work_dir, cert, root, root_sha256="", chain=""):
              the certificates written 0644.
     Fails:   ValidationError "give exactly one certificate" (cert or root); "the root's fingerprint is not the
              one in the invitation"; "the root is not a self-signed CA"; "the site certificate does not chain
-             to the root"; "the site certificate is not a CA"; "the site certificate is not for
+             to the root (<openssl's reason, e.g. certificate is not yet valid>)"; "the site certificate is not a CA"; "the site certificate is not for
              this site's key"; "no key/request in <work_dir>: make the request first"; to_pem's messages.
     Feeds:   setup --join (federation M3), before the `pki` step.
     """
@@ -46,9 +46,12 @@ def stage_site_ca(work_dir, cert, root, root_sha256="", chain=""):
         f.flush()
         u.write("".join(parents))
         u.flush()
-        if subprocess.run(["openssl", "verify", "-CAfile", f.name] + (["-untrusted", u.name] if parents else []),
-                          input=cert, capture_output=True, text=True).returncode != 0:
-            raise ValidationError("the site certificate does not chain to the root")
+        res = subprocess.run(["openssl", "verify", "-CAfile", f.name] + (["-untrusted", u.name] if parents else []),
+                             input=cert, capture_output=True, text=True)
+        if res.returncode != 0:
+            why = next((line.split(":", 2)[-1].strip() for line in (res.stdout + res.stderr).splitlines()
+                        if "error" in line), "")
+            raise ValidationError("the site certificate does not chain to the root" + (f" ({why})" if why else ""))
     if ca_path_len(cert) < 0:
         raise ValidationError("the site certificate is not a CA")
     with open(csr) as f:

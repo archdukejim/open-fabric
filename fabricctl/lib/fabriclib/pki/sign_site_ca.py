@@ -63,7 +63,8 @@ def sign_site_ca(v, actor, site_name, csr, root_key="", root_password_file="", s
              the new CA and the root ("" when the root signed; this site's CA and its parents when as_parent),
              "info": describe_cert dict}. The certificate, from a fixed template: subject CN
              "<site_name> Intermediate CA" and no other names, CA:TRUE with path length `nest`, certificate and
-             CRL signing, the request's key; valid cert_intermediate_days but never past the root's own expiry.
+             CRL signing, the request's key; valid from five minutes ago (clock skew between sites) for
+             cert_intermediate_days, but never past the root's own expiry.
     Fails:   ValidationError "invalid site name: ..."; "<name> is this site's own name"; "cannot sign: ..."
              (signature, key strength, or a name other than the expected CN); "nest must be 0 or more"; "this
              site's CA cannot hold sites below it" / "the root allows ... levels" / "this site's CA allows ..."
@@ -153,6 +154,7 @@ def sign_site_ca(v, actor, site_name, csr, root_key="", root_password_file="", s
         out = run_step(v, ["certificate", "sign", f"/home/step/artifacts/{staged['csr']}",
                            issuer_crt, f"/home/step/artifacts/{staged['key']}",
                            "--template", f"/home/step/artifacts/{staged['tpl']}", "--not-after", f"{hours}h",
+                           "--not-before", "-5m",          # the joining site's clock may be a little behind
                            "--password-file", f"/home/step/artifacts/{staged['pw']}"])
     finally:
         for name in staged.values():
