@@ -16,8 +16,9 @@ def run(ctx):
              the upstream's (design federation.md §4).
     Inputs:  ctx — SetupContext: join_invitation, vars (from collect_vars: domain, host_ip, image_stepca if set),
              secrets / secrets_file (ca_password, created here if missing), config_dir, source_dir (images.lock).
-    Returns: None. ctx.vars gains byoc, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain and the
-             organisation's cert_* settings (friendly_name only when unset); the deploy step saves them. The
+    Returns: None. ctx.vars gains byoc, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain,
+             ldap_base_dn and the organisation's cert_* settings (friendly_name only when unset); the deploy
+             step saves them. The
              site CA key and certificates are kept in <base>/fabric/config/site-ca (0700).
     Fails:   SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or
              unreachable, the root not the pinned one, a certificate that does not fit).

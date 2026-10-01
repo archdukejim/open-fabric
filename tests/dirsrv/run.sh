@@ -6,7 +6,7 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 W=$OUT/dirsrv
 BASE="dc=lan,dc=j-j,dc=family"
-LOCAL="o=pi-core"            # the local suffix (tests/render.py's host name)
+LOCAL="ou=pi-core,$BASE"     # the site part, a sub-suffix (tests/render.py's host name)
 DM_PW='DmPass1'
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
@@ -43,7 +43,7 @@ start() {
 seed() {  # same steps as dirsrv_seed in fabricctl/lib/dirsrv.sh
   for _ in $(seq 1 12); do
     docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null 2>&1 &&
-      docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal' >/dev/null 2>&1 && break
+      docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"' >/dev/null 2>&1 && break
     sleep 5
   done
   docker exec dstest sh -c 'python3 /seed/seed.py /seed/*.ldif'; }
@@ -111,6 +111,16 @@ check "memberOf and entryUUID plugins active" "grep -q 'cn=admins' <<<\"\$mo\" &
 second=$(REPO="$REPO" BASE="$BASE" PW='Other!pw9' python3 "$REPO/tests/dirsrv/admin_user.py" 2>&1)
 check "re-run leaves an existing user alone" "[ \"\$second\" = exists ]"
 check "re-run did not change the password" "pybind 'ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket' '$USERDN' 'JimPass!23' | grep -q BOUND"
+# the site part is a sub-suffix under the organisation: the organisation's read grants must not reach it
+part=$(docker exec -e P='JimPass!23' -e G=Ga1 dstest python3 -c "
+import ldap, os
+for who, pw in (('$USERDN', os.environ['P']), ('cn=group_admin,ou=admins,$LOCAL', os.environ['G'])):
+    c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s(who, pw)
+    org = c.search_s('ou=groups,$BASE', ldap.SCOPE_ONELEVEL, '(cn=admins)', ['cn'])
+    site = c.search_s('$LOCAL', ldap.SCOPE_SUBTREE, '(objectClass=*)', ['cn'])
+    print(who.split(',')[0], 'org', len(org), 'site', len(site))" 2>&1)
+check "a person and another service account read the organisation, not the site part" \
+    "grep -qx 'uid=jim org 1 site 0' <<<\"\$part\" && grep -qx 'cn=group_admin org 1 site 0' <<<\"\$part\""
 
 # ---- device RBAC (fabriclib/ldap device + role operations as cn=device_admin)
 echo "--- devices and roles"

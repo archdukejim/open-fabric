@@ -15,7 +15,8 @@ from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
-from fabriclib.federation.constants import SITE_NAME_RE  # noqa: E402
+from fabriclib.federation.common.site_name_problem import site_name_problem  # noqa: E402
+from fabriclib.federation.constants import BASE_DN_RE  # noqa: E402
 from fabriclib.federation.deploy_federation_endpoint import deploy_federation_endpoint  # noqa: E402
 from fabriclib.dns.normalize_acl_policies import normalize_acl_policies  # noqa: E402
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys  # noqa: E402
@@ -245,9 +246,9 @@ def apply_deployment(start_services=True):
              restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them.
     Fails:   sys.exit(1) with an "Error: ..." line when: secrets cannot be loaded (OpenBao locked) or saved; TSIG keys,
              ACL policies, RADIUS clients/people or DHCP settings are invalid (ValidationError); install_freeradius is
-             set with install_ldap false; host_ram_capacity is 1 or 2; site_name is not one host-name label, or
-             site_name / org_domain differ from config/.site-name / .org-domain (they name the directory's
-             suffixes, fixed once installed); vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad
+             set with install_ldap false; host_ram_capacity is 1 or 2; site_name is not one host-name label or is an
+             organisation OU, ldap_base_dn is malformed, or site_name / org_domain / ldap_base_dn differ from
+             config/.site-name / .org-domain / .ldap-base-dn (they name the directory, fixed once installed); vars.yaml.j2 or any template fails to render; an image build fails (start_services=False only); BIND9 refuses `rndc reconfig`; or run_cmd fails. A bad
              link-vars file is only printed. OSError from file operations propagates.
     Feeds:   fabriclib/setup/deploy_config.py (setup, images/switch_image.py); interactive.apply_mode (`fabricctl
              --apply`, the menu, and fabriclib/system/apply_changes.py for the web UI); `python3 deploy.py`.
@@ -428,10 +429,15 @@ def apply_deployment(start_services=True):
     # The site name names the local directory suffix (its devices and service accounts) and the
     # organisation domain names the organisation suffix: both fixed once installed. Recorded on first
     # deploy (an install from before sites gets its current values).
-    if not SITE_NAME_RE.match(str(final_vars.get('site_name', ''))):
-        print(f"Error: site_name '{final_vars.get('site_name')}' is not one host-name label (a-z, 0-9, -)")
+    org_ous = [ou.get('name') for ou in final_vars.get('ldap_organizational_units') or [] if not ou.get('parent')]
+    problem = site_name_problem(final_vars.get('site_name', ''), org_ous)
+    if problem:
+        print(f"Error: site_name: {problem}")
         sys.exit(1)
-    for key, marker in (('site_name', '.site-name'), ('org_domain', '.org-domain')):
+    if not BASE_DN_RE.match(str(final_vars.get('ldap_base_dn', ''))):
+        print(f"Error: ldap_base_dn '{final_vars.get('ldap_base_dn')}' is not dc=… or o=… followed by dc=… parts")
+        sys.exit(1)
+    for key, marker in (('site_name', '.site-name'), ('org_domain', '.org-domain'), ('ldap_base_dn', '.ldap-base-dn')):
         marker = os.path.join(TARGET_FABRIC, "config", marker)
         if os.path.exists(marker):
             recorded = open(marker).read().strip()

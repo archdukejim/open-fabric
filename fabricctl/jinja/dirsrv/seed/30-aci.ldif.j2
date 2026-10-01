@@ -3,7 +3,7 @@
 # Access control. `replace` makes each list the single source of truth: ACIs
 # added by hand on a suffix entry are removed on deploy. Anything not granted
 # here is denied (389-DS is default-deny). The service accounts named here are
-# this install's own, in its local suffix (ou=admins,o=<site>).
+# this install's own, in its site part (ou=admins,ou=<site>,<base>).
 
 # The organisation suffix: people, groups, device roles.
 dn: {{ ldap_base_dn }}
@@ -20,12 +20,14 @@ aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(targetattr="*")(
 aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(version 3.0; acl "Keycloak removes users"; allow (delete) userdn="{{ kc }}";)
 aci: (target="ldap:///ou=device-roles,{{ ldap_base_dn }}")(targetattr="*")(version 3.0; acl "Device admin manages device roles"; allow (all) userdn="ldap:///cn=device_admin,{{ admins }}";)
 
-# This install's local suffix: its service accounts and devices. Not readable
-# anonymously; only the accounts that need them (the web UI's device_admin,
-# FreeRADIUS's radius_reader) and super_admin.
+# This site's part (a sub-suffix under the organisation): its service accounts and devices. It
+# would inherit the organisation's anonymous and authenticated read above, so it first denies
+# everyone except the accounts that need it: super_admin, the web UI's device_admin and
+# FreeRADIUS's radius_reader (deny wins over allow; Directory Manager is not subject to ACIs).
 dn: {{ ldap_local_dn }}
 changetype: modify
 replace: aci
+aci: (targetattr="*")(version 3.0; acl "Only the accounts that need this site's part"; deny (all) userdn!="ldap:///cn=super_admin,{{ admins }} || ldap:///cn=device_admin,{{ admins }} || ldap:///cn=radius_reader,{{ admins }}";)
 aci: (targetattr="*")(version 3.0; acl "Super admin full control"; allow (all) userdn="ldap:///cn=super_admin,{{ admins }}";)
 aci: (target="ldap:///ou=devices,{{ ldap_local_dn }}")(targetattr="*")(version 3.0; acl "Device admin manages devices"; allow (all) userdn="ldap:///cn=device_admin,{{ admins }}";)
 aci: (target="ldap:///ou=devices,{{ ldap_local_dn }}")(targetattr!="aci")(version 3.0; acl "FreeRADIUS reads devices"; allow (read, search, compare) userdn="ldap:///cn=radius_reader,{{ admins }}";)

@@ -5,7 +5,7 @@ import json
 import re
 
 from fabriclib.common.errors import ValidationError
-from fabriclib.federation.constants import DOMAIN_RE, INVITE_PREFIX, SITE_NAME_RE
+from fabriclib.federation.constants import BASE_DN_RE, DOMAIN_RE, INVITE_PREFIX, SITE_NAME_RE
 
 _FP_RE = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){31}$")
 
@@ -13,8 +13,9 @@ _FP_RE = re.compile(r"^[0-9A-F]{2}(:[0-9A-F]{2}){31}$")
 def decode_invitation(text):
     """Purpose: On a joining node: read and check an invitation made by create_invitation (no network).
     Inputs:  text — the invitation string ("fabric-join-1.<base64url JSON>"); surrounding whitespace ignored.
-    Returns: {"id", "secret", "site", "upstream", "org_domain", "host", "address", "root_sha256", "expires"}
-             with every field checked: site SITE_NAME_RE, host and org_domain DNS names, address an IP,
+    Returns: {"id", "secret", "site", "upstream", "org_domain", "ldap_base_dn", "host", "address", "root_sha256",
+             "expires"} with every field checked: site SITE_NAME_RE, host and org_domain DNS names, ldap_base_dn
+             BASE_DN_RE, address an IP,
              root_sha256 an upper-case colon-separated SHA-256 fingerprint.
     Fails:   ValidationError "not a fabric invitation"; "the invitation is damaged (...)"; "the invitation has
              a bad <field>".
@@ -32,7 +33,7 @@ def decode_invitation(text):
         raise ValidationError("the invitation is damaged (unknown version): copy it again")
     checks = {"id": lambda x: re.fullmatch(r"[0-9a-f]{12}", x), "secret": lambda x: re.fullmatch(r"[A-Za-z0-9_-]{40,}", x),
               "site": SITE_NAME_RE.match, "upstream": SITE_NAME_RE.match, "org_domain": DOMAIN_RE.match,
-              "host": DOMAIN_RE.match, "root_sha256": _FP_RE.match}
+              "host": DOMAIN_RE.match, "root_sha256": _FP_RE.match, "ldap_base_dn": BASE_DN_RE.match}
     for field, ok in checks.items():
         if not isinstance(body.get(field), str) or not ok(body[field]):
             raise ValidationError(f"the invitation has a bad {field}")
@@ -42,5 +43,5 @@ def decode_invitation(text):
         raise ValidationError("the invitation has a bad address") from None
     if not isinstance(body.get("expires"), int):
         raise ValidationError("the invitation has a bad expires")
-    return {k: body[k] for k in ("id", "secret", "site", "upstream", "org_domain", "host", "address", "root_sha256",
-                                 "expires")}
+    return {k: body[k] for k in ("id", "secret", "site", "upstream", "org_domain", "ldap_base_dn", "host", "address",
+                                 "root_sha256", "expires")}

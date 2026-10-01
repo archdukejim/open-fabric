@@ -9,8 +9,8 @@
 | | |
 |---|---|
 | Purpose | On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time invitation, sign the site's intermediate CA with the root key, record the site and use up the invitation. |
-| Inputs | v — fabric vars: domain, org_domain (default domain), site_name, host_ip, hostname_federation and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
-| Returns | {"root": PEM, "cert": PEM of the site's intermediate, "org": {"org_domain", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
+| Inputs | v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip, hostname_federation and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
+| Returns | {"root": PEM, "cert": PEM of the site's intermediate, "org": {"org_domain", "ldap_base_dn", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
 | Fails | ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message, so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can retry); ValidationError from load_secrets/save_secrets; OSError. |
 | Feeds | the federation endpoint (fabricctl/lib/federation/server.py, POST /v1/join). |
 | Notes | the secret is compared by its SHA-256 in constant time; audited as FED_JOIN (actor "site:<name>", with the client address) and, on refusal, FED_JOIN_REFUSED. |
@@ -104,16 +104,40 @@
 | Feeds | accept_join, join_upstream. |
 | Called by | `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.join_upstream.join_upstream` |
 
+## `fabricctl/lib/fabriclib/federation/common/site_name_problem.py`
+
+### `site_name_problem(name, org_ous=())`
+
+| | |
+|---|---|
+| Purpose | why a name cannot be a site's name, if it cannot: it must be one host-name label and must not be a top-level OU of the organisation (a site's directory part is ou=<site>,<base DN>, beside them). |
+| Inputs | name — str; org_ous — the organisation's top-level OU names (ldap_organizational_units without a parent), default none. |
+| Returns | None when the name is fine, else the reason (str). |
+| Fails | never. |
+| Feeds | create_invitation, deploy.py apply_deployment. |
+| Called by | `deploy.apply_deployment`, `fabriclib.federation.create_invitation.create_invitation` |
+
 ## `fabricctl/lib/fabriclib/federation/create_invitation.py`
+
+### `_org_ous(v)`
+
+| | |
+|---|---|
+| Purpose | the organisation's top-level OU names (a site's part sits beside them: ou=<site>,<base DN>). |
+| Inputs | v — fabric vars: ldap_organizational_units. |
+| Returns | list of str. |
+| Fails | never. |
+| Feeds | create_invitation. |
+| Called by | `fabriclib.federation.create_invitation.create_invitation` |
 
 ### `create_invitation(v, actor, site_name, source='cli', now=None)`
 
 | | |
 |---|---|
 | Purpose | On the upstream: a one-time invitation for a new site to join this fabric (design federation.md §4). Only a hash of its secret is kept. |
-| Inputs | v — fabric vars: federation_endpoint (must be true), site_name (this site), domain, org_domain (default domain), host_ip, hostname_federation, deploy_base_dir (the root certificate); actor — str (audit); site_name — the new site, SITE_NAME_RE, not this site's own, not joined already; source — default "cli"; now — epoch seconds, default time.time() (tests). |
-| Returns | {"invitation": "fabric-join-1.<base64url JSON>", "site", "id", "expires" (epoch)}. The JSON holds the upstream's federation host name and address, the root CA's SHA-256 fingerprint, the organisation domain, the site name, the invitation id and its secret. |
-| Fails | ValidationError "the federation endpoint is off: fabricctl federation enable"; "invalid site name: ..."; "<name> is this site's own name"; "site <name> has joined already"; "this install has no CA yet"; ValidationError from load_secrets/save_secrets (OpenBao locked); OSError. |
+| Inputs | v — fabric vars: federation_endpoint (must be true), site_name (this site), domain, org_domain (default domain), ldap_base_dn, ldap_organizational_units, host_ip, hostname_federation, deploy_base_dir (the root certificate); actor — str (audit); site_name — the new site, SITE_NAME_RE, not this site's own, not joined already; source — default "cli"; now — epoch seconds, default time.time() (tests). |
+| Returns | {"invitation": "fabric-join-1.<base64url JSON>", "site", "id", "expires" (epoch)}. The JSON holds the upstream's federation host name and address, the root CA's SHA-256 fingerprint, the organisation domain and base DN, the site name, the invitation id and its secret. |
+| Fails | ValidationError "the federation endpoint is off: fabricctl federation enable"; site_name_problem's messages (not one label, or an organisation OU); "<name> is this site's own name"; "site <name> has joined already"; "this install has no CA yet"; ValidationError from load_secrets/save_secrets (OpenBao locked); OSError. |
 | Feeds | run_federation_command (invite). |
 | Notes | kept in fabric's secrets as federation_invitations[id] = {sha256 of the secret, site, expires, actor}; an earlier open invitation for the same site is replaced and expired ones are dropped. The secret is shown once and never logged; audited as FED_INVITE. |
 | Called by | `fabriclib.federation.run_federation_command.run_federation_command` |
@@ -126,7 +150,7 @@
 |---|---|
 | Purpose | On a joining node: read and check an invitation made by create_invitation (no network). |
 | Inputs | text — the invitation string ("fabric-join-1.<base64url JSON>"); surrounding whitespace ignored. |
-| Returns | {"id", "secret", "site", "upstream", "org_domain", "host", "address", "root_sha256", "expires"} with every field checked: site SITE_NAME_RE, host and org_domain DNS names, address an IP, root_sha256 an upper-case colon-separated SHA-256 fingerprint. |
+| Returns | {"id", "secret", "site", "upstream", "org_domain", "ldap_base_dn", "host", "address", "root_sha256", "expires"} with every field checked: site SITE_NAME_RE, host and org_domain DNS names, ldap_base_dn BASE_DN_RE, address an IP, root_sha256 an upper-case colon-separated SHA-256 fingerprint. |
 | Fails | ValidationError "not a fabric invitation"; "the invitation is damaged (...)"; "the invitation has a bad <field>". |
 | Feeds | setup collect_vars (--join: the site's defaults), setup step `join` (join_upstream). |
 | Notes | expiry is checked by the upstream, whose clock decides. |
@@ -167,7 +191,7 @@
 |---|---|
 | Purpose | On a node being set up with `--join`: join the upstream that made the invitation (design federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root, send the join over TLS verified against that root, check and stage the signed intermediate, and record the upstream. |
 | Inputs | v — fabric vars: service_users.step, image_stepca (make_site_ca_request); invitation — the invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key); work_dir — where the site CA key, request and certificates are kept; domain — this site's own domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder for federation.yaml and its lock (default: next to this code — setup runs from the package, so it passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the upstream's ports, default 80 and 443 (tests). |
-| Returns | {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path (stage_site_ca), site_name, org_domain and the organisation's friendly_name / cert_* —, "upstream": {"site_name", "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had}. |
+| Returns | {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name", "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had}. |
 | Fails | ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError. |
 | Feeds | setup step `join` (fabriclib/setup/join_federation.py). |
 | Notes | idempotent: once joined (an upstream recorded and the staged files present) a re-run returns the same settings without contacting the upstream, so setup can be repeated after a later failure. Audited as FED_JOINED. |
@@ -179,7 +203,7 @@
 |---|---|
 | Purpose | the settings a joined site is rendered with, from the invitation and the recorded upstream. |
 | Inputs | inv — decode_invitation's dict; up — the registry's upstream record; work_dir — the staged files. |
-| Returns | dict: byoc True, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain and the organisation's settings (friendly_name, cert_*). |
+| Returns | dict: byoc True, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain, ldap_base_dn and the organisation's settings (friendly_name, cert_*). |
 | Fails | never. |
 | Feeds | join_upstream (both the first join and a re-run). |
 | Called by | `fabriclib.federation.join_upstream.join_upstream` |

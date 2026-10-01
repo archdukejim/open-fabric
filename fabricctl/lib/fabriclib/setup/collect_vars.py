@@ -79,7 +79,7 @@ def _join_defaults(ctx, data):
     """Purpose: settings a site joining an upstream (setup --join) starts from: the invitation's site name and
              organisation domain, and a domain of its own, by default <site>.<organisation domain>.
     Inputs:  ctx — SetupContext: join_invitation, vars_file, config_dir; data — the settings so far (changed).
-    Returns: None; data gets site_name, org_domain and (unless set) domain.
+    Returns: None; data gets site_name, org_domain, ldap_base_dn and (unless set) domain.
     Fails:   SetupError when the invitation is damaged (decode_invitation), when this host already has a fabric
              that is not a member of that upstream (only fresh installs join: design F1), or when site_name is
              set to another name than the invitation's.
@@ -94,7 +94,7 @@ def _join_defaults(ctx, data):
                          "(fabricctl uninstall first, or invite it later when existing installs can join)")
     if data.get("site_name") and str(data["site_name"]).lower() != inv["site"]:
         raise SetupError(f"the invitation is for site {inv['site']}, but site_name is {data['site_name']}")
-    data["site_name"], data["org_domain"] = inv["site"], inv["org_domain"]
+    data["site_name"], data["org_domain"], data["ldap_base_dn"] = inv["site"], inv["org_domain"], inv["ldap_base_dn"]
     if not data.get("domain"):
         data["domain"] = f"{inv['site']}.{inv['org_domain']}"
     info(f"joining {inv['upstream']} ({inv['org_domain']}) as site {inv['site']}, domain {data['domain']}")

@@ -13,7 +13,7 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 3 | 1 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 11 | 9 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 36 | 27 |
-| [fabriclib-federation](fabriclib-federation.md) |  | 19 | 15 |
+| [fabriclib-federation](fabriclib-federation.md) |  | 21 | 16 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 15 | 9 |
 | [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 20 | 20 |

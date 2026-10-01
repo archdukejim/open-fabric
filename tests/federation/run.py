@@ -89,7 +89,8 @@ ROOT_PEM = open(f"{data}/certs/root_ca.crt").read()
 
 HTTP_PORT, HTTPS_PORT, EVIL_PORT = free_port(), free_port(), free_port()
 HQ = {"deploy_base_dir": f"{W}/hq", "image_stepca": IMAGE, "service_users": {"step": {"uid": STEP_UID, "gid": STEP_UID}},
-      "site_name": "hq", "domain": "hq.test", "org_domain": "hq.test", "host_ip": "127.0.0.1",
+      "site_name": "hq", "domain": "hq.test", "org_domain": "hq.test", "ldap_base_dn": "dc=lan", "host_ip": "127.0.0.1",
+      "ldap_organizational_units": [{"name": "accounts"}, {"name": "users", "parent": "accounts"}, {"name": "groups"}],
       "hostname_federation": FED_HOST, "federation_endpoint": False, "cert_intermediate_days": 1095,
       "friendly_name": "Fed Test Org", "cert_org": "Fed Test Org", "cert_country": "US"}
 
@@ -124,13 +125,16 @@ inv = create_invitation(HQ, "alice", "branch1")
 body = decode_invitation(inv["invitation"])
 check("invite: decodes to the site, the endpoint and the root's fingerprint",
       body["site"] == "branch1" and body["host"] == FED_HOST and body["address"] == "127.0.0.1"
-      and body["root_sha256"] == describe_cert(ROOT_PEM)["sha256"] and body["org_domain"] == "hq.test", body)
+      and body["root_sha256"] == describe_cert(ROOT_PEM)["sha256"] and body["org_domain"] == "hq.test"
+      and body["ldap_base_dn"] == "dc=lan", body)
 stored = open(SECRETS).read()
 check("invite: only a hash of the secret is kept", body["secret"] not in stored and "sha256" in stored)
 check("invite: the secret is not in the audit log", body["secret"] not in open(f"{W}/fabric/archive/audit.log").read())
 check("invite: listed as open", [i["site"] for i in list_invitations(HQ)] == ["branch1"])
 check("invite: this site's own name refused", refused(create_invitation, HQ, "alice", "hq", match="own name"))
 check("invite: invalid site name refused", refused(create_invitation, HQ, "alice", "Bad_Site", match="invalid site"))
+check("invite: an organisation OU as site name refused (ou=groups,dc=lan is taken)",
+      refused(create_invitation, HQ, "alice", "groups", match="directory OU of the organisation"))
 check("decode: not an invitation refused", refused(decode_invitation, "hello", match="not a fabric invitation"))
 check("decode: a damaged invitation refused", refused(decode_invitation, inv["invitation"][:-9] + "!!!!", match="damaged"))
 forged = json.loads(base64.urlsafe_b64decode(inv["invitation"].split(".", 1)[1] + "==="))
@@ -217,6 +221,7 @@ res = join_upstream(SITE, inv["invitation"], "Site-Pw-1", f"{B1}/site-ca", "bran
 jv = res["vars"]
 check("join: the site gets the bring-your-own-CA settings and the organisation",
       res["joined"] and jv["byoc"] and jv["site_name"] == "branch1" and jv["org_domain"] == "hq.test"
+      and jv["ldap_base_dn"] == "dc=lan"
       and jv["cert_org"] == "Fed Test Org" and all(os.path.isfile(jv[k]) for k in ("ca_crt_path", "ica_crt_path",
                                                                                     "ica_key_path")), res)
 site_ca = open(jv["ica_crt_path"]).read()

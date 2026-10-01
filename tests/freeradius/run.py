@@ -31,7 +31,7 @@ W = OUT + "/freeradius"
 NET, SUBNET, GW = "radtest_net", "10.254.24.0/24", "10.254.24.1"
 DS_IP, RADIUS_IP, SWITCH_IP, STRANGER_IP = "10.254.24.50", "10.254.24.98", "10.254.24.10", "10.254.24.11"
 DOMAIN, BASE = "lan.j-j.family", "dc=lan,dc=j-j,dc=family"       # tests/render.py's install
-LOCAL = "o=pi-core"                                                # its local suffix
+LOCAL = f"ou=pi-core,{BASE}"                                       # its site part (a sub-suffix)
 SECRET = "Sw1tchSecretForTests0123456789ab"
 FAILED = 0
 sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
@@ -171,7 +171,7 @@ def seed():
         if sh("docker exec rt-ds sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF \"$DS_SUFFIX_NAME (\" "
               "|| dsconf localhost backend create --suffix \"$DS_SUFFIX_NAME\" --be-name userroot'", ok=False).returncode == 0 \
                 and sh("docker exec rt-ds sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF \"$DS_LOCAL_SUFFIX (\" "
-                       "|| dsconf localhost backend create --suffix \"$DS_LOCAL_SUFFIX\" --be-name sitelocal'",
+                       "|| dsconf localhost backend create --suffix \"$DS_LOCAL_SUFFIX\" --be-name sitelocal --parent-suffix \"$DS_SUFFIX_NAME\"'",
                        ok=False).returncode == 0:
             break
         time.sleep(5)

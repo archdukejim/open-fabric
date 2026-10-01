@@ -797,7 +797,7 @@ Built-in folders always come from these defaults; user-added folders are kept.
 If `install_ldap` is enabled, these settings govern the directory structure and policy. Seed LDIFs live in `fabricctl/jinja/dirsrv/seed/` and are applied idempotently (entries are only added when missing), so changing these after install adds new OUs/groups but never deletes existing ones.
 
 ### `ldap_base_dn`
-**Description:** Base distinguished name of the organisation suffix (389-DS), always computed from `org_domain` (it cannot be set; `org_domain` is `domain` unless the install joined an upstream).
+**Description:** Base distinguished name of the organisation (389-DS): people, groups and device roles, with each site's part beneath it (`ldap_local_dn`). Choose it when the root site is installed, e.g. `ldap_base_dn: dc=lan` — `dc=` or `o=` first, then any `dc=` parts, lower case; it is a directory name only (the DNS domain stays a multi-label name). A site that joins an upstream gets the upstream's. Fixed at install: setup refuses to change it on a live install (marker `config/.ldap-base-dn`).
 
 **Default Value:** one `dc=` per label of `org_domain`, e.g. `dc=lan,dc=example,dc=com` for `lan.example.com`
 
@@ -810,7 +810,7 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 - `nginx/www/ldap/index.html.j2`, `nginx/www/ldap/install-ldap.sh.j2`
 
 ### `site_name`
-**Description:** This install's site name (design [federation.md](design/federation.md)): names its local directory suffix `o=<site_name>`. Lower-cased. Fixed at install: setup refuses to change it on a live install (marker `config/.site-name`).
+**Description:** This install's site name (design [federation.md](design/federation.md)): names its part of the directory, `ou=<site_name>,<ldap_base_dn>`. One host-name label, lower-cased, and not the name of one of the organisation's top-level OUs (`accounts`, `groups`, `hosts`, `device-roles`, …), which sit beside it. Fixed at install: setup refuses to change it on a live install (marker `config/.site-name`).
 
 **Default Value:** `hostname`
 
@@ -818,9 +818,9 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 - `vars.yaml.j2` (`ldap_local_dn`)
 
 ### `ldap_local_dn`
-**Description:** The install's local suffix, a second 389-DS backend (`sitelocal`) holding what belongs to this install only: its service accounts (`ou=admins`) and its devices (`ou=devices`). Always computed (it cannot be set). The organisation suffix (`ldap_base_dn`) holds people, groups and device roles. Installs from before the split are moved on upgrade (`fabriclib/ldap/migrate_local_suffix.py`).
+**Description:** This site's part of the directory: a second 389-DS backend (`sitelocal`), a sub-suffix under the organisation, holding what belongs to this site only: its service accounts (`ou=admins`) and its devices (`ou=devices`). Always computed (it cannot be set). A search from `ldap_base_dn` finds both. Installs from before the split are moved on upgrade (`fabriclib/ldap/migrate_local_suffix.py`).
 
-**Default Value:** `o=<site_name>`
+**Default Value:** `ou=<site_name>,<ldap_base_dn>`, e.g. `ou=lab,dc=lan`
 
 **Effected Jinja Templates:**
 - `dirsrv/docker-compose.yml.j2` (`DS_LOCAL_SUFFIX`)
@@ -833,7 +833,7 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 **Default Value:** `domain`
 
 **Effected Jinja Templates:**
-- `vars.yaml.j2` (`ldap_base_dn`, `ldap_domain_components`)
+- `vars.yaml.j2` (the default `ldap_base_dn`)
 
 ### `federation_endpoint`
 **Description:** Run the federation endpoint other sites join through: the `fabric-federation` service (unix socket), an nginx vhost at `hostname_federation` (join route rate- and size-limited), its certificate and a CNAME. Turn it on and off with `fabricctl federation enable|disable` (which also issues the certificate). Off: no new site can join; sites that joined stay.
@@ -853,14 +853,6 @@ If `install_ldap` is enabled, these settings govern the directory structure and 
 **Effected Jinja Templates:**
 - `nginx/nginx.conf.j2`
 - `vars.yaml.j2`
-
-### `ldap_domain_components`
-**Description:** The labels of `org_domain` as a list, always computed (it cannot be set). The first one is the `dc:` attribute of the suffix entry.
-
-**Default Value:** e.g. `[lan, example, com]` for `lan.example.com`
-
-**Effected Jinja Templates:**
-- `dirsrv/seed/10-tree.ldif.j2`
 
 ### `ldap_groups`
 **Description:** Defines the security groups to pre-provision in LDAP (created as `groupOfNames` + `posixGroup` under `ou=groups`).

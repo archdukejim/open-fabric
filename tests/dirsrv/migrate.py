@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 REPO, BASE = os.environ["REPO"], os.environ["BASE"]
-LOCAL = "o=pi-core"
+LOCAL = f"ou=pi-core,{BASE}"
 W = tempfile.mkdtemp(prefix="fabric-migrate-")
 subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
 sys.path.insert(0, f"{W}/fabric/lib")

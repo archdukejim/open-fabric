@@ -27,7 +27,7 @@ from fabriclib.ldap.remove_role import remove_role  # noqa: E402
 from fabriclib.ldap.update_device import update_device  # noqa: E402
 from fabriclib.ldap.update_role import update_role  # noqa: E402
 
-V = {"ldap_base_dn": BASE, "ldap_local_dn": "o=pi-core", "dirsrv_container": "dstest"}
+V = {"ldap_base_dn": BASE, "ldap_local_dn": f"ou=pi-core,{BASE}", "dirsrv_container": "dstest"}
 FAILED = 0
 
 

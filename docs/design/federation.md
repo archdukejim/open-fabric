@@ -82,7 +82,7 @@ the web UI), which can wait for an admin.
 
 | Service | Federation |
 |---|---|
-| **Directory (389-DS)** | Two suffixes per node. The **organisation suffix** (people, groups, device roles) is supplied by the root site and replicated **down** read-only (a consumer at a leaf site, a read-only *hub* at a site that has downstreams). Each site's **site suffix** (`ou=<site>,<parent DN>`: its devices and service accounts, §6) is supplied by that site and replicated **up** read-only. Replication over TLS with certificate authentication. Changes wait in the supplier's changelog while a link is down |
+| **Directory (389-DS)** | Two suffixes per node. The **organisation suffix** (people, groups, device roles) is supplied by the root site and replicated **down** read-only (a consumer at a leaf site, a read-only *hub* at a site that has downstreams). Each site's **site suffix** (`ou=<site>,<org>`: its devices and service accounts, §6) is supplied by that site and replicated **up** read-only. Replication over TLS with certificate authentication. Changes wait in the supplier's changelog while a link is down |
 | **Sign-in (Keycloak)** | Each site runs its own Keycloak, federating its **local** directory copy — sign-in works while the upstream is unreachable. Realm settings come from the same code (`keycloak_bootstrap`) everywhere. TOTP enrolment is per site (see decision F2) |
 | **RBAC** | Bundle groups replicate with identity. A group applies **everywhere** (`network-operators`) or only to **one site** (`branch1-network-operators`); a site's Keycloak maps global groups and its own site's groups only (decision F4) |
 | **PKI** | The root site's CA signs each downstream site's **intermediate** (path length 0 unless the site may hold nested sites, §6; optionally name-constrained to the site's DNS sub-zone, decision F6). Every site trusts the same root: a device certificate from any site is valid everywhere (EAP-TLS roaming, decision F3) |
@@ -169,7 +169,7 @@ fabricctl federation invite lab2 --under lab     # nested: lab owns lab2 (run on
 | | Flat | Flat through a node | Nested |
 |---|---|---|---|
 | Signs the site's CA | the root | the root | the parent site |
-| Directory part | `ou=lab,<org>` | `ou=lab,<org>` | `ou=lab2,ou=lab,<org>` |
+| Directory part | `ou=lab,<org>` | `ou=lab,<org>` | `ou=lab2,<org>` (the parent is recorded, not nested in the name) |
 | Talks to | the root site | the node, which forwards | the parent |
 | Middle goes away | — | the site points at the root directly (`fabricctl federation relay direct`); nothing is lost | the child keeps running (§3.3); rebuilding the parent orphans it until it is **re-parented** (`fabricctl federation reparent lab2 --to <root|site>`: a new CA from the new parent, the directory part moved) |
 | Administered by | the root and the site | the root and the site | the parent too (delegated) |
@@ -187,13 +187,17 @@ fabricctl federation invite lab2 --under lab     # nested: lab owns lab2 (run on
   issuer's, so the **root's path length caps the depth of the whole
   fabric**. `step ca init` makes a root with path length 1: room for flat
   sites only. Nesting needs a root made with more (setup option
-  `ca_nest_depth`, default 0 = path length 1; N gives path length N + 1),
+  `ca_nest_depth`, default 1 = path length 2; N gives path length N + 1),
   chosen when the root site is installed and fixed afterwards; a brought-in
   root's own path length decides for itself (setup reads and shows it).
   The test Pi's root has path length 1: flat and through-a-node only.
 - **Every site's directory part is one database of its own** (a 389-DS
-  sub-suffix): `ou=<site>,<parent's DN>`, the root site's own part included
-  (`ou=lan,dc=lan`). A search from the organisation's base finds everything;
+  sub-suffix), **always one level under the organisation**: `ou=<site>,<org>`,
+  the root site's own part included (`ou=lan,dc=lan`), nested sites too. A
+  nested name (`ou=lab2,ou=lab,…`) would need the parent's part to exist on
+  the child as well and would grow with every level; the parent is recorded
+  instead, so re-parenting never moves a directory part. Site names are
+  unique in the organisation and are never one of its top-level OUs. A search from the organisation's base finds everything;
   each part replicates on its own (§3.2), so a site's part goes up without
   the organisation's coming back down twice.
 - **The organisation's base DN** (`ldap_base_dn`) is chosen when the root
@@ -210,7 +214,7 @@ flowchart TB
   edge1["edge1 (node)<br/>ou=edge1"]
   lab["lab (flat)<br/>ou=lab,dc=lan"]
   lab3["lab3 (flat, via edge1)<br/>ou=lab3,dc=lan"]
-  lab2["lab2 (nested under lab)<br/>ou=lab2,ou=lab,dc=lan"]
+  lab2["lab2 (nested under lab)<br/>ou=lab2,dc=lan"]
   lan -->|signs CA| lab
   lan -->|signs CA| edge1
   lan -->|signs CA| lab3
@@ -267,7 +271,7 @@ Milestones, each tested before the next:
 | M | What | Notes |
 |---|---|---|
 | M1 | **Directory split** on every install (standalone too): the organisation suffix (`ldap_base_dn`: people, groups, device roles) and a **local suffix** `o=<site_name>` (this install's service accounts, its devices). A device names its roles (`fabricRoleName`) instead of roles listing members, so a site can put its devices into roles it only has a read-only copy of. Existing installs migrated on upgrade (devices and service accounts moved, role members turned into `fabricRoleName`). `site_name` defaults to the host name and is fixed after install | **Done.** Everything that binds or searches: fabric-agent, Keycloak federation, FreeRADIUS, the web UI, the seed and ACIs, tests (`fabriclib/ldap/migrate_local_suffix.py`, `tests/dirsrv/migrate.py`) |
-| M1b | **Layout and attachment** (owner decisions 2026-10-01, §6): `ldap_base_dn` settable at the root site's install and handed to sites; every site's part a sub-suffix `ou=<site>,<parent DN>` (migrating `o=<site>`); invitations `--via <node>` (relay; `relay direct` to drop it) and `--under <site>` / `--nest N` (path length), `ca_nest_depth` for new roots, `reparent`, `remove`; each site records its parent and relay | Applies to M2–M5 below; the test site is re-created as `lab` |
+| M1b | **Layout and attachment** (owner decisions 2026-10-01, §6): `ldap_base_dn` settable at the root site's install and handed to sites; every site's part a sub-suffix `ou=<site>,<org>`, one level for every mode (installs from before the split migrate straight to it; the unreleased `o=<site>` layout of M1 is not migrated: its two test installs are rebuilt); invitations `--via <node>` (relay; `relay direct` to drop it) and `--under <site>` / `--nest N` (path length), `ca_nest_depth` (default 1, settable) for new roots, `reparent`, `remove`; each site records its parent and relay | In three steps: (1) layout — settable base DN, `ou=<site>,<base>` sub-suffixes, the base DN in the invitation; (2) nesting; (3) relays. The test Pi is rebuilt as root `lan` (`dc=lan`), host-2's site as `lab` |
 | M2 | **Site CAs**: signing a site's intermediate with the root key (fixed template, path length 0); setup `--join` feeds it into the bring-your-own-CA path | **Done** (the operations; `--join` comes with M3): `pki/make_site_ca_request` (site: EC P-256 key encrypted with its `ca_password`, never leaves), `pki/sign_site_ca` (root: subject `<site> Intermediate CA`, no other names, never past the root's expiry), `pki/stage_site_ca` (site: pinned root fingerprint, chain, path length, its own key) → `byoc`. Step-CA now always gets its password file. `tests/pki/site_ca.py` |
 | M3 | **Invite and join**: `fabricctl federation invite|join|status`, one-time invitations kept hashed in fabric's secrets, the federation endpoint (a separate minimal root handler behind nginx, `federation.<domain>`) | **Done**: `fabricctl federation status/enable/disable/invite/invitations/revoke`; `setup --join` (step `join`, before `deploy`; fresh installs only; idempotent). The joining node fetches the root over plain HTTP and accepts it only by the invitation's fingerprint, then joins over TLS verified against it (by address, checking the endpoint's name). `org_domain` names the organisation suffix, so a site with its own domain shares it. Endpoint: `fabric-federation` (`lib/federation/server.py`, socket for nginx's uid only), `/v1/join` rate- and size-limited. `tests/federation/run.py`. Not yet: mutual TLS routes (status, renew), an offline signing path for a byoc root |
 | M4 | **DNS**: delegation (NS + glue) for sub-domain sites, secondary zones both ways with TSIG | |

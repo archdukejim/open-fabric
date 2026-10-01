@@ -31,7 +31,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the
              upstream's ports, default 80 and 443 (tests).
     Returns: {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path (stage_site_ca),
-             site_name, org_domain and the organisation's friendly_name / cert_* —, "upstream": {"site_name",
+             site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name",
              "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had}.
     Fails:   ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the
              upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered
@@ -68,6 +68,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"])
     org = answer.get("org") or {}
     up = {**(answer.get("upstream") or {}), "site": inv["site"], "org_domain": org.get("org_domain") or inv["org_domain"],
+          "ldap_base_dn": org.get("ldap_base_dn") or inv["ldap_base_dn"],
           "root_sha256": inv["root_sha256"],
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "org": {k: org[k] for k in ORG_KEYS if org.get(k)}}
@@ -84,10 +85,11 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
 def _vars(inv, up, work_dir):
     """Purpose: the settings a joined site is rendered with, from the invitation and the recorded upstream.
     Inputs:  inv — decode_invitation's dict; up — the registry's upstream record; work_dir — the staged files.
-    Returns: dict: byoc True, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain and the
-             organisation's settings (friendly_name, cert_*).
+    Returns: dict: byoc True, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain, ldap_base_dn
+             and the organisation's settings (friendly_name, cert_*).
     Fails:   never.
     Feeds:   join_upstream (both the first join and a re-run)."""
     return {"byoc": True, "ca_crt_path": os.path.join(work_dir, "root_ca.crt"),
             "ica_crt_path": os.path.join(work_dir, "site_ca.crt"), "ica_key_path": os.path.join(work_dir, "site_ca_key"),
-            "site_name": inv["site"], "org_domain": up.get("org_domain") or inv["org_domain"], **(up.get("org") or {})}
+            "site_name": inv["site"], "org_domain": up.get("org_domain") or inv["org_domain"],
+            "ldap_base_dn": up.get("ldap_base_dn") or inv["ldap_base_dn"], **(up.get("org") or {})}

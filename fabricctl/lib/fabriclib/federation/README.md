@@ -5,7 +5,7 @@ their own local network (design [federation.md](../../../../docs/design/federati
 
 | File | What |
 |---|---|
-| `constants.py` | The site-name and domain rules, the invitation format and lifetime, the join body limit |
+| `constants.py` | The site-name, domain and base-DN rules, the invitation format and lifetime, the join body limit |
 | `create_invitation.py` | Upstream: a one-time invitation for a new site (only a hash of its secret is kept; audited) |
 | `list_invitations.py` | Upstream: the open invitations, without their secrets |
 | `revoke_invitation.py` | Upstream: withdraw an open invitation (audited) |

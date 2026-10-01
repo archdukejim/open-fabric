@@ -42,7 +42,7 @@ dirsrv_seed() {
     until docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" \
             || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' \
           && docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" \
-            || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal'; do
+            || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"'; do
         tries=$((tries + 1))
         [ "$tries" -ge 12 ] && { echo "389-DS backend could not be created" >&2; return 1; }
         sleep 5

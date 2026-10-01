@@ -333,21 +333,22 @@ nginx_backend_ldaps: {{ nginx_backend_ldaps | default('dirsrv:3636') }}
 nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (stepca_port | default(9000))) }}
 
 # ============================================================
-# LDAP — base DN computed from the organisation's domain
+# LDAP — the organisation's base DN and this site's part
 # ============================================================
 {# The organisation's domain: this install's own domain unless it joined an upstream (design
    federation.md), whose organisation it then shares. Names the organisation suffix; fixed once
    installed (setup refuses a change). #}
 {% set _org_domain = (org_domain | default(domain, true)) | lower %}
 org_domain: {{ _org_domain }}
-ldap_base_dn: {{ _org_domain.split('.') | map('regex_replace', '^', 'dc=') | join(',') }}
+{# The organisation's base DN: chosen when the root site is installed (e.g. dc=lan), else one dc= per label
+   of org_domain; a site gets its upstream's. Fixed once installed (setup refuses a change). #}
+{% set _base_dn = ((ldap_base_dn | default('', true)) or (_org_domain.split('.') | map('regex_replace', '^', 'dc=') | join(','))) | lower %}
+ldap_base_dn: {{ _base_dn }}
 # This install's site (design federation.md): names its local directory suffix, which holds this
 # install's service accounts and its devices (the organisation suffix above holds people, groups and
 # device roles). Defaults to the host name; fixed once installed (setup refuses a change).
 site_name: {{ (site_name | default(hostname, true)) | lower }}
-ldap_local_dn: o={{ (site_name | default(hostname, true)) | lower }}
-ldap_domain_components:
-{{ _org_domain.split('.') | to_nice_yaml(indent=2) | indent(2, first=True) }}
+ldap_local_dn: ou={{ (site_name | default(hostname, true)) | lower }},{{ _base_dn }}
 
 {# `bundle`: the fabric role bundle Keycloak grants to members (design D19); admins get
    webui_admin_role through webui_admin_group. #}

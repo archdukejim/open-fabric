@@ -28,7 +28,7 @@ chmod 644 kc/*
 docker network create --subnet 10.254.9.0/24 kctest >/dev/null
 docker run -d --name kc-dirsrv --network kctest --ip 10.254.9.50 --network-alias ldap.lan.j-j.family \
   --user 911:911 --cap-drop ALL --security-opt no-new-privileges:true \
-  -e DS_SUFFIX_NAME="$BASE" -e DS_LOCAL_SUFFIX="o=pi-core" -e DS_DM_PASSWORD=DmPass1 -v "$D/data:/data" \
+  -e DS_SUFFIX_NAME="$BASE" -e DS_LOCAL_SUFFIX="ou=pi-core,$BASE" -e DS_DM_PASSWORD=DmPass1 -v "$D/data:/data" \
   --health-cmd "/usr/libexec/dirsrv/dscontainer -H" --health-interval 5s fabric/dirsrv:test >/dev/null
 docker run -d --name kc-keycloak --network kctest --ip 10.254.9.60 \
   -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=KcAdmin1 \
@@ -55,7 +55,7 @@ hostname_keycloak: sso.lan.j-j.family
 hostname_ldap: ldap.lan.j-j.family
 hostname_mgr: mgr.lan.j-j.family
 ldap_base_dn: $BASE
-ldap_local_dn: o=pi-core
+ldap_local_dn: ou=pi-core,$BASE
 install_ldap: true
 install_webui: true
 webui_realm: lan.j-j.family

@@ -87,7 +87,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 
 ```bash
 LDAPTLS_CACERT=/opt/stepca/data/certs/root_ca.crt \
-  ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,o=<site_name>" -W
+  ldapwhoami -H ldaps://ldap.<domain> -x -D "cn=super_admin,ou=admins,ou=<site_name>,<base_dn>" -W
 ```
 
 ### Access Control (ACIs)

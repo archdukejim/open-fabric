@@ -22,12 +22,13 @@ def accept_join(v, req, client_ip="", now=None):
     """Purpose: On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
              invitation.
-    Inputs:  v — fabric vars: domain, org_domain (default domain), site_name, host_ip, hostname_federation and
+    Inputs:  v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip,
+             hostname_federation and
              the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join
              request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)};
              client_ip — str for the audit; now — epoch seconds, default time.time().
-    Returns: {"root": PEM, "cert": PEM of the site's intermediate, "org": {"org_domain", friendly_name,
-             cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
+    Returns: {"root": PEM, "cert": PEM of the site's intermediate, "org": {"org_domain", "ldap_base_dn",
+             friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
     Fails:   ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
              so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has
@@ -71,7 +72,8 @@ def accept_join(v, req, client_ip="", now=None):
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
                                             f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")
-    org = {"org_domain": v.get("org_domain") or v["domain"], **{k: v.get(k) for k in _ORG_KEYS if v.get(k)}}
+    org = {"org_domain": v.get("org_domain") or v["domain"], "ldap_base_dn": v["ldap_base_dn"],
+           **{k: v.get(k) for k in _ORG_KEYS if v.get(k)}}
     return {"root": signed["root"], "cert": signed["cert"], "org": org,
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
                          "address": v["host_ip"]}}

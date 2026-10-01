@@ -153,8 +153,16 @@ unit = env.get_template('systemd/fabric-federation.service.j2').render(**fed)
 assert f"--allow-uid {fed['service_users']['nginx']['uid']}" in unit and 'lib/federation/server.py' in unit, unit
 site = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'domain': 'branch1.lan.j-j.family',
                                                                   'org_domain': 'lan.j-j.family', 'site_name': 'branch1'}))
-assert site['ldap_base_dn'] == v2['ldap_base_dn'] and site['ldap_domain_components'] == v2['ldap_domain_components']
-assert site['ldap_local_dn'] == 'o=branch1' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
+assert site['ldap_base_dn'] == v2['ldap_base_dn'] == 'dc=lan,dc=j-j,dc=family', site['ldap_base_dn']
+assert site['ldap_local_dn'] == 'ou=branch1,dc=lan,dc=j-j,dc=family' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
+# a chosen base DN (the root site's install, e.g. dc=lan): the site part sits under it; the seed's base entry
+# takes its first RDN (domain for dc=, organization for o=)
+for base, oc in (('dc=lan', 'objectClass: domain\ndc: lan'), ('o=acme,dc=lan', 'objectClass: organization\no: acme')):
+    chosen = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'ldap_base_dn': base}))
+    assert chosen['ldap_base_dn'] == base and chosen['ldap_local_dn'] == f'ou=pi-core,{base}', chosen['ldap_local_dn']
+    tree = env.get_template('dirsrv/seed/10-tree.ldif.j2').render(**{**chosen, **secrets})
+    assert f'dn: {base}\nobjectClass: top\n{oc}' in tree, tree[:400]
+    assert f'dn: ou=pi-core,{base}\nobjectClass: top\nobjectClass: organizationalUnit\nou: pi-core' in tree
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
 # Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
 # no compose file or Dockerfile names an image any other way.

@@ -9,10 +9,16 @@ ou={{ ou.name }},{{ ldap_base_dn }}
 # Directory tree. Entries are only added when missing; existing entries
 # (and anything edited through Keycloak or ldapmodify) are left alone.
 
+{% set _rdn = ldap_base_dn.split(',')[0].split('=', 1) %}
 dn: {{ ldap_base_dn }}
 objectClass: top
+{% if _rdn[0] == 'dc' %}
 objectClass: domain
-dc: {{ ldap_domain_components[0] }}
+dc: {{ _rdn[1] }}
+{% else %}
+objectClass: organization
+o: {{ _rdn[1] }}
+{% endif %}
 {% set ns = namespace(done=[]) %}
 {% for _ in ldap_organizational_units %}
 {% for ou in ldap_organizational_units %}
@@ -28,11 +34,12 @@ description: {{ ou.description }}
 {% endfor %}
 {% endfor %}
 
-# This install's local suffix: its service accounts and its devices (design federation.md)
+# This site's part, its own database under the organisation (a sub-suffix): its service accounts and
+# its devices (design federation.md §6)
 dn: {{ ldap_local_dn }}
 objectClass: top
-objectClass: organization
-o: {{ site_name }}
+objectClass: organizationalUnit
+ou: {{ site_name }}
 description: fabric site {{ site_name }}: its service accounts and devices
 
 dn: ou=admins,{{ ldap_local_dn }}

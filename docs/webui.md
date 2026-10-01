@@ -74,8 +74,8 @@ set from the people's fabric permissions in [Who may do what](#who-may-do-what):
 they say what a device may do on the network, not what a person may do in
 this web UI.
 
-- **Device** (`cn=<name>,ou=devices,o=<site_name>` — the install's local
-  suffix): type, MAC addresses (each MAC belongs to one device only), owner
+- **Device** (`cn=<name>,ou=devices,ou=<site_name>,<base>` — this
+  site's part of the directory): type, MAC addresses (each MAC belongs to one device only), owner
   (a user), description, enabled flag, the roles it is in (`fabricRoleName`)
   and the SHA-256 fingerprints of certificates issued to it.
 - **Role** (`cn=<name>,ou=device-roles,<base>`, organisation-wide):
