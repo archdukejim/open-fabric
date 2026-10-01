@@ -27,7 +27,7 @@ def _org_ous(v):
     return [ou.get("name") for ou in v.get("ldap_organizational_units") or [] if not ou.get("parent")]
 
 
-def create_invitation(v, actor, site_name, source="cli", now=None, nest=0):
+def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via=""):
     """Purpose: On the upstream: a one-time invitation for a new site to join this fabric (design
              federation.md §4). Only a hash of its secret is kept.
     Inputs:  v — fabric vars: federation_endpoint (must be true), site_name (this site), domain, org_domain
@@ -37,15 +37,18 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0):
              already; source — default "cli"; now — epoch seconds, default time.time() (tests); nest — how many
              levels of sites the new site may hold below it (its CA's path length), default 0. Made on the
              root site, the new site attaches flat; made on a site (one that may nest), it is nested under
-             that site (design federation.md §6).
+             that site (design federation.md §6); via — a site that joined this install, through whose
+             endpoint the new site joins (a relay: it forwards, signs nothing), default "" (direct).
     Returns: {"invitation": "fabric-join-1.<base64url JSON>", "site", "id", "expires" (epoch), "nest", "nested"
-             (True when made on a site: the new site will be nested under it)}. The JSON holds
+             (True when made on a site: the new site will be nested under it), "via"}. With via, the
+             invitation's host and address are the relay's endpoint. The JSON holds
              the upstream's federation host name and address, the root CA's SHA-256 fingerprint, the
              organisation domain and base DN, the site name, the invitation id and its secret.
     Fails:   ValidationError "the federation endpoint is off: fabricctl federation enable"; site_name_problem's
              messages (not one label, or an organisation OU); "<name> is this site's own name"; "site <name> has joined already"; "this install
              has no CA yet"; "this site's CA cannot sign sites ..." (a site invited without --nest); "--nest N is more
-             than this install's CA allows ..."; ValidationError from load_secrets/save_secrets (OpenBao locked);
+             than this install's CA allows ..."; "no site <via> joined here ..."; ValidationError from
+             load_secrets/save_secrets (OpenBao locked);
              OSError.
     Feeds:   run_federation_command (invite).
     Notes:   kept in fabric's secrets as federation_invitations[id] = {sha256 of the secret, site, expires,
@@ -73,18 +76,26 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0):
     secret, inv_id = secrets.token_urlsafe(32), secrets.token_hex(6)
     expires = now + INVITE_TTL_SECONDS
     with federation_lock():
-        if site_name in load_registry()["sites"]:
+        sites = load_registry()["sites"]
+        if site_name in sites:
             raise ValidationError(f"site {site_name} has joined already")
+        relay = sites.get(via) if via else None
+        if via and not relay:
+            raise ValidationError(f"no site {via} joined here: a relay must be a site of this install")
         open_invites = {i: e for i, e in (load_secrets(v=v).get("federation_invitations") or {}).items()
                         if e.get("expires", 0) > now and e.get("site") != site_name}
         open_invites[inv_id] = {"sha256": hashlib.sha256(secret.encode()).hexdigest(), "site": site_name,
-                                "expires": expires, "actor": actor, "nest": nest}
+                                "expires": expires, "actor": actor, "nest": nest, "via": via}
         save_secrets({"federation_invitations": open_invites}, v=v)
     body = {"v": 1, "id": inv_id, "secret": secret, "site": site_name, "upstream": v.get("site_name"),
             "org_domain": v.get("org_domain") or v["domain"], "ldap_base_dn": v["ldap_base_dn"],
-            "host": v["hostname_federation"],
-            "address": v["host_ip"], "root_sha256": describe_cert(open(root).read())["sha256"], "expires": expires}
+            "host": (relay.get("federation_host") or f"federation.{relay['domain']}") if relay else v["hostname_federation"],
+            "address": relay["address"] if relay else v["host_ip"],
+            "root_sha256": describe_cert(open(root).read())["sha256"], "expires": expires}
+    if via:
+        body["via"] = via
     text = INVITE_PREFIX + base64.urlsafe_b64encode(json.dumps(body, separators=(",", ":")).encode()).decode().rstrip("=")
-    write_audit(actor, "FED_INVITE", f"site={site_name} id={inv_id} nest={nest} expires={expires}", source)
+    write_audit(actor, "FED_INVITE", f"site={site_name} id={inv_id} nest={nest} via={via or '-'} expires={expires}",
+                source)
     return {"invitation": text, "site": site_name, "id": inv_id, "expires": expires, "nest": nest,
-            "nested": cap["as_parent"]}
+            "nested": cap["as_parent"], "via": via}

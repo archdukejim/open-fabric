@@ -29,7 +29,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder
              for federation.yaml and its lock (default: next to this code — setup runs from the package, so it
              passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the
-             upstream's ports, default 80 and 443 (tests); replace — join although an upstream is recorded
+             upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded
              (re-parenting: the invitation's upstream becomes this site's parent), default False.
     Returns: {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path,
              site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's
@@ -64,7 +64,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     root = fetch_pinned_root(inv["address"], inv["root_sha256"], port=http_port)
     answer = post_upstream(inv["address"], inv["host"], root, "/v1/join",
                            {"id": inv["id"], "secret": inv["secret"], "site": inv["site"], "csr": req["csr"],
-                            "domain": domain, "address": address}, port=https_port)
+                            "domain": domain, "address": address, "federation_host": f"federation.{domain}",
+                            "via": inv["via"]}, port=https_port)
     if not isinstance(answer, dict) or answer.get("root", "").strip() != root.strip():
         raise ValidationError("the upstream answered with a different root")
     staged = stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"],
@@ -75,6 +76,10 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
           "root_sha256": inv["root_sha256"], "site_ca_depth": staged["site_ca_depth"],
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "org": {k: org[k] for k in ORG_KEYS if org.get(k)}}
+    if https_port != 443 and not inv["via"]:
+        up["port"] = https_port                   # the upstream's endpoint is not on 443 (tests)
+    if inv["via"]:                                # joined through a relay: later traffic goes the same way
+        up["relay"] = {"site": inv["via"], "host": inv["host"], "address": inv["address"], "port": https_port}
     with federation_lock(lock_path):
         registry = load_registry(reg_path)
         registry["upstream"] = up

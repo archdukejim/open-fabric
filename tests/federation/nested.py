@@ -224,6 +224,43 @@ try:
     except ValidationError as e:
         refused = "another root" in str(e)
     check("reparent: a CA for another root is refused", refused)
+
+    # ------------------------------------------------------------ a relay node: lab3 joins through edge
+    bad = role(lan, "invite-via", "lab3", "nowhere")
+    check("relay: a node that is not a site of this install is refused", "no site nowhere joined here" in
+          bad.get("error", ""), bad)
+    inv_edge = role(lan, "invite", "edge", 0)
+    edge, edge_data, _ = install("edge", "edge", "edge.lan.test", "Edge-Pw-1")
+    res_e = join_upstream(SITE, inv_edge["invitation"], "Edge-Pw-1", f"{edge}/fabric/config/site-ca", "edge.lan.test",
+                          "127.0.0.1", config_dir=f"{edge}/fabric/config", audit_path=f"{edge}/audit.log",
+                          http_port=lan_http, https_port=lan_https)
+    become_upstream(edge_data, res_e["vars"], ROOT_PEM)
+    edge_https, edge_http = serve(edge, edge_data, "federation.edge.lan.test", "/home/step/certs/intermediate_ca.crt",
+                                  "/home/step/secrets/intermediate_ca_key", ROOT_PEM)
+    inv_lab3 = role(lan, "invite-via", "lab3", "edge")
+    body3 = json.loads(__import__("base64").urlsafe_b64decode(inv_lab3["invitation"].split(".", 1)[1] + "==="))
+    check("relay: the invitation names edge's endpoint and the organisation's root",
+          body3["via"] == "edge" and body3["host"] == "federation.edge.lan.test" and body3["address"] == "127.0.0.1"
+          and body3["root_sha256"] == describe_cert(ROOT_PEM)["sha256"], body3)
+    lab3, lab3_data, _ = install("lab3", "lab3", "lab3.lan.test", "Lab3-Pw-1")
+    res_3 = join_upstream(SITE, inv_lab3["invitation"], "Lab3-Pw-1", f"{lab3}/fabric/config/site-ca", "lab3.lan.test",
+                          "127.0.0.5", config_dir=f"{lab3}/fabric/config", audit_path=f"{lab3}/audit.log",
+                          http_port=edge_http, https_port=edge_https)
+    lab3_ca = open(res_3["vars"]["ica_crt_path"]).read()
+    check("relay: lab3's CA is signed by the root (the relay signs nothing), flat",
+          describe_cert(lab3_ca)["issuer"] == describe_cert(ROOT_PEM)["subject"] and res_3["vars"]["site_ca_depth"] == 0)
+    lan_reg = yaml.safe_load(open(f"{lan}/fabric/config/federation.yaml"))
+    lab3_reg = yaml.safe_load(open(f"{lab3}/fabric/config/federation.yaml"))
+    check("relay: the root records lab3 as joined through edge; lab3's upstream is the root, through edge",
+          lan_reg["sites"]["lab3"]["via"] == "edge" and lab3_reg["upstream"]["site_name"] == "lan"
+          and lab3_reg["upstream"]["relay"]["site"] == "edge", (lan_reg["sites"].get("lab3"), lab3_reg["upstream"]))
+    check("relay: edge holds no record of lab3 (it only forwarded) and audited the relay",
+          "lab3" not in (yaml.safe_load(open(f"{edge}/fabric/config/federation.yaml")) or {}).get("sites", {})
+          and "FED_JOIN_RELAYED" in open(f"{edge}/fabric/archive/audit.log").read())
+    dropped = role(lab3, "drop-relay")
+    check("relay direct: lab3 stops using the relay; a second time is refused",
+          dropped.get("site") == "edge" and "relay" not in yaml.safe_load(open(f"{lab3}/fabric/config/federation.yaml"))[
+              "upstream"] and "does not use a relay" in role(lab3, "drop-relay").get("error", ""), dropped)
 finally:
     for p in SERVERS:
         p.kill()

@@ -9,8 +9,9 @@ and root may connect (SO_PEERCRED), on top of the socket's 0660
 root:<nginx gid> permissions. Every route maps to one fabriclib operation.
 
   GET  /v1/health    {"ok": true, "site": <site_name>}
-  POST /v1/join      {id, secret, site, csr, domain, address} -> fabriclib/federation/accept_join
-                     (the invitation's one-time secret authenticates the call)
+  POST /v1/join      {id, secret, site, csr, domain, address, federation_host, via}
+                     -> fabriclib/federation/accept_join (the invitation's one-time secret authenticates the
+                     call), or relay_join when "via" names this site (it forwards to its upstream)
 """
 import argparse
 import json
@@ -27,6 +28,7 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.federation.accept_join import accept_join  # noqa: E402
 from fabriclib.federation.constants import JOIN_BODY_MAX  # noqa: E402
+from fabriclib.federation.relay_join import relay_join  # noqa: E402
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -81,7 +83,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         """Purpose: POST /v1/join — an invited site joins (accept_join).
         Inputs:  a JSON body of at most JOIN_BODY_MAX bytes.
-        Returns: None; 200 with accept_join's answer; 400 {"error": message} for a refusal (ValidationError) or a
+        Returns: None; 200 with accept_join's answer (or relay_join's, when the request's via names this site); 400 {"error": message} for a refusal (ValidationError) or a
                  bad body; 413 when too large; 404 for any other path; 500 {"error": "internal error"} otherwise
                  (details only in the journal).
         Fails:   OSError writing the reply.
@@ -96,7 +98,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(413, {"error": "request too large"})
         try:
             req = json.loads(self.rfile.read(length) or b"{}")
-            self.reply(200, accept_join(load_vars(), req, client_ip=self.client_ip()))
+            v = load_vars()
+            relay = isinstance(req, dict) and req.get("via") and req.get("via") == v.get("site_name")
+            self.reply(200, (relay_join if relay else accept_join)(v, req, client_ip=self.client_ip()))
         except (ValidationError, ValueError) as e:
             self.reply(400, {"error": str(e) if isinstance(e, ValidationError) else "the body is not JSON"})
         except Exception:  # noqa: BLE001 — never leak details to the network

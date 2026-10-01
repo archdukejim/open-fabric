@@ -45,6 +45,7 @@ def accept_join(v, req, client_ip="", now=None):
                                             for k in ("id", "secret", "site", "csr", "domain", "address")):
         raise ValidationError("the join request is incomplete")
     site, domain = req["site"].strip().lower(), req["domain"].strip().lower().rstrip(".")
+    fed_host = str(req.get("federation_host") or "").strip().lower()
     if not SITE_NAME_RE.match(site) or not DOMAIN_RE.match(domain):
         raise ValidationError("the site's name or domain is not valid")
     if domain == v["domain"]:
@@ -73,7 +74,9 @@ def accept_join(v, req, client_ip="", now=None):
             "domain": domain, "address": req["address"],
             "joined": datetime.datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
             "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
-            "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0)}
+            "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0),
+            "via": entry.get("via") or "",
+            "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}"}
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
                                             f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")

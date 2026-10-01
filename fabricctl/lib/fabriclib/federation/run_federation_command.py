@@ -4,6 +4,7 @@ import sys
 from fabriclib.common.errors import ValidationError
 from fabriclib.federation.create_invitation import create_invitation
 from fabriclib.federation.federation_status import federation_status
+from fabriclib.federation.drop_relay import drop_relay
 from fabriclib.federation.list_invitations import list_invitations
 from fabriclib.federation.remove_site import remove_site
 from fabriclib.federation.reparent_site import reparent_site
@@ -14,10 +15,12 @@ from fabriclib.setup.read_join_invitation import read_join_invitation
 
 USAGE = """usage: fabricctl federation status                 this install's place in its fabric: upstream, sites, invitations
        fabricctl federation enable | disable       the endpoint sites join through (https://federation.<domain>)
-       fabricctl federation invite <site> [--nest N]
+       fabricctl federation invite <site> [--nest N] [--via NODE]
                                                    a one-time invitation for a new site (good for one hour); on the
                                                    root it attaches flat, on a site nested under it; --nest N lets
-                                                   it hold N levels of sites below it
+                                                   it hold N levels of sites below it; --via NODE: it joins (and
+                                                   talks) through that site, which only relays
+       fabricctl federation relay direct           on a site: stop using its relay node, talk to the upstream
        fabricctl federation invitations            open invitations
        fabricctl federation remove <site>          forget a site that joined here (its CA stays valid until it expires)
        fabricctl federation reparent [@FILE|-]     on a site: move under the parent whose invitation you paste
@@ -35,7 +38,8 @@ def _when(epoch):
 
 
 def run_federation_command(ctx, argv):
-    """Purpose: `fabricctl federation status | enable | disable | invite | invitations | revoke | remove | reparent` —
+    """Purpose: `fabricctl federation status | enable | disable | invite | invitations | revoke | remove | reparent |
+             relay` —
              joining sites to
              this install without the web UI (design federation.md §4).
     Inputs:  ctx — SetupContext with state loaded (ctx.vars: the rendered vars); argv — list of str after
@@ -54,7 +58,8 @@ def run_federation_command(ctx, argv):
             print(f"federation endpoint: {'on, https://' + s['endpoint_host'] if s['endpoint'] else 'off'}")
             if s["upstream"]:
                 u = s["upstream"]
-                print(f"upstream: {u.get('site_name')} ({u.get('domain')}, {u.get('address')}), joined {u.get('joined')}")
+                print(f"upstream: {u.get('site_name')} ({u.get('domain')}, {u.get('address')}), joined {u.get('joined')}"
+                      + (f", through relay {u['relay'].get('site')}" if u.get("relay") else ""))
             for name, site in sorted(s["sites"].items()):
                 print(f"  site {name:<16} {site.get('domain', ''):<28} {site.get('address', ''):<16} "
                       f"joined {site.get('joined', '')}  CA until {site.get('ca_not_after', '')}")
@@ -69,9 +74,12 @@ def run_federation_command(ctx, argv):
                   f"federation endpoint {'on' if cmd == 'enable' else 'off'}"
                   + (f": https://{v.get('hostname_federation')}" if cmd == "enable" else " (sites that joined stay)"))
             return 0 if ok else 1
-        if cmd == "invite" and (len(args) == 1 or (len(args) == 3 and args[1] == "--nest" and args[2].isdigit())):
-            inv = create_invitation(v, "root", args[0], nest=int(args[2]) if len(args) == 3 else 0)
-            how = (f"nested under {v.get('site_name')}" if inv["nested"] else "flat, under the root site")
+        opts = dict(zip(args[1::2], args[2::2])) if cmd == "invite" and args and len(args) % 2 == 1 else None
+        if cmd == "invite" and opts is not None and set(opts) <= {"--nest", "--via"} \
+                and opts.get("--nest", "0").isdigit():
+            inv = create_invitation(v, "root", args[0], nest=int(opts.get("--nest", 0)), via=opts.get("--via", ""))
+            how = (f"nested under {v.get('site_name')}" if inv["nested"] else "flat, under the root site") \
+                + (f", through {inv['via']}" if inv["via"] else "")
             print(f"Invitation for site {inv['site']} ({how}; may hold {inv['nest']} level(s) of sites below it; "
                   f"one use, until {_when(inv['expires'])}):\n")
             print(f"  {inv['invitation']}\n")
@@ -85,6 +93,10 @@ def run_federation_command(ctx, argv):
                 print(f"{i['id']}  site {i['site']:<16} open until {_when(i['expires'])}  by {i['actor']}")
             if not rows:
                 print("no open invitations")
+            return 0
+        if cmd == "relay" and args == ["direct"]:
+            relay = drop_relay("root")
+            print(f"relay {relay.get('site')} dropped: this site talks to its upstream directly")
             return 0
         if cmd == "remove" and len(args) == 1:
             remove_site("root", args[0])

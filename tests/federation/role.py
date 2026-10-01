@@ -4,6 +4,8 @@ tree given first (its own config: vars, secrets, federation registry), so severa
 
     role.py <tree> invite <site> <nest>          -> prints {"invitation": ...} (create_invitation)
     role.py <tree> capacity                      -> prints signing_capacity
+    role.py <tree> invite-via <site> <node>      -> prints {"invitation": ...} through a relay
+    role.py <tree> drop-relay                    -> prints the dropped relay (drop_relay)
     role.py <tree> serve <https> <http> <crt> <key> <www>
                                                  -> the federation endpoint over TLS + the certs page, until killed
 """
@@ -25,6 +27,17 @@ action = sys.argv[2]
 if action == "invite":
     try:
         print(json.dumps(create_invitation(load_vars(), "tester", sys.argv[3], nest=int(sys.argv[4]))))
+    except ValidationError as e:
+        print(json.dumps({"error": str(e)}))
+elif action == "invite-via":
+    try:
+        print(json.dumps(create_invitation(load_vars(), "tester", sys.argv[3], via=sys.argv[4])))
+    except ValidationError as e:
+        print(json.dumps({"error": str(e)}))
+elif action == "drop-relay":
+    from fabriclib.federation.drop_relay import drop_relay  # noqa: E402
+    try:
+        print(json.dumps(drop_relay("tester")))
     except ValidationError as e:
         print(json.dumps({"error": str(e)}))
 elif action == "capacity":

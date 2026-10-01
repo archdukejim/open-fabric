@@ -12,6 +12,8 @@ their own local network (design [federation.md](../../../../docs/design/federati
 | `accept_join.py` | Upstream: an invited site joins — check the invitation, sign the site's CA with the root key, record the site |
 | `decode_invitation.py` | Joining node: read and check an invitation (no network) |
 | `join_upstream.py` | Joining node: make the site CA request, pin the upstream's root, join over verified TLS, stage the CA, record the upstream |
+| `relay_join.py` | On a relay node: pass a join that names it (`via`) on to its upstream and return the answer unchanged |
+| `drop_relay.py` | On a site that joined through a relay: talk to the upstream directly from now on |
 | `remove_site.py` | On a parent: forget a site that joined here (its CA stays valid until it expires: no revocation yet) |
 | `reparent_site.py` | On a site: move under another parent with its invitation — new CA, Step-CA switched, certificates re-issued |
 | `federation_status.py` | Standalone, upstream or site; the endpoint; joined sites; open invitations |
