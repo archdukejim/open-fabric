@@ -529,6 +529,17 @@
 | Feeds | run. |
 | Called by | `fabriclib.setup.init_pki.run` |
 
+### `_single_intermediate(path)`
+
+| | |
+|---|---|
+| Purpose | keep only the intermediate certificate in intermediate_ca.crt, the layout `step ca init` makes: the step CLI's offline signing (mint_offline_cert, sign_csr) takes exactly one certificate as --ca. Earlier bring-your-own installs appended the root there. |
+| Inputs | path — Step-CA's certs/intermediate_ca.crt. |
+| Returns | True if the file held more than one certificate and was rewritten with the first one. |
+| Fails | OSError reading or writing the file. |
+| Feeds | run (first initialisation with byoc, and every later run, so existing installs converge). |
+| Called by | `fabriclib.setup.init_pki.run` |
+
 ### `_publish_ca_certs(ctx, certs_dir)`
 
 | | |
@@ -557,7 +568,7 @@
 |---|---|
 | Purpose | initialise Step-CA once (its own root, or a bring-your-own root + intermediate when byoc), configure ca.json, publish the CA certificates and trust them on the host. |
 | Inputs | ctx — SetupContext: vars byoc, ca_crt_path, ica_crt_path, ica_key_path (default: the .crt path with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json settings; secrets.ca_password; service user step. |
-| Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and ca.json configured, chain verified, published and trusted. With byoc the brought-in intermediate key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the permissions, publishing and trust are (re)done. |
+| Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the permissions, publishing and trust are (re)done. |
 | Fails | SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars. |
 | Feeds | setup step `pki`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -568,7 +579,7 @@
 
 | | |
 |---|---|
-| Purpose | setup step `join` (only with `fabricctl setup --join '<invitation>'`): join the upstream before anything is rendered, so this install is set up as a site of that fabric — its CA an intermediate signed by the organisation's root (bring-your-own-CA path), its organisation suffix the upstream's (design federation.md §4). |
+| Purpose | setup step `join` (only with `fabricctl setup --join`): join the upstream before anything is rendered, so this install is set up as a site of that fabric — its CA an intermediate signed by the organisation's root (bring-your-own-CA path), its organisation suffix the upstream's (design federation.md §4). |
 | Inputs | ctx — SetupContext: join_invitation, vars (from collect_vars: domain, host_ip, image_stepca if set), secrets / secrets_file (ca_password, created here if missing), config_dir, source_dir (images.lock). |
 | Returns | None. ctx.vars gains byoc, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain and the organisation's cert_* settings (friendly_name only when unset); the deploy step saves them. The site CA key and certificates are kept in <base>/fabric/config/site-ca (0700). |
 | Fails | SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or unreachable, the root not the pinned one, a certificate that does not fit). |
@@ -670,6 +681,19 @@
 | Feeds | setup step `preflight`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
 
+## `fabricctl/lib/fabriclib/setup/read_join_invitation.py`
+
+### `read_join_invitation(value, non_interactive=False)`
+
+| | |
+|---|---|
+| Purpose | the invitation for `setup --join`, never taken from the command line: it carries a secret, and argv is readable by every user on the host. |
+| Inputs | value — what followed --join: None (no --join), "" (bare --join: a hidden prompt, or stdin when it is not a terminal), "-" (stdin), "@<path>" (a file); non_interactive — never prompt. |
+| Returns | the invitation text (stripped), or None without --join. |
+| Fails | SetupError "do not put the invitation on the command line ..." when the value is the invitation itself; "cannot read the invitation from <path>: ..."; "no invitation given" (empty input, or a terminal with --non-interactive). |
+| Feeds | run_setup main (ctx.join_invitation). |
+| Called by | `fabriclib.setup.run_setup.main` |
+
 ## `fabricctl/lib/fabriclib/setup/renew_service_certs.py`
 
 ### `renew_service_certs(ctx, force=False)`
@@ -729,7 +753,7 @@
 | | |
 |---|---|
 | Purpose | `fabricctl setup` / `fabricctl doctor`: parse options, collect settings, show the plan and run the selected steps of STEPS in order. |
-| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --step NAME (repeatable), --join INVITATION (join an upstream fabric), --list, --doctor (hidden, used by doctor). |
+| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --step NAME (repeatable), --join [@FILE\|-] (join an upstream fabric; read_join_invitation), --list, --doctor (hidden, used by doctor). |
 | Returns | exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted. A full run leaves the install converged; the steps before deploy (preflight, host, docker, deploy) collect vars first, and the plan is shown only when no --step is given. |
 | Fails | SystemExit(2) from argparse on bad options; SystemExit("setup cancelled") when Quit is chosen in the plan; any exception other than SetupError/KeyboardInterrupt from a step (CalledProcessError, CommandError, ValidationError, OSError) propagates as a traceback. |
 | Feeds | cli main (`setup`, `doctor`) and this file's `__main__`. |

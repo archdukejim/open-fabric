@@ -252,6 +252,31 @@ check("join: a node that joined one upstream refuses another's invitation",
       refused(join_upstream, SITE, inv_other["invitation"], "Site-Pw-1", f"{B1}/site-ca", "branch1.hq.test",
               "127.0.0.2", **J, match="already joined"))
 
+# ---------------------------------------------------------------- setup --join never takes the invitation from argv
+import io  # noqa: E402
+from fabriclib.setup.errors import SetupError  # noqa: E402
+from fabriclib.setup.read_join_invitation import read_join_invitation  # noqa: E402
+try:
+    read_join_invitation(inv["invitation"])
+    inline = False
+except SetupError as e:
+    inline = "command line" in str(e)
+check("setup --join: the invitation itself on the command line is refused", inline)
+with open(f"{W}/inv.txt", "w") as f:
+    f.write(inv["invitation"] + "\n")
+check("setup --join @FILE reads it", read_join_invitation(f"@{W}/inv.txt") == inv["invitation"])
+_stdin, sys.stdin = sys.stdin, io.StringIO(inv["invitation"])
+try:
+    check("setup --join - reads it from stdin", read_join_invitation("-") == inv["invitation"])
+finally:
+    sys.stdin = _stdin
+try:
+    read_join_invitation(f"@{W}/missing.txt")
+    missing = False
+except SetupError as e:
+    missing = "cannot read" in str(e)
+check("setup --join @FILE: a missing file is refused", missing)
+
 # ---------------------------------------------------------------- the unix socket accepts only listed uids
 sock_path = f"{W}/fed.sock"
 srv = fed_server.UnixServer(sock_path, fed_server.Handler)

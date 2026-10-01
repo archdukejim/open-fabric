@@ -23,7 +23,7 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-rbac](fabriclib-rbac.md) | Who may do what: permissions, bundles, route table | 2 | 2 |
 | [fabriclib-secrets](fabriclib-secrets.md) | fabric's own secrets: file or OpenBao | 10 | 8 |
 | [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 2 | 1 |
-| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 77 | 33 |
+| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 79 | 34 |
 | [fabriclib-system](fabriclib-system.md) | Service status, start/stop, apply, version | 5 | 4 |
 | [fabriclib-vault](fabriclib-vault.md) | OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass | 81 | 43 |
 | [installers](installers.md) | The Debian package wrapper | 2 | 1 |

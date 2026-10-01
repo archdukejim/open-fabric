@@ -52,6 +52,24 @@ def _configure_ca_json(ca_json, v):
         json.dump(cfg, f, indent="\t")
 
 
+def _single_intermediate(path):
+    """Purpose: keep only the intermediate certificate in intermediate_ca.crt, the layout `step ca init` makes:
+             the step CLI's offline signing (mint_offline_cert, sign_csr) takes exactly one certificate as --ca.
+             Earlier bring-your-own installs appended the root there.
+    Inputs:  path — Step-CA's certs/intermediate_ca.crt.
+    Returns: True if the file held more than one certificate and was rewritten with the first one.
+    Fails:   OSError reading or writing the file.
+    Feeds:   run (first initialisation with byoc, and every later run, so existing installs converge)."""
+    with open(path) as f:
+        text = f.read()
+    end = "-----END CERTIFICATE-----"
+    if text.count(end) <= 1:
+        return False
+    with open(path, "w") as f:
+        f.write(text[:text.index(end) + len(end)] + "\n")
+    return True
+
+
 def _publish_ca_certs(ctx, certs_dir):
     """Purpose: publish every CA format on certs.<domain> and trust the CA on this host; done on every
              setup, since a reinstall keeps the CA but not /opt/nginx or the host trust entries.
@@ -85,7 +103,8 @@ def run(ctx):
              with .key), image_stepca, ca_name, hostname_stepca, stepca_port (default 9000) and the ca.json
              settings; secrets.ca_password; service user step.
     Returns: None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step) and
-             ca.json configured, chain verified, published and trusted. With byoc the brought-in intermediate
+             ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the
+             intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate
              key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca
              init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the
              permissions, publishing and trust are (re)done.
@@ -98,6 +117,9 @@ def run(ctx):
     ca_json = os.path.join(data, "config", "ca.json")
     uid, gid = ctx.uid("step")
     if os.path.exists(ca_json):
+        if _single_intermediate(os.path.join(data, "certs", "intermediate_ca.crt")):
+            ctx.restart_services.add("stepca")
+            ok("intermediate_ca.crt: the intermediate alone (the root it carried is in root_ca.crt)")
         _public_certs_readable(os.path.join(data, "certs"))
         published = _publish_ca_certs(ctx, os.path.join(data, "certs"))
         ok("Step-CA already initialised" + ("; CA certs re-published and trusted" if published else ""))
@@ -131,9 +153,8 @@ def run(ctx):
     certs = os.path.join(data, "certs")
     if v.get("byoc"):
         shutil.copy2(v["ca_crt_path"], os.path.join(certs, "root_ca.crt"))
-        with open(os.path.join(certs, "intermediate_ca.crt"), "w") as out:
-            for p in (v["ica_crt_path"], v["ca_crt_path"]):
-                out.write(open(p).read())
+        shutil.copy2(v["ica_crt_path"], os.path.join(certs, "intermediate_ca.crt"))
+        _single_intermediate(os.path.join(certs, "intermediate_ca.crt"))
         shutil.copy2(ica_key, os.path.join(data, "secrets", "intermediate_ca_key"))
         os.chmod(os.path.join(data, "secrets", "intermediate_ca_key"), 0o600)
         # `step ca init` made a root of its own: its key signs nothing that chains to the brought-in root

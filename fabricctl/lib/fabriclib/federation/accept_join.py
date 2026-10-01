@@ -65,7 +65,7 @@ def accept_join(v, req, client_ip="", now=None):
         save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]}}, v=v)
         registry["sites"][site] = {
             "domain": domain, "address": req["address"],
-            "joined": datetime.datetime.fromtimestamp(now).isoformat(timespec="seconds"),
+            "joined": datetime.datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
             "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
             "invited_by": entry.get("actor", "")}
         save_registry(registry)

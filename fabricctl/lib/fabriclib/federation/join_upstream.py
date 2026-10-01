@@ -68,7 +68,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"])
     org = answer.get("org") or {}
     up = {**(answer.get("upstream") or {}), "site": inv["site"], "org_domain": org.get("org_domain") or inv["org_domain"],
-          "root_sha256": inv["root_sha256"], "joined": datetime.datetime.now().isoformat(timespec="seconds"),
+          "root_sha256": inv["root_sha256"],
+          "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "org": {k: org[k] for k in ORG_KEYS if org.get(k)}}
     with federation_lock(lock_path):
         registry = load_registry(reg_path)

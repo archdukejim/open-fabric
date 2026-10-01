@@ -10,7 +10,7 @@ from fabriclib.setup.errors import SetupError
 
 
 def run(ctx):
-    """Purpose: setup step `join` (only with `fabricctl setup --join '<invitation>'`): join the upstream before
+    """Purpose: setup step `join` (only with `fabricctl setup --join`): join the upstream before
              anything is rendered, so this install is set up as a site of that fabric — its CA an
              intermediate signed by the organisation's root (bring-your-own-CA path), its organisation suffix
              the upstream's (design federation.md §4).

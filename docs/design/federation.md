@@ -113,7 +113,7 @@ the joining node.
    SHA-256 fingerprint of the root CA, and a single-use secret valid for one
    hour. Audited.
 2. **Join** — on the new node, at install time:
-   `fabricctl setup --join '<invitation>'` (a fresh install; see F1 for
+   `fabricctl setup --join` with the invitation pasted at its prompt (a fresh install; see F1 for
    existing ones). The node connects to the upstream's federation endpoint
    (HTTPS, the server certificate checked against the pinned fingerprint),
    presents the secret and sends certificate requests.

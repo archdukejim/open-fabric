@@ -169,7 +169,7 @@ sudo fabricctl setup --file vars.yaml --non-interactive --yes
 | `--deploy-base <dir>` | Install root (default `/opt`) |
 | `--step <name>` | Run only this step (repeatable); the plan is not shown. An unknown name is refused |
 | `--list` | List the steps |
-| `--join <invitation>` | Join an existing fabric as a new site (a fresh install only): see [Joining an existing fabric](#joining-an-existing-fabric-a-new-site) |
+| `--join [@FILE \| -]` | Join an existing fabric as a new site (a fresh install only). The invitation is pasted at a hidden prompt, read from `@FILE` or from stdin (`-`); never on the command line, which every user on the host can read: see [Joining an existing fabric](#joining-an-existing-fabric-a-new-site) |
 
 After setup, `sudo fabricctl doctor` re-runs the end-to-end checks at any time. When a step fails, setup stops there with the reason (exit 1; some errors show a Python traceback instead): fix it and run setup again. Interrupted, it exits 130.
 
@@ -185,7 +185,7 @@ sudo fabricctl federation invite branch1  # one-time invitation, good for one ho
 On the new host, a fresh install:
 
 ```bash
-sudo fabricctl setup --join 'fabric-join-1.…'
+sudo fabricctl setup --join            # paste the invitation at the (hidden) prompt
 ```
 
 The site's name comes from the invitation; its domain defaults to `<site>.<organisation domain>`

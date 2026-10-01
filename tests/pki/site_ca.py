@@ -14,6 +14,8 @@ import sys
 import tempfile
 import time
 
+import jinja2
+
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/pki-site-ca"
 IMAGE = os.environ.get("FABRIC_STEP_IMAGE") or subprocess.run(
@@ -72,7 +74,8 @@ from fabriclib.pki.common.describe_cert import describe_cert  # noqa: E402
 from fabriclib.pki.make_site_ca_request import make_site_ca_request  # noqa: E402
 from fabriclib.pki.sign_site_ca import _hours_left, sign_site_ca  # noqa: E402
 from fabriclib.pki.stage_site_ca import stage_site_ca  # noqa: E402
-from fabriclib.setup.init_pki import _configure_ca_json  # noqa: E402
+from fabriclib.pki.mint_offline_cert import mint_offline_cert  # noqa: E402
+from fabriclib.setup.init_pki import _configure_ca_json, _single_intermediate  # noqa: E402
 
 USERS = {"step": {"uid": STEP_UID, "gid": STEP_UID}}
 HQ = {"deploy_base_dir": f"{W}/hq", "image_stepca": IMAGE, "service_users": USERS, "site_name": "hq",
@@ -193,8 +196,12 @@ step(data, "ca", "init", "--name=branch1", "--dns=ca.branch1.test,localhost", "-
      "--provisioner=admin", "--password-file=/home/step/secrets/password",
      "--provisioner-password-file=/home/step/secrets/password")
 shutil.copy2(staged["ca_crt_path"], f"{data}/certs/root_ca.crt")
-with open(f"{data}/certs/intermediate_ca.crt", "w") as out:
+with open(f"{data}/certs/intermediate_ca.crt", "w") as out:      # the layout earlier byoc installs had
     out.write(open(staged["ica_crt_path"]).read() + open(staged["ca_crt_path"]).read())
+check("byoc: an intermediate_ca.crt carrying the root is converged to the intermediate alone, once",
+      _single_intermediate(f"{data}/certs/intermediate_ca.crt") is True
+      and open(f"{data}/certs/intermediate_ca.crt").read().count("BEGIN CERTIFICATE") == 1
+      and _single_intermediate(f"{data}/certs/intermediate_ca.crt") is False)
 shutil.copy2(staged["ica_key_path"], f"{data}/secrets/intermediate_ca_key")
 os.remove(f"{data}/secrets/root_ca_key")
 _configure_ca_json(f"{data}/config/ca.json", {"byoc": True, "hostname_stepca": "ca.branch1.test"})
@@ -215,6 +222,19 @@ roots = sh(["docker", "exec", "sitecatest", "step", "ca", "roots", "--ca-url", "
             "--root", "/home/step/certs/root_ca.crt"], ok=False).stdout
 check("use: the site's Step-CA hands out the organisation's root", roots.strip() == ROOT_PEM.strip(), roots[:200])
 sh(["docker", "rm", "-f", "sitecatest"], ok=False)
+
+# offline signing with the site's intermediate (setup's admin client certificate, extra certs, the PKI page):
+# what failed on a real joined site while intermediate_ca.crt carried the root
+os.makedirs(f"{data}/templates/certs", exist_ok=True)
+with open(f"{data}/templates/certs/leaf.tpl", "w") as f:
+    f.write(jinja2.Environment().from_string(open(f"{REPO}/fabricctl/jinja/stepca/leaf.tpl.j2").read()).render(
+        cert_country="US", cert_province="CA", cert_city="Test", cert_org="Fabric Test", cert_ou="IT"))
+sh(["chown", "-R", f"{STEP_UID}:{STEP_UID}", data])
+crt, key = mint_offline_cert({"deploy_base_dir": f"{W}/branch1", "image_stepca": IMAGE, "service_users": USERS},
+                             "pc2.branch1.test", days=30, kty="EC", crv="P-256")
+check("use: offline signing with the site's intermediate (encrypted key) verifies against the root",
+      sh(["openssl", "verify", "-CAfile", ROOT, "-untrusted", f"{data}/certs/intermediate_ca.crt", crt],
+         ok=False).returncode == 0)
 
 print(json.dumps({"failed": FAILED}))
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")

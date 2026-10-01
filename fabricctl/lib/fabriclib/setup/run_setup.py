@@ -18,6 +18,7 @@ from fabriclib.setup.choose_plan import choose_plan  # noqa: E402
 from fabriclib.setup.collect_vars import collect_vars  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
 from fabriclib.setup.errors import SetupError  # noqa: E402
+from fabriclib.setup.read_join_invitation import read_join_invitation  # noqa: E402
 from fabriclib.setup.steps import STEPS  # noqa: E402
 from fabriclib.setup.verify_install import run as verify  # noqa: E402
 
@@ -28,7 +29,7 @@ def main(argv=None):
     """Purpose: `fabricctl setup` / `fabricctl doctor`: parse options, collect settings, show the plan and run
              the selected steps of STEPS in order.
     Inputs:  argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline,
-             --non-interactive, --yes/-y, --step NAME (repeatable), --join INVITATION (join an upstream fabric),
+             --non-interactive, --yes/-y, --step NAME (repeatable), --join [@FILE|-] (join an upstream fabric; read_join_invitation),
              --list, --doctor (hidden, used by doctor).
     Returns: exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted.
              A full run leaves the install converged; the steps before deploy (preflight, host, docker,
@@ -45,8 +46,9 @@ def main(argv=None):
     ap.add_argument("--non-interactive", action="store_true", help="never prompt; fail on missing values")
     ap.add_argument("--yes", "-y", action="store_true", help="accept the plan without the Proceed prompt")
     ap.add_argument("--step", action="append", help="run only this step (repeatable)")
-    ap.add_argument("--join", metavar="INVITATION",
-                    help="join an upstream fabric as a new site (a fresh install; fabricctl federation invite)")
+    ap.add_argument("--join", metavar="@FILE", nargs="?", const="",
+                    help="join an upstream fabric as a new site (a fresh install): paste the invitation from "
+                         "`fabricctl federation invite` at the prompt, or give @FILE or - (stdin)")
     ap.add_argument("--list", action="store_true", help="list the steps and exit")
     ap.add_argument("--doctor", action="store_true", help=argparse.SUPPRESS)
     args = ap.parse_args(argv)
@@ -56,8 +58,13 @@ def main(argv=None):
             print(f"  {name:10} {desc}")
         return 0
 
+    try:
+        invitation = read_join_invitation(args.join, args.non_interactive)
+    except SetupError as e:
+        err(str(e))
+        return 1
     ctx = SetupContext(deploy_base=args.deploy_base, user_vars_file=args.file, offline=args.offline,
-                       non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=args.join)
+                       non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=invitation)
     try:
         if args.doctor:
             ctx.load_state()

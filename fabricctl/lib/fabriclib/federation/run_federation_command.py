@@ -13,7 +13,7 @@ USAGE = """usage: fabricctl federation status                 this install's pla
        fabricctl federation invite <site>          a one-time invitation for a new site (good for one hour)
        fabricctl federation invitations            open invitations
        fabricctl federation revoke <id|site>       withdraw an open invitation
-  On the new site: sudo fabricctl setup --join '<invitation>'   (a fresh install)"""
+  On the new site: sudo fabricctl setup --join   (a fresh install; paste the invitation at the prompt)"""
 
 
 def _when(epoch):
@@ -61,10 +61,11 @@ def run_federation_command(ctx, argv):
             return 0 if ok else 1
         if cmd == "invite" and len(args) == 1:
             inv = create_invitation(v, "root", args[0])
-            print(f"Invitation for site {inv['site']} (one use, until {_when(inv['expires'])}). On the new site run:\n")
-            print(f"  sudo fabricctl setup --join '{inv['invitation']}'\n")
-            print("It carries a secret: send it over a channel you trust. Withdraw it with: "
-                  f"fabricctl federation revoke {inv['id']}")
+            print(f"Invitation for site {inv['site']} (one use, until {_when(inv['expires'])}):\n")
+            print(f"  {inv['invitation']}\n")
+            print("On the new site run `sudo fabricctl setup --join` and paste it at the prompt (or save it to a\n"
+                  "file and use --join @FILE). It carries a secret: send it over a channel you trust and never put\n"
+                  f"it on a command line. Withdraw it with: fabricctl federation revoke {inv['id']}")
             return 0
         if cmd == "invitations" and not args:
             rows = list_invitations(v)

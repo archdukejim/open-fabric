@@ -514,7 +514,7 @@ sudo fabricctl federation revoke branch1    # withdraw one (by id or site)
 sudo fabricctl federation disable           # no new joins; sites that joined stay
 ```
 
-The new site runs `sudo fabricctl setup --join '<invitation>'` (see
+The new site runs `sudo fabricctl setup --join` and pastes it at the prompt (or `--join @FILE`; see
 [install.md](install.md#joining-an-existing-fabric-a-new-site)). The invitation carries the endpoint's
 name and address, the root CA's fingerprint and a single-use secret — send it over a channel you trust;
 only a hash of the secret is kept. The joining node fetches the root over plain HTTP, accepts it only if
