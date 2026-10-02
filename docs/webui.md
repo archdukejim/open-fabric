@@ -175,6 +175,7 @@ them). The list lives in `fabriclib/rbac/permissions.py` (`PERMISSIONS`,
 | `dns:read` | See zones, records, reverse zones and TSIG keys (names and rights, never secrets) | BIND9 tab |
 | `dns:write` | Add and delete DNS records, and **Apply** — which runs the whole deployment, not only DNS | BIND9 tab |
 | `tsig:manage` | Create TSIG keys, give them a new secret, delete them | BIND9 → TSIG keys |
+| `dns:filter` | Open AdGuard Home's own UI (lists, upstreams, rules, clients) with the optional DNS filter | `https://adguard.<domain>` (oauth2-proxy checks it) |
 | `dhcp:read` | See DHCP subnets, reservations and leases | Kea tab |
 | `dhcp:write` | Add and remove DHCP reservations (applied at once) | Kea tab |
 | `pki:read` | See the CA and the certificates issued by hand; inspect a certificate or CSR; review a CSR before signing | Step-CA tab |
@@ -199,7 +200,7 @@ them). The list lives in `fabriclib/rbac/permissions.py` (`PERMISSIONS`,
 |---|---|---|---|
 | `admins` (`webui_admin_group`) | `fabric-admin` (`webui_admin_role`) | every permission above | everything |
 | `auditors` | `fabric-auditor` | `status:read`, `dns:read`, `dhcp:read`, `pki:read`, `devices:read`, `radius:read`, `people:read`, `vault:status`, `audit:read` | read every tab and the audit log; change nothing |
-| `network-operators` | `fabric-network-operator` | `status:read`, `dns:read`, `dns:write`, `tsig:manage`, `dhcp:read`, `dhcp:write`, `pki:read`, `vault:status` | DNS records and Apply, TSIG keys, DHCP reservations; read PKI and vault status; **no** device management |
+| `network-operators` | `fabric-network-operator` | `status:read`, `dns:read`, `dns:write`, `tsig:manage`, `dns:filter`, `dhcp:read`, `dhcp:write`, `pki:read`, `vault:status` | DNS records and Apply, TSIG keys, the DNS filter's UI, DHCP reservations; read PKI and vault status; **no** device management |
 | `equipment-operators` | `fabric-equipment-operator` | `status:read`, `dns:read`, `pki:read`, `pki:link-device`, `devices:read`, `devices:enroll`, `devices:admin`, `roles:admin`, `radius:read`, `radius:admin` | devices, device roles, 802.1X, link certificates to devices |
 | `pki-operators` | `fabric-pki-operator` | `status:read`, `pki:read`, `pki:issue`, `pki:sign`, `pki:link-device`, `devices:read` | sign CSRs, issue key pairs, convert, link certificates to devices |
 | `helpdesk` | `fabric-helpdesk` | `status:read`, `dns:read`, `pki:read`, `devices:read`, `devices:enroll`, `people:read`, `people:create`, `people:reset` | add a person, reset a sign-in, enrol devices; read DNS, PKI and devices |

@@ -307,4 +307,4 @@
 | Returns | True if the file was written, False if it already had that content (mode and owner not checked then). |
 | Fails | OSError from reading, writing, chown (needs root for another owner) or rename; a stale <path>.tmp is left behind if a step after its creation fails. |
 | Feeds | dhcp/deploy_kea, radius/deploy_freeradius, setup/mint_service_certs. |
-| Called by | `fabriclib.dhcp.deploy_kea.deploy_kea`, `fabriclib.radius.deploy_freeradius.deploy_freeradius`, `fabriclib.setup.mint_service_certs.run` |
+| Called by | `fabriclib.dhcp.deploy_kea.deploy_kea`, `fabriclib.dns_filter.deploy_adguard.deploy_adguard`, `fabriclib.radius.deploy_freeradius.deploy_freeradius`, `fabriclib.setup.mint_service_certs.run` |

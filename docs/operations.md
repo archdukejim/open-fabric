@@ -30,6 +30,7 @@ The same DNS and apply operations are also available in the browser through webu
   - [TSIG Keys (RFC2136)](#tsig-keys-rfc2136-dynamic-updates)
   - [ACLs](#acls)
   - [Landing Page Links](#landing-page-links)
+- [DNS filter (optional: AdGuard Home)](#dns-filter-optional-adguard-home)
 - [Federation (sites)](#federation-sites)
 - [OpenBao (secrets)](#openbao-secrets)
 - [Lifecycle Commands](#lifecycle-commands)
@@ -500,6 +501,31 @@ gets its reverse record at apply, in a zone fabric creates:
   `.in-addr.arpa` / `.ip6.arpa`) replaces the generated one for that range.
 - Change or delete the forward record and apply: the PTR follows.
 
+## DNS filter (optional: AdGuard Home)
+
+With `dns_filter: adguard` (design [dns-filter.md](design/dns-filter.md)) AdGuard Home answers the
+network's DNS on `host_ip:53` and BIND moves to port 5053 (`bind_dns_port`), where RFC2136 clients and
+linked federation sites find it. DHCP hands out the host's address as before.
+
+Out of the box AdGuard points at **local DNS only**: every query goes to this site's BIND, so fabric's
+names resolve and the internet does not, until you set AdGuard up:
+
+1. Open `https://adguard.<domain>` and sign in (Keycloak, TOTP). You need the `dns:filter` permission
+   (admins and network operators have it).
+2. In AdGuard: **Settings → DNS settings** — add your upstreams (e.g. `https://dns.google/dns-query`,
+   `https://dns.cloudflare.com/dns-query`, `tls://dns.google`) and bootstrap servers; **Filters** — add the
+   block lists you want; **Custom filtering rules** — your own rules go below fabric's marked section.
+
+fabric keeps everything you set there across deploys. It manages only its own part: the
+`[/<zone>/]10.255.0.30` lines that send fabric's zones (this site's, the organisation's, linked sites',
+reverse zones) to BIND, the allow rules that keep those names from ever being blocked, the LAN-only
+client list, AdGuard's ports, its local login (sent by nginx after your sign-in) and DHCP off. Your own
+AdGuard elsewhere instead: keep `dns_filter: none` and point it at the site's BIND on `bind_dns_port`.
+
+Two units: `adguard` (the DNS filter) and `adguard-auth` (the sign-in in front of its UI). They start and
+stop apart: with Keycloak or the sign-in down only `https://adguard.<domain>` is unreachable, DNS keeps
+answering, and a BIND restart (every DNS apply) does not touch AdGuard.
+
 ## Federation (sites)
 
 Several fabrics can form one: an **upstream** owns identity and the root CA, **sites** join it and run
@@ -535,7 +561,10 @@ certificate is re-issued. People's web UI certificates must then be re-issued (`
 parent delegates the site's domain when it lies below its own (`lab.<domain>`: NS + glue), and each side
 keeps a read-only secondary copy of the other's zone: transfers are signed with the link's key, changes
 are pushed with NOTIFY. The parent applies this right after the join; `remove` takes it away again. The
-two sites must reach each other on TCP/UDP 53. Sites that joined before this existed have no key: they
+two sites must reach each other on their DNS ports: each site reports its `bind_dns_port` when it joins,
+so a BIND published on 5053 behind another resolver on 53 (e.g. AdGuard Home) works. Resolvers follow a
+delegation only on port 53, so with BIND on another port the resolver in front of it forwards the
+site domains instead. Sites that joined before this existed have no key: they
 get one when they join again (or are re-parented).
 
 **Relay nodes.** `--via edge1` names a site that joined this install (with its endpoint enabled) as the

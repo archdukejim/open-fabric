@@ -50,7 +50,8 @@ def reparent_site(ctx, actor, invitation):
     password = load_secrets(v=v).get("ca_password")
     work_dir = os.path.join(ctx.config_dir, f"site-ca-{inv['upstream']}")
     res = join_upstream(v, invitation, password, work_dir, v["domain"], v["host_ip"], config_dir=ctx.config_dir,
-                        audit_path=ctx.path("fabric", "archive", "audit.log"), replace=True)
+                        audit_path=ctx.path("fabric", "archive", "audit.log"), replace=True,
+                        dns_port=int(v.get("bind_dns_port") or 53))
     new = res["vars"]
     if res.get("dns_secret"):                # the DNS link to the new parent
         keys = dict(load_secrets(v=v).get("federation_tsig") or {}, upstream=res["dns_secret"])

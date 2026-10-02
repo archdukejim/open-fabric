@@ -43,7 +43,8 @@ def run(ctx):
     try:
         res = join_upstream(v, ctx.join_invitation, password, os.path.join(ctx.config_dir, "site-ca"),
                             ctx.vars["domain"], ctx.vars["host_ip"], config_dir=ctx.config_dir,
-                            audit_path=ctx.path("fabric", "archive", "audit.log"))
+                            audit_path=ctx.path("fabric", "archive", "audit.log"),
+                            dns_port=int(ctx.vars.get("bind_dns_port") or 53))
     except ValidationError as e:
         raise SetupError(f"joining the upstream failed: {e}") from None
     if res.get("dns_secret"):

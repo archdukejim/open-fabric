@@ -10,6 +10,7 @@ client these files use.
 |---|---|
 | `keycloak_admin.py` | Admin REST client (CA-pinned) and realm name |
 | `ensure_rbac_roles.py` | A realm role per fabric permission and a composite role per bundle, converged |
+| `ensure_adguard_client.py` | The OIDC client `fabric-adguard` oauth2-proxy signs people into AdGuard's UI with (realm roles in a `roles` claim) |
 | `ensure_openbao_client.py` | The `fabric-openbao` OIDC client for OpenBao's own UI (TOTP flow, fabric roles in a `roles` ID-token claim, exact callback) |
 | `fabric_groups.py` | The directory groups that carry a fabric bundle |
 | `create_person.py` | Helpdesk: a new realm user in `users`, one-time password (changed at first sign-in) |

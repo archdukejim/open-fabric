@@ -73,6 +73,7 @@ install_ldap: true
 install_webui: true
 install_freeradius: true
 install_kea: true
+dns_filter: adguard
 dhcp:
   interfaces: [eth0]
   lease_time: 600
@@ -93,6 +94,24 @@ check "setup did not shadow the package command" "! in_box 'test -e /usr/local/b
 echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
+
+echo "--- DNS filter (AdGuard Home) in front of BIND"
+BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
+check "AdGuard answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
+    "in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP && in_box 'dig +short +time=3 -p 5053 @$IP ns.lan.test' | grep -qx $IP"
+check "AdGuard runs with no capabilities, its UI is not published (only 53)" \
+    "[ \"\$(in_box \"docker inspect -f '{{.HostConfig.CapAdd}} {{.HostConfig.CapDrop}}' adguardhome\")\" = '[] [ALL]' ] && ! in_box 'docker port adguardhome' | grep -q 3000"
+check "https://adguard.lan.test sends a stranger to sign-in (OIDC), never to AdGuard" \
+    "in_box 'curl -s -o /dev/null -w %{http_code}:%{redirect_url} --cacert /opt/stepca/data/certs/root_ca.crt --resolve adguard.lan.test:443:$IP https://adguard.lan.test/' | grep -q '^302:https://adguard.lan.test/oauth2/sign_in'"
+check "fabricctl status lists the DNS filter" "in_box 'fabricctl status' | grep -qE '^adguard +active'"
+ADG_SINCE=$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value adguard')
+in_box 'systemctl restart bind9'
+check "a BIND restart (every DNS apply) leaves AdGuard running" \
+    "[ \"\$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value adguard')\" = '$ADG_SINCE' ] && in_box 'systemctl is-active adguard' | grep -qx active"
+in_box 'systemctl stop keycloak && systemctl restart adguard-auth' > "$OUT/adguard-no-keycloak.log" 2>&1
+check "with Keycloak down the sign-in still starts and DNS answers through AdGuard" \
+    "in_box 'systemctl is-active adguard-auth' | grep -qx active && in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP"
+in_box 'systemctl start keycloak' >> "$OUT/adguard-no-keycloak.log" 2>&1
 
 echo "--- DHCP: Kea 3.0 serves the LAN, lease hostnames in dhcp.<domain>"
 BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
@@ -209,14 +228,14 @@ check "fabricctl secrets show: the value, and the read is audited" \
 
 echo "--- RFC2136 with the embedded TSIG key (what nginx-proxy-manager does)"
 docker cp "$REPO/tests/sandbox/rfc2136_test.sh" "$NAME:/root/rfc2136_test.sh"
-rfc2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test npm '$TSIG_SECRET' npm" 2>&1 | tee -a "$OUT/rfc2136.log"; }
+rfc2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test npm '$TSIG_SECRET' npm $BIND_PORT" 2>&1 | tee -a "$OUT/rfc2136.log"; }
 rfc2136 > /dev/null
 check "RFC2136: embedded key updates _acme-challenge.npm, other names and wrong keys refused" \
     "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
 check "embedded secret kept exactly (in OpenBao), never in vars or fabric.yaml" \
     "secrets_json | grep -qF '$TSIG_SECRET' && in_box \"! grep -qF '$TSIG_SECRET' /opt/fabric/config/vars.yaml /opt/fabric/config/fabric.yaml\""
-check "rfc2136.ini for the key: host IP, port 53, 0600" \
-    "in_box \"grep -qx 'dns_rfc2136_server = $IP' /opt/npm/rfc2136.ini && grep -qx 'dns_rfc2136_port = 53' /opt/npm/rfc2136.ini && [ \\\$(stat -c %a /opt/npm/rfc2136.ini) = 600 ]\""
+check "rfc2136.ini for the key: host IP, BIND's port ($BIND_PORT, behind the DNS filter), 0600" \
+    "in_box \"grep -qx 'dns_rfc2136_server = $IP' /opt/npm/rfc2136.ini && grep -qx 'dns_rfc2136_port = $BIND_PORT' /opt/npm/rfc2136.ini && [ \\\$(stat -c %a /opt/npm/rfc2136.ini) = 600 ]\""
 
 echo "--- admin login kit"
 check "kit: .p12, passwords and root CA in ~/fabric-admin" \
@@ -271,6 +290,7 @@ CAROL_P12_PW=$(in_box 'fabricctl client-cert carol' 2>&1 | sed -n 's/^.p12 passw
 check "third user carol in the auditors group, with a client cert" "grep -q created '$OUT/carol.log' && [ -n '$CAROL_P12_PW' ]"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
+in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
 cat > "$OUT/reset_guard.py" <<'PY'
 import sys, yaml
 sys.path.insert(0, "/opt/fabric/lib")
@@ -353,7 +373,7 @@ check "RFC2136 key still works after the re-runs (secret unchanged)" "grep -q '4
 
 echo "--- fabricctl tsig / acl on the running install"
 ACLF=/opt/bind9/config/named.conf.acl
-t2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test $1 '$2' $3" 2>&1 | tail -1; }   # key secret host
+t2136() { in_box "bash /root/rfc2136_test.sh $IP lan.test $1 '$2' $3 $BIND_PORT" 2>&1 | tail -1; }   # key secret host
 secret_of() { secrets_json | python3 -c "import json,sys; print(json.load(sys.stdin)['tsig_secrets']['$1'])"; }
 check "vars file: npm key is in ACL npm-updaters" \
     "in_box \"sed -n '/acl \\\"npm-updaters\\\"/,/};/p' $ACLF\" | grep -q 'key \"npm\"'"
@@ -411,7 +431,7 @@ check "policy: cleanup leaves no trace in BIND's config" \
     "! in_box \"grep -rqE 'dev1|dev2|certbot-devices' /opt/bind9/config\""
 
 in_box 'fabricctl tsig remove nas' >> "$OUT/tsig.log" 2>&1
-in_box "bash /root/rfc2136_test.sh $IP lan.test nas '$S2' web" > "$OUT/tsig-removed.log" 2>&1
+in_box "bash /root/rfc2136_test.sh $IP lan.test nas '$S2' web $BIND_PORT" > "$OUT/tsig-removed.log" 2>&1
 check "tsig remove: key refused by BIND" "grep -q '^FAIL RFC2136 update with the embedded key accepted' '$OUT/tsig-removed.log'"
 check "tsig remove: key gone from every ACL" "! in_box \"grep -q 'key \\\"nas\\\"' $ACLF\""
 check "tsig remove: rfc2136.ini deleted" "! in_box 'test -e /opt/nas/rfc2136.ini'"

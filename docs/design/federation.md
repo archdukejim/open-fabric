@@ -78,6 +78,34 @@ depends on minute to minute — keep working with no action when one node
 dies. What needs a promote is the administration side (sign-in, secrets,
 the web UI), which can wait for an admin.
 
+#### 3.1a Automatic takeover (owner idea 2026-10-01, to be designed)
+
+The owner's direction for HA, replacing "promote by hand" (decision F8) once designed:
+
+- **Heartbeat.** fabric-agent on each partner keeps a keep-alive with the others (its own port,
+  mutual TLS with Step-CA certificates: only fabric nodes of this organisation count).
+- **Services are announced.** Every agent tells its linked peers what it runs and in what state
+  (active, standby, stopped), so each node knows the whole picture.
+- **Takeover.** When a node stops answering, a partner starts the services that have no native HA
+  (the failover rows above: Keycloak + Postgres promote, OpenBao from the latest snapshot, web UI,
+  nginx, the federation endpoint, a singleton Step-CA role if any).
+- **Checked first at start-up.** Before starting any singleton, the agent asks the previously
+  linked systems who is active, so a node coming back after a takeover rejoins as standby instead
+  of starting a second copy.
+
+Open points to settle before building:
+- **Split brain.** With two nodes, "the other stopped answering" and "the link between us broke"
+  look the same; both would take over. A third vote is needed: a witness (the upstream site, or a
+  tiny witness-only agent) and a node takes over only with a majority. Without a majority it does
+  nothing (and says so).
+- **Addresses.** Clients and switches reach DNS, DHCP and RADIUS at both nodes already. Names
+  (`sso.<domain>`, the web UI) move by a DNS update, or a virtual IP (VRRP) moves with the active
+  node.
+- **Fencing.** The node that lost must stop its singletons when it notices it lost the majority,
+  before the other starts them.
+- **Data must already be there.** Takeover only works for what is replicated beforehand: Postgres
+  streaming replica, OpenBao snapshots, 389-DS multi-supplier, Kea HA leases, BIND secondaries.
+
 ### 3.2 Between sites: upstream/downstream
 
 | Service | Federation |
@@ -279,9 +307,12 @@ Milestones, each tested before the next:
 | M1b | **Layout and attachment** (owner decisions 2026-10-01, §6): `ldap_base_dn` settable at the root site's install and handed to sites; every site's part a sub-suffix `ou=<site>,<org>`, one level for every mode (installs from before the split migrate straight to it; the unreleased `o=<site>` layout of M1 is not migrated: its two test installs are rebuilt); invitations `--via <node>` (relay; `relay direct` to drop it) and `--under <site>` / `--nest N` (path length), `ca_nest_depth` (default 1, settable) for new roots, `reparent`, `remove`; each site records its parent and relay | **Done** in three steps: (1) layout — settable base DN, `ou=<site>,<base>` sub-suffixes, the base DN in the invitation; (2) nesting — `ca_nest_depth`, `--nest`, invitations on a parent, the parent chain through every certificate chain, `reparent`, `remove`; (3) relays — `--via`, `relay_join`, `relay direct`. Real machines: the test Pi rebuilt as root `lan` (`dc=lan`, root path length 2), host-2's WSL site `lab` joined with `--nest 1` and invited a nested `lab2` (withdrawn: no third machine). `tests/federation/nested.py` runs root → lab → lab2, re-parenting and a relay with real installs side by side |
 | M2 | **Site CAs**: signing a site's intermediate with the root key (fixed template, path length 0); setup `--join` feeds it into the bring-your-own-CA path | **Done** (the operations; `--join` comes with M3): `pki/make_site_ca_request` (site: EC P-256 key encrypted with its `ca_password`, never leaves), `pki/sign_site_ca` (root: subject `<site> Intermediate CA`, no other names, never past the root's expiry), `pki/stage_site_ca` (site: pinned root fingerprint, chain, path length, its own key) → `byoc`. Step-CA now always gets its password file. `tests/pki/site_ca.py` |
 | M3 | **Invite and join**: `fabricctl federation invite|join|status`, one-time invitations kept hashed in fabric's secrets, the federation endpoint (a separate minimal root handler behind nginx, `federation.<domain>`) | **Done**: `fabricctl federation status/enable/disable/invite/invitations/revoke`; `setup --join` (step `join`, before `deploy`; fresh installs only; idempotent). The joining node fetches the root over plain HTTP and accepts it only by the invitation's fingerprint, then joins over TLS verified against it (by address, checking the endpoint's name). `org_domain` names the organisation suffix, so a site with its own domain shares it. Endpoint: `fabric-federation` (`lib/federation/server.py`, socket for nginx's uid only), `/v1/join` rate- and size-limited. `tests/federation/run.py`. Not yet: mutual TLS routes (status, renew), an offline signing path for a byoc root |
-| M4 | **DNS**: delegation (NS + glue) for sub-domain sites, secondary zones both ways with TSIG | **Done**: a TSIG key per link made by the parent at join (`fed-<site>`, in both sites' secrets, returned in the join answer over TLS); `dns_links` turns the registry and secrets into what the BIND templates need — NS + glue for children below this domain, `allow-transfer` by key, `notify explicit` + `also-notify`, a secondary zone per linked site. The parent applies after a join (endpoint) or `remove`. `tests/federation/dns.py` with two real BIND servers. Relays forward joins only: DNS goes site to site directly |
+| M4 | **DNS**: delegation (NS + glue) for sub-domain sites, secondary zones both ways with TSIG | **Done**: a TSIG key per link made by the parent at join (`fed-<site>`, in both sites' secrets, returned in the join answer over TLS); `dns_links` turns the registry and secrets into what the BIND templates need — NS + glue for children below this domain, `allow-transfer` by key, `notify explicit` + `also-notify`, a secondary zone per linked site; transfers and NOTIFYs go to each site's own DNS port (its `bind_dns_port`, reported at join), so a BIND behind another resolver on 53 works. The parent applies after a join (endpoint) or `remove`. `tests/federation/dns.py` with two real BIND servers. Relays forward joins only: DNS goes site to site directly |
 | M5 | **Identity replication**: 389-DS changelog and replicas; organisation suffix supplied by the root site, read-only at sites; each site's local suffix replicated up; site Keycloak read-only on the organisation (no people created at a site) | |
 | M6 | Web UI Federation tab, docs, a two-site sandbox test, the Pi | |
+| M7 | **DNS filter (AdGuard Home)**, optional, per site, in front of BIND (owner decision 2026-10-01): design [dns-filter.md](dns-filter.md) | Built before M5 (owner) |
+| M8 | **DHCP management** (owner request 2026-10-01): subnets and pools from `fabricctl dhcp` and the Kea tab, any DHCP option (global, class, subnet, reservation: PXE, ZTP), client classes, each subnet's name, VLAN and notes as a record; the **address plan** across sites (networks reported upstream, overlaps refused) with M5, its table in M6: design [dhcp-management.md](dhcp-management.md) | Built before M5 (owner); the address plan's sync with M5 |
+| M9 | **Time (NTP)** (owner 2026-10-01: a critical service): chrony on every site's host, NTS sources, the upstream site first, serving the LAN, option 42 from Kea, sync checked by doctor: design [ntp.md](ntp.md) | Built before M8 |
 
 ## 9. Decisions for the owner
 
@@ -294,7 +325,7 @@ Milestones, each tested before the next:
 | F5 | May upstream admins manage a site's **local** items (subnets, switches) through the federation API, or only the site's own admins? | Site admins only in F1–F3; delegated administration from upstream in F4 behind `federation:admin` |
 | F6 | **Name-constrain** each site's intermediate to `<site>.<domain>`? | Yes for DNS names; people and device certificates use non-DNS names, so check the constraint set against them before deciding |
 | F7 | **Revocation** of a removed site's intermediate | A CRL from the root site's CA, published on `certs.<domain>` and checked by every site's FreeRADIUS and nginx (today there is no CRL: fabric relies on unlinking devices) |
-| F8 | HA **promote**: by hand only (this design), or automatic later? | By hand now (owner: no failover engineering at this stage) |
+| F8 | HA **promote**: by hand only (this design), or automatic later? | Owner direction 2026-10-01: automatic takeover by fabric-agent (heartbeat, announced services, start-up check of linked peers, §3.1a); split brain, addresses and fencing to settle before building |
 | F9 | Attachment modes | **Decided 2026-10-01**: flat, through a node and nested, chosen per invitation (§6); nesting bounded by the root's path length |
 | F10 | Organisation base DN | **Decided 2026-10-01**: chosen at the root site's install (e.g. `dc=lan`), sites nested one level under it unless nested on purpose |
 

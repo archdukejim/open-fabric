@@ -21,6 +21,10 @@ SERVICES = [
      "var": "image_debian", "build": "fabric/freeradius:local"},
     {"name": "fluentbit", "unit": "fluentbit", "container": "fluentbit", "folder": "fluentbit", "var": "image_fluentbit",
      "build": None},
+    {"name": "adguard", "unit": "adguard", "container": "adguardhome", "folder": "adguard", "var": "image_adguard",
+     "build": "fabric/adguard:local"},
+    {"name": "oauth2proxy", "unit": "adguard-auth", "container": "oauth2-proxy-adguard", "folder": "adguard-auth",
+     "var": "image_oauth2proxy", "build": None},
     {"name": "fabric-web", "unit": "fabric-web", "container": "fabric-web", "folder": "webui", "var": "image_debian",
      "build": "fabric/web:local"},
 ]

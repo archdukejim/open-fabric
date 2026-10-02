@@ -218,8 +218,8 @@
 | | |
 |---|---|
 | Purpose | default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service. |
-| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them); vars_file, target_dir. Env SSH_CONNECTION. |
-| Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept), UNIT written, enabled and restarted, DOCKER-USER rebuilt. Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
+| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them); vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
+| Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed — config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER rebuilt. Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
 | Fails | SetupError when the SSH client is outside every allowed CIDR (would lock the operator out); CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an invalid CIDR. |
 | Feeds | setup step `firewall`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -618,8 +618,8 @@
 | | |
 |---|---|
 | Purpose | the service certificates this install needs and where each one goes. |
-| Inputs | ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr, radius, federation), domain, install_ldap (default True), install_keycloak, install_webui, install_freeradius, federation_endpoint. |
-| Returns | list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")], services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP, Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert) and the federation endpoint when on. |
+| Inputs | ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr, radius, federation, adguard), domain, install_ldap (default True), install_keycloak, install_webui, install_freeradius, federation_endpoint, install_adguard. |
+| Returns | list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")], services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP, Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint and the DNS filter's UI when on. |
 | Fails | KeyError for a missing hostname_* var. |
 | Feeds | run. |
 | Called by | `fabriclib.setup.mint_service_certs.run` |
@@ -641,7 +641,7 @@
 |---|---|
 | Purpose | issue (or renew) every service certificate from Step-CA and the CA bundles that verify client certificates, then the extra_certs. |
 | Inputs | ctx — SetupContext: vars (see _targets; install_webui, install_freeradius for the bundles), force_certs (re-issue even when current), Step-CA certs under <deploy_base>/stepca/data/certs. |
-| Returns | None. Certificates that exist, cover their names, chain to this CA and are valid for 30+ days are left alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the FreeRADIUS ca.pem only when changed. Services whose certificates changed are added to ctx.restart_services. |
+| Returns | None. Certificates that exist, cover their names, chain to this CA and are valid for 30+ days are left alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the FreeRADIUS ca.pem and the DNS filter's oauth2-proxy root_ca.crt only when changed. Services whose certificates changed are added to ctx.restart_services. |
 | Fails | SetupError from mint_cert (step-ca refused); OSError/CalledProcessError installing files; ValidationError from mint_extra_certs; KeyError for missing hostname vars. |
 | Feeds | setup step `certs`, run by run_setup via STEPS; renew_service_certs (`fabricctl certs`). |
 | Called by | `fabriclib.setup.renew_service_certs.renew_service_certs` |
@@ -863,7 +863,7 @@
 | | |
 |---|---|
 | Purpose | start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, move an older directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate fabric.target. |
-| Inputs | ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui, install_fluentbit, install_kea, install_freeradius, federation_endpoint; restart_services (units to restart); target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file. |
+| Inputs | ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui, install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint; restart_services (units to restart); target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file. |
 | Returns | None. fabric.target enabled and started; renamed units retired; every enabled unit running and its container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6 tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web running when the web UI is on; fabric-federation running when federation_endpoint is on. |
 | Fails | SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration still fails after 6 tries; CalledProcessError from systemctl; ValidationError from ensure_default_device_roles or migrate_local_suffix (propagates). |
 | Feeds | setup step `start`, run by run_setup via STEPS. |
@@ -937,8 +937,8 @@
 
 | | |
 |---|---|
-| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint when on and every installed service. |
-| Inputs | ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port, install_ldap/webui/keycloak, federation_endpoint, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA root, the agent socket, ~/fabric-admin of the sudo user. |
+| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, and every installed service. |
+| Inputs | ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port, install_ldap/webui/keycloak, federation_endpoint, install_adguard, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA root, the agent socket, ~/fabric-admin of the sudo user. |
 | Returns | list of (name, passed: bool, detail: str). |
 | Fails | ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading root_ca.crt; subprocess.TimeoutExpired from the LDAPS probe (15 s); struct.error/IndexError from dns_query on a malformed reply. Check failures are results, not exceptions. |
 | Feeds | run. |

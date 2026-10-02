@@ -43,10 +43,10 @@ def _ldap_bind(uri, dn, password):
 def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
              trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin
-             (Keycloak role, client certificate), OpenBao state, the federation endpoint when on and every
-             installed service.
+             (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter
+             (AdGuard answers on 53, its UI asks for sign-in) when on, and every installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port,
-             install_ldap/webui/keycloak, federation_endpoint, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA
+             install_ldap/webui/keycloak, federation_endpoint, install_adguard, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA
              root, the agent socket, ~/fabric-admin of the sudo user.
     Returns: list of (name, passed: bool, detail: str).
     Fails:   ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading
@@ -67,6 +67,17 @@ def checks(ctx):
             add(f"DNS {name}", v["host_ip"] in got, ", ".join(got) or "no answer")
         except OSError as e:
             add(f"DNS {name}", False, str(e))
+
+    if v.get("install_adguard"):           # the DNS filter answers clients on 53, fabric's names through BIND
+        try:
+            got = dns_query(v["hostname_landing"], v["host_ip"], 53)
+            add(f"DNS filter (AdGuard, port 53) resolves {v['hostname_landing']}", v["host_ip"] in got,
+                ", ".join(got) or "no answer")
+        except OSError as e:
+            add(f"DNS filter (AdGuard, port 53) resolves {v['hostname_landing']}", False, str(e))
+        rc, code = _curl(f"https://{v['hostname_adguard']}/", v["hostname_adguard"], v["ip_nginx"], 443, root_ca)
+        add(f"https://{v['hostname_adguard']} asks for sign-in first (OIDC)", (rc, code) == (0, "302"),
+            f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
 
     rc, code = _curl(f"http://{v['host_ip']}/", v["host_ip"], v["host_ip"], 80, root_ca)
     add("nginx HTTP", code in ("200", "301", "302"), f"HTTP {code}")
@@ -149,7 +160,7 @@ def checks(ctx):
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
     for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "kea", "freeradius", "fluentbit",
-                 "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
+                 "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()
             add(f"service {unit}", active == "active", active)

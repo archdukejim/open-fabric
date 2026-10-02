@@ -20,6 +20,8 @@ Talks to the Keycloak admin REST API over TLS pinned to the core root CA
   * browser flow "fabric-webui-mfa" with TOTP required, bound to fabric-webui
   * confidential OIDC client "fabric-openbao" for OpenBao's own UI (same
     flow and role claim; fabriclib/keycloak/ensure_openbao_client.py)
+  * with the DNS filter on, "fabric-adguard" for oauth2-proxy in front of
+    AdGuard Home's UI (fabriclib/keycloak/ensure_adguard_client.py)
 """
 import argparse
 import os
@@ -31,6 +33,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from webui.tlsclient import TLSClient  # noqa: E402
+from fabriclib.keycloak.ensure_adguard_client import ensure_adguard_client  # noqa: E402
 from fabriclib.keycloak.ensure_openbao_client import ensure_openbao_client  # noqa: E402
 from fabriclib.keycloak.ensure_rbac_roles import ensure_rbac_roles  # noqa: E402
 from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
@@ -346,7 +349,7 @@ def ensure_client(kc, realm, v, s, role_reps, flow_id):
 def main():
     """Purpose: configure Keycloak for fabric, idempotently: realm, LDAP federation and group sync, fabric's permission
              and bundle roles with their group grants, the TOTP login flow, and the fabric-webui / fabric-openbao
-             clients.
+             clients (and fabric-adguard with the DNS filter on).
     Inputs:  command-line --vars (default /opt/fabric/config/vars.yaml) and --secrets (default
              /opt/fabric/config/fabric-secrets.yml); secrets come from that file or OpenBao (load_secrets). Talks to
              ip_keycloak:8443 with TLS pinned to <deploy_base_dir>/stepca/data/certs/root_ca.crt.
@@ -388,6 +391,9 @@ def main():
     if s.get("openbao_oidc_secret"):
         step(f"{ensure_openbao_client(kc, realm, v, s['openbao_oidc_secret'], list(reps.values()), flow_id)}"
              " client fabric-openbao")
+    if v.get("install_adguard") and s.get("adguard_oidc_secret"):
+        step(f"{ensure_adguard_client(kc, realm, v, s['adguard_oidc_secret'], list(reps.values()), flow_id)}"
+             " client fabric-adguard")
     print("Keycloak configuration complete.")
 
 

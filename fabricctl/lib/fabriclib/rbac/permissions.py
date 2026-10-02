@@ -10,6 +10,7 @@ PERMISSIONS = {
     "dns:read": "see zones, records, reverse zones and TSIG key names",
     "dns:write": "add and remove DNS records, apply DNS changes",
     "tsig:manage": "create, rotate and delete TSIG keys",
+    "dns:filter": "manage the DNS filter in AdGuard Home's own UI (lists, rules, clients)",
     "dhcp:read": "see DHCP subnets, reservations and leases",
     "dhcp:write": "add and remove DHCP reservations",
     "pki:read": "see the CA and issued certificates; inspect a CSR or certificate",
@@ -38,7 +39,7 @@ _READ = ["status:read", "dns:read", "dhcp:read", "pki:read", "devices:read", "ra
 BUNDLES = {
     "admin": sorted(PERMISSIONS),
     "fabric-auditor": _READ,
-    "fabric-network-operator": ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write",
+    "fabric-network-operator": ["status:read", "dns:read", "dns:write", "tsig:manage", "dns:filter", "dhcp:read", "dhcp:write",
                                 "pki:read", "vault:status"],
     "fabric-equipment-operator": ["status:read", "dns:read", "pki:read", "pki:link-device", "devices:read",
                                   "devices:enroll", "devices:admin", "roles:admin", "radius:read", "radius:admin"],

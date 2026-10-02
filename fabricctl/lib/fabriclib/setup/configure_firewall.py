@@ -39,9 +39,11 @@ def run(ctx):
              Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service.
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
              (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them); vars_file,
-             target_dir. Env SSH_CONNECTION.
+             target_dir, config_dir. Env SSH_CONNECTION.
     Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
-             (existing ufw rules kept), UNIT written, enabled and restarted, DOCKER-USER rebuilt. Off: DOCKER-USER
+             (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
+             config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER
+             rebuilt. Off: DOCKER-USER
              opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left
              as it is.
     Fails:   SetupError when the SSH client is outside every allowed CIDR (would lock the operator out);
@@ -68,6 +70,17 @@ def run(ctx):
     for cidr in allowed:
         subprocess.run(["ufw", "allow", "from", cidr, "to", "any", "port", "22", "proto", "tcp"],
                        check=True, capture_output=True)
+    # SSH rules fabric added for a network that is no longer allowed (lan_cidr changed, a firewall_allow entry
+    # removed) go; rules fabric did not add are never touched. The record says which are fabric's.
+    record = os.path.join(ctx.config_dir, ".firewall-ssh-allowed")
+    previous = open(record).read().split() if os.path.exists(record) else []
+    for cidr in previous:
+        if cidr not in allowed:
+            subprocess.run(["ufw", "delete", "allow", "from", cidr, "to", "any", "port", "22", "proto", "tcp"],
+                           capture_output=True)
+            info(f"host firewall: SSH from {cidr} removed (no longer allowed)")
+    with open(record, "w") as f:
+        f.write("\n".join(allowed) + "\n")
     # DHCP (optional): clients have no address yet (source 0.0.0.0), so allow port 67 on the served interfaces
     if ctx.vars.get("install_kea"):
         for iface in (ctx.vars.get("dhcp") or {}).get("interfaces") or []:

@@ -174,12 +174,34 @@ links = {'children': [{'site': 'lab', 'key': 'fed-lab', 'algorithm': 'hmac-sha25
 zones = env.get_template('bind9/config/named.conf.zones.j2').render(**full, federation_links=links)
 keys = env.get_template('bind9/config/named.conf.keys.j2').render(**full, federation_links=links)
 assert 'allow-transfer { key "fed-lab"; key "fed-pi-core"; };' in zones and 'notify explicit;' in zones, zones[:600]
-assert 'zone "lab.lan.j-j.family" {\n    type secondary;\n    primaries { 192.168.9.9 key "fed-lab"; };' in zones
+assert 'zone "lab.lan.j-j.family" {\n    type secondary;\n    primaries { 192.168.9.9 port 53 key "fed-lab"; };' in zones
 assert 'zone "hq.example.org" {\n    type secondary;' in zones and 'key "fed-lab" {' in keys and 'key "fed-pi-core" {' in keys
 db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=links, zone_name=v2['domain'],
                                                    zone_records=v2['dns']['dynamic_zone_var'])
 assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
+# DNS filter (dns-filter.md): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
+# the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
+assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False and v2['bind_dns_port'] == 53
+adg = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'AdGuard',
+                                                                 'bind_dns_port': 53}))
+assert adg['install_adguard'] is True and adg['bind_dns_port'] == 5053, (adg['install_adguard'], adg['bind_dns_port'])
+assert 'adguard' in [r['name'] for r in adg['dns']['dynamic_zone_var']['CNAME']] and adg['adguard_upstreams'] == []
+kept = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'bind_dns_port': 5053}))
+assert kept['bind_dns_port'] == 5053, 'with the filter off a chosen port is kept (an AdGuard of your own)'
+ngx = env.get_template('nginx/nginx.conf.j2').render(**{**secrets, **adg})
+assert 'server_name adguard.lan.j-j.family;' in ngx and 'auth_request /oauth2/auth;' in ngx
+assert 'include /etc/nginx/conf.d/adguard-auth.inc;' in ngx and 'adguard' not in env.get_template('nginx/nginx.conf.j2').render(**full)
+comp = yaml.safe_load(env.get_template('adguard/docker-compose.yml.j2').render(**{**secrets, **adg}))['services']
+assert comp['adguardhome']['cap_drop'] == ['ALL'] and 'cap_add' not in comp['adguardhome']
+auth = yaml.safe_load(env.get_template('adguard-auth/docker-compose.yml.j2').render(**{**secrets, **adg}))['services']
+assert not any(':3000' in p for p in comp['adguardhome']['ports']) and list(comp) == ['adguardhome'], list(comp)
+assert auth['oauth2-proxy']['read_only'] is True and auth['oauth2-proxy']['cap_drop'] == ['ALL']
+assert 'skip_oidc_discovery = true' in env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg), 'starts while Keycloak is down'
+_o2p = env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg)
+assert not [ln for ln in _o2p.splitlines() if ln.strip().startswith(('client_secret', 'cookie_secret'))], \
+    'oauth2-proxy secrets only via secrets.env'
+print('DNS filter: off by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
 # Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402

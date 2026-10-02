@@ -91,6 +91,14 @@ Paths are relative to `fabricctl/lib/` unless they start with `fabricctl/`,
 - Weak checks: `tests/freeradius/run.py:397` (PAP outside the tunnel uses a wrong password), `:433` and `tests/kea/run.py:194` (hardening checks inspect flags the test itself set), `tests/dirsrv/run.sh:74` (TLS < 1.2 may be refused by the client), `tests/fluentbit/run.py` logs-status counter (fails consistently: investigate).
 - Intermittent service starts (2026-09-30 / 10-01, each passed on rerun, none tied to the change under test): `dirsrv` "Can't contact LDAP server" while seeding in `hardening`; `systemctl start postgres` failing during the sandbox's reinstall; `systemctl start nginx` failing during the sandbox's image rollback. Likely a start racing a container that is still stopping or a slow host; capture `journalctl -u <unit>` on failure in the suites, then fix the start path (`start_unit`, the wrapper unit's health wait).
 
+## Ideas from the owner (not scheduled)
+
+- **AdGuard Home as an optional fabric service** (2026-10-01): the owner's network asks AdGuard on 53 for
+  everything, and AdGuard forwards the fabric domain to BIND on 5053 (TSIG updates go to BIND directly).
+  fabric already supports BIND on another port (`bind_dns_port`, and federation links carry it); a
+  managed AdGuard on 53 would forward each site's domain to its BIND, and Kea would hand out AdGuard's
+  address (DHCP gives addresses, never ports).
+
 ## Decisions for the owner
 
 - OpenBao first in setup (D26?) — secrets straight into OpenBao at install; needs a temporary TLS bootstrap before Step-CA. Does not remove secrets from service configs (S1, S10 do that).

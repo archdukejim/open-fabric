@@ -74,6 +74,7 @@ hostname_mgr: {{ _hostname_mgr }}
 hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
 hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower }}
 hostname_radius: {{ ((cname_radius | default('radius')) ~ '.' ~ domain) | lower }}
+hostname_adguard: {{ ((cname_adguard | default('adguard')) ~ '.' ~ domain) | lower }}
 {# The federation endpoint (design federation.md §5): sites join this install through it. Off until
    `fabricctl federation enable`; the name is always computed. #}
 federation_endpoint: {{ federation_endpoint | default(false) | bool | lower }}
@@ -91,6 +92,8 @@ image_keycloak: {{ image_keycloak | default(images_lock.keycloak) }}
 image_postgres: {{ image_postgres | default(images_lock.postgres) }}
 image_openbao: {{ image_openbao | default(images_lock.openbao) }}
 image_fluentbit: {{ image_fluentbit | default(images_lock.fluentbit) }}
+image_adguard: {{ image_adguard | default(images_lock.adguard) }}
+image_oauth2proxy: {{ image_oauth2proxy | default(images_lock.oauth2proxy) }}
 {# Base of the locally built bind9, dirsrv and webui images (Debian packages). #}
 image_debian: {{ image_debian | default(images_lock.debian) }}
 {# Names of the locally built images (not pulled). #}
@@ -145,6 +148,22 @@ radius_people: {{ radius_people | default([{'group': 'network-staff', 'vlan': no
                                           {'group': 'network-guests', 'vlan': none, 'priority': 100}]) | to_json }}
 ip_fluentbit: {{ ip_fluentbit | default('10.255.0.95') }}
 fluentbit_mem_limit: {{ fluentbit_mem_limit | default('64m') }}
+# DNS filter (optional, design dns-filter.md): AdGuard Home in front of BIND on host_ip:53; BIND moves to
+# bind_dns_port (5053). Clients ask AdGuard; AdGuard forwards fabric's domains to BIND and the rest over
+# DNS-over-HTTPS/TLS. Its UI: https://adguard.<domain>, OIDC sign-in through oauth2-proxy.
+dns_filter: {{ dns_filter | default('none', true) | lower }}
+install_adguard: {{ (dns_filter | default('none', true) | lower) == 'adguard' }}
+ip_adguard: {{ ip_adguard | default('10.255.0.31') }}
+ip_oauth2proxy: {{ ip_oauth2proxy | default('10.255.0.32') }}
+adguard_mem_limit: {{ adguard_mem_limit | default('256m') }}
+# Out of the box AdGuard points at local DNS only (this site's BIND); the internet upstreams (DoH/DoT),
+# bootstrap servers and filter lists are set up in AdGuard's UI after the OIDC sign-in and kept across
+# deploys. These two only prefill a first deploy, e.g. [https://dns.google/dns-query, tls://dns.google]
+# and [{name, url}] lists from https://adguardteam.github.io/HostlistsRegistry/.
+adguard_upstreams: {{ adguard_upstreams | default([], true) | to_json }}
+adguard_filter_lists: {{ adguard_filter_lists | default([], true) | to_json }}
+# Rules after the generated ones (fabric's own domains and this host are always allowed first).
+adguard_rules: {{ adguard_rules | default([], true) | to_json }}
 # syslog: {host, port (6514), tls (true), ca_file}; elastic: {url, index, user, ca_file}.
 # The Elasticsearch password lives in OpenBao: sudo fabricctl logs set-password elastic
 log_forwarding: {{ log_forwarding | default({}, true) | to_json }}
@@ -208,7 +227,9 @@ service_dirs:
   'openbao': {'uid': 913, 'gid': 913},
   'fluentbit': {'uid': 914, 'gid': 914},
   'kea': {'uid': 915, 'gid': 915},
-  'freeradius': {'uid': 916, 'gid': 916}
+  'freeradius': {'uid': 916, 'gid': 916},
+  'adguard': {'uid': 917, 'gid': 917},
+  'oauth2proxy': {'uid': 918, 'gid': 918}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:
@@ -259,7 +280,10 @@ cert_acme_lifetime_hours: {{ cert_acme_lifetime_hours | default('720h') }}
 # ============================================================
 # DNS — BIND9
 # ============================================================
-bind_dns_port: {{ bind_dns_port | default(53) }}
+{# With the DNS filter on, AdGuard answers clients on 53, so BIND can never be there: 53 becomes 5053
+   (dns-filter.md). With it off the port is kept as set (e.g. 5053 behind an AdGuard of your own). #}
+{% set _bind_port = (bind_dns_port | default(53, true)) | int %}
+bind_dns_port: {{ 5053 if (dns_filter | default('none', true) | lower) == 'adguard' and _bind_port == 53 else _bind_port }}
 bind9_doh_port: {{ bind9_doh_port | default(8053) }}
 {% set _fabric_subnet = fabric_subnet | default('10.255.0.0/24') %}
 {% set default_acls = {
@@ -310,6 +334,9 @@ bind_acl_policies:
 {% endif %}
 {% if federation_endpoint | default(false) | bool %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_federation | default('federation') }) %}
+{% endif %}
+{% if (dns_filter | default('none', true) | lower) == 'adguard' %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_adguard | default('adguard') }) %}
 {% endif %}
 {% set default_a = [
   { 'ip': host_ip, 'name': hostname }

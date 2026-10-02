@@ -241,7 +241,7 @@
 | Fails | never — addresses that cannot get a PTR are listed in "skipped". |
 | Feeds | deploy.py (apply renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones (fabricctl/lib/agent/server.py); webui/devserver.py. |
 | Notes | one PTR per address: the first named record wins, then an apex (@) record, then the zone's `ns` host. Private IPv4 (RFC 1918, CGNAT) and IPv6 ULA only. A reverse zone written by hand in `dns:` is left alone. |
-| Called by | `agent.server.Handler.dispatch`, `deploy.apply_deployment`, `webui.devserver.DevState.reverse` |
+| Called by | `agent.server.Handler.dispatch`, `deploy.apply_deployment`, `fabriclib.dns_filter.deploy_adguard._domains`, `webui.devserver.DevState.reverse` |
 
 ## `fabricctl/lib/fabriclib/dns/rfc2136_settings.py`
 

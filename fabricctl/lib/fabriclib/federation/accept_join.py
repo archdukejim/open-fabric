@@ -21,6 +21,15 @@ _ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cer
 REFUSED = "the invitation is not valid (unknown, used, withdrawn or expired)"
 
 
+def _port(value):
+    """Purpose: a DNS port a joining site reported, or 53.
+    Inputs:  value — anything from the request.
+    Returns: int 1..65535 (53 when absent or invalid).
+    Fails:   never.
+    Feeds:   accept_join (the site record's dns_port)."""
+    return int(value) if str(value).isdigit() and 0 < int(value) < 65536 else 53
+
+
 def accept_join(v, req, client_ip="", now=None):
     """Purpose: On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
@@ -33,7 +42,8 @@ def accept_join(v, req, client_ip="", now=None):
     Returns: {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain":
              PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its
              parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>",
-             "algorithm", "secret"} — the TSIG key both sites sign zone transfers with (kept here in fabric's
+             "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this
+             site's published DNS port) (kept here in fabric's
              secrets as federation_tsig[site]; design federation.md M4), "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
     Fails:   ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or
@@ -82,7 +92,7 @@ def accept_join(v, req, client_ip="", now=None):
             "joined": datetime.datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
             "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
             "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0),
-            "via": entry.get("via") or "",
+            "via": entry.get("via") or "", "dns_port": _port(req.get("dns_port")),
             "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}"}
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
@@ -90,6 +100,7 @@ def accept_join(v, req, client_ip="", now=None):
     org = {"org_domain": v.get("org_domain") or v["domain"], "ldap_base_dn": v["ldap_base_dn"],
            **{k: v.get(k) for k in _ORG_KEYS if v.get(k)}}
     return {"root": signed["root"], "cert": signed["cert"], "chain": signed["chain"], "org": org,
-            "dns": {"key": f"fed-{site}", "algorithm": "hmac-sha256", "secret": tsig},
+            "dns": {"key": f"fed-{site}", "algorithm": "hmac-sha256", "secret": tsig,
+                    "port": int(v.get("bind_dns_port") or 53)},
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
                          "address": v["host_ip"]}}

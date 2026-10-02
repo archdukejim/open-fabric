@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for  # noqa: E402
 from fabriclib.images.needs_rebuild import needs_rebuild  # noqa: E402
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit  # noqa: E402
+from fabriclib.dns_filter.deploy_adguard import deploy_adguard  # noqa: E402
 from fabriclib.dhcp.deploy_kea import deploy_kea  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
@@ -301,7 +302,8 @@ def apply_deployment(start_services=True):
     for name in ('ldap_super_admin_password', 'ldap_group_admin_password',
                  'ldap_user_creator_password', 'ldap_user_modifier_password', 'ldap_device_admin_password',
                  'ldap_radius_password',
-                 'webui_oidc_secret', 'openbao_oidc_secret'):
+                 'webui_oidc_secret', 'openbao_oidc_secret',
+                 'adguard_admin_password', 'adguard_oidc_secret', 'adguard_cookie_secret'):
         if name not in secrets:
             # Alphanumeric: safe inside LDIF and JSON without quoting.
             secrets[name] = run_cmd("openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32").stdout.strip()
@@ -538,6 +540,11 @@ def apply_deployment(start_services=True):
         {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
         # optional 802.1X (design §6): asks 389-DS about every device
         {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': ['ldap']},
+        # optional DNS filter (dns-filter.md): AdGuard Home on host_ip:53 in front of BIND, oauth2-proxy for its UI;
+        # no requires: a BIND restart (every DNS apply) must not take the clients' DNS down with it
+        {'service': 'adguard', 'compose': 'adguardhome', 'folder': 'adguard', 'requires': []},
+        # its sign-in, a unit of its own: when it or Keycloak is down only AdGuard's UI is, never DNS
+        {'service': 'adguard-auth', 'compose': 'oauth2-proxy-adguard', 'folder': 'adguard-auth', 'requires': []},
     ]
 
     for svc_info in sys_svcs:
@@ -555,6 +562,8 @@ def apply_deployment(start_services=True):
         if svc_folder == 'kea' and not final_vars.get('install_kea'):
             continue
         if svc_folder == 'freeradius' and not final_vars.get('install_freeradius'):
+            continue
+        if svc_folder in ('adguard', 'adguard-auth') and not final_vars.get('install_adguard'):
             continue
             
         render_file(f'{svc_folder}/docker-compose.yml.j2', f'{svc_folder}/docker-compose.yml')
@@ -795,6 +804,18 @@ def apply_deployment(start_services=True):
     # Fluent Bit (optional): its config, destination CAs, credentials, disk buffer
     if final_vars.get('install_fluentbit') and deploy_fluentbit(final_vars, secrets, jinja_env):
         services_to_restart.add('fluentbit')
+    # DNS filter (dns-filter.md): AdGuard's config merged with what it has, oauth2-proxy's, nginx's snippet
+    if final_vars.get('dns_filter') not in ('none', 'adguard'):
+        print(f"Error: dns_filter must be none or adguard (got {final_vars.get('dns_filter')!r})")
+        sys.exit(1)
+    if final_vars.get('install_adguard'):
+        adg = deploy_adguard(final_vars, secrets, merged_context['federation_links'], jinja_env)
+        if adg["adguard"]:
+            services_to_restart.add('adguard')
+        if adg["oauth2proxy"]:
+            services_to_restart.add('adguard-auth')
+        if adg["nginx"]:
+            nginx_config_changed = True
     # Kea (optional): its configs (leases are kept across restarts) and the DHCP subzone, created once
     if final_vars.get('install_kea'):
         k_uid, k_gid = get_service_user(final_vars, 'bind')

@@ -18,7 +18,7 @@ ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert
 
 
 def join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None,
-                  http_port=80, https_port=443, replace=False):
+                  http_port=80, https_port=443, replace=False, dns_port=53):
     """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (design
              federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root,
              send the join over TLS verified against that root, check and stage the signed intermediate, and
@@ -30,7 +30,9 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              for federation.yaml and its lock (default: next to this code — setup runs from the package, so it
              passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the
              upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded
-             (re-parenting: the invitation's upstream becomes this site's parent), default False.
+             (re-parenting: the invitation's upstream becomes this site's parent), default False; dns_port —
+             the port this site's DNS is published on (bind_dns_port), default 53: linked sites send zone
+             transfers and notifies there.
     Returns: {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path,
              site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's
              friendly_name / cert_* —, "upstream": {"site_name",
@@ -67,7 +69,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     answer = post_upstream(inv["address"], inv["host"], root, "/v1/join",
                            {"id": inv["id"], "secret": inv["secret"], "site": inv["site"], "csr": req["csr"],
                             "domain": domain, "address": address, "federation_host": f"federation.{domain}",
-                            "via": inv["via"]}, port=https_port)
+                            "via": inv["via"], "dns_port": int(dns_port)}, port=https_port)
     if not isinstance(answer, dict) or answer.get("root", "").strip() != root.strip():
         raise ValidationError("the upstream answered with a different root")
     staged = stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"],
@@ -78,7 +80,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
           "root_sha256": inv["root_sha256"], "site_ca_depth": staged["site_ca_depth"],
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "org": {k: org[k] for k in ORG_KEYS if org.get(k)},
-          "dns_key": (answer.get("dns") or {}).get("key") or f"fed-{inv['site']}"}
+          "dns_key": (answer.get("dns") or {}).get("key") or f"fed-{inv['site']}",
+          "dns_port": int((answer.get("dns") or {}).get("port") or 53)}
     if https_port != 443 and not inv["via"]:
         up["port"] = https_port                   # the upstream's endpoint is not on 443 (tests)
     if inv["via"]:                                # joined through a relay: later traffic goes the same way

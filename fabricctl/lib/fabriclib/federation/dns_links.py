@@ -8,8 +8,10 @@ ALGORITHM = "hmac-sha256"
 
 def _link(name, record, secret):
     """Purpose: one DNS link to another site, as the BIND templates use it.
-    Inputs:  name — the TSIG key name; record — {domain, address}; secret — the key's secret (or None).
-    Returns: dict {key, algorithm, secret, domain, address} or None when the record or secret is unusable.
+    Inputs:  name — the TSIG key name; record — {domain, address, dns_port (default 53)}; secret — the key's
+             secret (or None).
+    Returns: dict {key, algorithm, secret, domain, address, port} or None when the record or secret is
+             unusable.
     Fails:   never.
     Feeds:   dns_links."""
     domain, address = str(record.get("domain") or ""), str(record.get("address") or "")
@@ -19,7 +21,11 @@ def _link(name, record, secret):
         return None
     if not secret or not DOMAIN_RE.match(domain):
         return None
-    return {"key": name, "algorithm": ALGORITHM, "secret": secret, "domain": domain, "address": address}
+    port = record.get("dns_port") or 53
+    if not str(port).isdigit() or not 0 < int(port) < 65536:
+        return None
+    return {"key": name, "algorithm": ALGORITHM, "secret": secret, "domain": domain, "address": address,
+            "port": int(port)}
 
 
 def dns_links(v, secrets, registry_path):
@@ -31,7 +37,8 @@ def dns_links(v, secrets, registry_path):
     Returns: {"children": [link + {"site", "delegate": bool, "label"}] for each site that joined here — delegated
              when its domain is below this site's (label: the part before .<domain>) —, "upstream": link + {"site"}
              or None}. A link is {key "fed-<site>", algorithm, secret, domain, address}; sites without a usable
-             address, domain or key are left out (e.g. a site that joined before M4, until it joins again).
+             address, domain or key are left out (e.g. a site that joined before M4, until it joins again);
+             port is the site's published DNS port (its bind_dns_port, reported at join; 53 when not).
     Fails:   yaml/OSError from load_registry.
     Feeds:   deploy.py apply_deployment (the bind9 templates: named.conf.zones, named.conf.keys, zone.j2)."""
     registry = load_registry(registry_path)

@@ -199,7 +199,7 @@ These settings dictate how containers route traffic and how the BIND9 DNS server
 - read by `fabriclib/setup/configure_network.py`
 
 ### `bind_dns_port`
-**Description:** The host port (on `host_ip`, UDP and TCP) published to BIND9's port 53. Also the port given to RFC2136 clients in TSIG key settings, and checked by setup's final verification.
+**Description:** The host port (on `host_ip`, UDP and TCP) published to BIND9's port 53. Also the port given to RFC2136 clients in TSIG key settings, and checked by setup's final verification. A federation site reports it when it joins, and linked sites send zone transfers and NOTIFYs there. Set it when another resolver owns port 53 on the host, e.g. AdGuard Home in front of BIND (clients ask AdGuard on 53, AdGuard forwards your domain to BIND on 5053): DHCP can hand out only an address, never a port, so the resolver clients use must be on 53.
 
 **Default Value:** `53`
 
@@ -636,6 +636,8 @@ Allows deep customization of the container orchestration, including overriding i
 | `image_kea` | `fabric/kea:local` | name of the locally built Kea image (optional DHCP) |
 | `image_freeradius` | `fabric/freeradius:local` | name of the locally built FreeRADIUS image (optional 802.1X) |
 | `image_fluentbit` | validated `fluent/fluent-bit:5.1.x@sha256:…` | optional log forwarding |
+| `image_adguard` | validated `adguard/adguardhome:v0.107.x@sha256:…` | base of `fabric/adguard:local` (the same program without file capabilities); optional DNS filter |
+| `image_oauth2proxy` | validated `quay.io/oauth2-proxy/oauth2-proxy:v7.15.x@sha256:…` | OIDC sign-in in front of AdGuard's UI |
 | `image_pins` | `[]` | `image_*` keys the admin set explicitly; maintained by `fabricctl setup` |
 | `image_prune` | `true` | after `fabricctl images update`, remove old images of fabric's repositories (never the rollback image or anything in use) |
 
@@ -967,6 +969,20 @@ links:
 | `fluentbit_mem_limit` | `64m` | Container memory limit |
 
 The Elasticsearch password is not a setting: `sudo fabricctl logs set-password elastic` keeps it in OpenBao.
+
+### DNS filter (optional: AdGuard Home)
+Design [dns-filter.md](design/dns-filter.md); operations.md → DNS filter.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `dns_filter` | `none` | `adguard`: AdGuard Home answers clients on `host_ip:53` and BIND moves to `bind_dns_port` 5053. Out of the box AdGuard points at local DNS only (this site's BIND); set up its internet upstreams (DoH/DoT), bootstrap servers and filter lists in its UI after signing in |
+| `install_adguard` | computed | `dns_filter == adguard` (cannot be set) |
+| `hostname_adguard` | `adguard.<domain>` | AdGuard's UI: OIDC sign-in first (permission `dns:filter`); `cname_adguard` (default `adguard`) changes the first label |
+| `adguard_upstreams` | `[]` | Prefills a first deploy only, e.g. `[https://dns.google/dns-query, tls://dns.google]`; afterwards upstreams are AdGuard's UI's (fabric keeps only its `[/<zone>/]<ip_bind9>` lines) |
+| `adguard_filter_lists` | `[]` | Prefills a first deploy only: `[{name, url}]` |
+| `adguard_rules` | `[]` | Your rules, after the generated `@@\|\|<zone>^$important` ones (fabric's names are never blocked); rules added in the UI are kept below them |
+| `ip_adguard` / `ip_oauth2proxy` | `10.255.0.31` / `10.255.0.32` | On fabric_net |
+| `adguard_mem_limit` | `256m` | Container memory limit |
 
 ### 802.1X (optional)
 | Variable | Default | Notes |

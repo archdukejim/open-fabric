@@ -4,7 +4,8 @@
 the root site `lan` (lan.test) and its site `lab` (lab.lan.test), each configured from fabric's own
 templates with the links dns_links derives from a federation registry and fabric's secrets: lan delegates
 lab.lan.test (NS + glue), each keeps a secondary copy of the other's zone, transfers are TSIG-signed with
-the link's key, and a change on lan reaches lab by NOTIFY. Includes what must be refused (transfers
+the link's key, and a change on lan reaches lab by NOTIFY. lab's DNS also listens on 5053, the port lan
+records for it (a site whose BIND sits behind another resolver on 53). Includes what must be refused (transfers
 without the key or with the wrong one).
 
     sudo python3 tests/federation/dns.py         (needs Docker and dig; run by tests/federation/run.py)
@@ -61,7 +62,7 @@ env = jinja_env(os.path.join(REPO, "fabricctl", "jinja"))
 KEY = base64.b64encode(os.urandom(32)).decode()
 
 
-def render(site, records, registry, secrets):
+def render(site, records, registry, secrets, extra_port=None):
     """fabric's named.conf.keys/zones and zone file for one site, from its registry and secrets."""
     base = f"{W}/{site}"
     os.makedirs(f"{base}/config", exist_ok=True)
@@ -73,7 +74,8 @@ def render(site, records, registry, secrets):
     links = dns_links(v, secrets, f"{base}/federation.yaml")
     ctx = {**v, "federation_links": links}
     with open(f"{base}/config/named.conf", "w") as f:
-        f.write('options { directory "/var/cache/bind"; listen-on { any; }; listen-on-v6 { none; }; recursion no; };\n'
+        listen = "listen-on { any; };" + (f" listen-on port {extra_port} {{ any; }};" if extra_port else "")
+        f.write('options { directory "/var/cache/bind"; ' + listen + ' listen-on-v6 { none; }; recursion no; };\n'
                 'acl "lan" { any; };\n'
                 + env.get_template("bind9/config/named.conf.keys.j2").render(**ctx)
                 + env.get_template("bind9/config/named.conf.zones.j2").render(**ctx))
@@ -100,16 +102,20 @@ try:
     lan_records = {"zone_authority": True, "A": [{"name": "www", "ip": "10.9.9.1"}]}
     lab_records = {"zone_authority": True, "A": [{"name": "printer", "ip": "10.9.9.2"}]}
     lan_links = render("lan", lan_records,
-                       {"sites": {"lab": {"domain": "lab.lan.test", "address": IP["lab"]}}, "upstream": None},
+                       {"sites": {"lab": {"domain": "lab.lan.test", "address": IP["lab"], "dns_port": 5053}}, "upstream": None},
                        {"federation_tsig": {"lab": KEY}})
     lab_links = render("lab", lab_records,
                        {"sites": {}, "upstream": {"site_name": "lan", "site": "lab", "domain": "lan.test",
                                                   "address": IP["lan"], "dns_key": "fed-lab"}},
-                       {"federation_tsig": {"upstream": KEY}})
+                       {"federation_tsig": {"upstream": KEY}}, extra_port=5053)
     check("links: lan delegates lab.lan.test to lab; lab's upstream is lan, one shared key",
           lan_links["children"][0]["delegate"] and lan_links["children"][0]["label"] == "lab"
           and lab_links["upstream"]["key"] == lan_links["children"][0]["key"] == "fed-lab", (lan_links, lab_links))
     zone = open(f"{W}/lan/data/db.lan.test").read()
+    conf = open(f"{W}/lan/config/named.conf").read()
+    check("lan transfers lab's zone from lab's DNS port (5053, like a BIND behind AdGuard)",
+          'primaries { 10.254.31.11 port 5053 key "fed-lab"; };' in conf
+          and 'also-notify { 10.254.31.11 port 5053 key "fed-lab"; };' in conf, conf[-900:])
     check("lan's zone: NS and glue for lab", "lab                     NS      ns.lab.lan.test." in zone
           and "ns.lab                  A       10.254.31.11" in zone, zone[-600:])
     for site in ("lab", "lan"):
@@ -120,7 +126,7 @@ try:
           sh("docker logs fd-lan", ok=False).stderr[-600:] + sh("docker logs fd-lab", ok=False).stderr[-600:])
     check("lab keeps a secondary copy of lan's zone (answers authoritatively)",
           until(lambda: "10.9.9.1" in dig("lab", "+short", "www.lan.test")), sh("docker logs fd-lab", ok=False).stderr[-800:])
-    check("lan keeps a secondary copy of lab's zone",
+    check("lan keeps a secondary copy of lab's zone (transferred over 5053)",
           until(lambda: "10.9.9.2" in dig("lan", "+short", "printer.lab.lan.test")), sh("docker logs fd-lan", ok=False).stderr[-800:])
     referral = dig("lan", "+norec", "NS", "lab.lan.test")
     check("lan answers lab.lan.test's NS with ns.lab.lan.test", "ns.lab.lan.test." in referral, referral[-400:])
@@ -132,7 +138,7 @@ try:
           "www.lan.test" in dig("lan", "-y", f"hmac-sha256:fed-lab:{KEY}", "AXFR", "lan.test"))
     time.sleep(1.2)                                      # the zone serial is the time: let it move on
     render("lan", {**lan_records, "A": lan_records["A"] + [{"name": "new", "ip": "10.9.9.3"}]},
-           {"sites": {"lab": {"domain": "lab.lan.test", "address": IP["lab"]}}, "upstream": None},
+           {"sites": {"lab": {"domain": "lab.lan.test", "address": IP["lab"], "dns_port": 5053}}, "upstream": None},
            {"federation_tsig": {"lab": KEY}})
     sh("docker restart fd-lan")
     check("a change on lan reaches lab's copy (NOTIFY, then a signed transfer)",

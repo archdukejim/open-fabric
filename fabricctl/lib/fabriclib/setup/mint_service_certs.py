@@ -12,11 +12,12 @@ from fabriclib.setup.mint_extra_certs import mint_extra_certs
 def _targets(ctx):
     """Purpose: the service certificates this install needs and where each one goes.
     Inputs:  ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr,
-             radius, federation), domain, install_ldap (default True), install_keycloak, install_webui,
-             install_freeradius, federation_endpoint.
+             radius, federation, adguard), domain, install_ldap (default True), install_keycloak, install_webui,
+             install_freeradius, federation_endpoint, install_adguard.
     Returns: list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")],
              services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP,
-             Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert) and the federation endpoint when on.
+             Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint and the DNS
+             filter's UI when on.
     Fails:   KeyError for a missing hostname_* var.
     Feeds:   run."""
     v, p = ctx.vars, ctx.path
@@ -40,6 +41,8 @@ def _targets(ctx):
         t.append((v["hostname_mgr"], [], [nginx(v["hostname_mgr"])], ["nginx"]))
     if v.get("federation_endpoint"):
         t.append((v["hostname_federation"], [], [nginx(v["hostname_federation"])], ["nginx"]))
+    if v.get("install_adguard"):
+        t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
     if v.get("install_freeradius"):
         # the EAP-TLS server certificate supplicants check (server.pem, server.key)
         t.append((v["hostname_radius"], [], [(p("freeradius", "certs"), "freeradius:eap")], ["freeradius"]))
@@ -74,7 +77,7 @@ def run(ctx):
              force_certs (re-issue even when current), Step-CA certs under <deploy_base>/stepca/data/certs.
     Returns: None. Certificates that exist, cover their names, chain to this CA and are valid for 30+ days
              are left alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the
-             FreeRADIUS ca.pem only when changed. Services whose certificates changed are added to
+             FreeRADIUS ca.pem and the DNS filter's oauth2-proxy root_ca.crt only when changed. Services whose certificates changed are added to
              ctx.restart_services.
     Fails:   SetupError from mint_cert (step-ca refused); OSError/CalledProcessError installing files;
              ValidationError from mint_extra_certs; KeyError for missing hostname vars.
@@ -126,5 +129,11 @@ def run(ctx):
         if write_file_if_changed(ctx.path("freeradius", "certs", "ca.pem"), bundle, 0o644, uid, gid):
             restart.add("freeradius")
             ok("FreeRADIUS CA bundle")
+    if ctx.vars.get("install_adguard"):
+        # oauth2-proxy verifies Keycloak against this CA; on a first install the deploy ran before the CA existed
+        if write_file_if_changed(ctx.path("adguard", "oauth2-proxy", "root_ca.crt"), open(root_ca).read(),
+                                 0o644, 0, 0):
+            restart.add("adguard-auth")
+            ok("DNS filter sign-in (oauth2-proxy) trusts the fabric CA")
     ctx.restart_services.update(restart)
     mint_extra_certs(ctx)

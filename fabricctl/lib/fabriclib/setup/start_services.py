@@ -13,7 +13,8 @@ from fabriclib.setup.start_unit import start_unit
 ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv", "install_ldap"),
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit"),
-         ("kea", "kea-dhcp4", "install_kea"), ("freeradius", "freeradius", "install_freeradius")]
+         ("kea", "kea-dhcp4", "install_kea"), ("freeradius", "freeradius", "install_freeradius"),
+         ("adguard", "adguardhome", "install_adguard"), ("adguard-auth", "oauth2-proxy-adguard", "install_adguard")]
 
 
 def run(ctx):
@@ -21,7 +22,8 @@ def run(ctx):
              directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate
              fabric.target.
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
-             install_fluentbit, install_kea, install_freeradius, federation_endpoint; restart_services (units to restart);
+             install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint; restart_services
+             (units to restart);
              target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6

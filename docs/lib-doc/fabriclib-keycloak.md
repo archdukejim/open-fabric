@@ -27,6 +27,31 @@
 | Notes | the user joins the plain `users` group only (never a fabric group; skipped silently if that group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP enrolment, at the first sign-in. If a step after the creation fails the account stays, without a known password (reset_sign_in recovers it). Audited as PERSON_CREATE. |
 | Called by | `agent.server.Handler.dispatch` |
 
+## `fabricctl/lib/fabriclib/keycloak/ensure_adguard_client.py`
+
+### `_q(s)`
+
+| | |
+|---|---|
+| Purpose | URL-encode one path or query component for the Keycloak admin API (nothing kept, not "/"). |
+| Inputs | s — str (a realm or client id). |
+| Returns | the percent-encoded str. |
+| Fails | never for a str. |
+| Feeds | ensure_adguard_client. |
+| Called by | `fabriclib.keycloak.ensure_adguard_client.ensure_adguard_client` |
+
+### `ensure_adguard_client(kc, realm, v, secret, role_reps, flow_id)`
+
+| | |
+|---|---|
+| Purpose | Converge the Keycloak OIDC client (fabric-adguard) that oauth2-proxy signs people into AdGuard Home's UI with (design dns-filter.md §5). |
+| Inputs | kc — keycloak_bootstrap.Admin client; realm — realm name; v — fabric vars: hostname_adguard; secret — the client secret (adguard_oidc_secret); role_reps — role representations for the client's scope (every fabric role); flow_id — id of the browser flow to bind (the TOTP login flow). |
+| Returns | "created" or "updated" ("updated" for any existing client, even when nothing changed). |
+| Fails | SystemExit from kc.call on any admin API error or failed admin login; OSError / ssl errors if Keycloak is unreachable. |
+| Feeds | keycloak_bootstrap.main (prints "<state> client fabric-adguard") when dns_filter is adguard. |
+| Notes | confidential client, code flow only, the exact callback https://<hostname_adguard>/oauth2/callback, fullScopeAllowed off; realm roles go to a `roles` claim in the ID token, which oauth2-proxy checks for fabric:dns:filter. Existing attributes are kept (ours override); the mapper and scope mappings are only ever added. |
+| Called by | `keycloak_bootstrap.main` |
+
 ## `fabricctl/lib/fabriclib/keycloak/ensure_openbao_client.py`
 
 ### `_q(s)`

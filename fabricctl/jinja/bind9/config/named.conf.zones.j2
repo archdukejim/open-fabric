@@ -12,7 +12,7 @@ zone "{{ zone_name }}" {
     // Federation: the sites next to this one keep a secondary copy (TSIG-signed transfers, design federation.md M4)
     allow-transfer { {% for link in peers %}key "{{ link.key }}"; {% endfor %}};
     notify explicit;
-    also-notify { {% for link in peers %}{{ link.address }} key "{{ link.key }}"; {% endfor %}};
+    also-notify { {% for link in peers %}{{ link.address }} port {{ link.port | default(53) }} key "{{ link.key }}"; {% endfor %}};
 {% else %}
     allow-transfer { none; };
 {% endif %}
@@ -81,7 +81,7 @@ zone "{{ ddns_zone }}" {
 // Federation: a secondary copy of site {{ link.site }}'s zone, transferred from it with its key
 zone "{{ link.domain }}" {
     type secondary;
-    primaries { {{ link.address }} key "{{ link.key }}"; };
+    primaries { {{ link.address }} port {{ link.port | default(53) }} key "{{ link.key }}"; };
     file "/var/lib/bind/sec.{{ link.domain }}";
     allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
     allow-transfer { none; };

@@ -4,13 +4,24 @@
 
 ## `fabricctl/lib/fabriclib/federation/accept_join.py`
 
+### `_port(value)`
+
+| | |
+|---|---|
+| Purpose | a DNS port a joining site reported, or 53. |
+| Inputs | value — anything from the request. |
+| Returns | int 1..65535 (53 when absent or invalid). |
+| Fails | never. |
+| Feeds | accept_join (the site record's dns_port). |
+| Called by | `fabriclib.federation.accept_join.accept_join` |
+
 ### `accept_join(v, req, client_ip='', now=None)`
 
 | | |
 |---|---|
 | Purpose | On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time invitation, sign the site's intermediate CA with the root key, record the site and use up the invitation. |
 | Inputs | v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip, hostname_federation and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
-| Returns | {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain": PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>", "algorithm", "secret"} — the TSIG key both sites sign zone transfers with (kept here in fabric's secrets as federation_tsig[site]; design federation.md M4), "org": {"org_domain", "ldap_base_dn", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
+| Returns | {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain": PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>", "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this site's published DNS port) (kept here in fabric's secrets as federation_tsig[site]; design federation.md M4), "org": {"org_domain", "ldap_base_dn", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
 | Fails | ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message, so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can retry); ValidationError from load_secrets/save_secrets; OSError. |
 | Feeds | the federation endpoint (fabricctl/lib/federation/server.py, POST /v1/join). |
 | Notes | the secret is compared by its SHA-256 in constant time; audited as FED_JOIN (actor "site:<name>", with the client address) and, on refusal, FED_JOIN_REFUSED. |
@@ -190,8 +201,8 @@
 | | |
 |---|---|
 | Purpose | one DNS link to another site, as the BIND templates use it. |
-| Inputs | name — the TSIG key name; record — {domain, address}; secret — the key's secret (or None). |
-| Returns | dict {key, algorithm, secret, domain, address} or None when the record or secret is unusable. |
+| Inputs | name — the TSIG key name; record — {domain, address, dns_port (default 53)}; secret — the key's secret (or None). |
+| Returns | dict {key, algorithm, secret, domain, address, port} or None when the record or secret is unusable. |
 | Fails | never. |
 | Feeds | dns_links. |
 | Called by | `fabriclib.federation.dns_links.dns_links` |
@@ -202,7 +213,7 @@
 |---|---|
 | Purpose | the DNS links between this site and the sites next to it in the federation (design federation.md M4): what BIND delegates, transfers and keeps a secondary copy of. |
 | Inputs | v — fabric vars: domain; secrets — fabric's secrets (federation_tsig: {site: secret} for each site that joined here, "upstream": secret for this site's own upstream); registry_path — the federation registry (config/federation.yaml of the install being rendered). |
-| Returns | {"children": [link + {"site", "delegate": bool, "label"}] for each site that joined here — delegated when its domain is below this site's (label: the part before .<domain>) —, "upstream": link + {"site"} or None}. A link is {key "fed-<site>", algorithm, secret, domain, address}; sites without a usable address, domain or key are left out (e.g. a site that joined before M4, until it joins again). |
+| Returns | {"children": [link + {"site", "delegate": bool, "label"}] for each site that joined here — delegated when its domain is below this site's (label: the part before .<domain>) —, "upstream": link + {"site"} or None}. A link is {key "fed-<site>", algorithm, secret, domain, address}; sites without a usable address, domain or key are left out (e.g. a site that joined before M4, until it joins again); port is the site's published DNS port (its bind_dns_port, reported at join; 53 when not). |
 | Fails | yaml/OSError from load_registry. |
 | Feeds | deploy.py apply_deployment (the bind9 templates: named.conf.zones, named.conf.keys, zone.j2). |
 | Called by | `deploy.apply_deployment` |
@@ -236,12 +247,12 @@
 
 ## `fabricctl/lib/fabriclib/federation/join_upstream.py`
 
-### `join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None, http_port=80, https_port=443, replace=False)`
+### `join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None, http_port=80, https_port=443, replace=False, dns_port=53)`
 
 | | |
 |---|---|
 | Purpose | On a node being set up with `--join`: join the upstream that made the invitation (design federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root, send the join over TLS verified against that root, check and stage the signed intermediate, and record the upstream. |
-| Inputs | v — fabric vars: service_users.step, image_stepca (make_site_ca_request); invitation — the invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key); work_dir — where the site CA key, request and certificates are kept; domain — this site's own domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder for federation.yaml and its lock (default: next to this code — setup runs from the package, so it passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded (re-parenting: the invitation's upstream becomes this site's parent), default False. |
+| Inputs | v — fabric vars: service_users.step, image_stepca (make_site_ca_request); invitation — the invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key); work_dir — where the site CA key, request and certificates are kept; domain — this site's own domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder for federation.yaml and its lock (default: next to this code — setup runs from the package, so it passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded (re-parenting: the invitation's upstream becomes this site's parent), default False; dns_port — the port this site's DNS is published on (bind_dns_port), default 53: linked sites send zone transfers and notifies there. |
 | Returns | {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path, site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name", "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had, "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry)}. |
 | Fails | ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError. |
 | Feeds | setup step `join` (fabriclib/setup/join_federation.py). |

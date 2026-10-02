@@ -614,7 +614,7 @@
 
 | | |
 |---|---|
-| Purpose | configure Keycloak for fabric, idempotently: realm, LDAP federation and group sync, fabric's permission and bundle roles with their group grants, the TOTP login flow, and the fabric-webui / fabric-openbao clients. |
+| Purpose | configure Keycloak for fabric, idempotently: realm, LDAP federation and group sync, fabric's permission and bundle roles with their group grants, the TOTP login flow, and the fabric-webui / fabric-openbao clients (and fabric-adguard with the DNS filter on). |
 | Inputs | command-line --vars (default /opt/fabric/config/vars.yaml) and --secrets (default /opt/fabric/config/fabric-secrets.yml); secrets come from that file or OpenBao (load_secrets). Talks to ip_keycloak:8443 with TLS pinned to <deploy_base_dir>/stepca/data/certs/root_ca.crt. |
 | Returns | None; prints progress and "Keycloak configuration complete.". |
 | Fails | SystemExit (exit 1 with the message) from any failed admin call or login; argparse exits 2 on bad arguments; OSError/yaml errors reading the vars; ValidationError from load_secrets (OpenBao locked); KeyError when a required var or secret is missing. |
