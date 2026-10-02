@@ -12,8 +12,9 @@ def remove_site(actor, site, source="cli", v=None):
              a disposable lab torn down, or one moved elsewhere (design federation.md §6).
     Inputs:  actor — str (audit); site — its name; source — default "cli"; v — fabric vars for OpenBao
              (default: read from vars.yaml).
-    Returns: the removed record (dict); its DNS link key (federation_tsig[site]) is deleted too. The caller
-             applies, so the delegation and the secondary zone go.
+    Returns: the removed record (dict); its DNS link key (federation_tsig[site]) and directory link secret
+             (federation_replication[site]) are deleted too. The caller applies, so the delegation, the secondary
+             zone and the replication agreement go.
     Fails:   ValidationError "no site <x> joined here"; OSError / yaml errors from the registry.
     Feeds:   run_federation_command (remove).
     Notes:   the site's CA stays valid until it expires: revocation (a CRL, design F7) is not built yet, so a
@@ -25,8 +26,13 @@ def remove_site(actor, site, source="cli", v=None):
         if record is None:
             raise ValidationError(f"no site {site} joined here")
         save_registry(registry)
-        keys = dict(load_secrets(v=v).get("federation_tsig") or {})
-        if keys.pop(site, None) is not None:
-            save_secrets({"federation_tsig": keys}, v=v)
+        stored = load_secrets(v=v)
+        update = {}
+        for name in ("federation_tsig", "federation_replication"):     # the DNS and directory links
+            keys = dict(stored.get(name) or {})
+            if keys.pop(site, None) is not None:
+                update[name] = keys
+        if update:
+            save_secrets(update, v=v)
     write_audit(actor, "FED_SITE_REMOVE", f"site={site} ca_serial={record.get('ca_serial', '')}", source)
     return record

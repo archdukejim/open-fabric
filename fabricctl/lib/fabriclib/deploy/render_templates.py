@@ -69,6 +69,7 @@ def render_templates(paths, jinja_env, context, final_vars, secrets, tsig_keys, 
         render("bind9/data/reverse-zone.j2", f"bind9/data/db.{zone}", reverse_zone_name=zone, ptr_records=ptrs)
 
     if final_vars.get("install_ldap"):
+        render("systemd/fabric-directory-sync.service.j2", "systemd/fabric-directory-sync.service")
         for ldif in LDAP_SEED:
             render(f"dirsrv/seed/{ldif}", f"dirsrv/seed/{ldif[:-3]}")
         shutil.copy(os.path.join(jinja, "dirsrv/seed.py"), os.path.join(out, "dirsrv/seed/seed.py"))

@@ -11,14 +11,14 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabricctl-lib](fabricctl-lib.md) | Entry points: the deploy engine, the vars editor, the Keycloak configuration | 9 | 2 |
 | [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 29 | 19 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 5 | 1 |
-| [fabriclib-deploy](fabriclib-deploy.md) | The deploy engine: secrets, settings, render, install, restart | 29 | 24 |
+| [fabriclib-deploy](fabriclib-deploy.md) | The deploy engine: secrets, settings, render, install, restart | 30 | 25 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 12 | 9 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 43 | 32 |
 | [fabriclib-dns_filter](fabriclib-dns_filter.md) |  | 3 | 2 |
-| [fabriclib-federation](fabriclib-federation.md) |  | 29 | 22 |
+| [fabriclib-federation](fabriclib-federation.md) |  | 34 | 26 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 29 | 20 |
-| [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 21 | 21 |
+| [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 24 | 24 |
 | [fabriclib-logs](fabriclib-logs.md) | Optional log forwarding (Fluent Bit) | 4 | 3 |
 | [fabriclib-menu](fabriclib-menu.md) | The vars editor (fabricctl --interactive), --print and --apply | 17 | 12 |
 | [fabriclib-ntp](fabriclib-ntp.md) | Time: chrony on the host, its settings and checks | 6 | 5 |

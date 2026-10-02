@@ -1,0 +1,16 @@
+[Unit]
+Description=fabric: directory upkeep — POSIX identities and federation replication (run by fabric-directory-sync.timer)
+After=ldap.service
+ConditionPathExists={{ deploy_base_dir }}/fabric/lib/fabriclib/cli.py
+
+[Service]
+Type=oneshot
+# Root: it talks to 389-DS through `docker exec` into the dirsrv container (LDAPI, Directory Manager there).
+ExecStart=/usr/bin/python3 {{ deploy_base_dir }}/fabric/lib/fabriclib/cli.py directory sync --quiet
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+TimeoutStartSec=180

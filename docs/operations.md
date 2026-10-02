@@ -32,6 +32,7 @@ The same DNS and apply operations are also available in the browser through webu
   - [Landing Page Links](#landing-page-links)
 - [DNS filter (optional: AdGuard Home)](#dns-filter-optional-adguard-home)
 - [Time (NTP)](#time-ntp)
+- [People's Linux identities (POSIX)](#peoples-linux-identities-posix)
 - [Federation (sites)](#federation-sites)
 - [OpenBao (secrets)](#openbao-secrets)
 - [Lifecycle Commands](#lifecycle-commands)
@@ -554,6 +555,23 @@ chronyc sources -v          # every source and its state
 Your own clock instead (a GPS receiver, your router): `ntp_servers: ["192.168.4.1 prefer"]`, then
 `sudo fabricctl setup` (the firewall step follows network changes).
 
+## People's Linux identities (POSIX)
+
+Every person gets a Linux identity in the directory (design [domain-join.md](design/domain-join.md), the
+groundwork for joining machines): a `uidNumber` that 389-DS itself assigns from the `users` OU's `uid_range`
+(5001–50000 by default; never handed out twice, also after a person is deleted), the `users` group as primary
+group, `/home/<uid>` (`posix_home_base`) and `/bin/bash` (`posix_login_shell`). Groups already carry their
+`gidNumber`.
+
+It is given at once to people fabric creates (setup's admin, the web UI's People page) and within 5 minutes to
+people created elsewhere, such as Keycloak's own console (`fabric-directory-sync.timer`). A user name that is not a
+safe login name (`[a-z_][a-z0-9_.-]*`) is skipped and reported. At a federated site people arrive from the
+upstream site with their identity.
+
+```bash
+sudo fabricctl directory sync     # now, instead of waiting for the timer
+```
+
 ## Federation (sites)
 
 Several fabrics can form one: an **upstream** owns identity and the root CA, **sites** join it and run
@@ -594,6 +612,18 @@ so a BIND published on 5053 behind another resolver on 53 (e.g. AdGuard Home) wo
 delegation only on port 53, so with BIND on another port the resolver in front of it forwards the
 site domains instead. Sites that joined before this existed have no key: they
 get one when they join again (or are re-parented).
+
+**The directory between sites** (design [federation.md](design/federation.md) §3.2a). Each join also makes a
+directory link (a secret kept in both sites' secrets, replication over LDAPS checked against the
+organisation's root CA). The organisation — people, groups, device roles — is written only at the root and
+copied to every site read-only: a site refers writes to the root, its Keycloak does not change people, and
+creating a person there is refused. Each site's own part (its devices and service accounts) is written there
+and copied to its parent, whose admins can read it (its RADIUS cannot: devices roaming need the site's
+consent). A site keeps answering from its copy while the root is away, and changes made meanwhile arrive when
+the link is back. `fabricctl directory sync` (and its 5-minute timer) keeps the links as the federation says and
+starts a first copy again when it did not complete. A site that joined before this was built gets a directory link by joining again:
+`fabricctl federation remove <site>` and a new invitation at the parent, then `fabricctl federation reparent`
+on the site.
 
 **Relay nodes.** `--via edge1` names a site that joined this install (with its endpoint enabled) as the
 new site's way in: the invitation points at edge1, edge1 forwards the join to the root, and the root

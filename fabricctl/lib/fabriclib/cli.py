@@ -20,6 +20,8 @@
                                  log forwarding (optional Fluent Bit): destinations, sent, errors
   fabricctl images status|update|rollback|prune
                                  container images: validated versions, update, roll back, clean up
+  fabricctl directory sync
+                                 POSIX identities, replication links (also every 5 minutes)
   fabricctl secrets list|show <name>
                                  fabric's own secrets (in OpenBao); `show` is audited
   fabricctl client-cert <user> [--days N]
@@ -55,6 +57,7 @@ from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.federation.run_federation_command import run_federation_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
+from fabriclib.ldap.run_directory_command import run_directory_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
 from fabriclib.secrets.run_secrets_command import run_secrets_command  # noqa: E402
@@ -185,6 +188,8 @@ def main(argv):
         return run_dhcp_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "images":
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
+    if cmd == "directory":
+        return run_directory_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":

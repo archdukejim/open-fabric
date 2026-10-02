@@ -122,6 +122,11 @@ for who, pw in (('$USERDN', os.environ['P']), ('cn=group_admin,ou=admins,$LOCAL'
 check "a person and another service account read the organisation, not the site part" \
     "grep -qx 'uid=jim org 1 site 0' <<<\"\$part\" && grep -qx 'cn=group_admin org 1 site 0' <<<\"\$part\""
 
+# ---- POSIX identities (fabriclib/ldap/ensure_posix_identities.py, the DNA plugin)
+echo "--- POSIX identities"
+REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/posix.py" | tee "$W/posix.log"
+PASS=$((PASS + $(grep -c '^PASS' "$W/posix.log"))); FAIL=$((FAIL + $(grep -c '^FAIL' "$W/posix.log")))
+
 # ---- device RBAC (fabriclib/ldap device + role operations as cn=device_admin)
 echo "--- devices and roles"
 REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/devices.py" | tee "$W/devices.log"

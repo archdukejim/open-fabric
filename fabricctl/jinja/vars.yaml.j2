@@ -414,6 +414,10 @@ ldap_local_dn: ou={{ (site_name | default(hostname, true)) | lower }},{{ _base_d
 ldap_groups:
 {{ _merged_groups | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
+{# People's Linux identities (design domain-join.md): home folder base and login shell given with the uidNumber #}
+posix_home_base: {{ posix_home_base | default('/home') }}
+posix_login_shell: {{ posix_login_shell | default('/bin/bash') }}
+
 {% set default_ldap_ous = [
   { 'name': 'accounts', 'description': 'User Accounts' },
   { 'name': 'groups', 'description': 'Security Groups' },

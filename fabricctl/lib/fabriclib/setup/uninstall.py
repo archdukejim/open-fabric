@@ -6,7 +6,7 @@ import subprocess
 from fabriclib.common.console import info, ok, warn
 from fabriclib.images.constants import STATE as IMAGE_STATE
 
-UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
+UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
 TARGET = "/etc/systemd/system/fabric.target"
 CONTAINERS = ["fabric-web", "webui", "fluentbit", "kea-dhcp4", "kea-ddns", "freeradius", "adguardhome",
               "oauth2-proxy-adguard", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
@@ -31,11 +31,12 @@ def uninstall(ctx):
     v = ctx.vars
 
     info("stopping and removing services")
+    subprocess.run(["systemctl", "disable", "--now", "fabric-directory-sync.timer"], capture_output=True)
     for unit in UNITS:
         subprocess.run(["systemctl", "disable", "--now", unit], capture_output=True)
-        path = f"/etc/systemd/system/{unit}.service"
-        if os.path.exists(path):
-            os.remove(path)
+        for path in (f"/etc/systemd/system/{unit}.service", f"/etc/systemd/system/{unit}.timer"):
+            if os.path.exists(path):
+                os.remove(path)
     subprocess.run(["systemctl", "disable", "--now", "fabric.target"], capture_output=True)
     if os.path.exists(TARGET):
         os.remove(TARGET)

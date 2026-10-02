@@ -13,6 +13,7 @@ from fabriclib.keycloak.ensure_realm import ensure_realm
 from fabriclib.keycloak.ensure_webui_client import ensure_webui_client
 from fabriclib.keycloak.grant_role_to_group import grant_role_to_group
 from fabriclib.keycloak.step import step
+from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.secrets.load_secrets import load_secrets
 
 
@@ -38,7 +39,8 @@ def configure_keycloak(vars_path, secrets_path):
     print(f"Configuring Keycloak realm {realm}...")
     realm_id = ensure_realm(kc, realm, v.get("friendly_name") or v["domain"])
     if v.get("install_ldap", True):
-        ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s), v)
+        writable = people_written_here(os.path.join(v["deploy_base_dir"], "fabric", "config", "federation.yaml"))
+        ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s, writable), v)
     # The admin role and the TOTP flow serve the web UI, OpenBao's UI and AdGuard's.
     admin_role = v.get("webui_admin_role", "fabric-admin")
     reps = ensure_rbac_roles(kc, realm, admin_role)

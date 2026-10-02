@@ -984,6 +984,14 @@ Design [dns-filter.md](design/dns-filter.md); operations.md → DNS filter.
 | `ip_adguard` / `ip_oauth2proxy` | `10.255.0.31` / `10.255.0.32` | On fabric_net |
 | `adguard_mem_limit` | `256m` | Container memory limit |
 
+### People's Linux identities (POSIX)
+operations.md → People's Linux identities. The `uidNumber` range is the `users` OU's `uid_range` (`ldap_organizational_units`).
+
+| Variable | Default | Notes |
+|---|---|---|
+| `posix_home_base` | `/home` | Home folder of each person: `<posix_home_base>/<uid>` |
+| `posix_login_shell` | `/bin/bash` | Login shell given with the identity |
+
 ### Time (NTP)
 Design [ntp.md](design/ntp.md); operations.md → Time. chrony on the host.
 

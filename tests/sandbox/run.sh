@@ -96,6 +96,13 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
+echo "--- POSIX identities (domain-join.md step 1)"
+docker cp "$REPO/tests/sandbox/posix_check.py" "$NAME:/root/posix_check.py"
+check "the admin has a POSIX identity: uidNumber from the users range, group users, /home/<uid>" \
+    "in_box 'python3 /root/posix_check.py fabricadmin' | grep -qE '^(500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-4][0-9]{4}) 5000 /home/fabricadmin /bin/bash$'"
+check "fabricctl directory sync finds nothing left to do; its timer is enabled" \
+    "in_box 'fabricctl directory sync' | grep -q '0 added' && in_box 'systemctl is-enabled fabric-directory-sync.timer' | grep -qx enabled"
+
 echo "--- DNS filter (AdGuard Home) in front of BIND"
 BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
 check "AdGuard answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
@@ -303,6 +310,10 @@ docker cp "$OUT/carol.py" "$NAME:/root/carol.py"
 in_box "BOB_PW='$CAROL_PW' python3 /root/carol.py" > "$OUT/carol.log" 2>&1
 CAROL_P12_PW=$(in_box 'fabricctl client-cert carol' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
 check "third user carol in the auditors group, with a client cert" "grep -q created '$OUT/carol.log' && [ -n '$CAROL_P12_PW' ]"
+# bob and carol were written straight into the directory (as people created outside fabric are)
+in_box 'fabricctl directory sync' > "$OUT/posix-sync.log" 2>&1
+check "sync gives people created outside fabric distinct POSIX identities" \
+    "grep -q '2 added' '$OUT/posix-sync.log' && [ \"\$(in_box 'python3 /root/posix_check.py bob' | cut -d' ' -f1)\" != \"\$(in_box 'python3 /root/posix_check.py carol' | cut -d' ' -f1)\" ]"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
 in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails

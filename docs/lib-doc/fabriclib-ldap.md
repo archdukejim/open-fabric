@@ -138,6 +138,20 @@
 | Notes | binds as Directory Manager with the container's DS_DM_PASSWORD; roles arrive as JSON in the environment. The marker keeps a default role the admin deleted or renamed from coming back. |
 | Called by | `fabriclib.setup.start_services.run` |
 
+## `fabricctl/lib/fabriclib/ldap/ensure_posix_identities.py`
+
+### `ensure_posix_identities(v, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | give every person in the directory a POSIX identity (design domain-join.md step 1): posixAccount with a uidNumber the server assigns (389-DS DNA plugin, the users OU's uid_range, never handed out twice), the `users` group as primary group, /home/<uid> and a login shell. |
+| Inputs | v — fabric vars: ldap_base_dn, ldap_groups (the `users` group's gidNumber, default 5000), optional posix_home_base (default /home) and posix_login_shell (default /bin/bash); container — the dirsrv container (tests pass theirs). |
+| Returns | {"added": ["<uid>=<uidNumber>", …], "skipped": [uids that are not safe login names]}; people who already have a POSIX identity are left as they are. |
+| Fails | ValidationError when 389-DS is not running or the DNA plugin did not assign a number; RuntimeError for other failures (the container's message); subprocess.TimeoutExpired after 120 s. |
+| Feeds | setup (start step after seeding, admin step), keycloak/create_person, `fabricctl directory sync` and its timer (people created in Keycloak's own console); tests/dirsrv/posix.py. |
+| Notes | only where people are written (a standalone install, the root site); at a federated site people are a read-only copy and arrive with their identity (M5). A uid that is not a safe login name is never given a home folder path. |
+| Called by | `fabriclib.keycloak.create_person.create_person`, `fabriclib.ldap.run_directory_command.run_directory_command`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.start_services.run` |
+
 ## `fabricctl/lib/fabriclib/ldap/link_device_cert.py`
 
 ### `link_device_cert(v, actor, name, fingerprint, link=True, source='web')`
@@ -205,6 +219,19 @@
 | Notes | binds as Directory Manager with the container's DS_DM_PASSWORD. Run after keycloak_bootstrap has moved Keycloak's LDAP bind to the new keycloak_admin: deleting the old accounts earlier would break sign-in until then. A device already present in the local suffix is not overwritten. Deleting an old device lets 389-DS referential integrity drop it from the roles, so member values are removed from a fresh read. |
 | Called by | `fabriclib.setup.start_services.run` |
 
+## `fabricctl/lib/fabriclib/ldap/people_written_here.py`
+
+### `people_written_here(registry_path=FEDERATION_FILE)`
+
+| | |
+|---|---|
+| Purpose | whether people are created and changed on this install (a standalone install or the root site), or arrive read-only from an upstream site (federation M5). |
+| Inputs | registry_path — the federation registry (default this install's config/federation.yaml). |
+| Returns | True when this install has no upstream site. |
+| Fails | yaml/OSError from load_registry for a malformed registry. |
+| Feeds | setup/start_services and setup/create_admin (POSIX identities), run_directory_command (sync). |
+| Called by | `fabriclib.deploy.restart_changed.restart_changed`, `fabriclib.keycloak.configure_keycloak.configure_keycloak`, `fabriclib.keycloak.create_person.create_person`, `fabriclib.ldap.run_directory_command.run_directory_command`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.start_services.run` |
+
 ## `fabricctl/lib/fabriclib/ldap/remove_device.py`
 
 ### `remove_device(v, actor, name, source='web')`
@@ -246,14 +273,27 @@
 | Feeds | pki/issue_key_pair, pki/sign_csr. |
 | Called by | `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
 
+## `fabricctl/lib/fabriclib/ldap/run_directory_command.py`
+
+### `run_directory_command(v, args)`
+
+| | |
+|---|---|
+| Purpose | `fabricctl directory sync`: directory upkeep on this install — POSIX identities and replication links. |
+| Inputs | v — fabric vars; args — the words after `directory`: sync [--quiet]. |
+| Returns | exit status: 0, 2 for usage. |
+| Fails | ValidationError / RuntimeError from ensure_posix_identities or configure_directory_links. |
+| Feeds | cli.py (`directory`), fabric-directory-sync.service. |
+| Called by | `fabriclib.cli.main` |
+
 ## `fabricctl/lib/fabriclib/ldap/seed_directory.py`
 
-### `seed_directory()`
+### `seed_directory(org_copy=None)`
 
 | | |
 |---|---|
 | Purpose | seed 389-DS: create the two suffix backends on first run, apply /seed/*.ldif idempotently inside the container (seed.py) and restart the ldap service once when server configuration (cn=config) changed. |
-| Inputs | none; needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered seed files (deploy/install_dirsrv_seed copies them to <base>/dirsrv/seed, mounted at /seed). |
+| Inputs | org_copy — at a federated site, (organisation suffix, this site's part): the organisation is a read-only copy filled by replication, so only the site's part is seeded (default None: seed all). Needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered seed files (deploy/install_dirsrv_seed copies them to <base>/dirsrv/seed, mounted at /seed). |
 | Returns | seed.py's output (str), with a restart notice when it asked for one. |
 | Fails | ValidationError when dirsrv does not become healthy (before seeding or after the restart), the backends cannot be created after 12 tries 5 s apart (the healthcheck can pass a moment before LDAPI accepts connections), or seed.py fails (its output in the message). |
 | Feeds | setup/start_services (setup), deploy/restart_changed (apply when seed files changed); tests/dirsrv/run.sh mirrors the same steps. |

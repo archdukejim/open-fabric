@@ -88,7 +88,7 @@
 | | |
 |---|---|
 | Purpose | idempotently apply LDIF files to this container's 389-DS: add missing entries, apply only the modify operations whose values differ, and print RESTART_REQUIRED if anything under cn=config changed. |
-| Inputs | paths — list of LDIF file paths (applied in sorted order); DS_DM_PASSWORD in the environment. |
+| Inputs | paths — list of LDIF file paths (applied in sorted order); DS_DM_PASSWORD in the environment; SEED_SKIP_SUFFIX / SEED_KEEP_SUFFIX — at a federated site, entries under the organisation suffix are skipped except those under this site's part (the organisation arrives by replication). |
 | Returns | None; prints "+ dn" / "~ dn: attrs" lines and "seed: N added, M modified". |
 | Fails | SystemExit with a message for an unsupported changetype or a modify on a missing entry; ldap errors (e.g. schema violations) and bind_dm failures propagate as a traceback; exit is non-zero either way. |
 | Feeds | run as `python3 /seed/seed.py /seed/*.ldif` by fabriclib/ldap/seed_directory.py and the dirsrv, freeradius and hardening test suites; RESTART_REQUIRED is read by seed_directory. |

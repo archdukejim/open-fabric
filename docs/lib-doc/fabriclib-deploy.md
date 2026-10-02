@@ -144,6 +144,19 @@
 | Notes | named.conf.keys and rndc.key hold secrets: 0600. |
 | Called by | `fabriclib.deploy.apply_deployment._deploy` |
 
+## `fabricctl/lib/fabriclib/deploy/install_directory_sync_timer.py`
+
+### `install_directory_sync_timer(paths, final_vars, manage_units=True)`
+
+| | |
+|---|---|
+| Purpose | the timer that gives people created in Keycloak's own console their POSIX identity within 5 minutes (design domain-join.md step 1); removed when LDAP is off. |
+| Inputs | paths — deploy_paths() (render, jinja); final_vars — rendered settings (install_ldap); manage_units — systemctl calls (False in tests). |
+| Returns | True if a unit file changed or was removed (systemd must reload). |
+| Fails | OSError copying or removing; a failing systemctl is ignored (the next apply retries). |
+| Feeds | deploy/apply_deployment. |
+| Called by | `fabriclib.deploy.apply_deployment._deploy` |
+
 ## `fabricctl/lib/fabriclib/deploy/install_dirsrv_seed.py`
 
 ### `install_dirsrv_seed(paths, final_vars)`
@@ -354,12 +367,12 @@
 | Feeds | restart_changed. |
 | Called by | `fabriclib.deploy.restart_changed.restart_changed` |
 
-### `restart_changed(paths, final_vars, state, bind_ids)`
+### `restart_changed(paths, final_vars, secrets, state, bind_ids)`
 
 | | |
 |---|---|
 | Purpose | the end of an apply on a running install: build changed images, restart what changed, reload BIND's configuration and zones and nginx live, re-seed 389-DS, and restart fabric-agent, the federation endpoint and the web UI last without blocking. |
-| Inputs | paths — deploy_paths() (base, target); final_vars — rendered settings (federation_endpoint); state — what the install steps found (see finish_without_start, plus ldap_seed); bind_ids — the bind user's ids. |
+| Inputs | paths — deploy_paths() (base, target, federation); final_vars — rendered settings (federation_endpoint, install_ldap, ldap_base_dn, ldap_local_dn); secrets — fabric's secrets (the directory links); state — what the install steps found (see finish_without_start, plus ldap_seed); bind_ids — the bind user's ids. |
 | Returns | the set of units restarted (fabric-web included when it was queued). |
 | Fails | ValidationError when BIND refuses `rndc reconfig` (a silent failure would leave a removed TSIG key working). Timeouts of systemctl/docker are reported, not raised. |
 | Feeds | apply_deployment (start_services=True: `fabricctl --apply`, the web UI's Apply). |

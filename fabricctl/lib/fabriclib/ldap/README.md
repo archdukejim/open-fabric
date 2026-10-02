@@ -23,5 +23,8 @@ least-privilege `cn=device_admin`, so the directory's ACIs limit them.
 | `common/` | Helpers shared by the operations above (see its README) |
 | `ensure_default_device_roles.py` | Create the default device roles once (a marker file keeps a deleted one from coming back) |
 | `migrate_local_suffix.py` | Move an install from before the directory split: devices and service accounts to the local suffix |
+| `ensure_posix_identities.py` | Give every person without one a POSIX identity (uidNumber assigned by 389-DS's DNA plugin from the users range, group `users`, `/home/<uid>`) |
+| `people_written_here.py` | Whether people are written on this install (standalone or root site) or arrive from upstream |
+| `run_directory_command.py` | `fabricctl directory sync` |
 | `seed_directory.py` | Seed 389-DS: create the suffix backends on first run, apply the seed LDIFs, restart once if `cn=config` changed |
 | `ensure_admin_user.py` | Create a user under `ou=users,ou=accounts` if missing (never changes an existing one) and add it to the web UI admin group |

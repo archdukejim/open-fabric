@@ -70,7 +70,7 @@
 | Returns | True if dst was missing or different and has been replaced (mode and owner set), else False. |
 | Fails | OSError from comparing, copying, chown or chmod. |
 | Feeds | deploy/* (compose files, systemd units, nginx.conf, webui.json). |
-| Called by | `fabriclib.deploy.install_nginx_config.install_nginx_config`, `fabriclib.deploy.install_service_units.install_service_units`, `fabriclib.deploy.install_webui_files.install_webui_files` |
+| Called by | `fabriclib.deploy.install_directory_sync_timer.install_directory_sync_timer`, `fabriclib.deploy.install_nginx_config.install_nginx_config`, `fabriclib.deploy.install_service_units.install_service_units`, `fabriclib.deploy.install_webui_files.install_webui_files` |
 
 ## `fabricctl/lib/fabriclib/common/copy_tree_with_perms.py`
 

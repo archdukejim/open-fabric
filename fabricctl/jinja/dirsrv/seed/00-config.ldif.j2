@@ -64,3 +64,24 @@ dn: cn=entryuuid,cn=plugins,cn=config
 changetype: modify
 replace: nsslapd-pluginEnabled
 nsslapd-pluginEnabled: on
+
+# POSIX identities (design domain-join.md step 1): the server hands out uidNumber itself — atomically, never
+# twice — when an entry under ou=users becomes a posixAccount with uidNumber -1 (ldap/ensure_posix_identities).
+# The range is the users OU's uid_range. Added once: dnaNextValue moves on with every number handed out.
+{% set _users_ou = (ldap_organizational_units | default([]) | selectattr('name', 'equalto', 'users') | list | first) or {} %}
+{% set _uid_range = (_users_ou.get('uid_range') or '5001-50000').split('-') %}
+dn: cn=Distributed Numeric Assignment Plugin,cn=plugins,cn=config
+changetype: modify
+replace: nsslapd-pluginEnabled
+nsslapd-pluginEnabled: on
+
+dn: cn=Person UIDs,cn=Distributed Numeric Assignment Plugin,cn=plugins,cn=config
+objectClass: top
+objectClass: extensibleObject
+cn: Person UIDs
+dnaType: uidNumber
+dnaMagicRegen: -1
+dnaFilter: (objectClass=posixAccount)
+dnaScope: ou=users,ou=accounts,{{ ldap_base_dn }}
+dnaNextValue: {{ _uid_range[0] | trim }}
+dnaMaxValue: {{ _uid_range[1] | trim }}

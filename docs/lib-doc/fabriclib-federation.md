@@ -20,8 +20,8 @@
 | | |
 |---|---|
 | Purpose | On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time invitation, sign the site's intermediate CA with the root key, record the site and use up the invitation. |
-| Inputs | v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip, hostname_federation and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
-| Returns | {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain": PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>", "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this site's published DNS port) (kept here in fabric's secrets as federation_tsig[site]; design federation.md M4), "org": {"org_domain", "ldap_base_dn", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
+| Inputs | v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip, hostname_federation, hostname_ldap and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP), optional "ldap_host" (its LDAPS name, default ldap.<domain>)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
+| Returns | {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain": PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>", "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this site's published DNS port) (kept here in fabric's secrets as federation_tsig[site]; design federation.md M4), "directory": {"secret", "ldap_host", "ldap_port"} — the directory link's secret (replication both ways, kept here as federation_replication[site]; §3.2a) and this site's LDAPS name, "org": {"org_domain", "ldap_base_dn", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
 | Fails | ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message, so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can retry); ValidationError from load_secrets/save_secrets; OSError. |
 | Feeds | the federation endpoint (fabricctl/lib/federation/server.py, POST /v1/join). |
 | Notes | the secret is compared by its SHA-256 in constant time; audited as FED_JOIN (actor "site:<name>", with the client address) and, on refusal, FED_JOIN_REFUSED. |
@@ -65,7 +65,7 @@
 | Fails | yaml.YAMLError for a malformed file; OSError reading it. |
 | Feeds | create_invitation, accept_join, federation_status, join_upstream (records the upstream). |
 | Notes | holds no secrets (invitations live hashed in fabric's secrets). |
-| Called by | `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.common.signing_capacity.signing_capacity`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.dns_links.dns_links`, `fabriclib.federation.drop_relay.drop_relay`, `fabriclib.federation.federation_status.federation_status`, `fabriclib.federation.join_upstream.join_upstream`, `fabriclib.federation.relay_join.relay_join`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.ntp.chrony_settings.chrony_settings`, `fabriclib.setup.collect_vars._join_defaults`, `fabriclib.setup.verify_install.checks` |
+| Called by | `fabriclib.deploy.apply_deployment._deploy`, `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.common.signing_capacity.signing_capacity`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.directory_links.directory_links`, `fabriclib.federation.dns_links.dns_links`, `fabriclib.federation.drop_relay.drop_relay`, `fabriclib.federation.federation_status.federation_status`, `fabriclib.federation.join_upstream.join_upstream`, `fabriclib.federation.relay_join.relay_join`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.ldap.people_written_here.people_written_here`, `fabriclib.ntp.chrony_settings.chrony_settings`, `fabriclib.setup.collect_vars._join_defaults`, `fabriclib.setup.verify_install.checks` |
 
 ## `fabricctl/lib/fabriclib/federation/common/post_upstream.py`
 
@@ -141,6 +141,47 @@
 | Feeds | create_invitation, deploy/check_fixed_identity. |
 | Called by | `fabriclib.deploy.check_fixed_identity.check_fixed_identity`, `fabriclib.federation.create_invitation.create_invitation` |
 
+## `fabricctl/lib/fabriclib/federation/configure_agreement.py`
+
+### `configure_agreement(suffix, name, host, port, bind_dn, secret, description='', reinit=False, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | a replication agreement from this 389-DS (supplier or hub of `suffix`) to another site's copy, over LDAPS verified against the organisation's root CA (design federation.md §3.2a). |
+| Inputs | suffix — the replicated suffix; name — the agreement's name (to-<site>); host — the other site's LDAP name (its certificate's name, resolvable here through the federation's DNS links); port — its LDAPS port (636); bind_dn — the link account at the other site (cn=repl-from-<this site>,cn=config); secret — the link's secret (environment only); description — shown in status; reinit — send the whole suffix again; container — the dirsrv container. |
+| Returns | "created" (with a first total update started), "updated", "current"; with "+init" when the first copy had not completed (started again) and "+reinit" when asked. |
+| Fails | ValidationError when 389-DS is not running; RuntimeError for other failures (the container's message). |
+| Feeds | federation/configure_directory_links (apply); tests/federation/replication.sh. |
+| Called by | `fabriclib.federation.configure_directory_links.configure_directory_links` |
+
+## `fabricctl/lib/fabriclib/federation/configure_directory_links.py`
+
+### `configure_directory_links(v, secrets, registry_path, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | make this site's 389-DS replicate as the federation says (design federation.md §3.2a): copies of the parts of the sites that joined here, the replicas, the agreements; and remove what is no longer linked. |
+| Inputs | v — fabric vars (directory_links); secrets — fabric's secrets (federation_replication); registry_path — config/federation.yaml; container — the dirsrv container. |
+| Returns | list of what changed ([] when everything already was so). |
+| Fails | ValidationError / RuntimeError from configure_replica and configure_agreement (the first failing link stops the run: the next apply retries); RuntimeError when a backend cannot be created. |
+| Feeds | setup/start_services (after seeding) and deploy/restart_changed (every apply: a site joined or was removed); tests/federation/replication.sh. |
+| Notes | a removed site's copy (backend part_<site>) is kept until removed by hand (`dsconf localhost backend delete`): deleting directory data is never automatic. |
+| Called by | `fabriclib.deploy.restart_changed.restart_changed`, `fabriclib.ldap.run_directory_command.run_directory_command`, `fabriclib.setup.start_services.run` |
+
+## `fabricctl/lib/fabriclib/federation/configure_replica.py`
+
+### `configure_replica(suffix, role, replica_id, accounts, referral=None, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | make this 389-DS a replica of one suffix (design federation.md §3.2a): the supplier where it is written, a hub that passes it on, or a read-only consumer; and the link accounts allowed to push to it. |
+| Inputs | suffix — the replicated suffix (the organisation's base DN, or a site's part ou=<site>,<base>); role — "supplier", "hub" or "consumer"; replica_id — 1..65534 for a supplier (ignored otherwise: hubs and consumers share 65535); accounts — {account name: secret}: one per link whose supplier pushes here (cn=<name>,cn=config, password = the link's secret); referral — for a hub or consumer, the LDAP URL of the site where the suffix is written (ldaps://ldap.<root domain>:636): a write here is referred there; container — the dirsrv container. |
+| Returns | list of what changed ([] when it already was so). |
+| Fails | ValidationError for an unknown role, a bad replica id or when 389-DS is not running; RuntimeError for other failures (the container's message). |
+| Feeds | federation/configure_directory_links (apply); tests/federation/replication.sh. |
+| Notes | secrets travel in the environment of `docker exec` (never argv). The changelog is the backend's own (389-DS ≥ 1.4.3): suppliers and hubs log changes (nsDS5Flags 1). |
+| Called by | `fabriclib.federation.configure_directory_links.configure_directory_links` |
+
 ## `fabricctl/lib/fabriclib/federation/create_invitation.py`
 
 ### `_org_ous(v)`
@@ -193,6 +234,31 @@
 | Feeds | deploy/apply_deployment (the caller runs daemon-reload and restarts or starts the unit). |
 | Notes | the socket directory <base>/federation/run is root:<nginx gid> 0750; the server makes the socket root:<nginx gid> 0660. |
 | Called by | `fabriclib.deploy.apply_deployment._deploy` |
+
+## `fabricctl/lib/fabriclib/federation/directory_links.py`
+
+### `_account(site)`
+
+| | |
+|---|---|
+| Purpose | the name of the bind account a site's supplier uses at a neighbour (cn=<it>,cn=config). |
+| Inputs | site — the pushing site's name. |
+| Returns | str "repl-from-<site>". |
+| Fails | never. |
+| Feeds | directory_links. |
+| Called by | `fabriclib.federation.directory_links.directory_links` |
+
+### `directory_links(v, secrets, registry_path)`
+
+| | |
+|---|---|
+| Purpose | what this site's 389-DS replicates, as replicas and agreements (design federation.md §3.2a): the organisation comes down from the upstream (supplied here at the root), this site's part goes up, the parts of the sites that joined here are kept as copies. |
+| Inputs | v — fabric vars: site_name, ldap_base_dn, ldap_local_dn (this site's part); secrets — fabric's secrets (federation_replication: {site: secret} for each site that joined here, "upstream": the secret with this site's upstream); registry_path — config/federation.yaml. |
+| Returns | {"replicas": [{"suffix", "role", "replica_id", "accounts": {name: secret}, "referral"}], "agreements": [{"suffix", "name", "host", "port", "bind_dn", "secret", "description"}], "backends": [{"suffix", "name"}] — copies of joined sites' parts to create here}; all empty on a standalone install (no upstream, no sites). Links without a secret or an LDAP name (sites that joined before M5, until they join again) are left out. |
+| Fails | yaml/OSError from load_registry. |
+| Feeds | configure_directory_links; tests/federation/directory_links.py. |
+| Notes | at a site the organisation is a read-only copy (a consumer, or a hub when sites joined below it) that refers writes to the upstream; only one site writes each suffix, so every supplier is replica id 1. A joined site's part is a consumer here (it reaches the root when this is the root; parts of sites nested further down reach only their parent for now). |
+| Called by | `fabriclib.federation.configure_directory_links.configure_directory_links` |
 
 ## `fabricctl/lib/fabriclib/federation/dns_links.py`
 
@@ -253,7 +319,7 @@
 |---|---|
 | Purpose | On a node being set up with `--join`: join the upstream that made the invitation (design federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root, send the join over TLS verified against that root, check and stage the signed intermediate, and record the upstream. |
 | Inputs | v — fabric vars: service_users.step, image_stepca (make_site_ca_request); invitation — the invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key); work_dir — where the site CA key, request and certificates are kept; domain — this site's own domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder for federation.yaml and its lock (default: next to this code — setup runs from the package, so it passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded (re-parenting: the invitation's upstream becomes this site's parent), default False; dns_port — the port this site's DNS is published on (bind_dns_port), default 53: linked sites send zone transfers and notifies there. |
-| Returns | {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path, site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name", "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had, "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry)}. |
+| Returns | {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path, site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name", "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had, "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry), "replication_secret": the directory link's secret (likewise, federation_replication["upstream"])}. The upstream record keeps its LDAPS name and port (ldap_host, ldap_port) for replication. |
 | Fails | ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError. |
 | Feeds | setup step `join` (fabriclib/setup/join_federation.py). |
 | Notes | idempotent: once joined (an upstream recorded and the staged files present) a re-run returns the same settings without contacting the upstream, so setup can be repeated after a later failure. Audited as FED_JOINED. |
@@ -305,7 +371,7 @@
 |---|---|
 | Purpose | on a site's parent (the root, or the site it is nested under): forget a site that joined here — a disposable lab torn down, or one moved elsewhere (design federation.md §6). |
 | Inputs | actor — str (audit); site — its name; source — default "cli"; v — fabric vars for OpenBao (default: read from vars.yaml). |
-| Returns | the removed record (dict); its DNS link key (federation_tsig[site]) is deleted too. The caller applies, so the delegation and the secondary zone go. |
+| Returns | the removed record (dict); its DNS link key (federation_tsig[site]) and directory link secret (federation_replication[site]) are deleted too. The caller applies, so the delegation, the secondary zone and the replication agreement go. |
 | Fails | ValidationError "no site <x> joined here"; OSError / yaml errors from the registry. |
 | Feeds | run_federation_command (remove). |
 | Notes | the site's CA stays valid until it expires: revocation (a CRL, design F7) is not built yet, so a removed site's certificates are still trusted by the organisation. A site invited again under the same name gets a new CA. Audited as FED_SITE_REMOVE. |

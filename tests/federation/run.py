@@ -340,5 +340,15 @@ print("\n".join(line for line in nested.stdout.splitlines() if line.startswith((
       or nested.stdout[-2000:] + nested.stderr[-2000:])
 check("nested sites: nested.py passed", nested.returncode == 0, nested.stderr[-400:])
 
+for title, cmd in (("the replication plan (directory_links.py)",
+                    [sys.executable, os.path.join(REPO, "tests", "federation", "directory_links.py")]),
+                   ("directory replication with two real 389-DS (replication.sh)",
+                    ["bash", os.path.join(REPO, "tests", "federation", "replication.sh")])):
+    print(f"--- {title}")
+    part = subprocess.run(cmd, capture_output=True, text=True)
+    print("\n".join(line for line in part.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+          or part.stdout[-2000:] + part.stderr[-2000:])
+    check(f"{title} passed", part.returncode == 0, (part.stdout + part.stderr)[-400:])
+
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
 sys.exit(1 if FAILED else 0)

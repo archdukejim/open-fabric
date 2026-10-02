@@ -53,9 +53,13 @@ def reparent_site(ctx, actor, invitation):
                         audit_path=ctx.path("fabric", "archive", "audit.log"), replace=True,
                         dns_port=int(v.get("bind_dns_port") or 53))
     new = res["vars"]
-    if res.get("dns_secret"):                # the DNS link to the new parent
-        keys = dict(load_secrets(v=v).get("federation_tsig") or {}, upstream=res["dns_secret"])
-        save_secrets({"federation_tsig": keys}, v=v)
+    if res.get("dns_secret"):                # the DNS and directory links to the new parent
+        stored = load_secrets(v=v)
+        update = {"federation_tsig": dict(stored.get("federation_tsig") or {}, upstream=res["dns_secret"])}
+        if res.get("replication_secret"):
+            update["federation_replication"] = dict(stored.get("federation_replication") or {},
+                                                    upstream=res["replication_secret"])
+        save_secrets(update, v=v)
     replace_site_ca(v, new)
     with vars_lock():
         data = load_vars()

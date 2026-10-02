@@ -69,9 +69,9 @@
 |---|---|
 | Purpose | Helpdesk `people:create`: create a realm user in Keycloak (which writes the account to 389-DS) with a one-time password. |
 | Inputs | v — fabric vars (keycloak_admin: ip_keycloak, hostname_keycloak, webui_realm or domain, root CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao). |
-| Returns | the one-time password (token_urlsafe(15)): shown once, stored nowhere. |
-| Fails | ValidationError "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused: ..." (any other admin API error or failed admin login, raised as SystemExit by admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable); OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back. |
-| Feeds | agent route POST /v1/people (agent/ (fabric-agent) Handler.dispatch) -> webui agentclient.create_person -> People page. |
+| Returns | the one-time password (token_urlsafe(15)): shown once, stored nowhere. The person also gets their POSIX identity at once (ldap/ensure_posix_identities; if that fails, the 5-minute timer gives it). |
+| Fails | ValidationError "people are created at the root site …" at a federated site (M5: the directory is a read-only copy there); "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused: ..." (any other admin API error or failed admin login, raised as SystemExit by admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable); OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back. |
+| Feeds | agent route POST /v1/people (agent/post_route.py) -> webui agentclient.create_person -> People page. |
 | Notes | the user joins the plain `users` group only (never a fabric group; skipped silently if that group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP enrolment, at the first sign-in. If a step after the creation fails the account stays, without a known password (reset_sign_in recovers it). Audited as PERSON_CREATE. |
 | Called by | `agent.post_route.post_route` |
 
@@ -115,12 +115,12 @@
 
 ## `fabricctl/lib/fabriclib/keycloak/ensure_ldap_federation.py`
 
-### `ensure_ldap_federation(kc, realm, realm_id, v, s)`
+### `ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True)`
 
 | | |
 |---|---|
 | Purpose | create or update the realm's LDAP user federation to 389-DS ("389-DS": ldaps on port 3636, users under ou=users,ou=accounts, bound as this install's cn=keycloak_admin (its own site part), writable, imports users). |
-| Inputs | kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ldap_base_dn, ldap_local_dn, hostname_ldap); s — secrets (ldap_keycloak_password). |
+| Inputs | kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ldap_base_dn, ldap_local_dn, hostname_ldap); s — secrets (ldap_keycloak_password); writable — False at a federated site (READ_ONLY: people are changed at the root). |
 | Returns | str, the federation component id. An existing ldap provider is updated in place (fabric's settings win, other settings kept). |
 | Fails | SystemExit from Admin.call; KeyError if a needed var or secret is missing; StopIteration if a created provider cannot be found again. |
 | Feeds | configure_keycloak (the id is passed to ensure_group_mapper). |

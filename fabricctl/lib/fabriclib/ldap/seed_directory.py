@@ -13,11 +13,13 @@ BACKENDS = ('dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_S
             '--parent-suffix "$DS_SUFFIX_NAME"')
 
 
-def seed_directory():
+def seed_directory(org_copy=None):
     """Purpose: seed 389-DS: create the two suffix backends on first run, apply /seed/*.ldif idempotently inside the
              container (seed.py) and restart the ldap service once when server configuration (cn=config) changed.
-    Inputs:  none; needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered
-             seed files (deploy/install_dirsrv_seed copies them to <base>/dirsrv/seed, mounted at /seed).
+    Inputs:  org_copy — at a federated site, (organisation suffix, this site's part): the organisation is a
+             read-only copy filled by replication, so only the site's part is seeded (default None: seed all).
+             Needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered seed
+             files (deploy/install_dirsrv_seed copies them to <base>/dirsrv/seed, mounted at /seed).
     Returns: seed.py's output (str), with a restart notice when it asked for one.
     Fails:   ValidationError when dirsrv does not become healthy (before seeding or after the restart), the backends
              cannot be created after 12 tries 5 s apart (the healthcheck can pass a moment before LDAPI accepts
@@ -34,7 +36,8 @@ def seed_directory():
         time.sleep(5)
     else:
         raise ValidationError("389-DS backend could not be created")
-    res = subprocess.run(["docker", "exec", "dirsrv", "sh", "-c", "python3 /seed/seed.py /seed/*.ldif"],
+    skip = ["-e", f"SEED_SKIP_SUFFIX={org_copy[0]}", "-e", f"SEED_KEEP_SUFFIX={org_copy[1]}"] if org_copy else []
+    res = subprocess.run(["docker", "exec", *skip, "dirsrv", "sh", "-c", "python3 /seed/seed.py /seed/*.ldif"],
                          capture_output=True, text=True)
     out = (res.stdout or "") + (res.stderr or "")
     if res.returncode != 0:

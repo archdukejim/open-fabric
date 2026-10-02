@@ -6,6 +6,9 @@ from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
 from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles
 from fabriclib.ldap.migrate_local_suffix import migrate_local_suffix
+from fabriclib.federation.configure_directory_links import configure_directory_links
+from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities
+from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.ldap.seed_directory import seed_directory
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
@@ -47,14 +50,26 @@ def run(ctx):
         ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
 
     if v.get("install_ldap", True):
+        registry = os.path.join(ctx.config_dir, "federation.yaml")
+        org_here = people_written_here(registry)       # else a federated site: the organisation is a copy
         try:
-            out = seed_directory()
+            out = seed_directory(None if org_here else (v["ldap_base_dn"], v["ldap_local_dn"]))
         except ValidationError as e:
             raise SetupError(str(e))
         ok("389-DS seeded (" + (out.splitlines() or ["?"])[-1] + ")")
-        added = ensure_default_device_roles(v, ctx.path("fabric", "config", ".default-device-roles"))
-        if added:
-            ok("default device roles: " + ", ".join(added))
+        if org_here:
+            posix = ensure_posix_identities(v)
+            if posix["added"]:
+                ok("POSIX identities: " + ", ".join(posix["added"]))
+            added = ensure_default_device_roles(v, ctx.path("fabric", "config", ".default-device-roles"))
+            if added:
+                ok("default device roles: " + ", ".join(added))
+        try:                                            # the federation's directory links (M5)
+            linked = configure_directory_links(v, ctx.secrets, registry)
+        except (ValidationError, RuntimeError) as e:
+            raise SetupError(f"directory replication: {e}")
+        if linked:
+            ok("directory replication: " + ", ".join(linked))
 
     if v.get("install_keycloak"):
         for attempt in range(6):

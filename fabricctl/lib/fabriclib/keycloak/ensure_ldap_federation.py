@@ -4,12 +4,13 @@ from fabriclib.keycloak.step import step
 USER_STORAGE = "org.keycloak.storage.UserStorageProvider"
 
 
-def ensure_ldap_federation(kc, realm, realm_id, v, s):
+def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True):
     """Purpose: create or update the realm's LDAP user federation to 389-DS ("389-DS": ldaps on port 3636, users under
              ou=users,ou=accounts, bound as this install's cn=keycloak_admin (its own site part), writable, imports
              users).
     Inputs:  kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ldap_base_dn,
-             ldap_local_dn, hostname_ldap); s — secrets (ldap_keycloak_password).
+             ldap_local_dn, hostname_ldap); s — secrets (ldap_keycloak_password); writable — False at a federated
+             site (READ_ONLY: people are changed at the root).
     Returns: str, the federation component id. An existing ldap provider is updated in place (fabric's settings win,
              other settings kept).
     Fails:   SystemExit from Admin.call; KeyError if a needed var or secret is missing; StopIteration if a created
@@ -19,8 +20,10 @@ def ensure_ldap_federation(kc, realm, realm_id, v, s):
     config = {
         "enabled": ["true"],
         "vendor": ["rhds"],
-        "editMode": ["WRITABLE"],
-        "syncRegistrations": ["true"],
+        # people are written only where the organisation is (a standalone install, the root site): at a federated
+        # site the directory holds a read-only copy, so Keycloak does not offer changes it cannot make (M5)
+        "editMode": ["WRITABLE" if writable else "READ_ONLY"],
+        "syncRegistrations": ["true" if writable else "false"],
         "importEnabled": ["true"],
         "usernameLDAPAttribute": ["uid"],
         "rdnLDAPAttribute": ["uid"],

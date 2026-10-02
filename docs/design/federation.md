@@ -120,6 +120,35 @@ Open points to settle before building:
 | **OpenBao** | Per site: every site keeps its own secrets and unlock methods; nothing replicates between sites. (Optional later: a site's encrypted export deposited upstream for disaster recovery) |
 | **Images and packages** | Later (with D9/D21): a site pulls the validated image list and images through its upstream, which gives branches an offline path |
 
+### 3.2a Directory replication (M5, how)
+
+Each suffix has exactly one place where it is written; 389-DS replicates it from there:
+
+| Suffix | Written at (supplier) | Copies |
+|---|---|---|
+| The organisation (`<base>`: people, groups, device roles, host groups and rules) | the root site only (replica id 1, with the changelog) | every site, read-only: a *consumer* at a leaf site, a *hub* at a site that has sites below it (it passes the changes on) |
+| A site's part (`ou=<site>,<base>`: its devices, machines, service accounts) | that site (its own replica, changelog) | its parent read-only (a hub when the parent has its own parent, so the part reaches the root); sideways to another site only by consent (F3) |
+
+- **Agreements** are made by the joining flow: the parent and the site each create a replication manager
+  for the other, with a random password exchanged inside the TLS join answer (like the TSIG key, M4) and
+  kept in OpenBao (`federation_replication`); agreements bind over LDAPS, verified against the
+  organisation's root CA. Total update (initialisation) once, then incremental.
+- **Reaching each other:** LDAPS (636) of each site must be reachable from its parent and the other way;
+  the federation link adds the other site's address to the allowed networks (as for DNS).
+- **Read-only where not written:** at a site the organisation suffix refuses writes (consumer/hub), and
+  the site's Keycloak federation is READ_ONLY: people, groups and passwords are changed at the root
+  (password changes from Linux clients and the web UI are referred there). The web UI's People page and
+  `create_person` say so at a site.
+- **Offline:** a site keeps answering from its copies (logins, 802.1X, Keycloak sign-in); changes wait in
+  the supplier's changelog and arrive when the link is back. A site cut off longer than the changelog's
+  retention (7 days by default, settable) is re-initialised automatically.
+- **Removing a site** (`remove`) deletes its agreements and its part's copy at the parent.
+- **Nested and relays:** replication follows the parent chain (a relay forwards joins only, as for DNS).
+- **Tests:** two real 389-DS containers (root and site): a person created at the root appears at the site
+  with their POSIX identity; a device added at the site appears at the root; a write to the organisation
+  at the site is refused; with the root stopped the site still answers and binds; changes made meanwhile
+  arrive afterwards.
+
 ### 3.3 Offline behaviour of a branch (and of every site if the root goes away)
 
 Every site runs everything it needs itself, so with its upstream (or the
@@ -308,7 +337,7 @@ Milestones, each tested before the next:
 | M2 | **Site CAs**: signing a site's intermediate with the root key (fixed template, path length 0); setup `--join` feeds it into the bring-your-own-CA path | **Done** (the operations; `--join` comes with M3): `pki/make_site_ca_request` (site: EC P-256 key encrypted with its `ca_password`, never leaves), `pki/sign_site_ca` (root: subject `<site> Intermediate CA`, no other names, never past the root's expiry), `pki/stage_site_ca` (site: pinned root fingerprint, chain, path length, its own key) → `byoc`. Step-CA now always gets its password file. `tests/pki/site_ca.py` |
 | M3 | **Invite and join**: `fabricctl federation invite|join|status`, one-time invitations kept hashed in fabric's secrets, the federation endpoint (a separate minimal root handler behind nginx, `federation.<domain>`) | **Done**: `fabricctl federation status/enable/disable/invite/invitations/revoke`; `setup --join` (step `join`, before `deploy`; fresh installs only; idempotent). The joining node fetches the root over plain HTTP and accepts it only by the invitation's fingerprint, then joins over TLS verified against it (by address, checking the endpoint's name). `org_domain` names the organisation suffix, so a site with its own domain shares it. Endpoint: `fabric-federation` (`lib/federation/server.py`, socket for nginx's uid only), `/v1/join` rate- and size-limited. `tests/federation/run.py`. Not yet: mutual TLS routes (status, renew), an offline signing path for a byoc root |
 | M4 | **DNS**: delegation (NS + glue) for sub-domain sites, secondary zones both ways with TSIG | **Done**: a TSIG key per link made by the parent at join (`fed-<site>`, in both sites' secrets, returned in the join answer over TLS); `dns_links` turns the registry and secrets into what the BIND templates need — NS + glue for children below this domain, `allow-transfer` by key, `notify explicit` + `also-notify`, a secondary zone per linked site; transfers and NOTIFYs go to each site's own DNS port (its `bind_dns_port`, reported at join), so a BIND behind another resolver on 53 works. The parent applies after a join (endpoint) or `remove`. `tests/federation/dns.py` with two real BIND servers. Relays forward joins only: DNS goes site to site directly |
-| M5 | **Identity replication**: 389-DS changelog and replicas; organisation suffix supplied by the root site, read-only at sites; each site's local suffix replicated up; site Keycloak read-only on the organisation (no people created at a site) | |
+| M5 | **Identity replication**: 389-DS changelog and replicas; organisation suffix supplied by the root site, read-only at sites; each site's local suffix replicated up; site Keycloak read-only on the organisation (no people created at a site); sharing between sites by consent (F3); site-scoped groups (F4) | Built together with M10 (owner 2026-10-02). **Replication done** (§3.2a: replicas, agreements, read-only organisation at sites, `fabric-directory-sync.timer`); sharing by consent (F3) and site-scoped groups (F4) still to do |
 | M6 | Web UI Federation tab, docs, a two-site sandbox test, the Pi | |
 | M7 | **DNS filter (AdGuard Home)**, optional, per site, in front of BIND (owner decision 2026-10-01): design [dns-filter.md](dns-filter.md) | Built before M5 (owner) |
 | M8 | **DHCP management** (owner request 2026-10-01): subnets and pools from `fabricctl dhcp` and the Kea tab, any DHCP option (global, class, subnet, reservation: PXE, ZTP), client classes, each subnet's name, VLAN and notes as a record; the **address plan** across sites (networks reported upstream, overlaps refused) with M5, its table in M6: design [dhcp-management.md](dhcp-management.md) | Built before M5 (owner); the address plan's sync with M5 |
@@ -321,8 +350,8 @@ Milestones, each tested before the next:
 |---|---|---|
 | F1 | Can an **existing** install join, or only a fresh one? | Fresh (or an empty directory) at first: merging two directories' people is a migration project of its own |
 | F2 | **TOTP** at branches: enrolled per site, or sign in through the upstream's Keycloak (identity brokering)? | Per site first (works offline); brokering to the upstream as an option later, with the local sign-in as fallback |
-| F3 | **Roaming devices** (a laptop from branch1 at branch2): replicate every site's devices to every site (read-only), or only upward? | Every site's devices to every site, read-only: EAP-TLS then works anywhere with no RADIUS proxying |
-| F4 | **Site-scoped admin groups**: naming and who may create them | `<site>-<bundle>` groups, created in the root site's directory; a site's Keycloak honours global groups plus its own |
+| F3 | **Roaming devices** (a laptop from branch1 at branch2): replicate every site's devices to every site (read-only), or only upward? | **Decided 2026-10-02**: by consent between sites — a site offers its devices and machines to another site, which approves; only then are they replicated there read-only (each pair of sites decides). Each site's part still goes up to its parent |
+| F4 | **Site-scoped admin groups**: naming and who may create them | **Decided 2026-10-02**: `<site>-<role>` groups, created in the root site's directory (people stay central); they grant rights only at that site; organisation-wide groups apply everywhere |
 | F5 | May upstream admins manage a site's **local** items (subnets, switches) through the federation API, or only the site's own admins? | Site admins only in F1–F3; delegated administration from upstream in F4 behind `federation:admin` |
 | F6 | **Name-constrain** each site's intermediate to `<site>.<domain>`? | Yes for DNS names; people and device certificates use non-DNS names, so check the constraint set against them before deciding |
 | F7 | **Revocation** of a removed site's intermediate | A CRL from the root site's CA, published on `certs.<domain>` and checked by every site's FreeRADIUS and nginx (today there is no CRL: fabric relies on unlinking devices) |

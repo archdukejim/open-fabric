@@ -7,6 +7,8 @@ from fabriclib.common.console import info, ok, warn
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.keycloak.require_password_change import require_password_change
 from fabriclib.ldap.ensure_admin_user import ensure_admin_user
+from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities
+from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.pki.issue_client_cert import issue_client_cert
 from fabriclib.pki.needs_renewal import needs_renewal
 
@@ -62,7 +64,8 @@ def run(ctx):
              webui_admin_user, webui_admin_email, webui_admin_group (default admins), webui_client_cert_days
              (default 365), domain, hostname_mgr, hostname_certs, host_ip; secrets (Keycloak admin); the
              published CA under <deploy_base>/nginx/www/certs. Env SUDO_USER via sudo_owner.
-    Returns: None. Without web UI, Keycloak or LDAP: nothing. Otherwise the kit folder (0700) holds root-ca.crt/.cer,
+    Returns: None. Without web UI, Keycloak or LDAP: nothing. At a federated site the person is not created here
+             (people come from the root, M5): only the client certificate and the kit. Otherwise the kit folder (0700) holds root-ca.crt/.cer,
              README.txt and, when due, <user>.p12, <user>.crt and p12-password.txt; initial-password.txt only when
              the user was created (then Keycloak forces a password change). Idempotent: an existing user keeps
              their password; the certificate is renewed when due or from another CA.
@@ -79,14 +82,21 @@ def run(ctx):
     os.makedirs(folder, mode=0o700, exist_ok=True)
     os.chown(folder, uid, gid)
 
-    password = secrets.token_urlsafe(18)
-    state = ensure_admin_user(v, user, password, v.get("webui_admin_email") or f"{user}@{v['domain']}")
-    if state.startswith("created"):
-        require_password_change(v, ctx.secrets, user)
-        _write(os.path.join(folder, "initial-password.txt"), password + "\n", (uid, gid))
-        ok(f"admin '{user}' created in 389-DS, member of '{v.get('webui_admin_group', 'admins')}'")
-    else:
-        ok(f"admin '{user}' exists" + (" (added to the admin group)" if "+member" in state else ""))
+    if people_written_here(os.path.join(ctx.config_dir, "federation.yaml")):
+        password = secrets.token_urlsafe(18)
+        state = ensure_admin_user(v, user, password, v.get("webui_admin_email") or f"{user}@{v['domain']}")
+        if state.startswith("created"):
+            require_password_change(v, ctx.secrets, user)
+            _write(os.path.join(folder, "initial-password.txt"), password + "\n", (uid, gid))
+            ok(f"admin '{user}' created in 389-DS, member of '{v.get('webui_admin_group', 'admins')}'")
+        else:
+            ok(f"admin '{user}' exists" + (" (added to the admin group)" if "+member" in state else ""))
+        posix = ensure_posix_identities(v)
+        if posix["added"]:
+            ok("POSIX identity: " + ", ".join(posix["added"]))
+    else:                                     # a federated site: people (the admin too) come from the root (M5)
+        info(f"people are created at the root site: '{user}' signs in here once the root's directory has them "
+             f"(in '{v.get('webui_admin_group', 'admins')}'); their client certificate is issued here")
 
     crt_pub = os.path.join(folder, f"{user}.crt")
     certs = ctx.path("stepca", "data", "certs")

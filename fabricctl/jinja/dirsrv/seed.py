@@ -167,7 +167,9 @@ def main(paths):
     """Purpose: idempotently apply LDIF files to this container's 389-DS: add missing entries, apply only
              the modify operations whose values differ, and print RESTART_REQUIRED if anything under cn=config
              changed.
-    Inputs:  paths — list of LDIF file paths (applied in sorted order); DS_DM_PASSWORD in the environment.
+    Inputs:  paths — list of LDIF file paths (applied in sorted order); DS_DM_PASSWORD in the environment;
+             SEED_SKIP_SUFFIX / SEED_KEEP_SUFFIX — at a federated site, entries under the organisation suffix are
+             skipped except those under this site's part (the organisation arrives by replication).
     Returns: None; prints "+ dn" / "~ dn: attrs" lines and "seed: N added, M modified".
     Fails:   SystemExit with a message for an unsupported changetype or a modify on a missing entry; ldap errors
              (e.g. schema violations) and bind_dm failures propagate as a traceback; exit is non-zero either way.
@@ -176,10 +178,20 @@ def main(paths):
     conn = bind_dm()
     added = modified = 0
     restart = False
+    # at a federated site the organisation is a read-only copy filled by the upstream: only this site's part
+    # (and cn=config / the schema) is seeded here
+    skip = os.environ.get("SEED_SKIP_SUFFIX", "").lower()
+    keep = os.environ.get("SEED_KEEP_SUFFIX", "").lower()
+
+    def skipped(dn):
+        d = dn.lower()
+        return bool(skip) and d.endswith(skip) and not (keep and d.endswith(keep))
 
     for path in sorted(paths):
         with open(path, encoding="utf-8") as f:
             for dn, changetype, body in parse_ldif(f.read()):
+                if skipped(dn):
+                    continue
                 if changetype == "add":
                     entry = {}
                     for attr, value in body:
