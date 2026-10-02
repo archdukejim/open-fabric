@@ -26,7 +26,7 @@ fabric is installed as a Debian package, `fabricctl`, on the host it runs on (am
 - Nothing else listening on the LAN IP's ports 53, 80, 443, 389, 636 (`preflight` warns about these and 853); with DHCP also UDP 67, with 802.1X UDP 1812–1813
 - Root (`sudo`) and, unless `--offline`, internet access for apt and the images
 
-The package depends on `python3` (3.10+), `python3-yaml`, `python3-jinja2`, `openssl`, `curl`, `ca-certificates`, `iptables`, `ufw` and `dnsutils` (apt installs them with it) and recommends `python3-pykcs11` and `python3-pykmip` (security keys and KMIP as OpenBao unlock methods). Setup's `host` step installs anything still missing (`gnupg` too) and Docker Engine (`docker-ce`, `containerd.io`, compose and buildx plugins) from Docker's own apt repository if Docker is missing.
+The package depends on `python3` (3.10+), `python3-yaml`, `python3-jinja2`, `openssl`, `curl`, `ca-certificates`, `iptables`, `ufw` and `dnsutils` (apt installs them with it) and recommends `python3-pykcs11` and `python3-pykmip` (security keys and KMIP as OpenBao unlock methods). Setup's `host` step installs anything still missing and, if Docker is missing, Docker Engine from the Ubuntu archive (`docker.io`, `docker-compose-v2`, `docker-buildx`, in `universe`). fabric adds no apt sources: everything comes from the host's own, so it updates with Ubuntu and survives `do-release-upgrade`. A host that already runs Docker's own `docker-ce` keeps it ([operations.md](operations.md#docker-from-the-ubuntu-archive) shows how to switch).
 
 ## Configure vars
 
@@ -153,10 +153,27 @@ Any of these can be set in the vars file and changed later by re-running setup.
 ### Non-interactive install
 
 ```bash
-sudo fabricctl setup --file vars.yaml --non-interactive --yes
+sudo fabricctl setup --file vars.yaml --non-interactive --yes --approve all
 ```
 
-`--non-interactive` never prompts and fails if a required value is missing or invalid (the first web UI admin then defaults to the account that ran `sudo`, or `fabricadmin`); `--yes` accepts the plan.
+`--non-interactive` never prompts and fails if a required value is missing or invalid (the first web UI admin then defaults to the account that ran `sudo`, or `fabricadmin`); `--yes` accepts the plan; `--approve` allows the host changes (below) without asking — `--yes` alone approves none.
+
+### Changes to the host: asked first
+
+Before its first step, setup lists every change it would make **outside fabric's own folders**, by group, and asks a yes/no for each ([host-consent.md](design/host-consent.md)):
+
+| Group | What changes | If you say no |
+|---|---|---|
+| `packages` | apt packages, from the host's own sources (fabric adds none) | setup stops |
+| `runtime` | `/etc/docker/daemon.json` hardening and one Docker restart (every container on the host restarts once) | Docker is not hardened (shown in status) |
+| `services` | fabric's own systemd units (`fabric.target`, one per service, `fabric-agent`, `fabric-*` timers) | setup stops |
+| `accounts` | the service users and groups `fabric-*` in the uid band 600–649 (and moving an older install's accounts) | setup stops |
+| `resolver` | systemd-resolved's stub listener off (only with `use_host_dns: false`) | choose `use_host_dns: true` |
+| `firewall` | ufw on with incoming denied, and each rule fabric adds | the firewall is not managed (shown in status) |
+| `trust` | fabric's CA in the host's trust store | the host does not trust fabric's CA (shown in status) |
+| `time` | chrony's configuration | chrony keeps its own configuration (shown in status) |
+
+Answers are recorded in `config/consent.yaml`; a re-run asks again only about changes not approved before. `apply`, the web UI and the timers never ask: a change that needs a new answer waits for `sudo fabricctl setup`. `fabricctl status` lists the answers.
 
 ### Options
 
@@ -164,7 +181,9 @@ sudo fabricctl setup --file vars.yaml --non-interactive --yes
 |---|---|
 | `--file <path>` | Settings to apply (overrides the existing install's values for the keys it sets) |
 | `--non-interactive` | Never prompt |
-| `--yes`, `-y` | Accept the plan without asking |
+| `--yes`, `-y` | Accept the plan without asking (approves no host change) |
+| `--approve <groups>` | Allow these host changes without asking (comma-separated, repeatable, or `all`) |
+| `--decline <groups>` | Refuse these host changes (recommended ones are then left unmanaged and shown in status) |
 | `--offline` | Never download; packages and images must already be present |
 | `--deploy-base <dir>` | Install root (default `/opt`) |
 | `--step <name>` | Run only this step (repeatable); the plan is not shown. An unknown name is refused |

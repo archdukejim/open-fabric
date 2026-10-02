@@ -35,6 +35,7 @@ The same DNS and apply operations are also available in the browser through webu
 - [People's Linux identities (POSIX)](#peoples-linux-identities-posix)
 - [Federation (sites)](#federation-sites)
 - [OpenBao (secrets)](#openbao-secrets)
+- [Docker from the Ubuntu archive](#docker-from-the-ubuntu-archive)
 - [Lifecycle Commands](#lifecycle-commands)
 - [Service Ports](#service-ports)
 
@@ -854,6 +855,26 @@ apart from the recovery keys. `fabricctl uninstall` deletes both.
 unlock` says so): plug one in, or restore `/etc/fabric/openbao/` from your
 backup, then `sudo systemctl start openbao`. Setup never generates a new key
 next to existing data, because a new key cannot open the old vault.
+
+## Docker from the Ubuntu archive
+
+fabric installs Docker from the Ubuntu archive (`docker.io`, `docker-compose-v2`, `docker-buildx`, in
+`universe`) and adds no apt sources: Docker then updates with Ubuntu and keeps updating after
+`do-release-upgrade`, which disables third-party sources such as Docker's own repository. A host that already
+runs Docker's `docker-ce` keeps it — setup says so and changes nothing. To switch such a host (the two cannot
+be installed together):
+
+```bash
+sudo systemctl stop fabric.target
+sudo apt-get remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-get install docker.io docker-compose-v2 docker-buildx
+sudo rm -f /etc/apt/sources.list.d/docker.list* /etc/apt/keyrings/docker.asc
+sudo fabricctl setup
+```
+
+`remove` (not `purge`) keeps `/etc/docker/daemon.json` and `/var/lib/docker`. fabric's data lives in its own
+folders, not in the containers, so nothing is lost if images must come back: setup pulls the pinned images
+again and rebuilds the local ones (offline hosts: import the image bundle first).
 
 ## Resource Utilization
 

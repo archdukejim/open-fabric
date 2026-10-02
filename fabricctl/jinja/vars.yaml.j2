@@ -224,20 +224,23 @@ project_containers:
 {% set _default_folders = default_service_dirs | map(attribute='folder') | list %}
 service_dirs:
 {{ (default_service_dirs + ((service_dirs | default([])) | rejectattr('folder', 'in', _default_folders) | list)) | to_nice_yaml(indent=2) | indent(2, first=True) }}
+{# fabric's service accounts (design host-consent.md §5): fabric-* names that no Ubuntu package claims, ids in
+   fabric's band 600-649 — the middle of Debian's system range (100-999): packages allocate from 100 upwards,
+   useradd/systemd-sysusers from 999 downwards, and 0-99 belong to base-passwd. #}
 {% set default_service_users = {
-  'bind': {'uid': 53, 'gid': 53},
-  'ldap': {'uid': 911, 'gid': 911},
-  'nginx': {'uid': 443, 'gid': 443},
-  'step': {'uid': 135, 'gid': 135},
-  'keycloak': {'uid': 900, 'gid': 0},
-  'postgres': {'uid': 901, 'gid': 901},
-  'webui': {'uid': 912, 'gid': 912},
-  'openbao': {'uid': 913, 'gid': 913},
-  'fluentbit': {'uid': 914, 'gid': 914},
-  'kea': {'uid': 915, 'gid': 915},
-  'freeradius': {'uid': 916, 'gid': 916},
-  'adguard': {'uid': 917, 'gid': 917},
-  'oauth2proxy': {'uid': 918, 'gid': 918}
+  'bind': {'uid': 600, 'gid': 600, 'name': 'fabric-dns'},
+  'ldap': {'uid': 601, 'gid': 601, 'name': 'fabric-ldap'},
+  'nginx': {'uid': 602, 'gid': 602, 'name': 'fabric-proxy'},
+  'step': {'uid': 603, 'gid': 603, 'name': 'fabric-ca'},
+  'keycloak': {'uid': 604, 'gid': 0, 'name': 'fabric-sso'},
+  'postgres': {'uid': 605, 'gid': 605, 'name': 'fabric-db'},
+  'webui': {'uid': 606, 'gid': 606, 'name': 'fabric-webui'},
+  'openbao': {'uid': 607, 'gid': 607, 'name': 'fabric-vault'},
+  'fluentbit': {'uid': 608, 'gid': 608, 'name': 'fabric-logs'},
+  'kea': {'uid': 609, 'gid': 609, 'name': 'fabric-dhcp'},
+  'freeradius': {'uid': 610, 'gid': 610, 'name': 'fabric-radius'},
+  'adguard': {'uid': 611, 'gid': 611, 'name': 'fabric-dnsfilter'},
+  'oauth2proxy': {'uid': 612, 'gid': 612, 'name': 'fabric-auth'}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
 service_users:

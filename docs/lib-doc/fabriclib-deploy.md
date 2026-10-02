@@ -33,7 +33,7 @@
 | Purpose | the deploy engine: render every template from the vars file and secrets into /tmp/fabric-render, copy what changed into the deploy base and /etc/systemd/system, then reload or restart what is affected. Missing secrets (CA, rndc, LDAP, Keycloak, Kea, OIDC, AdGuard, TSIG, RADIUS) are generated once and saved. |
 | Inputs | start_services — bool, default True. False (first install, `fabricctl setup` via fabriclib/setup/deploy_config.py): files are deployed, changed images built and zones swapped safely, but no service is started, restarted or reloaded (certificates may not exist yet). Paths from deploy_paths() (env DEPLOY_BASE_DIR, CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE, LINK_VARS_PATH, read at call time). Must run as root. |
 | Returns | set of systemd units whose configuration changed. With start_services=True they have been restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them. |
-| Fails | sys.exit(1) after an "Error: …" line for every refusal (ValidationError): secrets that cannot be loaded (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings, dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or ldap_base_dn not valid or not what they were at install; a template that does not render; an image build that fails (start_services=False); BIND9 refusing `rndc reconfig`. A bad link-vars file is only reported. OSError from file operations propagates. |
+| Fails | sys.exit(1) after an "Error: …" line for every refusal (ValidationError): secrets that cannot be loaded (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings, dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or ldap_base_dn not valid or not what they were at install; a template that does not render; an image build that fails (start_services=False); BIND9 refusing `rndc reconfig`; fabric's own units (the `services` host change) not approved — an install set up before consent existed is not refused. A bad link-vars file is only reported. OSError from file operations propagates. |
 | Feeds | lib/deploy.py (`python3 deploy.py`, fabriclib/setup/deploy_config.py, images/switch_image.py), menu/apply_and_report (`fabricctl --apply`, the vars editor, system/apply_changes.py for the web UI). |
 | Notes | no --pull on image builds: apply never takes a new base image implicitly. The deployed vars are archived to <fabric>/archive/<stamp>-vars.yaml before being replaced. |
 | Called by | `fabriclib.menu.apply_and_report.apply_and_report`, `fabriclib.setup.deploy_config.run` |
@@ -83,8 +83,8 @@
 
 | | |
 |---|---|
-| Purpose | the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea and FreeRADIUS — each only when it is on (chrony whenever it is installed). |
-| Inputs | paths — deploy_paths() (federation); final_vars — rendered settings; secrets; jinja_env; links — dns_links() (the zones AdGuard forwards to BIND). |
+| Purpose | the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea and FreeRADIUS — each only when it is on (chrony whenever it is installed and the `time` host change is approved — design host-consent.md; an install set up before consent existed keeps converging). |
+| Inputs | paths — deploy_paths() (federation, config); final_vars — rendered settings; secrets; jinja_env; links — dns_links() (the zones AdGuard forwards to BIND). |
 | Returns | {"restart": set of units to restart, "nginx": True if nginx's sign-in snippet for AdGuard changed}. |
 | Fails | whatever the parts' deploy functions raise (ValidationError, OSError, CalledProcessError). |
 | Feeds | apply_deployment. |
@@ -341,7 +341,7 @@
 | Returns | (final_vars — the rendered settings, context — secrets + custom_vars + render_date: the start of what every other template renders with; the caller adds final_vars once they are checked). |
 | Fails | ValidationError when vars.yaml.j2 does not render, or host_ram_capacity is 1 or 2 (3 GB is the minimum for Keycloak and Postgres; 0 is unlimited). |
 | Feeds | apply_deployment. |
-| Called by | `fabriclib.deploy.apply_deployment._prepare` |
+| Called by | `fabriclib.consent.planned_vars.planned_vars`, `fabriclib.deploy.apply_deployment._prepare` |
 
 ## `fabricctl/lib/fabriclib/deploy/restart_changed.py`
 

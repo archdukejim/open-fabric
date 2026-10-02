@@ -24,7 +24,7 @@
 | Returns | {"sources": [{"host", "nts", "pool", "prefer"}], "allow": [network], "serve": bool}. |
 | Fails | ValidationError from normalize_ntp; yaml/OSError from load_registry. |
 | Feeds | deploy_chrony; tests/ntp/run.py, tests/render.py. |
-| Called by | `fabriclib.ntp.deploy_chrony.deploy_chrony`, `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.verify_install.checks` |
+| Called by | `fabriclib.ntp.deploy_chrony.deploy_chrony`, `fabriclib.security.firewall_rules.firewall_rules`, `fabriclib.setup.verify_install.checks` |
 
 ## `fabricctl/lib/fabriclib/ntp/deploy_chrony.py`
 

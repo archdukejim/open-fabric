@@ -65,6 +65,15 @@ federation.md §3.2a.
   refused for others, a login refused outside the OU's groups, the installer refusing a wrong CA
   fingerprint, and logins still working with the root site unreachable.
 
+> **Steps 4 and 5 are parked (owner decision 2026-10-02).** The owner is leaning towards an optional
+> **Windows domain (Samba AD)** — one forest, its first controller at the root site, a controller (read-only
+> where Samba allows) at each site, Windows join with Group Policy, 802.1X PEAP and machine authentication —
+> fed from fabric's directory, which stays the source of truth. Enrolment and Kerberos would then come from
+> AD instead, so they wait for one rescoped plan, made after M8, M6, step 3 and F4 are finished. Until then:
+> no separate KDC is built; every password change goes through one fabric function (so a later "also write
+> to Samba" is one addition; no Windows-format hashes are stored meanwhile); login rules, sudo rules and ids
+> stay fabric-owned data written into the directory, so they can be written into AD too.
+
 **Step 4 — machine enrolment:** `fabricctl hosts enroll [--group <host-group>…]` (and the web UI) gives a machine a
 one-time token; the installer exchanges it for a host entry in the site's part, a host certificate from the
 site's Step-CA (also for SSH host keys) and its own bind account. Machines are then listed, put into and taken out of

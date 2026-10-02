@@ -16,8 +16,10 @@ FROM ${BASE_IMAGE}
 ARG BASE_IMAGE
 LABEL org.fabric.base="${BASE_IMAGE}"
 
-ARG BIND_UID=53
-ARG BIND_GID=53
+ARG BIND_UID=600
+ARG BIND_GID=600
+# the service account's ids are baked in: a change rebuilds (images/needs_rebuild)
+LABEL org.fabric.ids="${BIND_UID}:${BIND_GID}"
 
 # bind9: named; bind9-utils: rndc (healthcheck, zone reloads) and named-checkzone.
 RUN apt-get update \

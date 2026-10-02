@@ -1,6 +1,8 @@
 import shutil
 
 from fabriclib.common.service_user import service_user
+from fabriclib.consent.allowed_to_change import allowed_to_change
+from fabriclib.consent.plan_time import plan_time
 from fabriclib.dhcp.deploy_kea import deploy_kea
 from fabriclib.dns_filter.deploy_adguard import deploy_adguard
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit
@@ -10,8 +12,9 @@ from fabriclib.radius.deploy_freeradius import deploy_freeradius
 
 def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
     """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea and
-             FreeRADIUS — each only when it is on (chrony whenever it is installed).
-    Inputs:  paths — deploy_paths() (federation); final_vars — rendered settings; secrets; jinja_env; links —
+             FreeRADIUS — each only when it is on (chrony whenever it is installed and the `time` host change is
+             approved — design host-consent.md; an install set up before consent existed keeps converging).
+    Inputs:  paths — deploy_paths() (federation, config); final_vars — rendered settings; secrets; jinja_env; links —
              dns_links() (the zones AdGuard forwards to BIND).
     Returns: {"restart": set of units to restart, "nginx": True if nginx's sign-in snippet for AdGuard changed}.
     Fails:   whatever the parts' deploy functions raise (ValidationError, OSError, CalledProcessError).
@@ -29,8 +32,12 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
             restart.add("adguard-auth")
         nginx = adg["nginx"]
     # Time (ntp.md): chrony on the host, the upstream site first; installed by setup's host step
-    if shutil.which("chronyd") and deploy_chrony(final_vars, paths["federation"], jinja_env):
-        print("  time: chrony configuration updated")
+    if shutil.which("chronyd"):
+        if not allowed_to_change(paths["config"], "time", plan_time(), unasked_install=True):
+            print("  time: chrony left as it is (the `time` host change is not approved; "
+                  "`sudo fabricctl setup --approve time` allows it)")
+        elif deploy_chrony(final_vars, paths["federation"], jinja_env):
+            print("  time: chrony configuration updated")
     # Kea (optional): its configs (leases are kept across restarts) and the DHCP subzone, created once
     if final_vars.get("install_kea") and deploy_kea(final_vars, secrets, jinja_env, *service_user(final_vars, "bind")):
         restart.add("kea")

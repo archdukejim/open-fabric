@@ -10,6 +10,8 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.common.jinja_env import jinja_env as jinja_env_for
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.service_user import service_user
+from fabriclib.consent.allowed_to_change import allowed_to_change
+from fabriclib.consent.plan_services import plan_services
 from fabriclib.deploy.archive_vars import archive_vars
 from fabriclib.deploy.check_fixed_identity import check_fixed_identity
 from fabriclib.deploy.check_settings import check_settings
@@ -149,15 +151,20 @@ def apply_deployment(start_services=True):
              (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings,
              dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or
              ldap_base_dn not valid or not what they were at install; a template that does not render; an image
-             build that fails (start_services=False); BIND9 refusing `rndc reconfig`. A bad link-vars file is only
+             build that fails (start_services=False); BIND9 refusing `rndc reconfig`; fabric's own units (the
+             `services` host change) not approved — an install set up before consent existed is not refused. A bad link-vars file is only
              reported. OSError from file operations propagates.
     Feeds:   lib/deploy.py (`python3 deploy.py`, fabriclib/setup/deploy_config.py, images/switch_image.py),
              menu/apply_and_report (`fabricctl --apply`, the vars editor, system/apply_changes.py for the web UI).
     Notes:   no --pull on image builds: apply never takes a new base image implicitly. The deployed vars are archived
              to <fabric>/archive/<stamp>-vars.yaml before being replaced."""
     print("Starting native Python deployment...")
+    paths = deploy_paths()
     try:
-        return _deploy(deploy_paths(), start_services)
+        if not allowed_to_change(paths["config"], "services", plan_services(), unasked_install=True):
+            raise ValidationError("fabric's own services (systemd units) are not approved on this host: "
+                                  "`sudo fabricctl setup` asks (design host-consent.md)")
+        return _deploy(paths, start_services)
     except ValidationError as e:
         print(f"Error: {e}")
         sys.exit(1)

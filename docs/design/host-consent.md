@@ -1,0 +1,118 @@
+# Design: asking before fabric changes the host
+
+Status: **built** (owner decision 2026-10-02; `fabriclib/consent/`, suite `tests/consent`). Not built yet: the web UI
+listing (status shows it), uninstall listing its undo per group (it keeps its own confirmation), `setup --undo`.
+
+## 1. The rule
+
+fabricctl changes only what it needs to run fabric. **Anything outside fabric's own tree — system files, other
+applications' configuration, accounts, the firewall — needs an explicit yes from the person installing.**
+Changes are grouped so one answer covers one kind of change (all service accounts are one question). Nothing
+is approved by default, by `--yes`, or by a web UI click that did not say what it changes.
+
+Two AGENTS.md rules meet here: *secure by default* and *no change without consent*. Both hold: the secure
+choice is the recommended answer, and declining it is recorded and shown in `fabricctl status` and the web UI
+as a relaxation (AGENTS.md §4).
+
+Integrations with software fabric does not own (Cockpit, an existing Docker, a reverse proxy) never go into
+fabricctl: if one is ever built it is a separate package with its own lifecycle and its own consent, and
+fabricctl offers only generic extension points. (A Podman move and a fabric Cockpit bridge were considered
+and dropped by the owner on 2026-10-02: Docker stays, and a community Cockpit plugin already shows fabric's
+compose stacks.)
+
+## 2. What fabric changes on the host today
+
+Inventory of 2026-10-02 (setup, apply and the timers):
+
+| Group | Changes | Made by | Level |
+|---|---|---|---|
+| `packages` | apt packages, all from the host's own sources (Docker is Ubuntu's `docker.io` since 2026-10-02; fabric adds no apt source) | setup `host` | required |
+| `runtime` | `/etc/docker/daemon.json` hardening and **a Docker restart (every container on the host, not only fabric's)** | setup `docker` | recommended |
+| `services` | fabric's own units in `/etc/systemd/system/` (`fabric-*`, `fabric.target`, timers), `/usr/local/bin/fabricctl`, `/usr/local/bin/step`, the vault unlock udev rule | deploy/apply, vault | required |
+| `accounts` | the service users and groups (`service_users`), names and ids listed | setup `accounts` | required |
+| `trust` | fabric's root and site CAs in the host trust store (`/usr/local/share/ca-certificates`, `update-ca-certificates`) | setup `pki`, apply | recommended |
+| `resolver` | systemd-resolved stub off and the host resolver pointed at `dns_server` (only with `use_host_dns: false`, to free port 53) | setup `network` | required by that choice |
+| `firewall` | ufw enabled, incoming denied by default, each rule fabric adds (SSH from the LAN, DNS, DHCP, NTP, …), the DOCKER-USER chain unit | setup `firewall`, apply | recommended |
+| `time` | `/etc/chrony/chrony.conf`, `/etc/default/chrony`, a `chrony-wait` drop-in (the host's time source) | apt, apply (M9) | recommended |
+
+Levels: **required** — declining stops setup with the reason; **recommended** — declining leaves that part
+unmanaged and shows a relaxation; **required by that choice** — declining asks for the other choice
+(`resolver`: keep the host resolver, so the DNS port must be free another way).
+
+Not a host change, never asked: files under the install (`/opt/fabric`, `/etc/fabric`), fabric's containers,
+its networks and images.
+
+## 3. How it works
+
+1. **Plan first, ask once, then run unattended.** After the settings are collected and before the first step,
+   setup computes every group's planned changes (each group has a pure `plan` function reading the vars) and
+   shows them. A full setup takes ~20 minutes: all questions come at the start, none half-way.
+2. **One question per group**, listing exactly what changes: `Firewall: enable ufw (deny incoming), allow
+   22/tcp from 192.168.4.0/22, 53 tcp+udp from …  Apply? [Y/n] (recommended)`. Required groups say what
+   declining means (`setup stops`).
+3. **Approvals are recorded** in `config/consent.yaml`: per group the answer, a digest of the planned changes,
+   when and who (`SUDO_USER`). A re-run asks again **only for groups whose planned changes differ** from what
+   was approved, and shows the difference.
+4. **Steps check before acting.** Each step that touches the host asks `consented(ctx, group, changes)`:
+   approved with the same digest → act; anything else → do not act (a required group raises `SetupError`).
+5. **Unattended installs** approve explicitly: `--approve firewall,accounts,…` or `--approve all`, and
+   `--decline GROUP`. `--yes` keeps its meaning (accept the plan) and approves nothing. A group without an
+   answer stops a non-interactive run naming the groups and the flag.
+6. **apply, the web UI, the agent and the timers never ask.** When a change would need a new approval (a new
+   firewall rule after a settings change), they leave the host as it is, log it, and status shows
+   *waiting for approval: `sudo fabricctl setup --step firewall`*. They never widen an approval.
+7. **Status** (`fabricctl status`, the web UI) lists every group: approved, declined (with the relaxation it
+   means) or waiting.
+8. **Uninstall** lists the host changes it will undo, per group, and asks once; `--purge` keeps its prompts.
+   *(planned: today uninstall keeps its own "Type 'yes'" confirmation.)*
+9. **Explicit commands are their own consent.** A command that exists to change the host — `fabricctl vault
+   add-usb` writing its udev rule, `fabricctl uninstall` — is the admin's request; it is not asked again.
+
+Decisions made while building (2026-10-02):
+
+- **Kinds, not lines, for `services` and `time`.** Their changes follow fabric's own settings (which services
+  are on, which time sources), so the question approves the kind; a new fabric unit or a new NTP source does
+  not ask again. `firewall`, `accounts`, `packages`, `runtime` and `resolver` are asked line by line.
+- **The subset rule.** A step may make a change only when it is among the changes its group's yes covered; a
+  yes keeps what was approved before, so a re-run that changes less still matches.
+- **No default answer.** The interactive question needs `y` or `n` typed; Enter asks again.
+- **Installs set up before consent existed** keep converging through apply, the agent and the timers (nothing
+  new is changed by those for them except fabric's own units and chrony, which they already ran); the next
+  `fabricctl setup` asks for everything once.
+
+## 4. Upgrades
+
+An existing install has no `consent.yaml`. The next setup shows the plan for everything already in place and
+asks once (non-interactive: `--approve`). Declining a recommended group stops managing it from then on; what
+was changed earlier is left as it is and reported, not reverted silently (`fabricctl setup --undo GROUP`,
+planned, reverts on request).
+
+## 5. Related
+
+- fabric adds no apt sources (owner decision 2026-10-02): Docker is Ubuntu's `docker.io` + `docker-compose-v2` +
+  `docker-buildx`. A release upgrade (`do-release-upgrade`) disables third-party sources, which left Docker's
+  own `docker-ce` without updates on the test Pi; an install that still runs `docker-ce` keeps it until its
+  owner switches.
+- The apt dependencies (chrony, ufw) are installed by apt, which shows and asks for them itself (e.g. chrony
+  replacing systemd-timesyncd); fabricctl's prompts are in `fabricctl setup`, never in package scripts.
+
+## 6. Build
+
+`fabriclib/consent/`: `plan_host_changes.py` (the groups' plans, one `plan_<group>.py` each), `ask_consent.py`
+(the grouped questions), `allowed_to_change.py` / `check_consent.py` (the checks steps and apply make),
+`load_consent.py` / `save_consent.py`, `consent_status.py` / `show_consent_status.py`. Setup gains `--approve` /
+`--decline`; restore passes them on. The steps that change the host check first: `host` (packages), `docker`
+(runtime), `deploy` and every apply (services; time through `deploy_optional_parts`), `accounts`, `network`
+(resolver), `firewall`, `pki` (trust). Tests: `tests/consent` (no containers) and the sandbox (an unattended
+setup without `--approve` changes nothing; with it, everything installs).
+
+## 7. Service accounts (built with consent)
+
+fabric's accounts were named like Ubuntu's own (`bind`, `postgres`, `nginx`, …) on ids Ubuntu reserves; the
+26.04 release upgrade on the test Pi asked to remove `bind` (uid 53, in `base-passwd`'s 0–99). Now: `fabric-*`
+names (`fabric-dns`, `fabric-ldap`, `fabric-proxy`, `fabric-ca`, `fabric-sso`, `fabric-db`, `fabric-webui`,
+`fabric-vault`, `fabric-logs`, `fabric-dhcp`, `fabric-radius`, `fabric-dnsfilter`, `fabric-auth`) on ids
+600–612 (band 600–649: the quiet middle of Debian's system range). An id held by another account stops setup.
+An older install's settings drop the previous defaults (`upgrade_vars`), the accounts step moves each previous
+account's files to its new one and removes the previous account (once no container runs as it: else on the
+next setup), and the images fabric builds are rebuilt for the new ids (`org.fabric.ids` label).

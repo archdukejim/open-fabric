@@ -4,6 +4,9 @@ import shutil
 import subprocess
 
 from fabriclib.common.console import info, ok
+from fabriclib.consent.allowed_to_change import allowed_to_change
+from fabriclib.consent.check_consent import check_consent
+from fabriclib.consent.plan_trust import plan_trust
 from fabriclib.pki.common.ca_path_len import ca_path_len
 from fabriclib.pki.publish_ca_certs import publish_ca_certs
 from fabriclib.setup.errors import SetupError
@@ -108,13 +111,16 @@ def _make_root(ctx, data, uid, gid):
 def _publish_ca_certs(ctx, certs_dir):
     """Purpose: publish every CA format on certs.<domain> and trust the CA on this host; done on every
              setup, since a reinstall keeps the CA but not /opt/nginx or the host trust entries.
-    Inputs:  ctx — SetupContext: vars.domain_file, service user nginx (uid/gid); certs_dir — Step-CA certs folder.
+    Inputs:  ctx — SetupContext: vars.domain_file, service user nginx (uid/gid), config_dir (the `trust` consent:
+             without it the CA is published but not added to the host's trust store); certs_dir — Step-CA certs
+             folder.
     Returns: True if anything changed (from publish_ca_certs).
     Fails:   CalledProcessError from openssl/update-ca-certificates and OSError inside publish_ca_certs;
              KeyError without domain_file.
     Feeds:   run."""
+    trusted = allowed_to_change(ctx.config_dir, "trust", plan_trust(ctx.vars))
     return publish_ca_certs(certs_dir, ctx.path("nginx", "www", "certs"), *ctx.uid("nginx"),
-                            trust_prefix=f"fabric-{ctx.vars['domain_file']}")
+                            trust_prefix=f"fabric-{ctx.vars['domain_file']}" if trusted else None)
 
 
 def _public_certs_readable(certs_dir):
@@ -149,8 +155,11 @@ def run(ctx):
     Fails:   SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when
              `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets
              when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars.
-    Feeds:   setup step `pki`, run by run_setup via STEPS."""
+    Feeds:   setup step `pki`, run by run_setup via STEPS.
+    Notes:   trusting the CA on the host needs the `trust` consent; without it a warning, and the CA is only
+             published (design host-consent.md)."""
     v = ctx.vars
+    check_consent(ctx.config_dir, "trust", plan_trust(v))       # warns once when declined; _publish_ca_certs checks
     data = ctx.path("stepca", "data")
     ca_json = os.path.join(data, "config", "ca.json")
     uid, gid = ctx.uid("step")

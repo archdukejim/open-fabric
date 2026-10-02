@@ -6,7 +6,7 @@
 #
 #   sudo installers/deb/install-from-checkout.sh                         interactive
 #   sudo installers/deb/install-from-checkout.sh --file vars.yaml        answers from a file
-#   sudo installers/deb/install-from-checkout.sh --file vars.yaml --non-interactive --yes
+#   sudo installers/deb/install-from-checkout.sh --file vars.yaml --non-interactive --yes --approve all
 #
 # Arguments go to `fabricctl setup`; without --file, the checkout's custom-vars.yaml
 # (if present) is used. Afterwards use `sudo fabricctl ...`

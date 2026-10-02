@@ -1,94 +1,61 @@
 import os
-import shutil
 import subprocess
 import time
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.run import CommandError, run as sh
+from fabriclib.consent.check_consent import check_consent
+from fabriclib.consent.plan_packages import DOCKER_PACKAGES, plan_packages
+from fabriclib.setup.common.missing_packages import missing_packages
 from fabriclib.setup.errors import SetupError
 
-# Only what the host itself runs; LDAP tools live in the dirsrv container.
-HOST_PACKAGES = ["openssl", "ca-certificates", "curl", "gnupg", "ufw", "iptables", "dnsutils",
-                 "python3-yaml", "python3-jinja2", "python3-bcrypt", "chrony"]
-DOCKER_PACKAGES = ["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]
+DOCKER_CE = "docker-ce"     # Docker's own package: kept when an install already runs it, never installed
 APT_ENV = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a"}
 
 
-def _missing(pkgs):
-    """Purpose: which of the given Debian packages are not installed.
-    Inputs:  pkgs — package names (list of str).
-    Returns: the names (in order) that dpkg-query does not report as "install ok installed".
-    Fails:   FileNotFoundError without dpkg-query; unknown packages count as missing.
+def _apt_install(pkgs, hint):
+    """Purpose: install packages from the host's own apt sources.
+    Inputs:  pkgs — package names; hint — what to check when apt fails (added to the error).
+    Returns: None; the packages installed.
+    Fails:   SetupError when apt cannot install them; CommandError from `apt-get update` propagates.
     Feeds:   run."""
-    res = subprocess.run(["dpkg-query", "-W", "-f=${Package} ${Status}\\n", *pkgs], capture_output=True, text=True)
-    installed = {l.split()[0] for l in res.stdout.splitlines() if l.endswith("install ok installed")}
-    return [p for p in pkgs if p not in installed]
-
-
-def _docker_ok():
-    """Purpose: whether Docker Engine, compose v2 and buildx all answer.
-    Inputs:  none (runs `docker version`, `docker compose version`, `docker buildx version`).
-    Returns: True only if all three exit 0.
-    Fails:   FileNotFoundError if docker is missing (run checks shutil.which first).
-    Feeds:   run."""
-    return all(subprocess.run(cmd, capture_output=True).returncode == 0
-               for cmd in (["docker", "version"], ["docker", "compose", "version"], ["docker", "buildx", "version"]))
-
-
-def _install_docker():
-    """Purpose: install docker-ce, containerd, buildx and compose from Docker's official apt repository.
-    Inputs:  none (reads /etc/os-release for distro and codename; `dpkg --print-architecture`). Needs network.
-    Returns: None; leaves /etc/apt/keyrings/docker.asc, /etc/apt/sources.list.d/docker.list and the packages.
-    Fails:   CommandError from common.run when curl, apt-get update or apt-get install fails (propagates, not
-             converted to SetupError); FileNotFoundError without /etc/os-release.
-    Feeds:   run."""
-    rel = {}
-    with open("/etc/os-release") as f:
-        for line in f:
-            k, _, v = line.strip().partition("=")
-            rel[k] = v.strip('"')
-    distro = rel.get("ID", "ubuntu")
-    codename = rel.get("VERSION_CODENAME") or rel.get("UBUNTU_CODENAME")
-    arch = sh(["dpkg", "--print-architecture"]).stdout.strip()
-    os.makedirs("/etc/apt/keyrings", mode=0o755, exist_ok=True)
-    sh(["curl", "-fsSL", "-o", "/etc/apt/keyrings/docker.asc", f"https://download.docker.com/linux/{distro}/gpg"])
-    os.chmod("/etc/apt/keyrings/docker.asc", 0o644)
-    with open("/etc/apt/sources.list.d/docker.list", "w") as f:
-        f.write(f"deb [arch={arch} signed-by=/etc/apt/keyrings/docker.asc] "
-                f"https://download.docker.com/linux/{distro} {codename} stable\n")
     sh(["apt-get", "update"], env=APT_ENV, timeout=900)
-    sh(["apt-get", "install", "-y", "--no-install-recommends", *DOCKER_PACKAGES], env=APT_ENV, timeout=1800)
+    try:
+        sh(["apt-get", "install", "-y", "--no-install-recommends", *pkgs], env=APT_ENV, timeout=1800)
+    except CommandError as e:
+        raise SetupError(f"apt could not install {' '.join(pkgs)}: {str(e)[-600:]}\n{hint}") from None
 
 
 def run(ctx):
-    """Purpose: host packages (HOST_PACKAGES) and Docker Engine with compose v2 and buildx, running and enabled.
-    Inputs:  ctx — SetupContext: offline (never download). Env APT_ENV for apt.
+    """Purpose: host packages and Docker Engine with compose v2 and buildx (Ubuntu's docker.io; an existing
+             docker-ce install is kept), running and enabled — all from the host's own apt sources, after the
+             `packages` consent (design host-consent.md).
+    Inputs:  ctx — SetupContext: offline (never download), config_dir (consent.yaml). Env APT_ENV for apt.
     Returns: None; missing packages installed, Docker installed if needed, docker.service enabled and answering
-             `docker info`. Idempotent: nothing is installed when present.
-    Fails:   SetupError: offline with packages or Docker missing; apt install failure (with advice on apt
-             sources); Docker not answering after about 60 s. CommandError from `apt-get update`,
-             `systemctl enable --now docker`, the version queries or _install_docker propagates.
+             `docker info`. Idempotent: nothing is installed when present. No apt source or key is added.
+    Fails:   SetupError: the packages not approved; offline with packages or Docker missing; apt install failure
+             (with advice on apt sources); Docker not answering after about 60 s. CommandError from
+             `apt-get update`, `systemctl enable --now docker` or the version queries propagates.
     Feeds:   setup step `host`, run by run_setup via STEPS."""
-    missing = _missing(HOST_PACKAGES)
-    if missing:
+    plan = plan_packages()
+    if plan["text"]:
         if ctx.offline:
-            raise SetupError(f"offline install but host packages are missing: {' '.join(missing)}")
-        info(f"installing {' '.join(missing)}")
-        sh(["apt-get", "update"], env=APT_ENV, timeout=900)
-        try:
-            sh(["apt-get", "install", "-y", "--no-install-recommends", *missing], env=APT_ENV, timeout=1800)
-        except CommandError as e:
-            raise SetupError(f"apt could not install {' '.join(missing)}: {str(e)[-600:]}\n"
-                             "If apt reports unmet dependencies or held broken packages, the host's apt sources "
-                             "are usually incomplete (e.g. missing <release>-updates, which the installed "
-                             "libraries came from). Fix the sources, run `apt-get update`, then re-run setup.") from None
+            raise SetupError(f"offline install but packages are missing: {' '.join(plan['host'] + plan['docker'])}")
+        check_consent(ctx.config_dir, "packages", plan["text"])
+    if plan["host"]:
+        info(f"installing {' '.join(plan['host'])}")
+        _apt_install(plan["host"], "If apt reports unmet dependencies or held broken packages, the host's apt sources "
+                                   "are usually incomplete (e.g. missing <release>-updates, which the installed "
+                                   "libraries came from). Fix the sources, run `apt-get update`, then re-run setup.")
     ok("host packages present")
 
-    if not (shutil.which("docker") and _docker_ok()):
-        if ctx.offline:
-            raise SetupError("offline install but Docker (with compose v2 and buildx) is not installed")
-        info("installing Docker Engine from Docker's apt repository")
-        _install_docker()
+    if plan["docker"]:
+        info(f"installing Docker Engine from the Ubuntu archive ({' '.join(DOCKER_PACKAGES)})")
+        _apt_install(plan["docker"], "They are in Ubuntu's universe component: check that the host's apt sources "
+                                     "include universe, run `apt-get update`, then re-run setup.")
+    elif not missing_packages([DOCKER_CE]):
+        info("Docker comes from Docker's own repository (docker-ce): kept as it is. New hosts get Ubuntu's "
+             "docker.io; to switch, see docs/operations.md (Docker from the Ubuntu archive)")
     sh(["systemctl", "enable", "--now", "docker"])
     for _ in range(12):
         if subprocess.run(["docker", "info"], capture_output=True).returncode == 0:

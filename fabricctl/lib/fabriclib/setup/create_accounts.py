@@ -1,68 +1,54 @@
-import grp
-import pwd
+import os
 import subprocess
 
 from fabriclib.common.console import ok, warn
+from fabriclib.consent.check_consent import check_consent
+from fabriclib.consent.plan_accounts import plan_accounts
 
 
-def _exists(db, name):
-    """Purpose: whether a user or group name exists in the name service.
-    Inputs:  db — "passwd" or "group"; name — account name.
-    Returns: True if `getent db name` exits 0.
-    Fails:   FileNotFoundError without getent.
-    Feeds:   _ensure_group, _ensure_user."""
-    return subprocess.run(["getent", db, name], capture_output=True).returncode == 0
-
-
-def _ensure_group(name, gid):
-    """Purpose: create a system group with the expected gid, unless the gid or name is already in use.
-    Inputs:  name — group name; gid — int (0: nothing to do, e.g. Keycloak's image convention).
-    Returns: None; a clash (gid owned by another group, or name with another gid) is warned about, not changed.
-    Fails:   CalledProcessError from groupadd.
+def _move_files(dirs, old, new, flag, tool):
+    """Purpose: give every file under the folders that belongs to an old id to the new one.
+    Inputs:  dirs — folders; old, new — ids (int); flag — "-uid" or "-gid"; tool — "chown" or "chgrp".
+    Returns: None.
+    Fails:   CalledProcessError from find.
     Feeds:   run."""
-    if gid == 0:            # keycloak runs with gid 0 (image convention): nothing to create
-        return
-    try:
-        owner = grp.getgrgid(gid).gr_name
-        if owner != name:
-            warn(f"gid {gid} belongs to group '{owner}', expected '{name}' (service_users in vars)")
-    except KeyError:
-        if _exists("group", name):
-            warn(f"group '{name}' exists with a different gid than {gid}")
-        else:
-            subprocess.run(["groupadd", "--system", "-g", str(gid), name], check=True)
-
-
-def _ensure_user(name, uid, gid):
-    """Purpose: create a nologin system user without home with the expected uid/gid, unless taken.
-    Inputs:  name — user name; uid, gid — ints.
-    Returns: None; a clash (uid owned by another user, or name with another uid) is warned about, not changed.
-    Fails:   CalledProcessError from useradd (e.g. the gid does not exist).
-    Feeds:   run."""
-    try:
-        owner = pwd.getpwuid(uid).pw_name
-        if owner != name:
-            warn(f"uid {uid} belongs to user '{owner}', expected '{name}' (service_users in vars)")
-    except KeyError:
-        if _exists("passwd", name):
-            warn(f"user '{name}' exists with a different uid than {uid}")
-        else:
-            subprocess.run(["useradd", "--system", "-u", str(uid), "-g", str(gid), "-M", "-d", "/nonexistent",
-                            "-s", "/usr/sbin/nologin", name], check=True)
+    for d in dirs:
+        subprocess.run(["find", d, "-xdev", flag, str(old), "-exec", tool, "-h", str(new), "{}", "+"], check=True)
 
 
 def run(ctx):
-    """Purpose: system users and groups for every service with the uid/gid fabric expects, so bind-mounted
-             files have the right owner.
-    Inputs:  ctx — SetupContext: vars.service_users {name: {uid, gid}}; entries with uid 0 are skipped.
-    Returns: None; accounts exist (nologin, no home). An id already taken by a different account is reported,
-             not changed. Idempotent.
-    Fails:   KeyError/ValueError for an entry without numeric uid/gid; CalledProcessError from groupadd/useradd.
+    """Purpose: one fabric-* system user and group per service, in fabric's uid band (600-649), so bind-mounted
+             files have the right owner; an install that still has the previous accounts (bind, nginx, ... with
+             their old ids) is moved to the new ones (design host-consent.md §5). Asks nothing: the `accounts`
+             consent was given before the first step.
+    Inputs:  ctx — SetupContext: vars.service_users, deploy_base, source_dir (jinja/), config_dir (consent.yaml).
+    Returns: None; accounts exist (nologin, no home); files of a previous account belong to its new one, and the
+             previous account is removed — unless a process still runs as it (a container not restarted yet):
+             then a warning, and the next setup run removes it. Idempotent.
+    Fails:   SetupError from plan_accounts (an id taken by another account) or check_consent (not approved);
+             CalledProcessError from groupadd/useradd/find.
     Feeds:   setup step `accounts`, run by run_setup via STEPS."""
-    for name, ids in (ctx.vars.get("service_users") or {}).items():
-        uid, gid = int(ids["uid"]), int(ids["gid"])
-        if uid == 0:
-            continue
-        _ensure_group(name, gid)
-        _ensure_user(name, uid, gid)
-        ok(f"{name} ({uid}:{gid})")
+    actions = plan_accounts(ctx.vars, ctx.deploy_base, os.path.join(ctx.source_dir, "jinja"))
+    if not actions:
+        ok("service accounts in place")
+        return
+    check_consent(ctx.config_dir, "accounts", [a["text"] for a in actions])
+    for a in actions:
+        if a["do"] == "group":
+            subprocess.run(["groupadd", "--system", "-g", str(a["gid"]), a["name"]], check=True)
+        elif a["do"] == "user":
+            subprocess.run(["useradd", "--system", "-u", str(a["uid"]), "-g", str(a["gid"]), "-M", "-d",
+                            "/nonexistent", "-s", "/usr/sbin/nologin", a["name"]], check=True)
+        elif a["do"] == "move":
+            _move_files(a["dirs"], *a["uid"], "-uid", "chown")
+            if a["gid"]:
+                _move_files(a["dirs"], *a["gid"], "-gid", "chgrp")
+        elif a["do"] == "remove":
+            res = subprocess.run(["userdel", a["name"]], capture_output=True, text=True)
+            if res.returncode != 0:
+                warn(f"the old account {a['name']} is still in use ({res.stderr.strip()}); "
+                     "the next setup run removes it")
+                continue
+            if a["group"]:
+                subprocess.run(["groupdel", a["name"]], capture_output=True)
+        ok(a["text"])

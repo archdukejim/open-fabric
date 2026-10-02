@@ -8,8 +8,10 @@ FROM ${BASE_IMAGE}
 ARG BASE_IMAGE
 LABEL org.fabric.base="${BASE_IMAGE}"
 
-ARG RADIUS_UID=916
-ARG RADIUS_GID=916
+ARG RADIUS_UID=610
+ARG RADIUS_GID=610
+# the service account's ids are baked in: a change rebuilds (images/needs_rebuild)
+LABEL org.fabric.ids="${RADIUS_UID}:${RADIUS_GID}"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends freeradius freeradius-python3 python3-ldap openssl \

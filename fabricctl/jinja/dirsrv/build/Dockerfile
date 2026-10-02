@@ -13,8 +13,10 @@ ARG BASE_IMAGE
 LABEL org.fabric.base="${BASE_IMAGE}"
 
 # Runtime account (service_users.ldap); dscontainer needs it in /etc/passwd.
-ARG DS_UID=911
-ARG DS_GID=911
+ARG DS_UID=601
+ARG DS_GID=601
+# the service account's ids are baked in: a change rebuilds (images/needs_rebuild)
+LABEL org.fabric.ids="${DS_UID}:${DS_GID}"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends 389-ds-base python3-lib389 ca-certificates tini \

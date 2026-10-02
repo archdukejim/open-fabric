@@ -54,7 +54,7 @@ builds:
 ### Deployment Modes
 - **Install:** `sudo apt install ./fabricctl_<version>_all.deb` (built by `installers/deb/build-deb.sh`, attached to each GitHub release), then `sudo fabricctl setup` — shows the hardened default plan; Proceed or Advanced (relax any item).
 - **From a checkout:** `sudo installers/deb/install-from-checkout.sh [setup options]` — builds the .deb from the checkout, installs it with apt, runs `fabricctl setup`; run it again to upgrade to the checkout's code.
-- **Non-interactive:** `sudo fabricctl setup --file vars.yaml --non-interactive --yes`.
+- **Non-interactive:** `sudo fabricctl setup --file vars.yaml --non-interactive --yes --approve all` (`--approve` names the host changes allowed without asking: [host-consent.md](docs/design/host-consent.md)).
 - **Run:** every service under systemd `fabric.target` — `fabricctl status|start|stop|restart`.
 - **Remove:** `sudo fabricctl uninstall` (offers an export of all data first); `sudo apt purge fabricctl` exports to `/var/backups/fabric/` and uninstalls.
 - **Offline (Air-gapped):** `--offline` never downloads; packages and images must already be present. Signed offline image bundles (`fabricctl images export/import`) are planned — see [the design](docs/design/fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases).

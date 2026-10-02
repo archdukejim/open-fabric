@@ -744,7 +744,7 @@ Toggle features and control system-level UNIX isolation mapping.
 `webui_realm`, `webui_admin_role`, `webui_admin_group`, `webui_admin_user`, `webui_admin_email` and `webui_client_cert_days` are rendered into `vars.yaml` (the last three are read by `fabriclib/setup/create_admin.py`); the session timeouts are read only by `webui/webui.json.j2` (set them in `custom-vars.yaml`). The OIDC client secret `webui_oidc_secret` is generated with fabric's secrets (OpenBao).
 
 ### `service_users`
-**Description:** Dictionary mapping container names to UID/GID objects for setting permissions.
+**Description:** Each service's host account: uid, gid and name (`fabric-*`), so bind-mounted files have the right owner.
 
 **Default Value:** *(See default configuration below)*
 
@@ -771,19 +771,28 @@ Toggle features and control system-level UNIX isolation mapping.
 
 **`service_users` Default:**
 ```yaml
-service_users:
-  bind:     { uid: 53,  gid: 53 }
-  ldap:     { uid: 911, gid: 911 }
-  nginx:    { uid: 443, gid: 443 }
-  step:     { uid: 135, gid: 135 }
-  keycloak: { uid: 900, gid: 0 }
-  postgres: { uid: 901, gid: 901 }
-  webui:    { uid: 912, gid: 912 }   # webui container user; also the fabric-agent socket group
-  openbao:    { uid: 913, gid: 913 }
-  fluentbit:  { uid: 914, gid: 914 }
-  kea:        { uid: 915, gid: 915 }
-  freeradius: { uid: 916, gid: 916 }
+service_users:            # fabric-* names no Ubuntu package claims; ids in fabric's band 600-649
+  bind:        { uid: 600, gid: 600, name: fabric-dns }
+  ldap:        { uid: 601, gid: 601, name: fabric-ldap }
+  nginx:       { uid: 602, gid: 602, name: fabric-proxy }
+  step:        { uid: 603, gid: 603, name: fabric-ca }
+  keycloak:    { uid: 604, gid: 0,   name: fabric-sso }    # gid 0: the Keycloak image's convention
+  postgres:    { uid: 605, gid: 605, name: fabric-db }
+  webui:       { uid: 606, gid: 606, name: fabric-webui }  # webui container user; also the fabric-agent socket group
+  openbao:     { uid: 607, gid: 607, name: fabric-vault }
+  fluentbit:   { uid: 608, gid: 608, name: fabric-logs }
+  kea:         { uid: 609, gid: 609, name: fabric-dhcp }
+  freeradius:  { uid: 610, gid: 610, name: fabric-radius }
+  adguard:     { uid: 611, gid: 611, name: fabric-dnsfilter }
+  oauth2proxy: { uid: 612, gid: 612, name: fabric-auth }
 ```
+
+The band 600–649 is the middle of Debian's system range (100–999): packages allocate from 100 upwards,
+`useradd --system` and systemd-sysusers from 999 downwards, and 0–99 belong to `base-passwd` (a 26.04 release
+upgrade asked to remove the previous `bind` account on uid 53). An id already held by another account stops
+setup with its name. Installs from before 2026-10 (`bind` 53, `nginx` 443, `ldap` 911, …) are moved by the
+accounts step: the files of each previous account go to its `fabric-*` one and the previous account is removed
+(after the `accounts` question). Entries you changed are kept as they are.
 
 **`service_dirs` Default:**
 ```yaml

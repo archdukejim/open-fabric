@@ -55,7 +55,7 @@ put "$OUT/vars.yaml"
 
 echo "--- setup (this host builds its images; takes a while on a Pi)"
 start=$(date +%s)
-R "fabricctl setup --file /tmp/vars.yaml --non-interactive --yes" > "$OUT/setup.log" 2>&1
+R "fabricctl setup --file /tmp/vars.yaml --non-interactive --yes --approve all" > "$OUT/setup.log" 2>&1
 echo "    setup took $(( ($(date +%s) - start) / 60 )) min"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
 R 'fabricctl doctor' > "$OUT/doctor.log" 2>&1

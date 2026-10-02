@@ -41,7 +41,7 @@ The repo must stay easy to navigate. For all of our own code:
   helper per file.
 - **Group files by domain in folders** (today: `dns/`, `dhcp/`, `pki/`, `ldap/`,
   `keycloak/`, `vault/`, `secrets/`, `images/`, `security/`, `setup/`,
-  `radius/`, `logs/`, `rbac/`, `system/`, `common/`). Prefer a new folder over a crowded one.
+  `radius/`, `logs/`, `rbac/`, `system/`, `consent/`, `common/`). Prefer a new folder over a crowded one.
 - Python domain code lives in **`fabricctl/lib/fabriclib/<domain>/`** and is
   imported as `fabriclib.<domain>.<file>` — namespaced so it can never
   collide with system packages (e.g. dnspython is also `dns`).

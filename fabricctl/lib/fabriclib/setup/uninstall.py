@@ -5,6 +5,7 @@ import subprocess
 
 from fabriclib.common.console import info, ok, warn
 from fabriclib.images.constants import STATE as IMAGE_STATE
+from fabriclib.setup.common.service_account_name import service_account_name
 
 UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
 TARGET = "/etc/systemd/system/fabric.target"
@@ -75,7 +76,8 @@ def uninstall(ctx):
     if os.path.isdir(etc) and not os.listdir(etc):
         os.rmdir(etc)
 
-    for name in (v.get("service_users") or {}):
+    for key, ids in (v.get("service_users") or {}).items():
+        name = service_account_name(key, ids)
         if subprocess.run(["id", name], capture_output=True).returncode == 0:
             subprocess.run(["userdel", name], capture_output=True)
             subprocess.run(["groupdel", name], capture_output=True)

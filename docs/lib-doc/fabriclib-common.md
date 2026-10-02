@@ -13,7 +13,7 @@
 | Returns | None. |
 | Fails | never in practice — only an OSError from writing to a closed stdout. |
 | Feeds | setup/run_setup.py, setup/choose_plan.py (console output only). |
-| Called by | `fabriclib.setup.choose_plan.choose_plan`, `fabriclib.setup.run_setup.main` |
+| Called by | `fabriclib.consent.ask_consent.ask_consent`, `fabriclib.setup.choose_plan.choose_plan`, `fabriclib.setup.run_setup.main` |
 
 ### `info(text)`
 
@@ -46,7 +46,7 @@
 | Returns | None. |
 | Fails | never in practice — only an OSError from writing to a closed stdout. |
 | Feeds | setup steps (configure_firewall, create_accounts, create_admin, harden_docker, preflight, …). |
-| Called by | `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.create_accounts._ensure_group`, `fabriclib.setup.create_accounts._ensure_user`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.harden_docker.run`, `fabriclib.setup.preflight.run`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.uninstall.uninstall` |
+| Called by | `fabriclib.consent.check_consent.check_consent`, `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.create_accounts.run`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.harden_docker.run`, `fabriclib.setup.preflight.run`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.uninstall.uninstall` |
 
 ### `err(text)`
 
@@ -178,7 +178,7 @@
 | Returns | jinja2.Environment with globals images_lock ({name: ref}), packages_lock and lookup. |
 | Fails | yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest. A missing lock file gives empty globals, not an error. |
 | Feeds | deploy/apply_deployment (and render_templates), dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py, radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites. |
-| Called by | `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.logs.run_logs_command.run_logs_command`, `fabriclib.system.render_template_file.render_template_file` |
+| Called by | `fabriclib.consent.planned_vars.planned_vars`, `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.logs.run_logs_command.run_logs_command`, `fabriclib.system.render_template_file.render_template_file` |
 
 ## `fabricctl/lib/fabriclib/common/load_vars.py`
 
@@ -243,7 +243,7 @@
 | Returns | subprocess.CompletedProcess (text mode). |
 | Fails | CommandError (first 6 args, exit code and the last 800 chars of stderr+stdout) when check and the exit is non-zero; subprocess.TimeoutExpired on timeout; FileNotFoundError if the program does not exist. |
 | Feeds | setup/condition_host.py. |
-| Called by | `fabriclib.setup.condition_host._install_docker`, `fabriclib.setup.condition_host.run` |
+| Called by | `fabriclib.setup.condition_host._apt_install`, `fabriclib.setup.condition_host.run` |
 
 ## `fabricctl/lib/fabriclib/common/save_vars.py`
 

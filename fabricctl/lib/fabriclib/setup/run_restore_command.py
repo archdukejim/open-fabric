@@ -5,14 +5,16 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.setup.context import SetupContext
 from fabriclib.setup.restore_install import restore_install
 
-USAGE = "usage: fabricctl restore <export folder> [--yes]   (a folder written by `fabricctl uninstall --export`)"
+USAGE = ("usage: fabricctl restore <export folder> [--yes] [--approve GROUPS] [--decline GROUPS]   "
+         "(a folder written by `fabricctl uninstall --export`)")
 
 
 def run_restore_command(args, deploy_base, cli):
     """Purpose: `fabricctl restore <folder>`: bring back a fabric removed with `fabricctl uninstall --export` (or
              apt purge): its data goes back in place with owners and modes, then setup runs on it — the same CA,
              directory, Keycloak, DNS and vault (its key comes back with it).
-    Inputs:  args — command arguments: the export folder (first non-option), --yes/-y, --deploy-base, --no-color;
+    Inputs:  args — command arguments: the export folder (first non-option), --yes/-y, --deploy-base, --no-color,
+             --approve/--decline GROUPS (passed to setup: the export's recorded answers usually cover everything);
              deploy_base — install root; cli — path of this fabricctl's cli.py (the packaged, newest code) that
              setup is run with.
     Returns: 1 when refused (no folder, not an export, fabric already installed) or not confirmed; on success
@@ -40,5 +42,7 @@ def run_restore_command(args, deploy_base, cli):
             print("nothing changed")
             return 1
     restore_install(ctx, folder)
-    os.execv(sys.executable, [sys.executable, cli, "setup", "--yes", "--non-interactive",
+    consent = [x for i, a in enumerate(args) if a in ("--approve", "--decline") and i + 1 < len(args)
+               for x in (a, args[i + 1])]          # host changes the restored answers do not cover yet
+    os.execv(sys.executable, [sys.executable, cli, "setup", "--yes", "--non-interactive", *consent,
                               *[a for a in args if a.startswith("--deploy-base") or a == "--no-color"]])

@@ -10,14 +10,14 @@
 | `context.py` | `SetupContext`: install paths, rendered vars, secrets, options, services to restart |
 | `errors.py` | `SetupError` — a step cannot continue; message says why and what to do |
 | `collect_vars.py` | Where settings come from: existing install, `--file` (or a checkout's `custom-vars.yaml` on a fresh install) overrides, prompts for anything missing |
-| `upgrade_vars.py` | Existing install's vars before re-render: new release's images (unless pinned) |
+| `upgrade_vars.py` | Existing install's vars before re-render: new release's images (unless pinned) and service accounts (unless changed) |
 | `detect_network.py` | Guess hostname, host IP, gateway, LAN CIDR and interface from the default route |
 | `choose_plan.py` | Show the (hardened) default plan; Proceed / Advanced / Quit |
 | `preflight.py` | Refuse a host without amd64/arm64, root, enough RAM or the cgroup memory controller; warn about untested OS and conflicting listeners |
-| `condition_host.py` | Host packages and Docker Engine (compose v2, buildx) |
-| `harden_docker.py` | Hardened `/etc/docker/daemon.json` (merged, not replaced) |
+| `condition_host.py` | Host packages and Docker Engine (compose v2, buildx) from the Ubuntu archive; no apt source added |
+| `harden_docker.py` | Hardened `/etc/docker/daemon.json` (merged, not replaced), after the `runtime` consent |
 | `deploy_config.py` | Render + deploy all configuration without starting anything; install `fabricctl` |
-| `create_accounts.py` | Service users and groups with the expected uid/gid |
+| `create_accounts.py` | `fabric-*` service users and groups (uid band 600–649); moves an older install off its previous accounts |
 | `configure_network.py` | Docker network `fabric_net`; optional host resolver drop-in |
 | `configure_firewall.py` | UFW default-deny (SSH from the LAN) + LAN-only Docker-published ports; lockout guard |
 | `join_federation.py` | Step `join` (only with `--join`): join the upstream before anything is rendered — site CA signed by the organisation's root, organisation settings |
@@ -41,3 +41,4 @@
 | `restore_install.py` | Put a reinstall backup or a full export back under the install root (owners preserved) |
 | `stage_source.py` | Reinstall from the installed copy: stage the code in `/var/tmp` so uninstall cannot delete what setup runs from |
 | `renew_service_certs.py` | `fabricctl certs [--force]`: day-2 renewal; restarts only running services whose certs changed |
+| `common/` | Helpers shared with the consent plans |

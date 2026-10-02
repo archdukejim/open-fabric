@@ -13,8 +13,10 @@ FROM ${BASE_IMAGE}
 ARG BASE_IMAGE
 LABEL org.fabric.base="${BASE_IMAGE}"
 
-ARG WEBUI_UID=912
-ARG WEBUI_GID=912
+ARG WEBUI_UID=606
+ARG WEBUI_GID=606
+# the service account's ids are baked in: a change rebuilds (images/needs_rebuild)
+LABEL org.fabric.ids="${WEBUI_UID}:${WEBUI_GID}"
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends python3 python3-jinja2 openssl ca-certificates tini \

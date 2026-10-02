@@ -3,8 +3,10 @@ import os
 import subprocess
 
 from fabriclib.common.console import info, ok, warn
-from fabriclib.ntp.chrony_settings import chrony_settings
+from fabriclib.consent.check_consent import check_consent
+from fabriclib.consent.plan_firewall import plan_firewall
 from fabriclib.security.apply_docker_firewall import apply_docker_firewall
+from fabriclib.security.firewall_rules import firewall_rules
 from fabriclib.setup.errors import SetupError
 
 UNIT = "/etc/systemd/system/fabric-firewall.service"
@@ -58,12 +60,13 @@ def run(ctx):
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
              (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123
              from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks
-             removed: config/.firewall-ntp-allowed); vars_file,
+             removed: config/.firewall-ntp-allowed) — the rules come from security/firewall_rules; vars_file,
              target_dir, config_dir. Env SSH_CONNECTION.
     Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
              (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
              config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER
-             rebuilt. Off: DOCKER-USER
+             rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is).
+             Off: DOCKER-USER
              opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left
              as it is.
     Fails:   SetupError when the SSH client is outside every allowed CIDR (would lock the operator out);
@@ -77,12 +80,15 @@ def run(ctx):
         warn("firewall disabled (security.firewall: false): published ports are reachable from anywhere")
         return
 
-    allowed = [ctx.vars["lan_cidr"]] + list(security.get("firewall_allow") or [])
+    rules = firewall_rules(ctx.vars, ctx.config_dir)
+    allowed = rules["ssh"]
     client = _ssh_client()
     if client and not any(ipaddress.ip_address(client) in ipaddress.ip_network(c, strict=False) for c in allowed):
         raise SetupError(f"your SSH session comes from {client}, outside {', '.join(allowed)}; enabling the "
                          f"firewall would lock you out. Add it to security.firewall_allow or connect from the LAN.")
 
+    if not check_consent(ctx.config_dir, "firewall", plan_firewall(ctx.vars, ctx.config_dir)):
+        return
     info("host firewall (ufw): deny incoming, allow SSH from " + ", ".join(allowed))
     # Existing ufw rules are kept; fabric only sets the defaults and adds its own.
     for cmd in (["ufw", "default", "deny", "incoming"], ["ufw", "default", "allow", "outgoing"]):
@@ -94,17 +100,15 @@ def run(ctx):
     # removed) go; rules fabric did not add are never touched. The record says which are fabric's.
     _forget_rules(os.path.join(ctx.config_dir, ".firewall-ssh-allowed"), allowed, "22", "tcp", "SSH")
     # time (ntp.md): the networks chrony answers may ask on UDP 123, nobody else
-    ntp_nets = chrony_settings(ctx.vars, os.path.join(ctx.config_dir, "federation.yaml"))["allow"] \
-        if ctx.vars.get("ntp_serve", True) else []
+    ntp_nets = rules["ntp"]
     for cidr in ntp_nets:
         subprocess.run(["ufw", "allow", "from", cidr, "to", "any", "port", "123", "proto", "udp"],
                        check=True, capture_output=True)
     _forget_rules(os.path.join(ctx.config_dir, ".firewall-ntp-allowed"), ntp_nets, "123", "udp", "NTP")
     # DHCP (optional): clients have no address yet (source 0.0.0.0), so allow port 67 on the served interfaces
-    if ctx.vars.get("install_kea"):
-        for iface in (ctx.vars.get("dhcp") or {}).get("interfaces") or []:
-            subprocess.run(["ufw", "allow", "in", "on", iface, "to", "any", "port", "67", "proto", "udp"],
-                           check=True, capture_output=True)
+    for iface in rules["dhcp"]:
+        subprocess.run(["ufw", "allow", "in", "on", iface, "to", "any", "port", "67", "proto", "udp"],
+                       check=True, capture_output=True)
     subprocess.run(["ufw", "--force", "enable"], check=True, capture_output=True)
 
     lib = os.path.join(ctx.target_dir, "lib")

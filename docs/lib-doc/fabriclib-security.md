@@ -26,3 +26,29 @@
 | Feeds | configure_firewall.run (setup) and fabric-firewall.service at boot (`python3 -m ...`, prints it). |
 | Notes | UFW cannot filter these ports: Docker routes them through its own chains before INPUT. |
 | Called by | `fabriclib.security.apply_docker_firewall.<module>`, `fabriclib.setup.configure_firewall.run` |
+
+## `fabricctl/lib/fabriclib/security/firewall_rules.py`
+
+### `firewall_rules(v, config_dir)`
+
+| | |
+|---|---|
+| Purpose | the networks and interfaces fabric's host firewall opens, computed once for the setup step and for the consent question that asks before it (design host-consent.md). |
+| Inputs | v — vars: lan_cidr, security.firewall_allow (extra CIDRs), ntp_serve (default True; chrony_settings decides its networks), install_kea + dhcp.interfaces; config_dir — the install's config folder (federation.yaml, for chrony's networks). |
+| Returns | {"ssh": [CIDR, ...] (22/tcp; also where Docker-published ports may be reached from), "ntp": [CIDR, ...] (123/udp), "dhcp": [interface, ...] (67/udp)}. |
+| Fails | KeyError without lan_cidr; ValidationError from chrony_settings for invalid NTP settings. |
+| Feeds | setup/configure_firewall, consent/plan_firewall. |
+| Called by | `fabriclib.consent.plan_firewall.plan_firewall`, `fabriclib.setup.configure_firewall.run` |
+
+## `fabricctl/lib/fabriclib/security/hardened_daemon_settings.py`
+
+### `hardened_daemon_settings(path=DAEMON_JSON)`
+
+| | |
+|---|---|
+| Purpose | Docker's daemon settings now and with fabric's hardening merged in (existing keys kept). |
+| Inputs | path — daemon.json (default /etc/docker/daemon.json; absent counts as {}). |
+| Returns | (current dict, merged dict); equal when nothing would change. |
+| Fails | json.JSONDecodeError on an unparseable file; OSError reading it. |
+| Feeds | setup/harden_docker (writes merged), consent/plan_runtime (asks first). |
+| Called by | `fabriclib.consent.plan_runtime.plan_runtime`, `fabriclib.setup.harden_docker.run` |

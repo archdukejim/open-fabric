@@ -63,7 +63,8 @@ def publish_ca_certs(certs_dir, www_dir, uid, gid, trust_prefix):
     Inputs:  certs_dir — holds Step-CA's root_ca.crt and intermediate_ca.crt (the latter may carry the root
              too, as with a bring-your-own chain: only its first certificate is used); www_dir — the certs
              web root (created if missing); uid, gid — owner of the published files (nginx);
-             trust_prefix — file name prefix in /usr/local/share/ca-certificates.
+             trust_prefix — file name prefix in /usr/local/share/ca-certificates; None: publish only, do not touch
+             the host's trust store (the `trust` consent was declined, design host-consent.md).
     Returns: True if any published file or trust-store file changed, else False.
     Fails:   subprocess.CalledProcessError from openssl or update-ca-certificates; OSError (missing CA
              files, trust directory not writable).
@@ -106,7 +107,7 @@ def publish_ca_certs(certs_dir, www_dir, uid, gid, trust_prefix):
 
         # This host trusts its own CA (system store: curl, python, apt, docker ...).
         trust_changed = False
-        for name in ("root-ca", "intermediate-ca"):
+        for name in ("root-ca", "intermediate-ca") if trust_prefix else ():
             dst = os.path.join(TRUST_DIR, f"{trust_prefix}-{name}.crt")
             src = os.path.join(www_dir, f"{name}.crt")
             if not (os.path.exists(dst) and filecmp.cmp(src, dst, shallow=False)):

@@ -315,7 +315,7 @@ for bad, msg in ((lambda d: d["subnets"][0].update(pools=["192.168.8.1 - 192.168
         assert msg in str(e), (msg, str(e))
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]
 assert kc["kea-dhcp4"]["cap_add"] == ["NET_RAW", "NET_BIND_SERVICE"] and kc["kea-dhcp4"]["network_mode"] == "host"
-assert kc["kea-ddns"]["user"] == "915:915" and not kc["kea-ddns"].get("cap_add")
+assert kc["kea-ddns"]["user"] == "609:609" and not kc["kea-ddns"].get("cap_add")
 assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
 print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, two capabilities only')
 
@@ -362,7 +362,7 @@ assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
 assert frj["uri"] == "ldaps://ldap.lan.j-j.family:3636" and frj["bind_dn"].startswith("cn=radius_reader,")
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
-assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "916:916", fc
+assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "610:610", fc
 assert fc["ports"] == [f"{v2['host_ip']}:1812:1812/udp", f"{v2['host_ip']}:1813:1813/udp"], fc["ports"]
 accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
 assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts

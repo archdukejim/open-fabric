@@ -88,9 +88,16 @@ EOF
 docker cp "$OUT/vars.yaml" "$NAME:/root/vars.yaml"
 
 echo "--- setup (fresh install)"
-in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes' 2>&1 | tee "$OUT/setup.log"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes' > "$OUT/setup-noconsent.log" 2>&1
+check "unattended setup without --approve changes nothing and names the groups to answer" \
+    "grep -q 'need an answer: packages' '$OUT/setup-noconsent.log' && ! in_box 'test -e /etc/systemd/system/fabric.target' \
+     && ! in_box 'getent passwd fabric-dns'"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all' 2>&1 | tee "$OUT/setup.log"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
 check "setup did not shadow the package command" "! in_box 'test -e /usr/local/bin/fabricctl'"
+check "Docker comes from the Ubuntu archive, no apt source added" \
+    "in_box 'dpkg -s docker.io docker-compose-v2 docker-buildx' | grep -c '^Status: install ok installed' | grep -qx 3 \
+     && ! in_box 'ls /etc/apt/sources.list.d/' | grep -qv '^ubuntu.sources$'"
 
 echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"

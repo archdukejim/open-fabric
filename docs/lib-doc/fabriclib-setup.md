@@ -154,9 +154,22 @@
 | Feeds | run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps before deploy; deploy_config renders from fabric.yaml. |
 | Called by | `fabriclib.setup.run_setup.main` |
 
-## `fabricctl/lib/fabriclib/setup/condition_host.py`
+## `fabricctl/lib/fabriclib/setup/common/docker_ready.py`
 
-### `_missing(pkgs)`
+### `docker_ready()`
+
+| | |
+|---|---|
+| Purpose | whether Docker Engine, compose v2 and buildx are installed and answer. |
+| Inputs | none (runs `docker version`, `docker compose version`, `docker buildx version`). |
+| Returns | True only if docker is on PATH and all three exit 0. |
+| Fails | never. |
+| Feeds | setup/condition_host, consent/plan_packages. |
+| Called by | `fabriclib.consent.plan_packages.plan_packages` |
+
+## `fabricctl/lib/fabriclib/setup/common/missing_packages.py`
+
+### `missing_packages(pkgs)`
 
 | | |
 |---|---|
@@ -164,28 +177,32 @@
 | Inputs | pkgs — package names (list of str). |
 | Returns | the names (in order) that dpkg-query does not report as "install ok installed". |
 | Fails | FileNotFoundError without dpkg-query; unknown packages count as missing. |
-| Feeds | run. |
-| Called by | `fabriclib.setup.condition_host.run` |
+| Feeds | setup/condition_host, consent/plan_packages. |
+| Called by | `fabriclib.consent.plan_packages.plan_packages`, `fabriclib.setup.condition_host.run` |
 
-### `_docker_ok()`
+## `fabricctl/lib/fabriclib/setup/common/service_account_name.py`
 
-| | |
-|---|---|
-| Purpose | whether Docker Engine, compose v2 and buildx all answer. |
-| Inputs | none (runs `docker version`, `docker compose version`, `docker buildx version`). |
-| Returns | True only if all three exit 0. |
-| Fails | FileNotFoundError if docker is missing (run checks shutil.which first). |
-| Feeds | run. |
-| Called by | `fabriclib.setup.condition_host.run` |
-
-### `_install_docker()`
+### `service_account_name(key, ids)`
 
 | | |
 |---|---|
-| Purpose | install docker-ce, containerd, buildx and compose from Docker's official apt repository. |
-| Inputs | none (reads /etc/os-release for distro and codename; `dpkg --print-architecture`). Needs network. |
-| Returns | None; leaves /etc/apt/keyrings/docker.asc, /etc/apt/sources.list.d/docker.list and the packages. |
-| Fails | CommandError from common.run when curl, apt-get update or apt-get install fails (propagates, not converted to SetupError); FileNotFoundError without /etc/os-release. |
+| Purpose | the host account name of one service_users entry (design host-consent.md §5): fabric-* names, so no Ubuntu package ever claims or questions them. |
+| Inputs | key — the service_users key (e.g. "bind"); ids — its entry ({uid, gid[, name]}). |
+| Returns | ids["name"] when set, else NAMES[key], else "fabric-<key>". |
+| Fails | never. |
+| Feeds | consent/plan_accounts, setup/uninstall. |
+| Called by | `fabriclib.consent.plan_accounts.plan_accounts`, `fabriclib.setup.uninstall.uninstall` |
+
+## `fabricctl/lib/fabriclib/setup/condition_host.py`
+
+### `_apt_install(pkgs, hint)`
+
+| | |
+|---|---|
+| Purpose | install packages from the host's own apt sources. |
+| Inputs | pkgs — package names; hint — what to check when apt fails (added to the error). |
+| Returns | None; the packages installed. |
+| Fails | SetupError when apt cannot install them; CommandError from `apt-get update` propagates. |
 | Feeds | run. |
 | Called by | `fabriclib.setup.condition_host.run` |
 
@@ -193,10 +210,10 @@
 
 | | |
 |---|---|
-| Purpose | host packages (HOST_PACKAGES) and Docker Engine with compose v2 and buildx, running and enabled. |
-| Inputs | ctx — SetupContext: offline (never download). Env APT_ENV for apt. |
-| Returns | None; missing packages installed, Docker installed if needed, docker.service enabled and answering `docker info`. Idempotent: nothing is installed when present. |
-| Fails | SetupError: offline with packages or Docker missing; apt install failure (with advice on apt sources); Docker not answering after about 60 s. CommandError from `apt-get update`, `systemctl enable --now docker`, the version queries or _install_docker propagates. |
+| Purpose | host packages and Docker Engine with compose v2 and buildx (Ubuntu's docker.io; an existing docker-ce install is kept), running and enabled — all from the host's own apt sources, after the `packages` consent (design host-consent.md). |
+| Inputs | ctx — SetupContext: offline (never download), config_dir (consent.yaml). Env APT_ENV for apt. |
+| Returns | None; missing packages installed, Docker installed if needed, docker.service enabled and answering `docker info`. Idempotent: nothing is installed when present. No apt source or key is added. |
+| Fails | SetupError: the packages not approved; offline with packages or Docker missing; apt install failure (with advice on apt sources); Docker not answering after about 60 s. CommandError from `apt-get update`, `systemctl enable --now docker` or the version queries propagates. |
 | Feeds | setup step `host`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
 
@@ -229,8 +246,8 @@
 | | |
 |---|---|
 | Purpose | default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service. |
-| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123 from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks removed: config/.firewall-ntp-allowed); vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
-| Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed — config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER rebuilt. Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
+| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123 from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks removed: config/.firewall-ntp-allowed) — the rules come from security/firewall_rules; vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
+| Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed — config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is). Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
 | Fails | SetupError when the SSH client is outside every allowed CIDR (would lock the operator out); CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an invalid CIDR. |
 | Feeds | setup step `firewall`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -242,9 +259,9 @@
 | | |
 |---|---|
 | Purpose | create the Docker network fabric_net (the services' private bridge) and, when use_host_dns is false, point the host resolver at dns_server with the stub listener off (frees port 53). |
-| Inputs | ctx — SetupContext: vars fabric_subnet (default 10.255.0.0/24), use_host_dns (default True), dns_server (default 8.8.8.8). |
+| Inputs | ctx — SetupContext: vars fabric_subnet (default 10.255.0.0/24), use_host_dns (default True), dns_server (default 8.8.8.8), config_dir (the `resolver` consent, asked before the first step). |
 | Returns | None; fabric_net exists (an existing one is not checked or changed). Without use_host_dns: the resolved drop-in RESOLVED_DROPIN is written and /etc/resolv.conf re-linked to systemd-resolved's file, restarting it — only when the drop-in changed. |
-| Fails | CalledProcessError from `docker network create` or `systemctl restart systemd-resolved`; OSError on the files. |
+| Fails | SetupError when the resolver change was not approved; CalledProcessError from `docker network create` or `systemctl restart systemd-resolved`; OSError on the files. |
 | Feeds | setup step `network`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
 
@@ -362,36 +379,14 @@
 
 ## `fabricctl/lib/fabriclib/setup/create_accounts.py`
 
-### `_exists(db, name)`
+### `_move_files(dirs, old, new, flag, tool)`
 
 | | |
 |---|---|
-| Purpose | whether a user or group name exists in the name service. |
-| Inputs | db — "passwd" or "group"; name — account name. |
-| Returns | True if `getent db name` exits 0. |
-| Fails | FileNotFoundError without getent. |
-| Feeds | _ensure_group, _ensure_user. |
-| Called by | `fabriclib.setup.create_accounts._ensure_group`, `fabriclib.setup.create_accounts._ensure_user` |
-
-### `_ensure_group(name, gid)`
-
-| | |
-|---|---|
-| Purpose | create a system group with the expected gid, unless the gid or name is already in use. |
-| Inputs | name — group name; gid — int (0: nothing to do, e.g. Keycloak's image convention). |
-| Returns | None; a clash (gid owned by another group, or name with another gid) is warned about, not changed. |
-| Fails | CalledProcessError from groupadd. |
-| Feeds | run. |
-| Called by | `fabriclib.setup.create_accounts.run` |
-
-### `_ensure_user(name, uid, gid)`
-
-| | |
-|---|---|
-| Purpose | create a nologin system user without home with the expected uid/gid, unless taken. |
-| Inputs | name — user name; uid, gid — ints. |
-| Returns | None; a clash (uid owned by another user, or name with another uid) is warned about, not changed. |
-| Fails | CalledProcessError from useradd (e.g. the gid does not exist). |
+| Purpose | give every file under the folders that belongs to an old id to the new one. |
+| Inputs | dirs — folders; old, new — ids (int); flag — "-uid" or "-gid"; tool — "chown" or "chgrp". |
+| Returns | None. |
+| Fails | CalledProcessError from find. |
 | Feeds | run. |
 | Called by | `fabriclib.setup.create_accounts.run` |
 
@@ -399,10 +394,10 @@
 
 | | |
 |---|---|
-| Purpose | system users and groups for every service with the uid/gid fabric expects, so bind-mounted files have the right owner. |
-| Inputs | ctx — SetupContext: vars.service_users {name: {uid, gid}}; entries with uid 0 are skipped. |
-| Returns | None; accounts exist (nologin, no home). An id already taken by a different account is reported, not changed. Idempotent. |
-| Fails | KeyError/ValueError for an entry without numeric uid/gid; CalledProcessError from groupadd/useradd. |
+| Purpose | one fabric-* system user and group per service, in fabric's uid band (600-649), so bind-mounted files have the right owner; an install that still has the previous accounts (bind, nginx, ... with their old ids) is moved to the new ones (design host-consent.md §5). Asks nothing: the `accounts` consent was given before the first step. |
+| Inputs | ctx — SetupContext: vars.service_users, deploy_base, source_dir (jinja/), config_dir (consent.yaml). |
+| Returns | None; accounts exist (nologin, no home); files of a previous account belong to its new one, and the previous account is removed — unless a process still runs as it (a container not restarted yet): then a warning, and the next setup run removes it. Idempotent. |
+| Fails | SetupError from plan_accounts (an id taken by another account) or check_consent (not approved); CalledProcessError from groupadd/useradd/find. |
 | Feeds | setup step `accounts`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
 
@@ -509,7 +504,7 @@
 | | |
 |---|---|
 | Purpose | merge the HARDENED settings into /etc/docker/daemon.json (existing keys kept) and restart Docker if anything changed. |
-| Inputs | ctx — SetupContext: vars security.docker_daemon_hardening (default True). Reads DAEMON_JSON. |
+| Inputs | ctx — SetupContext: vars security.docker_daemon_hardening (default True), config_dir (the `runtime` consent: without it nothing is written). Reads DAEMON_JSON. |
 | Returns | None; daemon.json converged and Docker restarted only when it changed. With the setting false it only warns — settings written earlier are not removed. |
 | Fails | json.JSONDecodeError on an unparseable daemon.json; CalledProcessError from `systemctl restart docker`; SetupError when Docker does not answer `docker info` within about 60 s; AttributeError if vars `security` is null. |
 | Feeds | setup step `docker`, run by run_setup via STEPS. |
@@ -567,7 +562,7 @@
 | | |
 |---|---|
 | Purpose | publish every CA format on certs.<domain> and trust the CA on this host; done on every setup, since a reinstall keeps the CA but not /opt/nginx or the host trust entries. |
-| Inputs | ctx — SetupContext: vars.domain_file, service user nginx (uid/gid); certs_dir — Step-CA certs folder. |
+| Inputs | ctx — SetupContext: vars.domain_file, service user nginx (uid/gid), config_dir (the `trust` consent: without it the CA is published but not added to the host's trust store); certs_dir — Step-CA certs folder. |
 | Returns | True if anything changed (from publish_ca_certs). |
 | Fails | CalledProcessError from openssl/update-ca-certificates and OSError inside publish_ca_certs; KeyError without domain_file. |
 | Feeds | run. |
@@ -593,6 +588,7 @@
 | Returns | None. First run: <deploy_base>/stepca/data with the CA (password file 0600, owned by step; an own root made with path length ca_nest_depth + 1 by _make_root; with byoc, certs/ca_parents.crt and certs/intermediate_chain.crt for the parent CAs) and ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the permissions, publishing and trust are (re)done. |
 | Fails | SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars. |
 | Feeds | setup step `pki`, run by run_setup via STEPS. |
+| Notes | trusting the CA on the host needs the `trust` consent; without it a warning, and the CA is only published (design host-consent.md). |
 | Called by | — (no static caller) |
 
 ## `fabricctl/lib/fabriclib/setup/join_federation.py`
@@ -762,7 +758,7 @@
 | | |
 |---|---|
 | Purpose | `fabricctl restore <folder>`: bring back a fabric removed with `fabricctl uninstall --export` (or apt purge): its data goes back in place with owners and modes, then setup runs on it — the same CA, directory, Keycloak, DNS and vault (its key comes back with it). |
-| Inputs | args — command arguments: the export folder (first non-option), --yes/-y, --deploy-base, --no-color; deploy_base — install root; cli — path of this fabricctl's cli.py (the packaged, newest code) that setup is run with. |
+| Inputs | args — command arguments: the export folder (first non-option), --yes/-y, --deploy-base, --no-color, --approve/--decline GROUPS (passed to setup: the export's recorded answers usually cover everything); deploy_base — install root; cli — path of this fabricctl's cli.py (the packaged, newest code) that setup is run with. |
 | Returns | 1 when refused (no folder, not an export, fabric already installed) or not confirmed; on success it does not return: restore_install, then the process is replaced by `cli.py setup --yes --non-interactive`. |
 | Fails | ValidationError is printed with USAGE (exit 1); CalledProcessError from restore_install (cp -a); EOFError from input() without --yes; OSError from os.execv. |
 | Feeds | cli main (`restore`). |
@@ -775,8 +771,8 @@
 | | |
 |---|---|
 | Purpose | `fabricctl setup` / `fabricctl doctor`: parse options, collect settings, show the plan and run the selected steps of STEPS in order. |
-| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --step NAME (repeatable), --join [@FILE\|-] (join an upstream fabric; read_join_invitation), --list, --doctor (hidden, used by doctor). |
-| Returns | exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted. A full run leaves the install converged; the steps before deploy (preflight, host, docker, deploy) collect vars first, and the plan is shown only when no --step is given. |
+| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --approve GROUPS / --decline GROUPS (host changes, repeatable), --step NAME (repeatable), --join [@FILE\|-] (join an upstream fabric; read_join_invitation), --list, --doctor (hidden, used by doctor). |
+| Returns | exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted. A full run leaves the install converged; the steps before deploy (preflight, host, docker, deploy) collect vars first, and the plan is shown only when no --step is given. Before the first step every change outside fabric's own tree is asked about, by group (consent; --yes approves none). |
 | Fails | SystemExit(2) from argparse on bad options; SystemExit("setup cancelled") when Quit is chosen in the plan; any exception other than SetupError/KeyboardInterrupt from a step (CalledProcessError, CommandError, ValidationError, OSError) propagates as a traceback. |
 | Feeds | cli main (`setup`, `doctor`) and this file's `__main__`. |
 | Called by | `fabriclib.cli.main`, `fabriclib.setup.run_setup.<module>` |
@@ -912,9 +908,9 @@
 
 | | |
 |---|---|
-| Purpose | adjust an existing install's vars before a newer fabric re-renders them, so an upgrade never changes a running image. |
+| Purpose | adjust an existing install's vars before a newer fabric re-renders them, so an upgrade never changes a running image, and gets this release's service accounts. |
 | Inputs | data — the existing vars dict (modified in place); pinned — collection of image_* keys the admin set explicitly (left alone). |
-| Returns | list of change descriptions (str), one per image_* key dropped. Keys pinned by digest ("@sha256:") are kept; unpinned refs and local build names not in `pinned` are deleted, so the release's validated, digest-pinned default applies. |
+| Returns | list of change descriptions (str), one per image_* key dropped and one per service account moved. Keys pinned by digest ("@sha256:") are kept; unpinned refs and local build names not in `pinned` are deleted, so the release's validated, digest-pinned default applies. service_users entries that are exactly a previous release's default (PREVIOUS_ACCOUNTS: same uid and gid, no name) are deleted, so the fabric-* account in the 600-649 band applies (the accounts step moves the files); entries the admin changed are kept. |
 | Fails | never — dict operations only. |
 | Feeds | collect_vars (logs each change). |
 | Notes | `fabricctl images update` is what changes images (design D21). |

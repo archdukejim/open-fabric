@@ -10,6 +10,7 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabricctl-jinja](fabricctl-jinja.md) | Code that runs inside service containers (389-DS seeding, FreeRADIUS policy) | 24 | 8 |
 | [fabricctl-lib](fabricctl-lib.md) | Entry points: the deploy engine, the vars editor, the Keycloak configuration | 9 | 2 |
 | [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 29 | 19 |
+| [fabriclib-consent](fabriclib-consent.md) |  | 25 | 18 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 5 | 1 |
 | [fabriclib-deploy](fabriclib-deploy.md) | The deploy engine: secrets, settings, render, install, restart | 30 | 25 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 12 | 9 |
@@ -26,8 +27,8 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-radius](fabriclib-radius.md) | Optional 802.1X (FreeRADIUS): clients, groups, setup guides, decisions | 16 | 14 |
 | [fabriclib-rbac](fabriclib-rbac.md) | Who may do what: permissions, bundles, route table | 2 | 2 |
 | [fabriclib-secrets](fabriclib-secrets.md) | fabric's own secrets: file or OpenBao | 11 | 9 |
-| [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 2 | 1 |
-| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 81 | 34 |
+| [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 4 | 3 |
+| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 80 | 37 |
 | [fabriclib-system](fabriclib-system.md) | Service status, start/stop, apply, version | 6 | 5 |
 | [fabriclib-vault](fabriclib-vault.md) | OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass | 81 | 43 |
 | [installers](installers.md) | The Debian package wrapper | 2 | 1 |

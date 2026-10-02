@@ -119,7 +119,7 @@ for z in $(grep -o 'db\.[^"]*' "$R/bind9/config/named.conf.zones"); do
     else printf '$TTL 3600\n@ IN SOA ns.%s. hostmaster.%s. (1 3600 900 604800 300)\n@ IN NS ns.%s.\n' "$DOMAIN" "$DOMAIN" "$DOMAIN" > "$BASE/bind9/data/$z"; fi
 done
 cp dns.chain "$BASE/bind9/ssl/fullchain.pem"; cp dns.key "$BASE/bind9/ssl/privkey.pem"; cp root.crt "$BASE/bind9/ssl/root_ca.crt"
-chown -R 53:53 "$BASE/bind9"; chmod 600 "$BASE/bind9/config/rndc.key" "$BASE/bind9/config/named.conf.keys" "$BASE/bind9/ssl/privkey.pem"
+chown -R 600:600 "$BASE/bind9"; chmod 600 "$BASE/bind9/config/rndc.key" "$BASE/bind9/config/named.conf.keys" "$BASE/bind9/ssl/privkey.pem"
 check "bind9 builds and becomes healthy" "up bind9 && wait_healthy bind9"
 check "bind9 hardened: $(hardened bind9 1 | tr -d '\n')" "hardened bind9 1 >/dev/null"
 dnsq() {  # name server port -> first A answer (tiny stdlib DNS client)
@@ -146,8 +146,8 @@ check "bind9 follows CNAME (ca.$DOMAIN -> pi-core)" "[ \"\$(dnsq ca.$DOMAIN 127.
 # ---- step-ca -------------------------------------------------------------
 echo "--- step-ca"
 mkdir -p "$BASE/stepca/data/secrets"; openssl rand -hex 16 > "$BASE/stepca/data/secrets/password"
-chown -R 135:135 "$BASE/stepca"
-docker run --rm --user 135:135 -v "$BASE/stepca/data:/home/step" -e STEPPATH=/home/step \
+chown -R 603:603 "$BASE/stepca"
+docker run --rm --user 603:603 -v "$BASE/stepca/data:/home/step" -e STEPPATH=/home/step \
   "$(python3 -c "import yaml;print(yaml.safe_load(open('$R/vars.yaml'))['image_stepca'])")" \
   step ca init --name "Test CA" --dns "ca.$DOMAIN" --dns 127.0.0.1 --address :9000 --provisioner admin \
   --password-file /home/step/secrets/password --provisioner-password-file /home/step/secrets/password \
@@ -159,7 +159,7 @@ check "step-ca hardened: $(hardened step-ca 1 | tr -d '\n')" "hardened step-ca 1
 echo "--- postgres"
 mkdir -p "$BASE/postgres/data" "$BASE/postgres/certs"
 cp pg.chain "$BASE/postgres/certs/fullchain.pem"; cp pg.key "$BASE/postgres/certs/privkey.pem"
-chown -R 901:901 "$BASE/postgres"; chmod 600 "$BASE/postgres/certs/privkey.pem"
+chown -R 605:605 "$BASE/postgres"; chmod 600 "$BASE/postgres/certs/privkey.pem"
 check "postgres initialises and becomes healthy" "up postgres && wait_healthy postgres"
 check "postgres hardened: $(hardened postgres 1 | tr -d '\n')" "hardened postgres 1 >/dev/null"
 check "postgres serves TLS" "docker exec postgres psql -U keycloak -d keycloak -tAc 'show ssl' | grep -qx on"
@@ -168,7 +168,7 @@ check "postgres serves TLS" "docker exec postgres psql -U keycloak -d keycloak -
 echo "--- keycloak"
 mkdir -p "$BASE/keycloak/data" "$BASE/keycloak/certs"
 cp kc.chain "$BASE/keycloak/certs/fullchain.pem"; cp kc.key "$BASE/keycloak/certs/privkey.pem"; cp root.crt "$BASE/keycloak/certs/root_ca.crt"
-chown -R 900:0 "$BASE/keycloak"; chmod 600 "$BASE/keycloak/certs/privkey.pem"
+chown -R 604:0 "$BASE/keycloak"; chmod 600 "$BASE/keycloak/certs/privkey.pem"
 check "keycloak (optimized build) starts against postgres (verify-full TLS)" "up keycloak && wait_healthy keycloak 420"
 check "keycloak hardened: $(hardened keycloak 1 | tr -d '\n')" "hardened keycloak 1 >/dev/null"
 # Health (port 9000) comes up a few seconds before first-boot realm setup ends.
@@ -182,7 +182,7 @@ mkdir -p "$BASE/dirsrv/data/tls/ca" "$BASE/dirsrv/seed"
 cp ldap.crt "$BASE/dirsrv/data/tls/server.crt"; cp ldap.key "$BASE/dirsrv/data/tls/server.key"
 cp root.crt int.crt "$BASE/dirsrv/data/tls/ca/"
 cp "$R"/dirsrv/seed/*.ldif "$BASE/dirsrv/seed/"; cp "$REPO/fabricctl/jinja/dirsrv/seed.py" "$BASE/dirsrv/seed/"
-chown -R 911:911 "$BASE/dirsrv/data"; chown -R 0:911 "$BASE/dirsrv/seed"; chmod 750 "$BASE/dirsrv/seed"; chmod 640 "$BASE/dirsrv/seed"/*
+chown -R 601:601 "$BASE/dirsrv/data"; chown -R 0:601 "$BASE/dirsrv/seed"; chmod 750 "$BASE/dirsrv/seed"; chmod 640 "$BASE/dirsrv/seed"/*
 check "dirsrv builds and becomes healthy" "up dirsrv && wait_healthy dirsrv"
 check "dirsrv hardened: $(hardened dirsrv 1 | tr -d '\n')" "hardened dirsrv 1 >/dev/null"
 seed() {
@@ -204,7 +204,7 @@ printf 'seal "static" {
   current_key = "file:///openbao/seal/fabric-1.key"
 }
 ' > "$BASE/openbao/config/seal.hcl"
-mkdir -p "$W/admin"; chown -R 913:913 "$BASE/openbao" "$W/run" "$W/admin"; chmod 700 "$W/run" "$W/admin"; chmod 400 "$W/run/fabric-1.key" "$BASE/openbao/certs/privkey.pem"
+mkdir -p "$W/admin"; chown -R 607:607 "$BASE/openbao" "$W/run" "$W/admin"; chmod 700 "$W/run" "$W/admin"; chmod 400 "$W/run/fabric-1.key" "$BASE/openbao/certs/privkey.pem"
 check "openbao (pinned image) starts; uninitialised counts as healthy" "up openbao && wait_healthy openbao"
 check "openbao hardened: $(hardened openbao 1 | tr -d '\n')" "hardened openbao 1 >/dev/null"
 check "openbao serves TLS with its cert" \

@@ -13,8 +13,10 @@ ARG KEA_REPO
 ARG KEA_SUITE
 ARG KEA_KEY_URL
 ARG KEA_KEY_FINGERPRINT
-ARG KEA_UID=915
-ARG KEA_GID=915
+ARG KEA_UID=609
+ARG KEA_GID=609
+# the service account's ids are baked in: a change rebuilds (images/needs_rebuild)
+LABEL org.fabric.ids="${KEA_UID}:${KEA_GID}"
 LABEL org.fabric.kea="${KEA_VERSION}"
 
 RUN apt-get update \

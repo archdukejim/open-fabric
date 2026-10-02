@@ -51,6 +51,7 @@ import sys
 # Run as a script, Python puts fabriclib/ itself first on sys.path, where its
 # folders (dns/, ldap/, keycloak/) would shadow real packages. Use fabric/lib.
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from fabriclib.consent.show_consent_status import show_consent_status  # noqa: E402
 from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
@@ -211,6 +212,8 @@ def main(argv):
             print(f"{unit:<16} {state:<10} {health}")
         if cmd != "status":
             print(f"fabric: {cmd} done (systemctl {cmd} fabric.target)")
+        else:
+            show_consent_status(SetupContext(deploy_base=_base(args)).config_dir)
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)

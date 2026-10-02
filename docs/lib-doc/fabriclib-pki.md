@@ -440,7 +440,7 @@
 | | |
 |---|---|
 | Purpose | Publish the fabric root and intermediate CA certificates for every kind of system into www_dir (served at certs.<domain>) and trust them on this host. Idempotent. |
-| Inputs | certs_dir — holds Step-CA's root_ca.crt and intermediate_ca.crt (the latter may carry the root too, as with a bring-your-own chain: only its first certificate is used); www_dir — the certs web root (created if missing); uid, gid — owner of the published files (nginx); trust_prefix — file name prefix in /usr/local/share/ca-certificates. |
+| Inputs | certs_dir — holds Step-CA's root_ca.crt and intermediate_ca.crt (the latter may carry the root too, as with a bring-your-own chain: only its first certificate is used); www_dir — the certs web root (created if missing); uid, gid — owner of the published files (nginx); trust_prefix — file name prefix in /usr/local/share/ca-certificates; None: publish only, do not touch the host's trust store (the `trust` consent was declined, design host-consent.md). |
 | Returns | True if any published file or trust-store file changed, else False. |
 | Fails | subprocess.CalledProcessError from openssl or update-ca-certificates; OSError (missing CA files, trust directory not writable). |
 | Feeds | setup/init_pki.py _publish_ca_certs. |

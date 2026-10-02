@@ -10,6 +10,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [dns/](dns/) | DNS zones and records in `vars.yaml` (validated), zone sync status |
 | [system/](system/) | Version, service status, apply |
 | [setup/](setup/) | `fabricctl setup`, `doctor`, `uninstall`, `reinstall` — the installer |
+| [consent/](consent/) | Asking before fabric changes the host: the change groups, the questions, the recorded answers |
 | [pki/](pki/) | Issue, check and install certificates from Step-CA |
 | [security/](security/) | Firewall for Docker-published ports |
 | [rbac/](rbac/) | Access control for people: permissions, bundles, what each fabric-agent route needs |

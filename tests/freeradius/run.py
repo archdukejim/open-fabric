@@ -244,10 +244,10 @@ people_map = normalize_radius_people([{"group": "staff", "vlan": 20, "priority":
                                       {"group": "guests", "vlan": 50, "priority": 60},
                                       {"group": "contractors", "priority": 70}])
 rv = {"deploy_base_dir": W, "ldap_base_dn": BASE, "ldap_local_dn": LOCAL, "hostname_ldap": f"ldap.{DOMAIN}", "radius_clients": clients,
-      "radius_people": people_map, "service_users": {"freeradius": {"uid": 916, "gid": 916}}}
+      "radius_people": people_map, "service_users": {"freeradius": {"uid": 610, "gid": 610}}}
 deploy_freeradius(rv, {"radius_secrets": embedded, "ldap_radius_password": "Rr1"},
                   jinja_env(os.path.join(REPO, "fabricctl", "jinja")))
-install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt", f"{W}/freeradius/certs", 916, 916,
+install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt", f"{W}/freeradius/certs", 610, 610,
              names=("server.pem", "server.key", None))
 with open(f"{W}/freeradius/certs/ca.pem", "w") as f:       # as setup's certificate step writes it
     f.write(open(f"{W}/pki/root.crt").read() + open(f"{W}/pki/int.crt").read())
@@ -257,9 +257,9 @@ check("config: clients.conf holds the client secret, mode 0640 (never world-read
 
 
 def start_radius():
-    sh(["docker", "run", "-d", "--name", "rt-radius", "--network", NET, "--ip", RADIUS_IP, "--user", "916:916",
+    sh(["docker", "run", "-d", "--name", "rt-radius", "--network", NET, "--ip", RADIUS_IP, "--user", "610:610",
         "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
-        "--tmpfs", "/tmp:noexec,nosuid,size=8m", "--tmpfs", "/run/freeradius:uid=916,gid=916,mode=0700,size=8m",
+        "--tmpfs", "/tmp:noexec,nosuid,size=8m", "--tmpfs", "/run/freeradius:uid=610,gid=610,mode=0700,size=8m",
         "-v", f"{W}/freeradius/config:/etc/freeradius/fabric:ro",
         "-v", f"{W}/freeradius/certs:/etc/freeradius/certs:ro",
         "-v", f"{W}/freeradius/python:/etc/freeradius/python:ro", "fabric/freeradius:test"])
@@ -434,8 +434,8 @@ check("389-DS back: FreeRADIUS reconnects by itself", code == "Access-Accept", o
 # ------------------------------------------------------------------ hardening
 import json  # noqa: E402
 h = json.loads(sh("docker inspect rt-radius").stdout)[0]
-check("container: uid 916, no capabilities, read-only, no-new-privileges",
-      h["Config"]["User"] == "916:916" and h["HostConfig"]["CapDrop"] == ["ALL"] and not h["HostConfig"].get("CapAdd")
+check("container: uid 610, no capabilities, read-only, no-new-privileges",
+      h["Config"]["User"] == "610:610" and h["HostConfig"]["CapDrop"] == ["ALL"] and not h["HostConfig"].get("CapAdd")
       and h["HostConfig"]["ReadonlyRootfs"] and "no-new-privileges:true" in h["HostConfig"]["SecurityOpt"])
 check("no RADIUS secret and no person's password in the logs",
       SECRET not in logs() and PW not in logs() and "wrong-password" not in logs())
