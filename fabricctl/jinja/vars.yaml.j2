@@ -75,6 +75,7 @@ hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
 hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower }}
 hostname_radius: {{ ((cname_radius | default('radius')) ~ '.' ~ domain) | lower }}
 hostname_adguard: {{ ((cname_adguard | default('adguard')) ~ '.' ~ domain) | lower }}
+hostname_ntp: {{ ((cname_ntp | default('ntp')) ~ '.' ~ domain) | lower }}
 {# The federation endpoint (design federation.md §5): sites join this install through it. Off until
    `fabricctl federation enable`; the name is always computed. #}
 federation_endpoint: {{ federation_endpoint | default(false) | bool | lower }}
@@ -164,6 +165,13 @@ adguard_upstreams: {{ adguard_upstreams | default([], true) | to_json }}
 adguard_filter_lists: {{ adguard_filter_lists | default([], true) | to_json }}
 # Rules after the generated ones (fabric's own domains and this host are always allowed first).
 adguard_rules: {{ adguard_rules | default([], true) | to_json }}
+# Time (design ntp.md): chrony on the host keeps its clock and serves the network. ntp_servers: "<host> [nts]
+# [pool] [prefer]" (nts: authenticated time); a federated site asks its upstream site first. [] = the upstream
+# site only (or this host's own clock). ntp_serve: answer the LAN (UDP 123; Kea hands it out as option 42).
+# ntp_set_clock: false runs chrony without setting the clock (a container sharing its host's kernel clock).
+ntp_servers: {{ (ntp_servers if ntp_servers is defined and ntp_servers is not none else ['time.cloudflare.com nts', 'nts.netnod.se nts', 'ptbtime1.ptb.de nts']) | to_json }}
+ntp_serve: {{ ntp_serve | default(true) | bool | lower }}
+ntp_set_clock: {{ ntp_set_clock | default(true) | bool | lower }}
 # syslog: {host, port (6514), tls (true), ca_file}; elastic: {url, index, user, ca_file}.
 # The Elasticsearch password lives in OpenBao: sudo fabricctl logs set-password elastic
 log_forwarding: {{ log_forwarding | default({}, true) | to_json }}
@@ -337,6 +345,11 @@ bind_acl_policies:
 {% endif %}
 {% if (dns_filter | default('none', true) | lower) == 'adguard' %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_adguard | default('adguard') }) %}
+{% endif %}
+{# ntp.<domain> for clients; an install that already has a record of that name keeps its own #}
+{% set _own = ((dns | default({})).get('dynamic_zone_var', {}).get('A', []) + (dns | default({})).get('dynamic_zone_var', {}).get('CNAME', [])) | map(attribute='name') | list %}
+{% if ntp_serve | default(true) | bool and (cname_ntp | default('ntp')) not in _own %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_ntp | default('ntp') }) %}
 {% endif %}
 {% set default_a = [
   { 'ip': host_ip, 'name': hostname }

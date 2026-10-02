@@ -1,11 +1,16 @@
 import os
+import shutil
 import stat
 import subprocess
 
 from fabriclib.common.console import err, ok
 from fabriclib.common.dns_query import dns_query
 from fabriclib.common.sudo_owner import sudo_owner
+from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.keycloak.user_has_role import user_has_role
+from fabriclib.ntp.chrony_settings import chrony_settings
+from fabriclib.ntp.query_time import query_time
+from fabriclib.ntp.time_status import time_status
 from fabriclib.setup.errors import SetupError
 from fabriclib.vault.vault_status import vault_status
 
@@ -44,7 +49,9 @@ def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
              trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin
              (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter
-             (AdGuard answers on 53, its UI asks for sign-in) when on, and every installed service.
+             (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off
+             — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site),
+             and every installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port,
              install_ldap/webui/keycloak, federation_endpoint, install_adguard, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA
              root, the agent socket, ~/fabric-admin of the sudo user.
@@ -78,6 +85,22 @@ def checks(ctx):
         rc, code = _curl(f"https://{v['hostname_adguard']}/", v["hostname_adguard"], v["ip_nginx"], 443, root_ca)
         add(f"https://{v['hostname_adguard']} asks for sign-in first (OIDC)", (rc, code) == (0, "302"),
             f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
+
+    if shutil.which("chronyc"):             # time (ntp.md): certificates, TOTP and TSIG depend on it
+        t = time_status()
+        own_only = not chrony_settings(v, os.path.join(ctx.config_dir, "federation.yaml"))["sources"]
+        if t.get("error"):
+            add("time: chrony answers", False, t["error"])
+        else:
+            add("time synchronised (under 1 s off)" if not own_only else "time: this host's own clock (no sources)",
+                (t["synced"] and t["offset"] < 1.0) or (own_only and t["local"]),
+                f"{t['source']}, stratum {t['stratum']}, {t['offset']:.3f} s off" if not t["local"]
+                else "no time source reachable: this host's own clock")
+        up = (load_registry(os.path.join(ctx.config_dir, "federation.yaml")).get("upstream") or {}).get("address")
+        if up:
+            off = query_time(up)
+            add(f"time agrees with the upstream site ({up})", off is not None and abs(off) < 1.0,
+                f"{off:+.3f} s" if off is not None else "no answer on UDP 123")
 
     rc, code = _curl(f"http://{v['host_ip']}/", v["host_ip"], v["host_ip"], 80, root_ca)
     add("nginx HTTP", code in ("200", "301", "302"), f"HTTP {code}")

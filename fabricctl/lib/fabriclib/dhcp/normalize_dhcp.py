@@ -24,18 +24,31 @@ def _pool(text, net):
     return lo, hi
 
 
+def _is_v4(text):
+    """Purpose: whether text is an IPv4 address.
+    Inputs:  text — anything.
+    Returns: bool.
+    Fails:   never.
+    Feeds:   normalize_dhcp (dhcp.ntp)."""
+    try:
+        return ipaddress.ip_address(str(text)).version == 4
+    except ValueError:
+        return False
+
+
 def normalize_dhcp(v):
     """Purpose: Check `dhcp:` (and that nothing static collides with it) before anything is rendered.
     Inputs:  v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4
              network, host bits zero), pools, routers, reservations [{mac, ip, hostname}]}], ddns_subdomain (one label,
-             default dhcp), lease_time (int 300-2592000, default 86400)}; dns (its A records).
+             default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default
+             86400)}; dns (its A records).
     Returns: a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` with subnets normalized (subnet as str,
              reservations with lower-case colon MACs and a hostname only when set).
     Fails:   ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4
              subnet, a bad pool, a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
              pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain
              ValueError (not a ValidationError) if routers is not an IP address.
-    Feeds:   deploy.py (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py.
+    Feeds:   deploy/check_settings (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py.
     Notes:   a static A record inside a pool is refused because Kea would hand that address out.
     """
     d = dict(v.get("dhcp") or {})
@@ -46,6 +59,9 @@ def normalize_dhcp(v):
         raise ValidationError("dhcp.interfaces: the host interface(s) to serve, e.g. [eth0]")
     if not LABEL_RE.match(str(d.get("ddns_subdomain", "dhcp"))):
         raise ValidationError("dhcp.ddns_subdomain: one DNS label, e.g. dhcp")
+    ntp = d.get("ntp", [])
+    if not isinstance(ntp, list) or not all(_is_v4(a) for a in ntp):
+        raise ValidationError("dhcp.ntp: IPv4 addresses of the time servers handed out, e.g. [192.168.4.2]")
     lease = d.get("lease_time", 86400)
     if not isinstance(lease, int) or not 300 <= lease <= 2592000:
         raise ValidationError("dhcp.lease_time: seconds, 300 to 2592000")

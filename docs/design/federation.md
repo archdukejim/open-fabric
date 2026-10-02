@@ -313,6 +313,7 @@ Milestones, each tested before the next:
 | M7 | **DNS filter (AdGuard Home)**, optional, per site, in front of BIND (owner decision 2026-10-01): design [dns-filter.md](dns-filter.md) | Built before M5 (owner) |
 | M8 | **DHCP management** (owner request 2026-10-01): subnets and pools from `fabricctl dhcp` and the Kea tab, any DHCP option (global, class, subnet, reservation: PXE, ZTP), client classes, each subnet's name, VLAN and notes as a record; the **address plan** across sites (networks reported upstream, overlaps refused) with M5, its table in M6: design [dhcp-management.md](dhcp-management.md) | Built before M5 (owner); the address plan's sync with M5 |
 | M9 | **Time (NTP)** (owner 2026-10-01: a critical service): chrony on every site's host, NTS sources, the upstream site first, serving the LAN, option 42 from Kea, sync checked by doctor: design [ntp.md](ntp.md) | Built before M8 |
+| M10 | **Joining Linux machines** (owner 2026-10-02): POSIX identities for people, login and sudo rules in the directory, an installer that pins the CA, an Ubuntu client test; then machine enrolment; Kerberos only by decision: design [domain-join.md](domain-join.md) | Planned |
 
 ## 9. Decisions for the owner
 

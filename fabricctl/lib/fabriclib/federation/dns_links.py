@@ -40,7 +40,7 @@ def dns_links(v, secrets, registry_path):
              address, domain or key are left out (e.g. a site that joined before M4, until it joins again);
              port is the site's published DNS port (its bind_dns_port, reported at join; 53 when not).
     Fails:   yaml/OSError from load_registry.
-    Feeds:   deploy.py apply_deployment (the bind9 templates: named.conf.zones, named.conf.keys, zone.j2)."""
+    Feeds:   deploy/apply_deployment (the bind9 templates: named.conf.zones, named.conf.keys, zone.j2)."""
     registry = load_registry(registry_path)
     keys = (secrets or {}).get("federation_tsig") or {}
     domain = str(v.get("domain") or "")

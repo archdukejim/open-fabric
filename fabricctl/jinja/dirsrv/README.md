@@ -2,7 +2,7 @@
 
 389 Directory Server (only with `install_ldap`). Rendered and copied by
 `deploy.py` into `/opt/dirsrv/`; the `ldap` systemd unit runs the
-`dirsrv` container, and `lib/dirsrv.sh seed` applies the seed.
+`dirsrv` container, and `fabriclib/ldap/seed_directory.py` applies the seed.
 
 | Path | What |
 |---|---|

@@ -26,8 +26,22 @@
 | Returns | [] for start/stop/restart once systemctl succeeded; for status [(unit, state, container health)]: fabric.target first, then service_status() — no change is made. |
 | Fails | ValidationError when systemctl fails or the verb is unknown; subprocess.TimeoutExpired after 900 s. |
 | Feeds | cli main (prints the rows). |
-| Notes | stop names every installed unit too: stopping an inactive target would not reach them. |
+| Notes | stop names every installed unit too: stopping an inactive target would not reach them. chrony (the host's time, ntp.md) is shown by status but never stopped. |
 | Called by | `fabriclib.cli.main` |
+
+## `fabricctl/lib/fabriclib/system/render_template_file.py`
+
+### `render_template_file(template, vars_path, output=None)`
+
+| | |
+|---|---|
+| Purpose | `fabricctl --render-jinja <file.j2> [--vars FILE] [--output FILE\|DIR]`: render one Jinja2 template with fabric's vars and filters, for checking a template or making a config file from them. |
+| Inputs | template — the .j2 file; vars_path — the vars file (default <fabric>/config/vars.yaml, chosen by the caller); output — a file or a folder (default: the sudo caller's home). Env SUDO_USER/USER. |
+| Returns | exit status 0 after "Render complete: <dest>"; 1 with a message when the template or vars file is missing or the template does not render. |
+| Fails | OSError writing the result (an unknown user only skips the chown). |
+| Feeds | cli.py (--render-jinja). |
+| Notes | the result is named after the template without .j2 (or <name>.rendered), mode 0644, owned by the caller. |
+| Called by | `fabriclib.cli._flags` |
 
 ## `fabricctl/lib/fabriclib/system/service_status.py`
 

@@ -1,12 +1,10 @@
-import importlib
 import os
-import sys
 
 import yaml
 
 from fabriclib.common.console import ok
+from fabriclib.deploy.apply_deployment import apply_deployment
 from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
-from fabriclib.common.paths import LIB_DIR
 
 CLI_WRAPPER = """#!/bin/bash
 # fabricctl - fabric management CLI (installed by fabricctl setup)
@@ -50,12 +48,12 @@ def run(ctx):
              starting anything; make sure a `fabricctl` command exists.
     Inputs:  ctx — SetupContext: vars (saved to <config>/fabric.yaml first, keeping plan choices), config_dir,
              secrets_file, deploy_base, target_dir. Sets env DEPLOY_BASE_DIR, CUSTOM_VARS_PATH,
-             SECRETS_FILE_OVERRIDE, LINK_VARS_PATH and reloads lib/deploy.py (it reads them at import).
+             SECRETS_FILE_OVERRIDE, LINK_VARS_PATH for the deploy engine (deploy/deploy_paths reads them per run).
     Returns: None. Leaves the rendered install, an empty 0600 secrets file unless the secrets are in OpenBao,
              ctx.restart_services extended with services whose config, unit or image changed, ctx reloaded
              (vars.yaml). From the package: an old /usr/local/bin wrapper is removed; from a checkout:
              /usr/local/bin/fabricctl is written (runs <target>/lib/manage.sh).
-    Fails:   whatever deploy.apply_deployment raises (ValidationError, CalledProcessError, OSError) —
+    Fails:   whatever apply_deployment raises (ValidationError, CalledProcessError, OSError) —
              propagates; OSError writing files.
     Feeds:   setup step `deploy`, run by run_setup via STEPS (run_setup then reloads ctx.vars)."""
     fabric_yaml = os.path.join(ctx.config_dir, "fabric.yaml")
@@ -75,11 +73,8 @@ def run(ctx):
         "SECRETS_FILE_OVERRIDE": ctx.secrets_file,
         "LINK_VARS_PATH": os.path.join(ctx.config_dir, "link-vars.yaml"),
     })
-    if LIB_DIR not in sys.path:
-        sys.path.insert(0, LIB_DIR)
-    deploy = importlib.reload(importlib.import_module("deploy"))   # reads DEPLOY_BASE_DIR at import
     # Services whose config, unit or image changed: the start step restarts them.
-    ctx.restart_services.update(deploy.apply_deployment(start_services=False) or ())
+    ctx.restart_services.update(apply_deployment(start_services=False) or ())
     ctx.load_state()
     ok(f"configuration deployed to {ctx.deploy_base}")
 

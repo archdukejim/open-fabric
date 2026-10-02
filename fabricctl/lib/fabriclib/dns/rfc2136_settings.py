@@ -6,7 +6,7 @@ def rfc2136_settings(v, key, secret):
              secret — base64 str, written as is.
     Returns: str: dns_rfc2136_server, _port, _name, _secret, _algorithm (upper case) and _base_domain lines.
     Fails:   KeyError if key has no "name".
-    Feeds:   deploy.py (writes each key's rfc2136.ini), create_zone_tsig_key, rotate_tsig_key.
+    Feeds:   deploy/render_templates (each key's rfc2136.ini), create_zone_tsig_key, rotate_tsig_key.
     Notes:   the text holds the secret; callers must keep it private.
     """
     return (f"# RFC2136 credentials for TSIG key: {key['name']}\n"

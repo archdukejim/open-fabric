@@ -37,6 +37,6 @@
 | Inputs | v — rendered vars: deploy_base_dir, service_users (adguard, oauth2proxy, nginx), ip_bind9, host_ip, lan_cidr, fabric_subnet, domain, org_domain, the adguard_* settings and what the templates use; secrets — fabric's secrets: adguard_admin_password, adguard_oidc_secret, adguard_cookie_secret; links — dns_links' result (the linked sites' zones); jinja_env — the fabric template environment. |
 | Returns | {"adguard": bool, "oauth2proxy": bool, "nginx": bool} — which of them changed (restart / reload). |
 | Fails | KeyError for missing vars or secrets; OSError; yaml errors reading AdGuard's file; jinja2 errors. |
-| Feeds | deploy.py apply_deployment (when install_adguard); tests/adguard/run.py. |
+| Feeds | deploy/deploy_optional_parts (when install_adguard); tests/adguard/run.py. |
 | Notes | <base>/adguard/conf and work are the adguard user's (0700); its YAML is 0600 and rewritten only when the merge changes its content, so AdGuard's own reformatting never restarts it. The local user's bcrypt hash is kept while it still matches the password. oauth2-proxy/secrets.env is root 0600 (docker reads it); the nginx snippet conf.d/adguard-auth.inc (not *.conf, so it is included only in AdGuard's location) is root:nginx 0640. |
-| Called by | `deploy.apply_deployment` |
+| Called by | `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts` |

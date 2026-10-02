@@ -74,6 +74,7 @@ install_webui: true
 install_freeradius: true
 install_kea: true
 dns_filter: adguard
+ntp_set_clock: false        # the sandbox shares the PC's kernel clock: chrony keeps time, never sets it
 dhcp:
   interfaces: [eth0]
   lease_time: 600
@@ -113,15 +114,27 @@ check "with Keycloak down the sign-in still starts and DNS answers through AdGua
     "in_box 'systemctl is-active adguard-auth' | grep -qx active && in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP"
 in_box 'systemctl start keycloak' >> "$OUT/adguard-no-keycloak.log" 2>&1
 
-echo "--- DHCP: Kea 3.0 serves the LAN, lease hostnames in dhcp.<domain>"
+echo "--- Time: chrony on the host serves the LAN (ntp.md)"
 BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
+check "time: chrony runs, configured by fabric, answering the LAN" \
+    "in_box 'systemctl is-active chrony' | grep -qx active && in_box 'grep -q ^allow /etc/chrony/chrony.conf && grep -q fabric /etc/chrony/chrony.conf'"
+check "time: UDP 123 opened in the host firewall" "in_box 'ufw status' | grep -q '123/udp'"
+check "time: ntp.lan.test points at the host" "in_box 'dig +short @$IP ntp.lan.test' | grep -qx $IP"
+docker run --rm --network "$NET" "$BUSYBOX" timeout 20 ntpd -n -w -d -p "$IP" > "$OUT/ntp-client.log" 2>&1
+check "time: a LAN client gets the time from the host" "grep -q 'reply from $IP' '$OUT/ntp-client.log'"
+
+echo "--- DHCP: Kea 3.0 serves the LAN, lease hostnames in dhcp.<domain>"
 docker rm -f fabric-sbx-dhcp >/dev/null 2>&1
-docker run --name fabric-sbx-dhcp --network "$NET" --cap-add NET_ADMIN --cap-add NET_RAW "$BUSYBOX" \
-    udhcpc -i eth0 -n -q -f -t 5 -s /bin/true -x hostname:sbxclient > "$OUT/dhcp.log" 2>&1
+# the event script prints what the client was handed (ntpsrv: DHCP option 42)
+docker run --name fabric-sbx-dhcp --network "$NET" --cap-add NET_ADMIN --cap-add NET_RAW \
+    -e EV='echo "event $1 ntpsrv=$ntpsrv"' "$BUSYBOX" \
+    sh -c 'printf "#!/bin/sh\n%s\n" "$EV" > /tmp/ev && chmod +x /tmp/ev && exec udhcpc -i eth0 -n -q -f -t 5 -s /tmp/ev -O ntpsrv -x hostname:sbxclient' \
+    > "$OUT/dhcp.log" 2>&1
 docker rm -f fabric-sbx-dhcp >/dev/null 2>&1
 check "kea: DHCP unit active, Kea 3.0 LTS inside" \
     "in_box 'systemctl is-active kea' | grep -qx active && in_box 'docker exec kea-dhcp4 kea-dhcp4 -v' | grep -q '^3\.0\.'"
 check "kea: a LAN client gets an address from the pool" "grep -q 'lease of 10.77.0.2[0-2][0-9]' '$OUT/dhcp.log'"
+check "kea: the client is handed this host as its time server (option 42)" "grep -q 'ntpsrv=$IP' '$OUT/dhcp.log'"
 check "kea: its hostname is registered in dhcp.lan.test (delegated from lan.test)" \
     "for _ in 1 2 3 4 5; do in_box 'dig +short @$IP sbxclient.dhcp.lan.test' | grep -q '^10\.77\.0\.2' && exit 0; sleep 2; done; exit 1"
 check "kea: fabricctl dhcp leases lists the client's lease" "in_box 'fabricctl dhcp leases' | grep -q 'sbxclient.dhcp.lan.test'"
@@ -194,6 +207,8 @@ in_box 'fabricctl stop' > "$OUT/stop.log" 2>&1
 check "fabricctl stop: every service stopped" \
     "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak openbao fabric-web fabric-agent' | grep -qx active"
 check "fabricctl stop: DNS no longer answers" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
+check "fabricctl stop: the host keeps its time (chrony is not part of the stack)" \
+    "in_box 'systemctl is-active chrony' | grep -qx active"
 in_box 'fabricctl start' > "$OUT/start.log" 2>&1
 sleep 20
 in_box 'fabricctl doctor' > "$OUT/doctor-after-start.log" 2>&1

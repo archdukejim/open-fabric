@@ -30,6 +30,12 @@
 {% endif %}
     "option-data": [
         { "name": "domain-name-servers", "data": "{{ d.dns | default([host_ip]) | join(', ') }}" },
+{% if d.ntp is defined or ntp_serve | default(true) %}
+        // time (ntp.md): this host's chrony unless dhcp.ntp names others ([] hands out none)
+{% if (d.ntp | default([host_ip])) %}
+        { "name": "ntp-servers", "data": "{{ d.ntp | default([host_ip]) | join(', ') }}" },
+{% endif %}
+{% endif %}
         { "name": "domain-name", "data": "{{ d.domain | default(domain) }}" },
         { "name": "domain-search", "data": "{{ ([ddns_zone] if d.ddns | default(true) else []) | join(', ') }}{{ ', ' if d.ddns | default(true) else '' }}{{ domain }}" }
     ],

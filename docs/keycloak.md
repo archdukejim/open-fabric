@@ -77,7 +77,7 @@ These still apply if you drive `kcadm.sh` by hand inside the container.
 ## Phase 4: Security & ACLs
 
 ### 389-DS Seeding (cn=config and the tree)
-*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`dirsrv.sh seed`, run by the `start` setup step and by `fabricctl --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
+*   The seed LDIFs in `/opt/dirsrv/seed/` are applied by `seed.py` **inside** the container over LDAPI as Directory Manager (`fabriclib/ldap/seed_directory.py`, run by the `start` setup step and by `fabricctl --apply` when a seed file changes). Entries are only added when missing; `changetype: modify` records only touch differing values; if anything under `cn=config` changed, the `ldap` service is restarted once.
 *   `00-config.ldif` hardens the server: `nsslapd-require-secure-binds: on`, `nsslapd-minssf: 56` (rootDSE excluded), TLS 1.2 minimum, `PBKDF2-SHA512` password storage, password syntax checks (min length 12, 3 categories), lockout after 5 failures for 900 s, and enables the `memberOf` and `entryUUID` plugins.
 *   `10-tree.ldif` creates the suffix, OUs and groups (`groupOfNames` + `posixGroup`, so both `member` and `gidNumber` work). `20-accounts.ldif` creates the role accounts. `30-aci.ldif` holds the ACIs.
 

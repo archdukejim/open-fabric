@@ -27,7 +27,7 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   │   ├── agent/        # fabric-agent: the privileged host API behind the web UI
 │   │   ├── deploy.py     # render every template from vars.yaml and apply changes
 │   │   ├── interactive.py, keycloak_bootstrap.py
-│   │   └── manage.sh, certs.sh, dirsrv.sh, vars.sh, output.sh
+│   │   └── manage.sh (hands every command to fabriclib/cli.py)
 │   ├── jinja/            # one folder per service (config, compose file, local image build/)
 │   ├── examples/vars.yaml
 │   ├── images.lock.yaml  # validated images (by digest) and pinned packages
@@ -286,7 +286,7 @@ All `.j2` files are rendered by the `fabricctl` deployment engine (`fabricctl/li
 | `fabricctl/jinja/bind9/config/named.conf*.j2` | `/opt/bind9/config/named.conf*` |
 | `fabricctl/jinja/bind9/data/zone.j2` | `/opt/bind9/data/db.<zone>` (forward zones) |
 | `fabricctl/jinja/bind9/data/reverse-zone.j2` | `/opt/bind9/data/db.<reverse zone>` (`in-addr.arpa` /24 and `ip6.arpa` /64 PTR zones — auto-generated) |
-| `fabricctl/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `dirsrv.sh seed`) |
+| `fabricctl/jinja/dirsrv/seed/*.ldif.j2` | `/opt/dirsrv/seed/*.ldif` (applied by `seed.py` via `fabriclib/ldap/seed_directory.py`) |
 | `fabricctl/jinja/dirsrv/seed.py` | `/opt/dirsrv/seed/seed.py` (copied, not rendered) |
 | `fabricctl/jinja/webui/webui.json.j2` | `/opt/webui/config/webui.json` |
 | `webui/Dockerfile` + `webui/*.py` (installed as `jinja/webui/build/` and `lib/webui/`) | `/opt/webui/build/` (+ `app/`) — copied, not rendered; image `fabric/web:local` (container and unit `fabric-web`) |

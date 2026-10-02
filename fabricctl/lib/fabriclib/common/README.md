@@ -19,3 +19,7 @@
 | `sudo_owner.py` | Login, home, uid and gid of the account that ran `sudo` (files handed to the admin) |
 | `set_tsig_secrets.py` | Set or remove TSIG secrets in `fabric-secrets.yml` (kept `0600`) |
 | `write_file_if_changed.py` | Write a file atomically with its mode and owner, only if its content changed (Kea, FreeRADIUS configs) |
+| `copy_if_changed.py` | Install one file (mode, owner) when its content differs |
+| `copy_tree_with_perms.py` | Copy a tree setting owner and mode; say whether anything changed |
+| `ensure_dir.py` | A directory with the given mode and owner |
+| `service_user.py` | A service's uid/gid from `service_users` |

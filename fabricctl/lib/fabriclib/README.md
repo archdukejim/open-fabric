@@ -22,6 +22,8 @@ and import as `fabriclib.<domain>.<file>`.
 | [vault/](vault/) | OpenBao: init, configure, status, unlock methods (key slots: USB, security key, KMIP), vault key rotation, root token |
 | [secrets/](secrets/) | fabric's own secrets: the 0600 file until the vault step, then OpenBao; load, save, import, export |
 | [dns_filter/](dns_filter/) | Optional DNS filter (AdGuard Home) in front of BIND: its configuration and deploy |
+| [deploy/](deploy/) | The deploy engine (apply): secrets, settings, render, install, restart — `lib/deploy.py` is its entry point |
+| [ntp/](ntp/) | Time: chrony on the host, serving the network, its settings and checks |
 | [federation/](federation/) | Sites: the site-name rule; invitations, joining and the federation endpoint as they are built |
 
 `cli.py` routes the `fabricctl` commands implemented here (setup, doctor, uninstall, reinstall, certs, tsig, acl,

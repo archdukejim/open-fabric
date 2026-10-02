@@ -91,7 +91,7 @@
 | Inputs | paths — list of LDIF file paths (applied in sorted order); DS_DM_PASSWORD in the environment. |
 | Returns | None; prints "+ dn" / "~ dn: attrs" lines and "seed: N added, M modified". |
 | Fails | SystemExit with a message for an unsupported changetype or a modify on a missing entry; ldap errors (e.g. schema violations) and bind_dm failures propagate as a traceback; exit is non-zero either way. |
-| Feeds | run as `python3 /seed/seed.py /seed/*.ldif` by lib/dirsrv.sh (seed) and the dirsrv, freeradius and hardening test suites; RESTART_REQUIRED is read by dirsrv.sh. |
+| Feeds | run as `python3 /seed/seed.py /seed/*.ldif` by fabriclib/ldap/seed_directory.py and the dirsrv, freeradius and hardening test suites; RESTART_REQUIRED is read by seed_directory. |
 | Called by | `fabricctl.jinja.dirsrv.seed.<module>` |
 
 ## `fabricctl/jinja/freeradius/python/check_person.py`

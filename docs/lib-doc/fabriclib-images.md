@@ -52,8 +52,8 @@
 | Inputs | compose_file — str, path to a rendered docker-compose.yml. Asks Docker via built_from. |
 | Returns | bool; False when no service has a build section with BASE_IMAGE or KEA_VERSION. |
 | Fails | OSError if the file cannot be read; yaml.YAMLError on invalid YAML; AttributeError if a service's `build` is a plain string rather than a mapping. |
-| Feeds | deploy.py (decides whether to run `docker compose build`). |
-| Called by | `deploy.apply_deployment` |
+| Feeds | deploy/install_service_units (decides whether to run `docker compose build`). |
+| Called by | `fabriclib.deploy.install_service_units.install_service_units` |
 
 ## `fabricctl/lib/fabriclib/images/prune_images.py`
 
@@ -149,7 +149,7 @@
 | Purpose | render and deploy with image var `var` set to `ref` (local images rebuild on the new base), then restart each service through its systemd unit and wait until it is healthy. |
 | Inputs | ctx — SetupContext (ctx.vars is changed in place and persisted by deploy_config); var — str image var; ref — str image ref; services — list of SERVICES entries to restart, in order. |
 | Returns | None. |
-| Fails | SetupError from start_unit when a container does not become healthy; subprocess.CalledProcessError from systemctl; anything deploy_config.run / deploy.py raises (SystemExit on a deploy failure). |
+| Fails | SetupError from start_unit when a container does not become healthy; subprocess.CalledProcessError from systemctl; anything deploy_config.run / the deploy engine raises (SystemExit on a deploy failure). |
 | Feeds | switch_image (update and its rollback). |
 | Called by | `fabriclib.images.switch_image.switch_image` |
 

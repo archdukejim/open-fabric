@@ -2,7 +2,7 @@
 
 LDIF templates rendered by `deploy.py` to `/opt/dirsrv/seed/<name>.ldif`
 (root:ldap 0640, mounted read-only at `/seed`) and applied in name order by
-`seed.py` (`lib/dirsrv.sh seed`) on every deploy: missing entries are added,
+`seed.py` (`fabriclib/ldap/seed_directory.py`) on every deploy: missing entries are added,
 changed attributes replaced, nothing else touched.
 
 | File | What |

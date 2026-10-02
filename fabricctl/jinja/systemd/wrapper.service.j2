@@ -3,7 +3,8 @@ Description=Docker Compose service for {{ item.service }}
 PartOf=fabric.target
 # fabric.target is reached once this service is up (and healthy): `fabricctl start` waits for it.
 Before=fabric.target
-After=docker.service network-online.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
+# time-sync.target: certificates, TOTP and TSIG need the right clock (ntp.md); chrony-wait gives up after 90 s
+After=docker.service network-online.target time-sync.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
 
 Requires=docker.service network-online.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
 
@@ -33,13 +34,18 @@ SuccessExitStatus=130
 TimeoutStartSec=600
 TimeoutStopSec=30
 {% if item.healthcheck | default(true) %}
+# Wait for the container to be healthy. Missing or "created" means compose is still pulling or creating it (a
+# first start pulls the image): keep waiting. Only a container that ran and stopped is a failure; one that dies at
+# once also ends `compose up` (--abort-on-container-exit), which fails the unit by itself.
 ExecStartPost=/bin/bash -c 'for i in {1..120}; do \
-    running=$(docker inspect -f "{{"{{.State.Running}}"}}" {{ item.compose }} 2>/dev/null || echo "false"); \
-    if [ "$running" != "true" ] && [ $i -gt 3 ]; then echo "Container died or missing."; exit 1; fi; \
-    status=$(docker inspect -f "{{"{{.State.Health.Status}}"}}" {{ item.compose }} 2>/dev/null || echo "missing"); \
-    if [ "$status" = "healthy" ]; then exit 0; elif [ "$status" = "unhealthy" ]; then exit 1; fi; \
+    state=$(docker inspect -f "{{"{{.State.Status}}"}}" {{ item.compose }} 2>/dev/null || echo "missing"); \
+    if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then echo "Container {{ item.compose }} stopped."; exit 1; fi; \
+    if [ "$state" = "running" ]; then \
+        status=$(docker inspect -f "{{"{{.State.Health.Status}}"}}" {{ item.compose }} 2>/dev/null || echo "none"); \
+        if [ "$status" = "healthy" ]; then exit 0; elif [ "$status" = "unhealthy" ]; then exit 1; fi; \
+    fi; \
     sleep 5; \
-done; exit 1'
+done; echo "Container {{ item.compose }} not healthy after 10 minutes."; exit 1'
 {% endif %}
 
 {% for cmd in item.post | default([]) %}

@@ -14,7 +14,7 @@ def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
     Returns: True if either Kea config file changed (Kea must be restarted), else False.
     Fails:   KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors
              from ensure_ddns_zone.
-    Feeds:   deploy.py (apply); tests/kea/run.py.
+    Feeds:   deploy/deploy_optional_parts (apply); tests/kea/run.py.
     Notes:   config/ is root:kea 0750 and the files root:kea 0640 (the DDNS one holds the TSIG secret); leases/ and run/
              are root 0750. The subzone file is made only when dhcp.ddns is not false.
     """

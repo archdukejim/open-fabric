@@ -17,4 +17,5 @@ re-imported.
 | `import_secrets.py` | File → OpenBao: write, read back, compare, then write the marker and shred the file |
 | `export_secrets.py` | A root-only 0600 copy for a reinstall's backup (setup re-imports and shreds it) |
 | `run_secrets_command.py` | `fabricctl secrets list` (names) / `show <name>` (one value, audited) |
+| `random_secret.py` | A new random secret from the OS's CSPRNG (base64, or 32 letters and digits) |
 | `common/` | OpenBao read/write of the `fabric/secrets` entry (see its README) |

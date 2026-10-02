@@ -144,7 +144,7 @@ Every setting can be changed later (`fabricctl security …`,
 | Today | Reuse |
 |---|---|
 | `fabricctl/lib/deploy.py` — native render + deploy + selective reload (what `fabricctl --apply` runs) | The core of the installer (`deploy` step) and of day-2 `fabricctl --apply` |
-| `webui/` (container app), `fabricctl/lib/agent/` (fabric-agent), `keycloak_bootstrap.py`, `dirsrv.sh` | Ship as-is inside the package |
+| `webui/` (container app), `fabricctl/lib/agent/` (fabric-agent), `keycloak_bootstrap.py` | Ship as-is inside the package |
 | `fabricctl/jinja/**` templates | Ship as-is (package data) |
 | `fabriclib/setup/` — the native installer (§4) | Ships as-is |
 | `fabriclib/` (one operation per file) | The package's library layout from day one |

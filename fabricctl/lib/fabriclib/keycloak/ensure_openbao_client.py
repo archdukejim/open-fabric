@@ -15,14 +15,14 @@ def _q(s):
 
 def ensure_openbao_client(kc, realm, v, secret, role_reps, flow_id):
     """Purpose: Converge the Keycloak OIDC client (fabric-openbao) that OpenBao's own UI signs in with.
-    Inputs:  kc — keycloak_bootstrap.Admin client; realm — realm name; v — fabric vars: hostname_openbao;
+    Inputs:  kc — admin_client.Admin client; realm — realm name; v — fabric vars: hostname_openbao;
              secret — the client secret (openbao_oidc_secret); role_reps — role representations to put in
              the client's scope (keycloak_bootstrap passes every fabric role); flow_id — id of the browser
              flow to bind (the TOTP login flow the web UI uses).
     Returns: "created" or "updated" ("updated" for any existing client, even when nothing changed).
     Fails:   SystemExit from kc.call on any admin API error or failed admin login; OSError / ssl errors if
              Keycloak is unreachable.
-    Feeds:   keycloak_bootstrap.main (prints "<state> client fabric-openbao").
+    Feeds:   configure_keycloak (prints "<state> client fabric-openbao").
     Notes:   confidential client, code flow only, the exact callback
              https://<hostname_openbao>/ui/vault/auth/oidc/oidc/callback, fullScopeAllowed off; realm roles
              go to a `roles` claim in the ID token only, which OpenBao's role is bound to. Existing

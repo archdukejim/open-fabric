@@ -13,6 +13,11 @@ through apply (`deploy.py`), which reloads only changed zones.
 | `validate_record.py` | Build a record dict from user input, rejecting anything unsafe for a zone file |
 | `format_value.py` | Human-readable right-hand side of a record (as rendered in the zone file) |
 | `sync_status.py` | Serial BIND is serving vs. the deployed zone file |
+| `rndc.py` | Run `rndc` inside the bind9 container (argument list, never a shell) |
+| `zone_content_changed.py` | Rendered vs deployed zone file, ignoring the SOA serial |
+| `find_changed_zones.py` | The rendered zones whose records changed (the deploy engine installs them) |
+| `install_zone_file.py` | Put a zone file in place with a fresh mtime and drop its stale journal |
+| `reload_zone.py` | Swap a zone under a running BIND (freeze/thaw, or reload for static zones) until it serves the new serial |
 | `list_zones.py` | Zones with record counts (flagging hand-written reverse zones) |
 | `ptr_for_ip.py` | Reverse zone and PTR label for an address — or why it gets none (public, loopback, link-local) |
 | `reverse_zones.py` | Reverse zones + PTRs generated from all forward A/AAAA records (one per address); used by apply and the web UI |

@@ -94,7 +94,7 @@ def jinja_env(template_dir):
     Fails:   yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is
              unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest.
              A missing lock file gives empty globals, not an error.
-    Feeds:   deploy.py, dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py,
+    Feeds:   deploy/apply_deployment (and render_templates), dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py,
              radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites."""
     env = _RelativeEnvironment(loader=jinja2.FileSystemLoader(template_dir), keep_trailing_newline=True,
                                trim_blocks=True, lstrip_blocks=True)

@@ -17,7 +17,7 @@ def save_secrets(update, path=SECRETS_FILE, v=None):
     Returns: the full, updated secrets dict (unchanged content: nothing is written).
     Fails:   ValidationError from read_vault_secrets / write_vault_secrets (OpenBao unavailable, or a
              check-and-set conflict with a concurrent change); yaml.YAMLError; OSError.
-    Feeds:   deploy.py apply_deployment, common/set_tsig_secrets, logs/run_logs_command,
+    Feeds:   deploy/apply_deployment, common/set_tsig_secrets, logs/run_logs_command,
              radius/add_radius_client, radius/remove_radius_client, radius/rotate_radius_secret,
              setup/collect_vars.
     Notes:   OpenBao gets a new version only when something changed. The file is rewritten in place with

@@ -9,7 +9,7 @@ from fabriclib.setup.errors import SetupError
 
 # Only what the host itself runs; LDAP tools live in the dirsrv container.
 HOST_PACKAGES = ["openssl", "ca-certificates", "curl", "gnupg", "ufw", "iptables", "dnsutils",
-                 "python3-yaml", "python3-jinja2"]
+                 "python3-yaml", "python3-jinja2", "python3-bcrypt", "chrony"]
 DOCKER_PACKAGES = ["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]
 APT_ENV = {**os.environ, "DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "a"}
 

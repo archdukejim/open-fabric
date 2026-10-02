@@ -2,6 +2,54 @@
 
 # fabriclib-keycloak
 
+## `fabricctl/lib/fabriclib/keycloak/admin_client.py`
+
+### `Admin.__init__(self, tls, user, password)`
+
+| | |
+|---|---|
+| Purpose | a Keycloak admin REST client that logs in as the master-realm admin on first use. |
+| Inputs | tls — a webui.tlsclient.TLSClient pinned to the fabric root CA; user, password — str, the Keycloak admin credentials from fabric's secrets (never on a command line). |
+| Returns | None (no request is made yet; token and expiry start empty). |
+| Fails | never. |
+| Feeds | configure_keycloak, keycloak_admin, require_password_change, user_has_role; tests/keycloak/verify.py, tests/host/reset_user.py. |
+| Called by | — (no static caller) |
+
+### `Admin._auth(self)`
+
+| | |
+|---|---|
+| Purpose | get or refresh the admin access token (password grant, client admin-cli, master realm). |
+| Inputs | none; uses self.tls, self.user, self.password; reuses the token until 15 s before it expires. |
+| Returns | None; sets self.token and self.expires. |
+| Fails | SystemExit("Keycloak admin login failed (<status>): <body>") on any non-200 reply; OSError/ssl errors from the TLS connection propagate. |
+| Feeds | Admin.call. |
+| Called by | `fabriclib.keycloak.admin_client.Admin.call` |
+
+### `Admin.call(self, method, path, body=None, ok=(200, 201, 204), allow=())`
+
+| | |
+|---|---|
+| Purpose | make one authenticated call to the admin API under /admin/realms. |
+| Inputs | method — HTTP method; path — str appended to /admin/realms (callers quote names with q); body — JSON-able object or None; ok — statuses treated as success (default 200, 201, 204); allow — extra statuses returned to the caller instead of failing (e.g. 404). |
+| Returns | (status, payload) — payload is parsed JSON, text, or {"location": ...} for an empty reply with Location. |
+| Fails | SystemExit("<method> <path> failed (<status>): <payload>") for any other status; SystemExit from _auth; OSError/ssl errors from the connection. |
+| Feeds | every ensure_* step in fabriclib/keycloak, grant_role_to_group and the admin helpers; tests/keycloak/verify.py. |
+| Called by | — (no static caller) |
+
+## `fabricctl/lib/fabriclib/keycloak/configure_keycloak.py`
+
+### `configure_keycloak(vars_path, secrets_path)`
+
+| | |
+|---|---|
+| Purpose | configure Keycloak for fabric, idempotently: realm, LDAP federation and group sync, fabric's permission and bundle roles with their group grants, the TOTP login flow, and the fabric-webui / fabric-openbao clients (and fabric-adguard with the DNS filter on). |
+| Inputs | vars_path — vars.yaml; secrets_path — the secrets file (or OpenBao once imported: load_secrets). Talks to ip_keycloak:8443 with TLS pinned to <deploy_base_dir>/stepca/data/certs/root_ca.crt. |
+| Returns | None; prints progress and "Keycloak configuration complete.". |
+| Fails | SystemExit (with the message) from any failed admin call or login; OSError/yaml errors reading the vars; ValidationError from load_secrets (OpenBao locked); KeyError when a required var or secret is missing. |
+| Feeds | lib/keycloak_bootstrap.py (setup's start step, `fabricctl --keycloak-sync`, tests/keycloak/run.sh). |
+| Called by | `keycloak_bootstrap.main` |
+
 ## `fabricctl/lib/fabriclib/keycloak/create_person.py`
 
 ### `_q(s)`
@@ -22,7 +70,7 @@
 | Purpose | Helpdesk `people:create`: create a realm user in Keycloak (which writes the account to 389-DS) with a one-time password. |
 | Inputs | v — fabric vars (keycloak_admin: ip_keycloak, hostname_keycloak, webui_realm or domain, root CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao). |
 | Returns | the one-time password (token_urlsafe(15)): shown once, stored nowhere. |
-| Fails | ValidationError "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused: ..." (any other admin API error or failed admin login, raised as SystemExit by keycloak_bootstrap.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable); OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back. |
+| Fails | ValidationError "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused: ..." (any other admin API error or failed admin login, raised as SystemExit by admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable); OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back. |
 | Feeds | agent route POST /v1/people (agent/server.py Handler.dispatch) -> webui agentclient.create_person -> People page. |
 | Notes | the user joins the plain `users` group only (never a fabric group; skipped silently if that group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP enrolment, at the first sign-in. If a step after the creation fails the account stays, without a known password (reset_sign_in recovers it). Audited as PERSON_CREATE. |
 | Called by | `agent.server.Handler.dispatch` |
@@ -45,12 +93,51 @@
 | | |
 |---|---|
 | Purpose | Converge the Keycloak OIDC client (fabric-adguard) that oauth2-proxy signs people into AdGuard Home's UI with (design dns-filter.md §5). |
-| Inputs | kc — keycloak_bootstrap.Admin client; realm — realm name; v — fabric vars: hostname_adguard; secret — the client secret (adguard_oidc_secret); role_reps — role representations for the client's scope (every fabric role); flow_id — id of the browser flow to bind (the TOTP login flow). |
+| Inputs | kc — admin_client.Admin client; realm — realm name; v — fabric vars: hostname_adguard; secret — the client secret (adguard_oidc_secret); role_reps — role representations for the client's scope (every fabric role); flow_id — id of the browser flow to bind (the TOTP login flow). |
 | Returns | "created" or "updated" ("updated" for any existing client, even when nothing changed). |
 | Fails | SystemExit from kc.call on any admin API error or failed admin login; OSError / ssl errors if Keycloak is unreachable. |
-| Feeds | keycloak_bootstrap.main (prints "<state> client fabric-adguard") when dns_filter is adguard. |
+| Feeds | configure_keycloak (prints "<state> client fabric-adguard") when dns_filter is adguard. |
 | Notes | confidential client, code flow only, the exact callback https://<hostname_adguard>/oauth2/callback, fullScopeAllowed off; realm roles go to a `roles` claim in the ID token, which oauth2-proxy checks for fabric:dns:filter. Existing attributes are kept (ours override); the mapper and scope mappings are only ever added. |
-| Called by | `keycloak_bootstrap.main` |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
+
+## `fabricctl/lib/fabriclib/keycloak/ensure_group_mapper.py`
+
+### `ensure_group_mapper(kc, realm, ldap_id, v)`
+
+| | |
+|---|---|
+| Purpose | create or update the LDAP group mapper (groupOfNames under ou=groups, LDAP_ONLY) and sync the directory's groups into Keycloak. |
+| Inputs | kc — Admin; realm — realm name; ldap_id — federation id from ensure_ldap_federation; v — vars (ldap_base_dn). |
+| Returns | None. |
+| Fails | SystemExit from Admin.call (including a failed sync); KeyError if ldap_base_dn is missing; StopIteration if a created mapper cannot be found again. |
+| Feeds | configure_keycloak (the synced groups are what grant_role_to_group looks up). |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
+
+## `fabricctl/lib/fabriclib/keycloak/ensure_ldap_federation.py`
+
+### `ensure_ldap_federation(kc, realm, realm_id, v, s)`
+
+| | |
+|---|---|
+| Purpose | create or update the realm's LDAP user federation to 389-DS ("389-DS": ldaps on port 3636, users under ou=users,ou=accounts, bound as this install's cn=keycloak_admin (its own site part), writable, imports users). |
+| Inputs | kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ldap_base_dn, ldap_local_dn, hostname_ldap); s — secrets (ldap_keycloak_password). |
+| Returns | str, the federation component id. An existing ldap provider is updated in place (fabric's settings win, other settings kept). |
+| Fails | SystemExit from Admin.call; KeyError if a needed var or secret is missing; StopIteration if a created provider cannot be found again. |
+| Feeds | configure_keycloak (the id is passed to ensure_group_mapper). |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
+
+## `fabricctl/lib/fabriclib/keycloak/ensure_mfa_flow.py`
+
+### `ensure_mfa_flow(kc, realm)`
+
+| | |
+|---|---|
+| Purpose | make sure the "fabric-webui-mfa" browser flow exists (a copy of the stock browser flow) with its conditional second-factor sub-flow forced to REQUIRED, OTP REQUIRED and its "user configured" conditions DISABLED, so every user must enrol and use TOTP. |
+| Inputs | kc — Admin; realm — realm name. |
+| Returns | str, the flow's id. |
+| Fails | SystemExit from Admin.call; StopIteration if the flow is missing after the copy. |
+| Feeds | configure_keycloak -> ensure_webui_client, ensure_openbao_client, ensure_adguard_client (browser flow override). |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
 
 ## `fabricctl/lib/fabriclib/keycloak/ensure_openbao_client.py`
 
@@ -70,12 +157,12 @@
 | | |
 |---|---|
 | Purpose | Converge the Keycloak OIDC client (fabric-openbao) that OpenBao's own UI signs in with. |
-| Inputs | kc — keycloak_bootstrap.Admin client; realm — realm name; v — fabric vars: hostname_openbao; secret — the client secret (openbao_oidc_secret); role_reps — role representations to put in the client's scope (keycloak_bootstrap passes every fabric role); flow_id — id of the browser flow to bind (the TOTP login flow the web UI uses). |
+| Inputs | kc — admin_client.Admin client; realm — realm name; v — fabric vars: hostname_openbao; secret — the client secret (openbao_oidc_secret); role_reps — role representations to put in the client's scope (keycloak_bootstrap passes every fabric role); flow_id — id of the browser flow to bind (the TOTP login flow the web UI uses). |
 | Returns | "created" or "updated" ("updated" for any existing client, even when nothing changed). |
 | Fails | SystemExit from kc.call on any admin API error or failed admin login; OSError / ssl errors if Keycloak is unreachable. |
-| Feeds | keycloak_bootstrap.main (prints "<state> client fabric-openbao"). |
+| Feeds | configure_keycloak (prints "<state> client fabric-openbao"). |
 | Notes | confidential client, code flow only, the exact callback https://<hostname_openbao>/ui/vault/auth/oidc/oidc/callback, fullScopeAllowed off; realm roles go to a `roles` claim in the ID token only, which OpenBao's role is bound to. Existing attributes are kept (ours override); the mapper and scope mappings are only ever added. |
-| Called by | `keycloak_bootstrap.main` |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
 
 ## `fabricctl/lib/fabriclib/keycloak/ensure_rbac_roles.py`
 
@@ -95,7 +182,7 @@
 | | |
 |---|---|
 | Purpose | Get a realm role, creating it first when it does not exist. |
-| Inputs | kc — keycloak_bootstrap.Admin; realm — realm name; name — role name; description — used only when the role is created. |
+| Inputs | kc — admin_client.Admin; realm — realm name; name — role name; description — used only when the role is created. |
 | Returns | the role representation (dict with "id", "name", ...). |
 | Fails | SystemExit from kc.call on an admin API error (404 on the first lookup is expected). |
 | Feeds | ensure_rbac_roles. |
@@ -106,12 +193,38 @@
 | | |
 |---|---|
 | Purpose | Converge fabric's access control in Keycloak (design D19): one realm role per permission (fabric:<area>:<action>) and one composite role per bundle holding exactly its permissions. |
-| Inputs | kc — keycloak_bootstrap.Admin; realm — realm name; admin_role — name of the "admin" bundle (webui_admin_role, default fabric-admin). Reads rbac/permissions PERMISSIONS, BUNDLES, PREFIX. |
+| Inputs | kc — admin_client.Admin; realm — realm name; admin_role — name of the "admin" bundle (webui_admin_role, default fabric-admin). Reads rbac/permissions PERMISSIONS, BUNDLES, PREFIX. |
 | Returns | {role name: representation} for every fabric role (permissions and bundles). |
 | Fails | SystemExit from kc.call on any admin API error; OSError / ssl errors if Keycloak is unreachable. |
-| Feeds | keycloak_bootstrap.main: group grants (grant_role_to_group) and client scope mappings (ensure_client, ensure_openbao_client). |
+| Feeds | configure_keycloak: group grants (grant_role_to_group) and client scope mappings (ensure_client, ensure_openbao_client). |
 | Notes | missing fabric: members of a bundle are added and extra ones removed; non-fabric composites are left alone. Descriptions are set only when a role is created. |
-| Called by | `keycloak_bootstrap.main` |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
+
+## `fabricctl/lib/fabriclib/keycloak/ensure_realm.py`
+
+### `ensure_realm(kc, realm, display)`
+
+| | |
+|---|---|
+| Purpose | create the realm if missing and set its login protections (brute-force lockout after 5 failures, temporary lockout up to 15 min, no e-mail login, no duplicate e-mails). |
+| Inputs | kc — Admin; realm — realm name; display — display name, used only on creation. |
+| Returns | str, the realm's internal id. |
+| Fails | SystemExit from Admin.call on any unexpected status. |
+| Feeds | configure_keycloak (the id is the parent of the LDAP federation in ensure_ldap_federation). |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
+
+## `fabricctl/lib/fabriclib/keycloak/ensure_webui_client.py`
+
+### `ensure_webui_client(kc, realm, v, s, role_reps, flow_id)`
+
+| | |
+|---|---|
+| Purpose | create or update the confidential OIDC client "fabric-webui" for the web UI: code flow with PKCE S256, exact redirect https://<hostname_mgr>/oidc/callback, no direct/implicit grants, the TOTP flow bound, a "roles" claim in the ID token, and every given realm role in its scope. |
+| Inputs | kc — Admin; realm — realm name; v — vars (hostname_mgr); s — secrets (webui_oidc_secret); role_reps — list of role representations to put in scope; flow_id — from ensure_mfa_flow. |
+| Returns | None. Existing attributes are merged; missing scope roles are added (none are removed). |
+| Fails | SystemExit from Admin.call; KeyError if hostname_mgr or webui_oidc_secret is missing. |
+| Feeds | configure_keycloak (when install_webui). |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
 
 ## `fabricctl/lib/fabriclib/keycloak/fabric_groups.py`
 
@@ -126,6 +239,19 @@
 | Feeds | reset_sign_in. |
 | Called by | `fabriclib.keycloak.reset_sign_in.reset_sign_in` |
 
+## `fabricctl/lib/fabriclib/keycloak/grant_role_to_group.py`
+
+### `grant_role_to_group(kc, realm, role_rep, group_name)`
+
+| | |
+|---|---|
+| Purpose | give a Keycloak group a realm role, if it does not have it yet. |
+| Inputs | kc — Admin; realm — realm name; role_rep — the role representation (needs "name"); group_name — exact group name. |
+| Returns | None; prints a step when granted. A missing group prints "! group '<name>' not found ... manually" and returns without error. |
+| Fails | SystemExit from Admin.call. |
+| Feeds | configure_keycloak (the admin bundle to webui_admin_group, and each ldap_groups bundle). |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak` |
+
 ## `fabricctl/lib/fabriclib/keycloak/keycloak_admin.py`
 
 ### `keycloak_admin(v, s)`
@@ -134,10 +260,23 @@
 |---|---|
 | Purpose | A Keycloak admin REST client and the realm fabric uses. |
 | Inputs | v — fabric vars: deploy_base_dir (root CA), ip_keycloak, hostname_keycloak, webui_realm (else domain); s — fabric's secrets (dict): keycloak_admin_user, keycloak_admin_password. |
-| Returns | (keycloak_bootstrap.Admin over a TLSClient to <ip_keycloak>:8443 verified against the fabric root CA for hostname_keycloak, realm name). No request is made yet (login on first call). |
-| Fails | KeyError on missing vars or secrets; ImportError if keycloak_bootstrap or webui.tlsclient cannot be imported. |
-| Feeds | create_person, reset_sign_in. |
-| Called by | `fabriclib.keycloak.create_person.create_person`, `fabriclib.keycloak.reset_sign_in.reset_sign_in` |
+| Returns | (Admin (keycloak/admin_client) over a TLSClient to <ip_keycloak>:8443 verified against the fabric root CA for hostname_keycloak, realm name). No request is made yet (login on first call). |
+| Fails | KeyError on missing vars or secrets; ImportError if webui.tlsclient cannot be imported. |
+| Feeds | create_person, reset_sign_in, require_password_change, user_has_role. |
+| Called by | `fabriclib.keycloak.create_person.create_person`, `fabriclib.keycloak.require_password_change.require_password_change`, `fabriclib.keycloak.reset_sign_in.reset_sign_in`, `fabriclib.keycloak.user_has_role.user_has_role` |
+
+## `fabricctl/lib/fabriclib/keycloak/quote.py`
+
+### `q(s)`
+
+| | |
+|---|---|
+| Purpose | URL-quote one path or query component (every character outside [A-Za-z0-9_.-~] escaped, "/" too). |
+| Inputs | s — any value, converted with str(). |
+| Returns | str, the quoted text. |
+| Fails | never. |
+| Feeds | every Admin.call path in fabriclib/keycloak; tests/keycloak/verify.py, tests/host/reset_user.py. |
+| Called by | `fabriclib.keycloak.ensure_group_mapper.ensure_group_mapper`, `fabriclib.keycloak.ensure_ldap_federation.ensure_ldap_federation`, `fabriclib.keycloak.ensure_mfa_flow.ensure_mfa_flow`, `fabriclib.keycloak.ensure_realm.ensure_realm`, `fabriclib.keycloak.ensure_webui_client.ensure_webui_client`, `fabriclib.keycloak.grant_role_to_group.grant_role_to_group`, `fabriclib.keycloak.require_password_change.require_password_change`, `fabriclib.keycloak.user_has_role.user_has_role` |
 
 ## `fabricctl/lib/fabriclib/keycloak/require_password_change.py`
 
@@ -148,9 +287,9 @@
 | Purpose | Make Keycloak ask an LDAP-federated user for a new password at the next login, so a generated initial password works only once. |
 | Inputs | v — fabric vars (as keycloak_admin); s — fabric's secrets (Keycloak admin credentials); user — username. |
 | Returns | None (UPDATE_PASSWORD added to the user's required actions if missing). |
-| Fails | ValidationError "Keycloak does not see LDAP user <user>" after 10 lookups 3 s apart; SystemExit from keycloak_bootstrap.Admin on an admin API error or failed login (not converted); OSError / ssl errors if Keycloak is unreachable. |
+| Fails | ValidationError "Keycloak does not see LDAP user <user>" after 10 lookups 3 s apart; SystemExit from the admin client (keycloak/admin_client) on an admin API error or failed login (not converted); OSError / ssl errors if Keycloak is unreachable. |
 | Feeds | setup/create_admin.py run (only when ensure_admin_user created the user). |
-| Notes | the lookup also imports the user from 389-DS into Keycloak; the retries cover federation still settling right after bootstrap. Builds its own admin client (same as keycloak_admin). |
+| Notes | the lookup also imports the user from 389-DS into Keycloak; the retries cover federation still settling right after bootstrap. |
 | Called by | `fabriclib.setup.create_admin.run` |
 
 ## `fabricctl/lib/fabriclib/keycloak/reset_sign_in.py`
@@ -178,6 +317,19 @@
 | Notes | members of fabric groups (admins, auditors, operators, ...) need `privileged`: otherwise the helpdesk could take over an admin's single sign-on (OpenBao's UI needs no client certificate). Audited as PERSON_RESET. |
 | Called by | `agent.server.Handler.dispatch` |
 
+## `fabricctl/lib/fabriclib/keycloak/step.py`
+
+### `step(msg)`
+
+| | |
+|---|---|
+| Purpose | print one progress line of the Keycloak configuration ("  - <msg>"). |
+| Inputs | msg — str. |
+| Returns | None. |
+| Fails | never. |
+| Feeds | configure_keycloak and its ensure_* steps. |
+| Called by | `fabriclib.keycloak.configure_keycloak.configure_keycloak`, `fabriclib.keycloak.ensure_group_mapper.ensure_group_mapper`, `fabriclib.keycloak.ensure_ldap_federation.ensure_ldap_federation`, `fabriclib.keycloak.ensure_mfa_flow.ensure_mfa_flow`, `fabriclib.keycloak.ensure_realm.ensure_realm`, `fabriclib.keycloak.ensure_webui_client.ensure_webui_client`, `fabriclib.keycloak.grant_role_to_group.grant_role_to_group` |
+
 ## `fabricctl/lib/fabriclib/keycloak/user_has_role.py`
 
 ### `user_has_role(v, s, user, role)`
@@ -187,9 +339,9 @@
 | Purpose | Whether Keycloak grants a user a realm role, directly or through a group or composite (e.g. the LDAP admin group). |
 | Inputs | v — fabric vars (as keycloak_admin); s — fabric's secrets (Keycloak admin credentials); user — username; role — realm role name. |
 | Returns | True if the user's effective realm roles include role; False, also when Keycloak does not know the user. |
-| Fails | SystemExit from keycloak_bootstrap.Admin on an admin API error or failed login; OSError / ssl errors if Keycloak is unreachable; KeyError on missing vars or secrets. |
+| Fails | SystemExit from the admin client (keycloak/admin_client) on an admin API error or failed login; OSError / ssl errors if Keycloak is unreachable; KeyError on missing vars or secrets. |
 | Feeds | setup/verify_install.py checks ("Keycloak grants <admin> <role>"). |
-| Notes | the lookup imports an LDAP user into Keycloak. Builds its own admin client. |
+| Notes | the lookup imports an LDAP user into Keycloak. |
 | Called by | `fabriclib.setup.verify_install.checks` |
 
 ## `fabricctl/lib/fabriclib/keycloak/verify_user_token.py`

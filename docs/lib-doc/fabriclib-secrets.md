@@ -78,9 +78,22 @@
 | Inputs | path — the secrets file, default SECRETS_FILE (/opt/fabric/config/fabric-secrets.yml); v — fabric vars for OpenBao, default loaded from vars.yaml next to path (only when needed). |
 | Returns | dict of secrets: the 0600 file's content ({} if there is neither file nor marker), or OpenBao's entry once imported (marker present, no file). |
 | Fails | ValidationError from read_vault_secrets (OpenBao unreachable, sealed or refusing); yaml.YAMLError for a malformed file; OSError. |
-| Feeds | setup/context.py SetupContext.secrets, keycloak_bootstrap.main, deploy.py apply_deployment, keycloak/create_person, keycloak/reset_sign_in, ldap/common/run_dirsrv, export_secrets, run_secrets_command. |
+| Feeds | setup/context.py SetupContext.secrets, configure_keycloak, deploy/apply_deployment, keycloak/create_person, keycloak/reset_sign_in, ldap/common/run_dirsrv, export_secrets, run_secrets_command. |
 | Notes | a secrets file that was put back (a reinstall restores one) wins over OpenBao and is re-imported by the `vault` step. OpenBao failing raises: a missing file must never look like "no secrets", or setup would generate new passwords the running services do not know. |
-| Called by | `deploy.apply_deployment`, `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.list_invitations.list_invitations`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.revoke_invitation.revoke_invitation`, `fabriclib.keycloak.create_person.create_person`, `fabriclib.keycloak.reset_sign_in.reset_sign_in`, `fabriclib.ldap.common.run_dirsrv.run_dirsrv`, `fabriclib.secrets.export_secrets.export_secrets`, `fabriclib.secrets.run_secrets_command.run_secrets_command`, `fabriclib.setup.context.SetupContext.secrets`, `keycloak_bootstrap.main` |
+| Called by | `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.list_invitations.list_invitations`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.revoke_invitation.revoke_invitation`, `fabriclib.keycloak.configure_keycloak.configure_keycloak`, `fabriclib.keycloak.create_person.create_person`, `fabriclib.keycloak.reset_sign_in.reset_sign_in`, `fabriclib.ldap.common.run_dirsrv.run_dirsrv`, `fabriclib.secrets.export_secrets.export_secrets`, `fabriclib.secrets.run_secrets_command.run_secrets_command`, `fabriclib.setup.context.SetupContext.secrets` |
+
+## `fabricctl/lib/fabriclib/secrets/random_secret.py`
+
+### `random_secret(nbytes=32, alnum=False)`
+
+| | |
+|---|---|
+| Purpose | a new random secret from the operating system's CSPRNG. |
+| Inputs | nbytes — random bytes for the base64 form (default 32); alnum — True: 32 letters and digits instead (safe unquoted in LDIF, JSON and every switch CLI). |
+| Returns | str — base64 text (44 characters for 32 bytes), or 32 alphanumeric characters. |
+| Fails | never. |
+| Feeds | deploy/generate_missing_secrets, deploy/merge_tsig_keys, deploy/merge_radius_clients. |
+| Called by | `fabriclib.deploy.generate_missing_secrets.generate_missing_secrets`, `fabriclib.deploy.merge_radius_clients.merge_radius_clients`, `fabriclib.deploy.merge_tsig_keys.merge_tsig_keys` |
 
 ## `fabricctl/lib/fabriclib/secrets/run_secrets_command.py`
 
@@ -117,9 +130,9 @@
 | Inputs | update — dict: top-level keys are set, a None value removes a key; tsig_secrets and radius_secrets are merged key by key (a None secret removes that key); path — the secrets file, default SECRETS_FILE; v — fabric vars for OpenBao, default from vars.yaml next to path. |
 | Returns | the full, updated secrets dict (unchanged content: nothing is written). |
 | Fails | ValidationError from read_vault_secrets / write_vault_secrets (OpenBao unavailable, or a check-and-set conflict with a concurrent change); yaml.YAMLError; OSError. |
-| Feeds | deploy.py apply_deployment, common/set_tsig_secrets, logs/run_logs_command, radius/add_radius_client, radius/remove_radius_client, radius/rotate_radius_secret, setup/collect_vars. |
+| Feeds | deploy/apply_deployment, common/set_tsig_secrets, logs/run_logs_command, radius/add_radius_client, radius/remove_radius_client, radius/rotate_radius_secret, setup/collect_vars. |
 | Notes | OpenBao gets a new version only when something changed. The file is rewritten in place with umask 077 and chmod 0600. |
-| Called by | `deploy.apply_deployment`, `fabriclib.common.set_tsig_secrets.set_tsig_secrets`, `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.revoke_invitation.revoke_invitation`, `fabriclib.logs.run_logs_command.run_logs_command`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.setup.collect_vars.collect_vars`, `fabriclib.setup.join_federation.run` |
+| Called by | `fabriclib.common.set_tsig_secrets.set_tsig_secrets`, `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.revoke_invitation.revoke_invitation`, `fabriclib.logs.run_logs_command.run_logs_command`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.setup.collect_vars.collect_vars`, `fabriclib.setup.join_federation.run` |
 
 ## `fabricctl/lib/fabriclib/secrets/secrets_in_openbao.py`
 

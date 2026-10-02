@@ -369,8 +369,8 @@
 | Inputs | v — fabric vars; entry — {cn (required), sans, days (365), kty ("RSA"), size (4096), is_ca, path_len (0), out_dir (default: the sudo user's home)}; no "crv" is passed on, so an EC entry gets step's default curve. |
 | Returns | the crt path (chain, 0644); the key lies next to it (0600); both owned by the sudo user and replacing any existing files. |
 | Fails | ValidationError "output directory does not exist: ..."; mint_offline_cert's ValidationError (invalid name, "step-ca refused: ..."); KeyError without "cn"; OSError from move / chown. |
-| Feeds | setup/mint_extra_certs.py mint_extra_certs; fabriclib/cli.py `extra-cert` (fabricctl --mint-certs from certs.sh / interactive.py). |
-| Called by | `fabriclib.cli.main`, `fabriclib.setup.mint_extra_certs.mint_extra_certs` |
+| Feeds | setup/mint_extra_certs.py mint_extra_certs; fabriclib/cli.py `extra-cert` (fabricctl --mint-certs from pki/run_mint_certs_command / interactive.py). |
+| Called by | `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.setup.mint_extra_certs.mint_extra_certs` |
 
 ## `fabricctl/lib/fabriclib/pki/mint_offline_cert.py`
 
@@ -459,6 +459,55 @@
 | Fails | ValidationError "the new CA is for another root" when the staged root is not this site's root; OSError; json errors reading ca.json. |
 | Feeds | federation/reparent_site.py. |
 | Called by | `fabriclib.federation.reparent_site.reparent_site` |
+
+## `fabricctl/lib/fabriclib/pki/run_mint_certs_command.py`
+
+### `_ask(prompt, default='')`
+
+| | |
+|---|---|
+| Purpose | one prompt with a default. |
+| Inputs | prompt — text; default — returned for an empty answer. |
+| Returns | the answer (str), stripped. |
+| Fails | EOFError when stdin is closed. |
+| Feeds | run_mint_certs_command. |
+| Called by | `fabriclib.pki.run_mint_certs_command.run_mint_certs_command` |
+
+### `_show(crt)`
+
+| | |
+|---|---|
+| Purpose | print where a minted certificate is and what it says. |
+| Inputs | crt — the certificate's path (its key is next to it, .key). |
+| Returns | None. |
+| Fails | never (openssl's errors are not shown). |
+| Feeds | run_mint_certs_command. |
+| Called by | `fabriclib.pki.run_mint_certs_command.run_mint_certs_command` |
+
+### `run_mint_certs_command(vars_path, archive_dir, args)`
+
+| | |
+|---|---|
+| Purpose | `fabricctl --mint-certs`: offline certificates signed by Step-CA. With --apply every extra_certs entry in vars.yaml is minted; otherwise one is asked for (a leaf, or with --intermediate-ca [N] a subordinate CA with path length N, default 0), recorded in vars.yaml and minted. |
+| Inputs | vars_path — vars.yaml; archive_dir — <fabric>/archive (a copy of vars.yaml before it changes); args — the words after --mint-certs: --apply, --intermediate-ca [N], --kty RSA\|EC\|OKP (default RSA), --size BITS (default 4096); prompts on stdin. |
+| Returns | exit status: 0 (also when cancelled or nothing to mint), 1 when vars.yaml is missing or the Common Name is empty. |
+| Fails | whatever mint_extra_cert raises (SetupError from step-ca, ValidationError for a bad entry); EOFError at a prompt without stdin. |
+| Feeds | cli.py (--mint-certs); the same minting as setup (pki/mint_extra_cert). |
+| Notes | the entry is built as data (never text pasted into JSON), recorded under vars_lock. |
+| Called by | `fabriclib.cli._flags` |
+
+## `fabricctl/lib/fabriclib/pki/run_service_cert_command.py`
+
+### `run_service_cert_command(ctx, args)`
+
+| | |
+|---|---|
+| Purpose | `fabricctl --service-cert`: re-issue every core service certificate (which restarts the affected services). Without --apply it first lists the installed certificates' expiry dates and asks. |
+| Inputs | ctx — SetupContext (loaded); args — the words after --service-cert (--apply). |
+| Returns | exit status: 0 (also when cancelled), 1 when fabric is not deployed. |
+| Fails | SetupError from renew_service_certs; EOFError at the prompt without stdin. |
+| Feeds | cli.py (--service-cert); the same issuing as `fabricctl certs --force`. |
+| Called by | `fabriclib.cli._flags` |
 
 ## `fabricctl/lib/fabriclib/pki/sign_csr.py`
 

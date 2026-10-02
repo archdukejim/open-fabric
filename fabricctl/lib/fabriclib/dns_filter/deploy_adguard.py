@@ -34,7 +34,7 @@ def deploy_adguard(v, secrets, links, jinja_env):
              links — dns_links' result (the linked sites' zones); jinja_env — the fabric template environment.
     Returns: {"adguard": bool, "oauth2proxy": bool, "nginx": bool} — which of them changed (restart / reload).
     Fails:   KeyError for missing vars or secrets; OSError; yaml errors reading AdGuard's file; jinja2 errors.
-    Feeds:   deploy.py apply_deployment (when install_adguard); tests/adguard/run.py.
+    Feeds:   deploy/deploy_optional_parts (when install_adguard); tests/adguard/run.py.
     Notes:   <base>/adguard/conf and work are the adguard user's (0700); its YAML is 0600 and rewritten only
              when the merge changes its content, so AdGuard's own reformatting never restarts it. The local
              user's bcrypt hash is kept while it still matches the password. oauth2-proxy/secrets.env is root

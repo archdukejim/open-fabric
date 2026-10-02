@@ -11,7 +11,7 @@ def normalize_acl_policies(policies, domain):
     Returns: {acl: {"domain", "record_types" (upper case), and "records" or "any_name": True}}.
     Fails:   ValidationError "invalid ACL name …", "ACL …: invalid domain …", "…: invalid record_types …", "…: invalid
              record names …", "…: a policy needs records (hosts) or any_name".
-    Feeds:   deploy.py (apply), set_acl_policy.
+    Feeds:   deploy/merge_tsig_keys (apply), set_acl_policy.
     Notes:   records win over any_name when both are given.
     """
     out = {}

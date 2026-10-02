@@ -15,7 +15,7 @@ def deploy_freeradius(v, secrets, jinja_env):
              freeradius/python/*.py.
     Returns: True if any file changed, else False.
     Fails:   KeyError on missing vars; OSError from makedirs, chown, listing or writing; jinja2 errors while rendering.
-    Feeds:   deploy.py (apply); tests/freeradius/run.py.
+    Feeds:   deploy/deploy_optional_parts (apply); tests/freeradius/run.py.
     Notes:   config files are root:freerad 0640 (clients.conf holds the RADIUS secrets, ldap-password the directory
              account's). certs/ (server.pem, server.key and ca.pem, the fabric CA that client certificates and 389-DS
              must chain to) is only created here; setup's certificate step fills it.

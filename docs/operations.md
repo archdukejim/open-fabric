@@ -5,7 +5,7 @@
 Use `fabricctl` for post-install changes to DNS records, TSIG keys, certificates, and infrastructure variables — no full redeploy needed. Run it **on the target machine**; every command needs root (`sudo`). The command is `/usr/bin/fabricctl` from the package (or `/usr/local/bin/fabricctl` when setup was run straight from a git checkout). It has two kinds of commands:
 
 - **subcommands** (`fabricctl setup`, `fabricctl tsig …`, `fabricctl vault …`): Python, in `fabricctl/lib/fabriclib/`. `setup`, `reinstall`, `uninstall`, `restore` and `--help` run the packaged code; the others run the deployed install in `/opt/fabric`.
-- **flags** (`fabricctl --interactive`, `--apply`, `--mint-certs`, …): the older interface (`fabricctl/lib/manage.sh`); still supported. With no argument at all, `fabricctl` opens the interactive menu.
+- **flags** (`fabricctl --interactive`, `--apply`, `--mint-certs`, …): the older interface (routed by `fabriclib/cli.py` like the rest); still supported. With no argument at all, `fabricctl` opens the interactive menu.
 
 The same DNS and apply operations are also available in the browser through webui — see [webui.md](webui.md).
 
@@ -31,6 +31,7 @@ The same DNS and apply operations are also available in the browser through webu
   - [ACLs](#acls)
   - [Landing Page Links](#landing-page-links)
 - [DNS filter (optional: AdGuard Home)](#dns-filter-optional-adguard-home)
+- [Time (NTP)](#time-ntp)
 - [Federation (sites)](#federation-sites)
 - [OpenBao (secrets)](#openbao-secrets)
 - [Lifecycle Commands](#lifecycle-commands)
@@ -63,7 +64,7 @@ Apply any manual changes made directly to `vars.yaml`. `fabricctl` leverages the
 - If only `nginx/www/...` templates change, Nginx natively live-reads the files. No restart or reload is performed.
 - If `bind9` configuration changes, BIND9 gets `rndc reconfig`; if `nginx` configuration changes, `nginx -s reload`.
 - **DNS zones** are compared ignoring the SOA serial, so only zones whose records actually changed are touched. Forward zones are dynamic (they carry an `update-policy`), so each changed zone is updated with `rndc freeze` → swap the zone file → delete the stale `.jnl` → `rndc thaw` (static zones get `rndc reload <zone>`). Non-disruptive; dynamic updates made since the last apply (e.g. ACME TXT records) are discarded for that zone.
-- If a **389-DS seed file** (`/opt/dirsrv/seed/*.ldif`) changes, it is applied live with `dirsrv.sh seed`; the `ldap` service is restarted only if `cn=config` changed.
+- If a **389-DS seed file** (`/opt/dirsrv/seed/*.ldif`) changes, it is applied live (`fabriclib/ldap/seed_directory.py`); the `ldap` service is restarted only if `cn=config` changed.
 - If the **webui** config, app code or Dockerfile changes, the `webui` image is rebuilt (if needed) and the container restarted last (queued with `--no-block`, so an apply started from webui completes). If the `fabric-agent` unit changes, `fabric-agent` is restarted (also queued).
 - A full container restart (`docker compose down/up` via systemctl) is ONLY triggered if immutable service definitions (like `docker-compose.yml` or the systemd `.service` wrapper) or service-specific config files (like StepCA templates) actually change their rendered contents.
 
@@ -525,6 +526,33 @@ AdGuard elsewhere instead: keep `dns_filter: none` and point it at the site's BI
 Two units: `adguard` (the DNS filter) and `adguard-auth` (the sign-in in front of its UI). They start and
 stop apart: with Keycloak or the sign-in down only `https://adguard.<domain>` is unreachable, DNS keeps
 answering, and a BIND restart (every DNS apply) does not touch AdGuard.
+
+## Time (NTP)
+
+Every install keeps its clock with **chrony** on the host (design [ntp.md](design/ntp.md)) and serves the
+network: certificates, TOTP sign-in, TSIG and RADIUS all depend on the right time.
+
+- **Sources:** `ntp_servers` — by default three independent public servers with NTS (authenticated
+  time: Cloudflare, Netnod, PTB), so one that is wrong is outvoted. A federated site asks its
+  **upstream site first**, so the whole federation keeps one time. With no source reachable
+  the host keeps serving its own steady clock, so the network stays consistent with itself.
+- **Serving:** the LAN, `security.firewall_allow` networks and the DHCP subnets may ask on UDP 123 (opened in
+  the firewall for those only; chronyc works from the host only). Clients find it at `ntp.<domain>`; Kea hands
+  it out as option 42 (`dhcp.ntp` to name others).
+- **Boot:** a Raspberry Pi has no battery-backed clock. chrony starts from its last saved time and steps the
+  clock at the first updates; fabric's services start after the clock is synchronised, or after 90 s
+  (offline installs still start).
+- **Checks:** `fabricctl doctor` fails when the clock is not synchronised or more than 1 s off (passes on the
+  host's own clock when you set no source) and, at a site, when it is more than 1 s from its upstream site.
+  `fabricctl status` lists chrony.
+
+```bash
+chronyc tracking            # source, stratum, offset
+chronyc sources -v          # every source and its state
+```
+
+Your own clock instead (a GPS receiver, your router): `ntp_servers: ["192.168.4.1 prefer"]`, then
+`sudo fabricctl setup` (the firewall step follows network changes).
 
 ## Federation (sites)
 

@@ -3,6 +3,7 @@ import os
 import subprocess
 
 from fabriclib.common.console import info, ok, warn
+from fabriclib.ntp.chrony_settings import chrony_settings
 from fabriclib.security.apply_docker_firewall import apply_docker_firewall
 from fabriclib.setup.errors import SetupError
 
@@ -34,11 +35,30 @@ def _ssh_client():
     return parts[0] if parts else None
 
 
+def _forget_rules(record, allowed, port, proto, what):
+    """Purpose: remove the ufw rules fabric added earlier for networks no longer allowed; record the current ones.
+    Inputs:  record — the file listing the networks fabric opened the port for last time; allowed — the networks
+             now; port, proto — the rule's port and protocol (str); what — the service's name for messages.
+    Returns: None; record rewritten with allowed. Rules fabric did not add are never touched.
+    Fails:   OSError writing record (a failing `ufw delete` is ignored: the rule may be gone already).
+    Feeds:   run."""
+    previous = open(record).read().split() if os.path.exists(record) else []
+    for cidr in previous:
+        if cidr not in allowed:
+            subprocess.run(["ufw", "delete", "allow", "from", cidr, "to", "any", "port", port, "proto", proto],
+                           capture_output=True)
+            info(f"host firewall: {what} from {cidr} removed (no longer allowed)")
+    with open(record, "w") as f:
+        f.write("\n".join(allowed) + ("\n" if allowed else ""))
+
+
 def run(ctx):
     """Purpose: default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so
              Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service.
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
-             (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them); vars_file,
+             (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123
+             from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks
+             removed: config/.firewall-ntp-allowed); vars_file,
              target_dir, config_dir. Env SSH_CONNECTION.
     Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
              (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
@@ -72,15 +92,14 @@ def run(ctx):
                        check=True, capture_output=True)
     # SSH rules fabric added for a network that is no longer allowed (lan_cidr changed, a firewall_allow entry
     # removed) go; rules fabric did not add are never touched. The record says which are fabric's.
-    record = os.path.join(ctx.config_dir, ".firewall-ssh-allowed")
-    previous = open(record).read().split() if os.path.exists(record) else []
-    for cidr in previous:
-        if cidr not in allowed:
-            subprocess.run(["ufw", "delete", "allow", "from", cidr, "to", "any", "port", "22", "proto", "tcp"],
-                           capture_output=True)
-            info(f"host firewall: SSH from {cidr} removed (no longer allowed)")
-    with open(record, "w") as f:
-        f.write("\n".join(allowed) + "\n")
+    _forget_rules(os.path.join(ctx.config_dir, ".firewall-ssh-allowed"), allowed, "22", "tcp", "SSH")
+    # time (ntp.md): the networks chrony answers may ask on UDP 123, nobody else
+    ntp_nets = chrony_settings(ctx.vars, os.path.join(ctx.config_dir, "federation.yaml"))["allow"] \
+        if ctx.vars.get("ntp_serve", True) else []
+    for cidr in ntp_nets:
+        subprocess.run(["ufw", "allow", "from", cidr, "to", "any", "port", "123", "proto", "udp"],
+                       check=True, capture_output=True)
+    _forget_rules(os.path.join(ctx.config_dir, ".firewall-ntp-allowed"), ntp_nets, "123", "udp", "NTP")
     # DHCP (optional): clients have no address yet (source 0.0.0.0), so allow port 67 on the served interfaces
     if ctx.vars.get("install_kea"):
         for iface in (ctx.vars.get("dhcp") or {}).get("interfaces") or []:

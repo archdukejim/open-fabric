@@ -10,7 +10,7 @@ def needs_rebuild(compose_file):
     Returns: bool; False when no service has a build section with BASE_IMAGE or KEA_VERSION.
     Fails:   OSError if the file cannot be read; yaml.YAMLError on invalid YAML; AttributeError if a service's
              `build` is a plain string rather than a mapping.
-    Feeds:   deploy.py (decides whether to run `docker compose build`)."""
+    Feeds:   deploy/install_service_units (decides whether to run `docker compose build`)."""
     with open(compose_file) as f:
         services = (yaml.safe_load(f) or {}).get("services") or {}
     for svc in services.values():

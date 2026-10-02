@@ -33,7 +33,7 @@ def create_person(v, actor, uid, first, last, email, source="web"):
     Fails:   ValidationError "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address
              looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused:
              ..." (any other admin API error or failed admin login, raised as SystemExit by
-             keycloak_bootstrap.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable);
+             admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable);
              OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back.
     Feeds:   agent route POST /v1/people (agent/server.py Handler.dispatch) -> webui
              agentclient.create_person -> People page.

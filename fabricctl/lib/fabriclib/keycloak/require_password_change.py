@@ -1,7 +1,8 @@
-import os
 import time
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.keycloak.keycloak_admin import keycloak_admin
+from fabriclib.keycloak.quote import q
 
 
 def require_password_change(v, s, user):
@@ -11,21 +12,16 @@ def require_password_change(v, s, user):
              user — username.
     Returns: None (UPDATE_PASSWORD added to the user's required actions if missing).
     Fails:   ValidationError "Keycloak does not see LDAP user <user>" after 10 lookups 3 s apart;
-             SystemExit from keycloak_bootstrap.Admin on an admin API error or failed login (not
+             SystemExit from the admin client (keycloak/admin_client) on an admin API error or failed login (not
              converted); OSError / ssl errors if Keycloak is unreachable.
     Feeds:   setup/create_admin.py run (only when ensure_admin_user created the user).
     Notes:   the lookup also imports the user from 389-DS into Keycloak; the retries cover federation
-             still settling right after bootstrap. Builds its own admin client (same as keycloak_admin).
+             still settling right after bootstrap.
     """
-    import keycloak_bootstrap as kb          # fabric/lib: admin client pinned to the fabric root CA
-    from webui.tlsclient import TLSClient
-
-    ca = os.path.join(v["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
-    kc = kb.Admin(TLSClient(v["ip_keycloak"], 8443, v["hostname_keycloak"], ca),
-                  s["keycloak_admin_user"], s["keycloak_admin_password"])
-    realm = kb.q(v.get("webui_realm") or v["domain"])
+    kc, realm = keycloak_admin(v, s)
+    realm = q(realm)
     for _ in range(10):                     # federation may still be settling right after bootstrap
-        _, found = kc.call("GET", f"/{realm}/users?username={kb.q(user)}&exact=true")
+        _, found = kc.call("GET", f"/{realm}/users?username={q(user)}&exact=true")
         if found:
             break
         time.sleep(3)

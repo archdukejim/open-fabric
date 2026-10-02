@@ -213,12 +213,23 @@
 | Feeds | run (lockout guard). |
 | Called by | `fabriclib.setup.configure_firewall.run` |
 
+### `_forget_rules(record, allowed, port, proto, what)`
+
+| | |
+|---|---|
+| Purpose | remove the ufw rules fabric added earlier for networks no longer allowed; record the current ones. |
+| Inputs | record — the file listing the networks fabric opened the port for last time; allowed — the networks now; port, proto — the rule's port and protocol (str); what — the service's name for messages. |
+| Returns | None; record rewritten with allowed. Rules fabric did not add are never touched. |
+| Fails | OSError writing record (a failing `ufw delete` is ignored: the rule may be gone already). |
+| Feeds | run. |
+| Called by | `fabriclib.setup.configure_firewall.run` |
+
 ### `run(ctx)`
 
 | | |
 |---|---|
 | Purpose | default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service. |
-| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them); vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
+| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123 from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks removed: config/.firewall-ntp-allowed); vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
 | Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed — config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER rebuilt. Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
 | Fails | SetupError when the SSH client is outside every allowed CIDR (would lock the operator out); CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an invalid CIDR. |
 | Feeds | setup step `firewall`, run by run_setup via STEPS. |
@@ -448,9 +459,9 @@
 | | |
 |---|---|
 | Purpose | render every template and deploy config, compose files, systemd units and web assets without starting anything; make sure a `fabricctl` command exists. |
-| Inputs | ctx — SetupContext: vars (saved to <config>/fabric.yaml first, keeping plan choices), config_dir, secrets_file, deploy_base, target_dir. Sets env DEPLOY_BASE_DIR, CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE, LINK_VARS_PATH and reloads lib/deploy.py (it reads them at import). |
+| Inputs | ctx — SetupContext: vars (saved to <config>/fabric.yaml first, keeping plan choices), config_dir, secrets_file, deploy_base, target_dir. Sets env DEPLOY_BASE_DIR, CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE, LINK_VARS_PATH for the deploy engine (deploy/deploy_paths reads them per run). |
 | Returns | None. Leaves the rendered install, an empty 0600 secrets file unless the secrets are in OpenBao, ctx.restart_services extended with services whose config, unit or image changed, ctx reloaded (vars.yaml). From the package: an old /usr/local/bin wrapper is removed; from a checkout: /usr/local/bin/fabricctl is written (runs <target>/lib/manage.sh). |
-| Fails | whatever deploy.apply_deployment raises (ValidationError, CalledProcessError, OSError) — propagates; OSError writing files. |
+| Fails | whatever apply_deployment raises (ValidationError, CalledProcessError, OSError) — propagates; OSError writing files. |
 | Feeds | setup step `deploy`, run by run_setup via STEPS (run_setup then reloads ctx.vars). |
 | Called by | `fabriclib.images.switch_image._apply` |
 
@@ -716,7 +727,7 @@
 | Returns | None. Changed services that are active are restarted; inactive ones are left for their next start. |
 | Fails | as mint_service_certs.run (SetupError, ValidationError, CalledProcessError); CalledProcessError from `systemctl restart`. |
 | Feeds | cli main (`certs`). |
-| Called by | `fabriclib.cli.main`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint` |
+| Called by | `fabriclib.cli.main`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.pki.run_service_cert_command.run_service_cert_command` |
 
 ## `fabricctl/lib/fabriclib/setup/restore_install.py`
 
@@ -863,7 +874,7 @@
 | | |
 |---|---|
 | Purpose | start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, move an older directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate fabric.target. |
-| Inputs | ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui, install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint; restart_services (units to restart); target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file. |
+| Inputs | ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui, install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint; restart_services (units to restart); target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file. |
 | Returns | None. fabric.target enabled and started; renamed units retired; every enabled unit running and its container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6 tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web running when the web UI is on; fabric-federation running when federation_endpoint is on. |
 | Fails | SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration still fails after 6 tries; CalledProcessError from systemctl; ValidationError from ensure_default_device_roles or migrate_local_suffix (propagates). |
 | Feeds | setup step `start`, run by run_setup via STEPS. |
@@ -937,7 +948,7 @@
 
 | | |
 |---|---|
-| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, and every installed service. |
+| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site), and every installed service. |
 | Inputs | ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port, install_ldap/webui/keycloak, federation_endpoint, install_adguard, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA root, the agent socket, ~/fabric-admin of the sudo user. |
 | Returns | list of (name, passed: bool, detail: str). |
 | Fails | ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading root_ca.crt; subprocess.TimeoutExpired from the LDAPS probe (15 s); struct.error/IndexError from dns_query on a malformed reply. Check failures are results, not exceptions. |

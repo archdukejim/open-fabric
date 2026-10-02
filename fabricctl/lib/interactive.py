@@ -78,7 +78,7 @@ def clean_data(data):
 def save_yaml(path, data):
     """Purpose: write the editor's data back to a YAML file (empty strings become null, key order kept).
     Inputs:  path — str, destination (CUSTOM_VARS_FILE or LINK_VARS_FILE); data — the mapping. Note the order is (path,
-             data), the reverse of deploy.save_yaml.
+             data), the reverse of the engine's vars.yaml writer.
     Returns: None.
     Fails:   OSError if the file cannot be written; yaml.representer.RepresenterError for unsupported types. It takes no
              vars lock, unlike the fabriclib DNS edits.
@@ -104,7 +104,7 @@ def print_vars():
     Returns: None; prints one numbered line per key (dicts and lists shown as "(complex structure)"), or a notice when
              the file is missing or empty.
     Fails:   OSError / yaml.YAMLError from load_yaml.
-    Feeds:   `interactive.py --print` (manage.sh MODE print)."""
+    Feeds:   `interactive.py --print` (cli.py --print)."""
     data = load_yaml(CUSTOM_VARS_FILE)
     if not data:
         print(f"{YELLOW}No custom variables found in {CUSTOM_VARS_FILE}{NC}")
@@ -571,7 +571,7 @@ def interactive_mode():
              IMMUTABLE_KEYS cannot be deleted or edited, WARNED_KEYS ask for "yes" before apply. Prompts on stdin.
     Returns: never returns normally: sys.exit(0) on q/quit/exit or after a successful apply.
     Fails:   sys.exit with apply_mode's code when the apply fails; OSError from save_yaml; EOFError from input().
-    Feeds:   `interactive.py --interactive` (manage.sh default MODE).
+    Feeds:   `interactive.py --interactive` (cli.py --interactive; `fabricctl` without arguments).
     Notes:   CUSTOM_VARS_FILE and DEPLOYED_VARS_FILE are the same file on a standard /opt install, and edits are saved
              before apply, so the WARNED_KEYS check finds no difference there."""
     data = load_yaml(CUSTOM_VARS_FILE)
@@ -740,20 +740,20 @@ def interactive_mode():
             continue
 
 def apply_mode():
-    """Purpose: `fabricctl --apply`: run the deploy engine (deploy.apply_deployment) on the vars file, report which
-             variables changed and restart the services it returns.
-    Inputs:  none; sets env CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE and DEPLOY_BASE_DIR for deploy.py; reads the newest
+    """Purpose: `fabricctl --apply`: run the deploy engine (fabriclib/deploy/apply_deployment) on the vars file,
+             report which variables changed and restart the services it returns.
+    Inputs:  none; sets env CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE and DEPLOY_BASE_DIR for the engine; reads the newest
              <fabric>/archive/*-vars.yaml (else DEPLOYED_VARS_FILE) and /tmp/fabric-render/vars.yaml.
     Returns: None; progress printed. Returns early ("System is up to date") when no top-level key differs.
     Fails:   sys.exit(<code>) with "Error deploying configurations!" when apply_deployment exits; sys.exit(1) with a
              traceback on any other exception. A failing `systemctl restart` raises CalledProcessError (not caught); a
              timeout is printed.
-    Feeds:   `interactive.py --apply` (manage.sh MODE apply, fabriclib/system/apply_changes.py for the web UI);
+    Feeds:   `interactive.py --apply` (cli.py --apply, fabriclib/system/apply_changes.py for the web UI);
              interactive_mode; edit_dns_zone.
     Notes:   apply_deployment already restarted those services, so each active one is restarted a second time here,
              fabric-web synchronously. The archive it compares with is written by apply_deployment in the same run."""
     import glob
-    from deploy import apply_deployment
+    from fabriclib.deploy.apply_deployment import apply_deployment
     print(f"{BOLD}Applying changes natively...{NC}")
     
     archives = glob.glob(os.path.join(FABRIC_DIR, "archive/*-vars.yaml"))

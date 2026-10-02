@@ -246,6 +246,19 @@
 | Feeds | pki/issue_key_pair, pki/sign_csr. |
 | Called by | `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
 
+## `fabricctl/lib/fabriclib/ldap/seed_directory.py`
+
+### `seed_directory()`
+
+| | |
+|---|---|
+| Purpose | seed 389-DS: create the two suffix backends on first run, apply /seed/*.ldif idempotently inside the container (seed.py) and restart the ldap service once when server configuration (cn=config) changed. |
+| Inputs | none; needs the running dirsrv container with DS_SUFFIX_NAME and DS_LOCAL_SUFFIX set and the rendered seed files (deploy/install_dirsrv_seed copies them to <base>/dirsrv/seed, mounted at /seed). |
+| Returns | seed.py's output (str), with a restart notice when it asked for one. |
+| Fails | ValidationError when dirsrv does not become healthy (before seeding or after the restart), the backends cannot be created after 12 tries 5 s apart (the healthcheck can pass a moment before LDAPI accepts connections), or seed.py fails (its output in the message). |
+| Feeds | setup/start_services (setup), deploy/restart_changed (apply when seed files changed); tests/dirsrv/run.sh mirrors the same steps. |
+| Called by | `fabriclib.deploy.restart_changed.restart_changed`, `fabriclib.setup.start_services.run` |
+
 ## `fabricctl/lib/fabriclib/ldap/update_device.py`
 
 ### `update_device(v, actor, name, fields, source='web')`

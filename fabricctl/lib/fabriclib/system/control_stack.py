@@ -12,11 +12,13 @@ def control_stack(verb):
              fabric.target first, then service_status() — no change is made.
     Fails:   ValidationError when systemctl fails or the verb is unknown; subprocess.TimeoutExpired after 900 s.
     Feeds:   cli main (prints the rows).
-    Notes:   stop names every installed unit too: stopping an inactive target would not reach them."""
+    Notes:   stop names every installed unit too: stopping an inactive target would not reach them. chrony (the
+             host's time, ntp.md) is shown by status but never stopped."""
     if verb in ("start", "stop", "restart"):
         # stop: name the units too — stopping an inactive target would not
         # reach them (PartOf propagates from an active target only).
-        units = [u for u, _, _ in service_status()] if verb == "stop" else []
+        # chrony is listed for status but is the host's clock, not part of the stack: it keeps running
+        units = [u for u, _, _ in service_status() if u != "chrony"] if verb == "stop" else []
         res = subprocess.run(["systemctl", verb, "fabric.target", *units], capture_output=True, text=True,
                              timeout=900)
         if res.returncode != 0:

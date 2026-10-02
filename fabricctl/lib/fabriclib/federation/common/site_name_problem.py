@@ -8,7 +8,7 @@ def site_name_problem(name, org_ous=()):
              parent), default none.
     Returns: None when the name is fine, else the reason (str).
     Fails:   never.
-    Feeds:   create_invitation, deploy.py apply_deployment."""
+    Feeds:   create_invitation, deploy/check_fixed_identity."""
     if not SITE_NAME_RE.match(str(name)):
         return f"invalid site name: {name!r} (one host-name label: a-z, 0-9, -)"
     if str(name) in set(org_ous):

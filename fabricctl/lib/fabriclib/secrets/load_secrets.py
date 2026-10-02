@@ -16,7 +16,7 @@ def load_secrets(path=SECRETS_FILE, v=None):
              OpenBao's entry once imported (marker present, no file).
     Fails:   ValidationError from read_vault_secrets (OpenBao unreachable, sealed or refusing);
              yaml.YAMLError for a malformed file; OSError.
-    Feeds:   setup/context.py SetupContext.secrets, keycloak_bootstrap.main, deploy.py apply_deployment,
+    Feeds:   setup/context.py SetupContext.secrets, configure_keycloak, deploy/apply_deployment,
              keycloak/create_person, keycloak/reset_sign_in, ldap/common/run_dirsrv, export_secrets,
              run_secrets_command.
     Notes:   a secrets file that was put back (a reinstall restores one) wins over OpenBao and is

@@ -40,7 +40,7 @@ start() {
   done
   docker logs dstest | tail -30; return 1
 }
-seed() {  # same steps as dirsrv_seed in fabricctl/lib/dirsrv.sh
+seed() {  # same steps as fabricctl/lib/fabriclib/ldap/seed_directory.py
   for _ in $(seq 1 12); do
     docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null 2>&1 &&
       docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"' >/dev/null 2>&1 && break

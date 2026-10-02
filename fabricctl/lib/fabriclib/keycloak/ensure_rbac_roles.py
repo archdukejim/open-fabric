@@ -15,7 +15,7 @@ def _q(s):
 
 def _role(kc, realm, name, description):
     """Purpose: Get a realm role, creating it first when it does not exist.
-    Inputs:  kc — keycloak_bootstrap.Admin; realm — realm name; name — role name; description — used only
+    Inputs:  kc — admin_client.Admin; realm — realm name; name — role name; description — used only
              when the role is created.
     Returns: the role representation (dict with "id", "name", ...).
     Fails:   SystemExit from kc.call on an admin API error (404 on the first lookup is expected).
@@ -31,11 +31,11 @@ def _role(kc, realm, name, description):
 def ensure_rbac_roles(kc, realm, admin_role):
     """Purpose: Converge fabric's access control in Keycloak (design D19): one realm role per permission
              (fabric:<area>:<action>) and one composite role per bundle holding exactly its permissions.
-    Inputs:  kc — keycloak_bootstrap.Admin; realm — realm name; admin_role — name of the "admin" bundle
+    Inputs:  kc — admin_client.Admin; realm — realm name; admin_role — name of the "admin" bundle
              (webui_admin_role, default fabric-admin). Reads rbac/permissions PERMISSIONS, BUNDLES, PREFIX.
     Returns: {role name: representation} for every fabric role (permissions and bundles).
     Fails:   SystemExit from kc.call on any admin API error; OSError / ssl errors if Keycloak is unreachable.
-    Feeds:   keycloak_bootstrap.main: group grants (grant_role_to_group) and client scope mappings
+    Feeds:   configure_keycloak: group grants (grant_role_to_group) and client scope mappings
              (ensure_client, ensure_openbao_client).
     Notes:   missing fabric: members of a bundle are added and extra ones removed; non-fabric composites
              are left alone. Descriptions are set only when a role is created.

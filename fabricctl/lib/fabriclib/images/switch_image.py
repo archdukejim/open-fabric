@@ -18,7 +18,7 @@ def _apply(ctx, var, ref, services):
              ref — str image ref; services — list of SERVICES entries to restart, in order.
     Returns: None.
     Fails:   SetupError from start_unit when a container does not become healthy; subprocess.CalledProcessError
-             from systemctl; anything deploy_config.run / deploy.py raises (SystemExit on a deploy failure).
+             from systemctl; anything deploy_config.run / the deploy engine raises (SystemExit on a deploy failure).
     Feeds:   switch_image (update and its rollback)."""
     ctx.vars[var] = ref
     deploy_config.run(ctx)

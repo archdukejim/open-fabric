@@ -24,9 +24,9 @@
 | Inputs | v — the rendered vars: deploy_base_dir, service_users.fluentbit uid/gid, log_forwarding (syslog / elastic, each with an optional ca_file) and what the template uses. secrets — fabric's secrets dict (log_elastic_password). jinja_env — Jinja environment holding fluentbit/fluent-bit.yaml.j2 (fabricctl/jinja). |
 | Returns | True if any file changed (the service must restart), else False. |
 | Fails | ValidationError "log_forwarding.<name>.ca_file … not found" (a destination's ca_file, or the fabric root CA used by default, is missing); KeyError on missing vars; OSError; jinja2 errors. |
-| Feeds | deploy.py (apply), run_logs_command (set-password elastic); tests/fluentbit/run.py. |
+| Feeds | deploy/deploy_optional_parts (apply), run_logs_command (set-password elastic); tests/fluentbit/run.py. |
 | Notes | config/ is root:fluentbit 0750 and buffer/ fluentbit 0750; the config and CA files are 0640, secrets.env root 0600. Both CA files are written even for a destination that is not configured. |
-| Called by | `deploy.apply_deployment`, `fabriclib.logs.run_logs_command.run_logs_command` |
+| Called by | `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts`, `fabriclib.logs.run_logs_command.run_logs_command` |
 
 ## `fabricctl/lib/fabriclib/logs/log_status.py`
 

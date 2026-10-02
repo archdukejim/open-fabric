@@ -1,0 +1,40 @@
+import shutil
+
+from fabriclib.common.service_user import service_user
+from fabriclib.dhcp.deploy_kea import deploy_kea
+from fabriclib.dns_filter.deploy_adguard import deploy_adguard
+from fabriclib.logs.deploy_fluentbit import deploy_fluentbit
+from fabriclib.ntp.deploy_chrony import deploy_chrony
+from fabriclib.radius.deploy_freeradius import deploy_freeradius
+
+
+def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
+    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea and
+             FreeRADIUS — each only when it is on (chrony whenever it is installed).
+    Inputs:  paths — deploy_paths() (federation); final_vars — rendered settings; secrets; jinja_env; links —
+             dns_links() (the zones AdGuard forwards to BIND).
+    Returns: {"restart": set of units to restart, "nginx": True if nginx's sign-in snippet for AdGuard changed}.
+    Fails:   whatever the parts' deploy functions raise (ValidationError, OSError, CalledProcessError).
+    Feeds:   apply_deployment."""
+    restart, nginx = set(), False
+    # Fluent Bit (optional): its config, destination CAs, credentials, disk buffer
+    if final_vars.get("install_fluentbit") and deploy_fluentbit(final_vars, secrets, jinja_env):
+        restart.add("fluentbit")
+    # DNS filter (dns-filter.md): AdGuard's config merged with what it has, oauth2-proxy's, nginx's snippet
+    if final_vars.get("install_adguard"):
+        adg = deploy_adguard(final_vars, secrets, links, jinja_env)
+        if adg["adguard"]:
+            restart.add("adguard")
+        if adg["oauth2proxy"]:
+            restart.add("adguard-auth")
+        nginx = adg["nginx"]
+    # Time (ntp.md): chrony on the host, the upstream site first; installed by setup's host step
+    if shutil.which("chronyd") and deploy_chrony(final_vars, paths["federation"], jinja_env):
+        print("  time: chrony configuration updated")
+    # Kea (optional): its configs (leases are kept across restarts) and the DHCP subzone, created once
+    if final_vars.get("install_kea") and deploy_kea(final_vars, secrets, jinja_env, *service_user(final_vars, "bind")):
+        restart.add("kea")
+    # FreeRADIUS (optional): config with the client secrets, fabric's policy code, CA bundle
+    if final_vars.get("install_freeradius") and deploy_freeradius(final_vars, secrets, jinja_env):
+        restart.add("freeradius")
+    return {"restart": restart, "nginx": nginx}

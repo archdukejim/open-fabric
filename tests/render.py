@@ -182,7 +182,8 @@ assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.la
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
 # DNS filter (dns-filter.md): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
 # the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
-assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False and v2['bind_dns_port'] == 53
+assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False
+assert v2['bind_dns_port'] == user.get('bind_dns_port', 53), 'with the filter off the port is what vars say (53)'
 adg = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'AdGuard',
                                                                  'bind_dns_port': 53}))
 assert adg['install_adguard'] is True and adg['bind_dns_port'] == 5053, (adg['install_adguard'], adg['bind_dns_port'])
@@ -202,6 +203,16 @@ _o2p = env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg)
 assert not [ln for ln in _o2p.splitlines() if ln.strip().startswith(('client_secret', 'cookie_secret'))], \
     'oauth2-proxy secrets only via secrets.env'
 print('DNS filter: off by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
+# time (ntp.md): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
+assert v2['ntp_serve'] is True and v2['ntp_set_clock'] is True and all(x.endswith(' nts') for x in v2['ntp_servers'])
+assert 'ntp' in [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']]
+own = copy.deepcopy(PRISTINE)
+own['dns'] = {'dynamic_zone_var': {'zone_authority': True, 'A': [{'name': 'ntp', 'ip': '192.168.4.9'}]}}
+own_v = yaml.safe_load(env.get_template('vars.yaml.j2').render(**own))
+assert 'ntp' not in [r['name'] for r in own_v['dns']['dynamic_zone_var'].get('CNAME', [])], 'never a CNAME next to an A'
+assert yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'ntp_servers': []}))['ntp_servers'] == []
+assert 'time-sync.target' in env.get_template('systemd/wrapper.service.j2').render(**{**v2, 'item': {'service': 'x', 'folder': 'x', 'compose': 'x'}})
+print('time: served with NTS sources by default, ntp.<domain>, units after time-sync.target, Kea option 42')
 # Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402
@@ -265,6 +276,18 @@ sn = k4["subnet4"][0]
 assert sn["pools"] == [{"pool": "192.168.7.100 - 192.168.7.199"}] and sn["reservations"][0]["ip-address"] == "192.168.7.20"
 assert k4["ddns-qualifying-suffix"] == "dhcp.lan.j-j.family." and k4["ddns-conflict-resolution-mode"] == "check-with-dhcid"
 assert k4["control-socket"]["socket-name"].startswith("/var/run/kea/") and k4["interfaces-config"]["interfaces"] == ["eth0"]
+# time (ntp.md): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
+assert {"name": "ntp-servers", "data": kv["host_ip"]} in k4["option-data"], k4["option-data"]
+kv["dhcp"] = {**kv["dhcp"], "ntp": ["192.168.7.2", "192.168.7.3"]}
+assert {"name": "ntp-servers", "data": "192.168.7.2, 192.168.7.3"} in kea_json("kea-dhcp4.conf")["Dhcp4"]["option-data"]
+kv["dhcp"] = {**kv["dhcp"], "ntp": []}
+assert "ntp-servers" not in str(kea_json("kea-dhcp4.conf")["Dhcp4"]["option-data"]), "dhcp.ntp [] hands out none"
+kv["dhcp"] = {k: x for k, x in kv["dhcp"].items() if k != "ntp"}
+try:
+    normalize_dhcp({**kv, "dhcp": {**kv["dhcp"], "ntp": ["time.example"]}})
+    raise AssertionError("dhcp.ntp must be IPv4 addresses")
+except ValidationError:
+    pass
 d2 = kea_json("kea-dhcp-ddns.conf")["DhcpDdns"]
 assert d2["forward-ddns"]["ddns-domains"][0]["name"] == "dhcp.lan.j-j.family." and d2["tsig-keys"][0]["name"] == "kea-ddns"
 zones = env.get_template('bind9/config/named.conf.zones.j2').render(**{**secrets, **kv, "tsig_keys": [], "tsig_secrets": {}})
@@ -354,9 +377,9 @@ print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS, EAP
 
 # each systemd unit waits for its health check by container name: that name
 # must be a container_name in its compose template (else start hangs 10 min)
-units = re.findall(r"'compose': '([^']+)', 'folder': '([^']+)'",
-                   open(os.path.join(REPO, "fabricctl", "lib", "deploy.py")).read())
-assert len(units) >= 8, f"deploy.py's unit list not found (the pattern matched {units})"
+from fabriclib.deploy.service_units import service_units  # noqa: E402
+units = [(u["compose"], u["folder"]) for u in service_units("/opt", {})]
+assert len(units) >= 8, units
 for container, folder in units:
     text = open(os.path.join(REPO, "fabricctl", "jinja", folder, "docker-compose.yml.j2")).read()
     assert re.search(rf"^\s+container_name: {re.escape(container)}\s*$", text, re.M), (folder, container)
@@ -399,12 +422,11 @@ assert "-Pfx" in _g["windows"]["tls"]["script"] and "<Type xmlns=\"http://www.mi
     in _g["windows"]["ttls"]["script"] and "<PAPAuthentication />" in _g["windows"]["ttls"]["script"]
 print("802.1X guides: Windows scripts (CA, pinned server, well-formed profiles, CRLF, public data only)")
 
-# every command fabriclib/cli.py handles is handed to it by manage.sh (else `fabricctl <cmd>` says "Unknown flag")
+# every fabricctl command on an install reaches cli.py: manage.sh hands it all its arguments (none: the menu)
+_manage = open(os.path.join(REPO, "fabricctl", "lib", "manage.sh")).read()
+assert 'exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@"' in _manage and "set -- --interactive" in _manage
 _cli = open(os.path.join(REPO, "fabricctl", "lib", "fabriclib", "cli.py")).read()
-_cmds = set(re.findall(r'cmd == "([a-z][a-z-]*)"', _cli)) | {c for t in re.findall(r"cmd in \(([^)]*)\)", _cli)
-                                                           for c in re.findall(r'"([a-z][a-z-]*)"', t)}
-_cmds -= {"help", "extra-cert", "restore"}      # fallback; internal (certs.sh); restore: the package wrapper (no install yet)
-_routed = set(re.search(r"^\s*([a-z|-]+)\) exec python3 \"\$FABRIC_DIR/lib/fabriclib/cli.py\"",
-                        open(os.path.join(REPO, "fabricctl", "lib", "manage.sh")).read(), re.M).group(1).split("|"))
-assert _cmds <= _routed, f"cli.py commands manage.sh does not route: {sorted(_cmds - _routed)}"
-print('every fabricctl subcommand reaches cli.py')
+for _flag in ("--mint-certs", "--service-cert", "--render-jinja", "--print", "--interactive", "--apply",
+              "--update-containers", "--client-cert", "--keycloak-sync", "--version"):
+    assert f'"{_flag}"' in _cli, f"cli.py does not route {_flag}"
+print('every fabricctl subcommand and flag reaches cli.py')

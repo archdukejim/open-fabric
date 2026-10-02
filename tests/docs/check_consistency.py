@@ -90,8 +90,8 @@ def check_vars():
 
 
 def _cli_commands():
-    """(command, subcommand or None) pairs from cli.py's docstring, manage.sh's
-    router and every `fabricctl <cmd> <sub>` in a USAGE string."""
+    """(command, subcommand or None) pairs from cli.py's docstring and every
+    `fabricctl <cmd> <sub>` in a USAGE string."""
     cmds = set()
     doc = ast.get_docstring(ast.parse(_read("fabricctl/lib/fabriclib/cli.py"))) or ""
     for m in re.finditer(r"^\s+fabricctl ([a-z][a-z-]*)(?: ([a-z|-]+))?", doc, re.M):

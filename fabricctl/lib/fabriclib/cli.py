@@ -30,9 +30,20 @@
   fabricctl reinstall [--yes]    uninstall + setup, keeping config, secrets, the CA and certificates
   fabricctl restore <folder> [--yes]
                                  bring back a fabric exported by `uninstall --export` (or apt purge)
+
+Older flag forms (still supported):
+  fabricctl [--interactive]      the vars editor menu      fabricctl --print   list the vars
+  fabricctl --apply              deploy vars.yaml now      fabricctl --version
+  fabricctl --mint-certs [--apply] [--intermediate-ca [N]] [--kty T] [--size N]
+                                 offline certificates from extra_certs (or asked for)
+  fabricctl --service-cert [--apply]
+                                 re-issue every service certificate
+  fabricctl --render-jinja <file.j2> [--vars FILE] [--output FILE|DIR]
+                                 render one template with fabric's vars
+  fabricctl --client-cert <user> | --keycloak-sync | --update-containers
 """
-import json
 import os
+import subprocess
 import sys
 
 # Run as a script, Python puts fabriclib/ itself first on sys.path, where its
@@ -47,7 +58,9 @@ from fabriclib.images.run_images_command import run_images_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
 from fabriclib.secrets.run_secrets_command import run_secrets_command  # noqa: E402
-from fabriclib.pki.mint_extra_cert import mint_extra_cert  # noqa: E402
+from fabriclib.pki.run_mint_certs_command import run_mint_certs_command  # noqa: E402
+from fabriclib.pki.run_service_cert_command import run_service_cert_command  # noqa: E402
+from fabriclib.system.render_template_file import render_template_file  # noqa: E402
 from fabriclib.setup import run_setup  # noqa: E402
 from fabriclib.setup.backup_install import backup_install  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
@@ -82,6 +95,58 @@ def _confirm(prompt, args):
     return input(f"{prompt} Type 'yes' to continue: ").strip().lower() == "yes"
 
 
+def _version():
+    """Purpose: `fabricctl --version`: this install's version and build.
+    Inputs:  none (<fabric>/VERSION and BUILD next to this code).
+    Returns: 0 after printing them.
+    Fails:   never (a missing file prints "unknown" or nothing).
+    Feeds:   main (before the root check: anyone may ask)."""
+    fabric = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+    def read(name):
+        path = os.path.join(fabric, name)
+        return open(path).read().strip() if os.path.exists(path) else ""
+    print(f"fabricctl version {read('VERSION') or 'unknown'}")
+    if read("BUILD"):
+        print(read("BUILD"))
+    return 0
+
+
+def _flags(argv):
+    """Purpose: route the older flag forms (`fabricctl --mint-certs`, `--apply`, …) to their function.
+    Inputs:  argv — the command-line words; the first known flag decides, as manage.sh did.
+    Returns: exit status, or None when argv holds no known flag.
+    Fails:   whatever the handler raises; SystemExit from the vars editor.
+    Feeds:   main."""
+    fabric = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    lib = os.path.join(fabric, "lib")
+    vars_file = os.path.join(fabric, "config", "vars.yaml")
+
+    def value(flag):
+        i = argv.index(flag) + 1
+        return argv[i] if flag in argv and i < len(argv) and not argv[i].startswith("--") else None
+
+    for flag in argv:
+        if flag == "--mint-certs":
+            return run_mint_certs_command(vars_file, os.path.join(fabric, "archive"), argv)
+        if flag == "--service-cert":
+            return run_service_cert_command(SetupContext(deploy_base=os.path.dirname(fabric)).load_state(), argv)
+        if flag == "--render-jinja":
+            return render_template_file(value("--render-jinja"), value("--vars") or vars_file, value("--output"))
+        if flag in ("--print", "--interactive"):
+            return subprocess.call([sys.executable, os.path.join(lib, "interactive.py"), flag])
+        if flag == "--update-containers":        # the old name
+            return main(["images", "update", "--all"])
+        if flag == "--client-cert":
+            return main(["client-cert", value("--client-cert") or ""])
+        if flag == "--keycloak-sync":
+            return subprocess.call([sys.executable, os.path.join(lib, "keycloak_bootstrap.py"), "--vars", vars_file,
+                                    "--secrets", os.path.join(fabric, "config", "fabric-secrets.yml")])
+    if "--apply" in argv:
+        return subprocess.call([sys.executable, os.path.join(lib, "interactive.py"), "--apply"])
+    return None
+
+
 def main(argv):
     """Purpose: route `fabricctl <command> ...` to the one function that implements it (routing only).
     Inputs:  argv — command-line words after the program name; argv[0] is the command (none: help).
@@ -92,10 +157,17 @@ def main(argv):
     Fails:   SystemExit("Run as root ...") when not root. start/stop/restart/status: any exception is printed
              as "error: ..." and 1 is returned. Other commands let their handlers' exceptions propagate as a
              traceback (e.g. ValidationError, SetupError from `certs`, ValueError for a non-numeric --days).
-    Feeds:   `__main__` of this file, run by /usr/bin/fabricctl (package), manage.sh and certs.sh (`extra-cert`)
-             and the OpenBao unit (`vault unlock`/`wipe-key`); the exit status is the process's."""
+    Feeds:   `__main__` of this file, run by /usr/bin/fabricctl (package), manage.sh (everything on an install;
+             no arguments there opens the vars editor) and the OpenBao unit (`vault unlock`/`wipe-key`); the exit
+             status is the process's. The older flag forms go through _flags."""
+    if argv[:1] == ["--version"]:
+        return _version()
     if os.geteuid() != 0:
         sys.exit("Run as root (sudo fabricctl ...)")
+    if argv and argv[0].startswith("--") and argv[0] not in ("--help",):
+        status = _flags(argv)
+        if status is not None:
+            return status
     cmd, args = (argv[0], argv[1:]) if argv else ("help", [])
     if cmd == "setup":
         return run_setup.main(args)
@@ -139,9 +211,6 @@ def main(argv):
         return run_tsig_command(args)
     if cmd == "acl":
         return run_acl_command(args)
-    if cmd == "extra-cert" and args:        # internal: fabricctl --mint-certs (certs.sh) -> one JSON entry
-        print(mint_extra_cert(SetupContext(deploy_base=_base(args)).load_state().vars, json.loads(args[0])))
-        return 0
     if cmd == "restore":
         return run_restore_command(args, _base(args), os.path.abspath(__file__))
     if cmd == "uninstall":

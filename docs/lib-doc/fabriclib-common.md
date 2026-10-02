@@ -24,7 +24,7 @@
 | Returns | None. |
 | Fails | never in practice — only an OSError from writing to a closed stdout. |
 | Feeds | setup steps (collect_vars, condition_host, configure_firewall, create_admin, init_pki, …). |
-| Called by | `fabriclib.setup.collect_vars._join_defaults`, `fabriclib.setup.collect_vars.collect_vars`, `fabriclib.setup.condition_host.run`, `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.export_install.export_install`, `fabriclib.setup.harden_docker.run`, `fabriclib.setup.init_pki.run`, `fabriclib.setup.join_federation.run`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.start_bootstrap.run`, `fabriclib.setup.start_services.run`, `fabriclib.setup.uninstall.uninstall` |
+| Called by | `fabriclib.setup.collect_vars._join_defaults`, `fabriclib.setup.collect_vars.collect_vars`, `fabriclib.setup.condition_host.run`, `fabriclib.setup.configure_firewall._forget_rules`, `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.export_install.export_install`, `fabriclib.setup.harden_docker.run`, `fabriclib.setup.init_pki.run`, `fabriclib.setup.join_federation.run`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.start_bootstrap.run`, `fabriclib.setup.start_services.run`, `fabriclib.setup.uninstall.uninstall` |
 
 ### `ok(text)`
 
@@ -59,6 +59,32 @@
 | Feeds | setup/run_setup.py, setup/verify_install.py. |
 | Called by | `fabriclib.setup.run_setup.main` |
 
+## `fabricctl/lib/fabriclib/common/copy_if_changed.py`
+
+### `copy_if_changed(src, dst, mode, uid=0, gid=0)`
+
+| | |
+|---|---|
+| Purpose | install one file when its content differs from what is there. |
+| Inputs | src, dst — file paths; mode — int; uid, gid — owner (default root). |
+| Returns | True if dst was missing or different and has been replaced (mode and owner set), else False. |
+| Fails | OSError from comparing, copying, chown or chmod. |
+| Feeds | deploy/* (compose files, systemd units, nginx.conf, webui.json). |
+| Called by | `fabriclib.deploy.install_nginx_config.install_nginx_config`, `fabriclib.deploy.install_service_units.install_service_units`, `fabriclib.deploy.install_webui_files.install_webui_files` |
+
+## `fabricctl/lib/fabriclib/common/copy_tree_with_perms.py`
+
+### `copy_tree_with_perms(src, dst, uid=0, gid=0, fmode=416, dmode=488)`
+
+| | |
+|---|---|
+| Purpose | copy a directory tree, setting owner and mode on everything, and say whether anything changed. |
+| Inputs | src, dst — directories; uid, gid — owner of every copied directory and file; fmode, dmode — modes. |
+| Returns | True when dst was created or a file was new or different (compared by content), else False. Directories get owner and mode on every call; unchanged files are left as they are. |
+| Fails | OSError from listing, copying, chown or chmod. Files in dst that are not in src are kept. |
+| Feeds | deploy/* (the fabric tree, web assets, docs, service config trees, build contexts, seeds). |
+| Called by | `fabriclib.deploy.install_bind9_files.install_bind9_files`, `fabriclib.deploy.install_dirsrv_seed.install_dirsrv_seed`, `fabriclib.deploy.install_fabric_tree.install_fabric_tree`, `fabriclib.deploy.install_openbao_config.install_openbao_config`, `fabriclib.deploy.install_service_units.install_service_units`, `fabriclib.deploy.install_stepca_templates.install_stepca_templates` |
+
 ## `fabricctl/lib/fabriclib/common/dns_query.py`
 
 ### `dns_query(name, server, port=53, timeout=3)`
@@ -72,6 +98,19 @@
 | Feeds | setup/verify_install.py. |
 | Notes | no TCP fallback and no check of the reply's id or rcode; the answer section is read right after the question, assuming the server echoed it unchanged. |
 | Called by | `fabriclib.setup.verify_install.checks` |
+
+## `fabricctl/lib/fabriclib/common/ensure_dir.py`
+
+### `ensure_dir(path, mode=488, uid=0, gid=0)`
+
+| | |
+|---|---|
+| Purpose | make sure a directory exists with the given mode and owner (created if missing, fixed if not). |
+| Inputs | path — str; mode — int, default 0o750; uid, gid — int, default 0 (root). |
+| Returns | None. |
+| Fails | OSError (PermissionError when not root, FileExistsError if path is a file) from os.makedirs/chmod/chown. |
+| Feeds | deploy/* (archive, web, service, OpenBao, BIND9, dirsrv, webui, Step-CA and data directories). |
+| Called by | `fabriclib.deploy.archive_vars.archive_vars`, `fabriclib.deploy.check_fixed_identity.check_fixed_identity`, `fabriclib.deploy.install_bind9_files.install_bind9_files`, `fabriclib.deploy.install_dirsrv_seed.install_dirsrv_seed`, `fabriclib.deploy.install_fabric_tree.install_fabric_tree`, `fabriclib.deploy.install_nginx_config.install_nginx_config`, `fabriclib.deploy.install_openbao_config.install_openbao_config`, `fabriclib.deploy.install_runtime_dirs.install_runtime_dirs`, `fabriclib.deploy.install_service_units.install_service_units`, `fabriclib.deploy.install_stepca_templates.install_stepca_templates`, `fabriclib.deploy.install_webui_files.install_webui_files` |
 
 ## `fabricctl/lib/fabriclib/common/jinja_env.py`
 
@@ -138,8 +177,8 @@
 | Inputs | template_dir — str, the jinja folder (fabricctl/jinja); its parent must hold images.lock.yaml. |
 | Returns | jinja2.Environment with globals images_lock ({name: ref}), packages_lock and lookup. |
 | Fails | yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest. A missing lock file gives empty globals, not an error. |
-| Feeds | deploy.py, dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py, radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites. |
-| Called by | `deploy.apply_deployment`, `fabriclib.logs.run_logs_command.run_logs_command` |
+| Feeds | deploy/apply_deployment (and render_templates), dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py, radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites. |
+| Called by | `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.logs.run_logs_command.run_logs_command`, `fabriclib.system.render_template_file.render_template_file` |
 
 ## `fabricctl/lib/fabriclib/common/load_vars.py`
 
@@ -152,7 +191,7 @@
 | Returns | dict of the settings; {} if the file does not exist or is empty. |
 | Fails | yaml.YAMLError on invalid YAML; OSError (e.g. PermissionError) if it cannot be read. |
 | Feeds | dns/*, dhcp/add_reservation, dhcp/remove_reservation, radius/* (client and group edits), secrets/load_secrets, secrets/save_secrets, agent/server.py, interactive.py. |
-| Called by | `agent.server.Handler.authorize`, `agent.server.Handler.directory`, `agent.server.Handler.dispatch`, `agent.server.Handler.pki`, `agent.server.Handler.vault`, `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key`, `fabriclib.dns.list_tsig_keys.list_tsig_keys`, `fabriclib.dns.list_zones.list_zones`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.rotate_tsig_key.rotate_tsig_key`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command._stored_key`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.dns.zone_detail.zone_detail`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.radius.unmap_radius_group.unmap_radius_group`, `fabriclib.secrets.load_secrets.load_secrets`, `fabriclib.secrets.save_secrets.save_secrets`, `federation.server.Handler.do_GET`, `federation.server.Handler.do_POST`, `interactive._reload` |
+| Called by | `agent.server.Handler.authorize`, `agent.server.Handler.directory`, `agent.server.Handler.dispatch`, `agent.server.Handler.pki`, `agent.server.Handler.vault`, `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key`, `fabriclib.dns.list_tsig_keys.list_tsig_keys`, `fabriclib.dns.list_zones.list_zones`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.rotate_tsig_key.rotate_tsig_key`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command._stored_key`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.dns.zone_detail.zone_detail`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.radius.unmap_radius_group.unmap_radius_group`, `fabriclib.secrets.load_secrets.load_secrets`, `fabriclib.secrets.save_secrets.save_secrets`, `fabriclib.system.render_template_file.render_template_file`, `federation.server.Handler.do_GET`, `federation.server.Handler.do_POST`, `interactive._reload` |
 
 ## `fabricctl/lib/fabriclib/common/read_audit.py`
 
@@ -228,7 +267,20 @@
 | Returns | None. |
 | Fails | OSError if the file cannot be written; yaml.representer.RepresenterError for values YAML cannot dump. Not atomic: the file is truncated first, so a failure mid-write leaves it partial. |
 | Feeds | dns/* (record, ACL and TSIG edits), dhcp/add_reservation, dhcp/remove_reservation, radius/add_radius_client, remove_radius_client, map_radius_group, unmap_radius_group. |
-| Called by | `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.unmap_radius_group.unmap_radius_group` |
+| Called by | `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.unmap_radius_group.unmap_radius_group` |
+
+## `fabricctl/lib/fabriclib/common/service_user.py`
+
+### `service_user(v, name)`
+
+| | |
+|---|---|
+| Purpose | look up the uid/gid a service's files must belong to. |
+| Inputs | v — the rendered vars (reads service_users.<name>.uid/gid); name — str, e.g. "bind". |
+| Returns | (uid, gid) as ints; (0, 0) when the service is not listed. |
+| Fails | ValueError/TypeError if a listed uid or gid is not a number. |
+| Feeds | deploy/* (ownership of every deployed file and directory). |
+| Called by | `fabriclib.deploy.apply_deployment._deploy`, `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts`, `fabriclib.deploy.install_bind9_files.install_bind9_files`, `fabriclib.deploy.install_dirsrv_seed.install_dirsrv_seed`, `fabriclib.deploy.install_fabric_tree.install_fabric_tree`, `fabriclib.deploy.install_nginx_config.install_nginx_config`, `fabriclib.deploy.install_openbao_config.install_openbao_config`, `fabriclib.deploy.install_runtime_dirs.install_runtime_dirs`, `fabriclib.deploy.install_service_units.install_service_units`, `fabriclib.deploy.install_stepca_templates.install_stepca_templates`, `fabriclib.deploy.install_webui_files.install_webui_files` |
 
 ## `fabricctl/lib/fabriclib/common/set_tsig_secrets.py`
 
@@ -267,7 +319,7 @@
 | Returns | a context manager; the body runs while the flock is held. |
 | Fails | OSError if the lock file or its folder cannot be created; blocks without timeout while another process holds the lock. Exceptions from the body propagate after the lock is released. |
 | Feeds | dns/* edits, dhcp/add_reservation, dhcp/remove_reservation, radius/* edits, system/apply_changes. |
-| Called by | `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.radius.unmap_radius_group.unmap_radius_group`, `fabriclib.system.apply_changes.apply_changes` |
+| Called by | `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.radius.unmap_radius_group.unmap_radius_group`, `fabriclib.system.apply_changes.apply_changes` |
 
 ## `fabricctl/lib/fabriclib/common/wait_healthy.py`
 
@@ -281,7 +333,7 @@
 | Fails | never raises for a missing or unhealthy container (reported in the tuple); FileNotFoundError if the docker command is missing. |
 | Feeds | setup/start_unit.py, setup/start_bootstrap.py. |
 | Notes | a container without a healthcheck never reports healthy and runs into the timeout. |
-| Called by | `fabriclib.setup.start_bootstrap.run`, `fabriclib.setup.start_unit.start_unit` |
+| Called by | `fabriclib.ldap.seed_directory.seed_directory`, `fabriclib.setup.start_bootstrap.run`, `fabriclib.setup.start_unit.start_unit` |
 
 ## `fabricctl/lib/fabriclib/common/write_audit.py`
 
@@ -307,4 +359,4 @@
 | Returns | True if the file was written, False if it already had that content (mode and owner not checked then). |
 | Fails | OSError from reading, writing, chown (needs root for another owner) or rename; a stale <path>.tmp is left behind if a step after its creation fails. |
 | Feeds | dhcp/deploy_kea, radius/deploy_freeradius, setup/mint_service_certs. |
-| Called by | `fabriclib.dhcp.deploy_kea.deploy_kea`, `fabriclib.dns_filter.deploy_adguard.deploy_adguard`, `fabriclib.radius.deploy_freeradius.deploy_freeradius`, `fabriclib.setup.mint_service_certs.run` |
+| Called by | `fabriclib.dhcp.deploy_kea.deploy_kea`, `fabriclib.dns_filter.deploy_adguard.deploy_adguard`, `fabriclib.ntp.deploy_chrony.deploy_chrony`, `fabriclib.radius.deploy_freeradius.deploy_freeradius`, `fabriclib.setup.mint_service_certs.run` |

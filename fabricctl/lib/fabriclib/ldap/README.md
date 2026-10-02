@@ -23,4 +23,5 @@ least-privilege `cn=device_admin`, so the directory's ACIs limit them.
 | `common/` | Helpers shared by the operations above (see its README) |
 | `ensure_default_device_roles.py` | Create the default device roles once (a marker file keeps a deleted one from coming back) |
 | `migrate_local_suffix.py` | Move an install from before the directory split: devices and service accounts to the local suffix |
+| `seed_directory.py` | Seed 389-DS: create the suffix backends on first run, apply the seed LDIFs, restart once if `cn=config` changed |
 | `ensure_admin_user.py` | Create a user under `ou=users,ou=accounts` if missing (never changes an existing one) and add it to the web UI admin group |

@@ -45,7 +45,7 @@ def _ini(key):
     Returns: the key's out, else "/opt/<name>/rfc2136.ini".
     Fails:   KeyError if key has no name.
     Feeds:   run_tsig_command (after-apply message).
-    Notes:   hard-codes /opt, while apply writes the file under the deploy base (deploy.py).
+    Notes:   hard-codes /opt, while apply writes the file under the deploy base (deploy/install_runtime_dirs).
     """
     return key.get("out") or f"/opt/{key['name']}/rfc2136.ini"
 

@@ -15,7 +15,8 @@ import sys
 import yaml
 
 sys.path.insert(0, "/opt/fabric/lib")
-import keycloak_bootstrap as kb  # noqa: E402
+from fabriclib.keycloak.admin_client import Admin  # noqa: E402
+from fabriclib.keycloak.quote import q  # noqa: E402
 from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
 from webui.tlsclient import TLSClient  # noqa: E402
 
@@ -34,10 +35,10 @@ subprocess.run(["docker", "exec", "-i", "-e", "F_DN", "-e", "F_PW", "dirsrv", "p
 
 s = load_secrets("/opt/fabric/config/fabric-secrets.yml", v)
 ca = os.path.join(v["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
-kc = kb.Admin(TLSClient(v["ip_keycloak"], 8443, v["hostname_keycloak"], ca),
-              s["keycloak_admin_user"], s["keycloak_admin_password"])
-realm = kb.q(v.get("webui_realm") or v["domain"])
-_, found = kc.call("GET", f"/{realm}/users?username={kb.q(user)}&exact=true")
+kc = Admin(TLSClient(v["ip_keycloak"], 8443, v["hostname_keycloak"], ca),
+           s["keycloak_admin_user"], s["keycloak_admin_password"])
+realm = q(v.get("webui_realm") or v["domain"])
+_, found = kc.call("GET", f"/{realm}/users?username={q(user)}&exact=true")
 if found:
     rep = found[0]
     _, creds = kc.call("GET", f"/{realm}/users/{rep['id']}/credentials")

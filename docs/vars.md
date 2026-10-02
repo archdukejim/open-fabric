@@ -984,6 +984,17 @@ Design [dns-filter.md](design/dns-filter.md); operations.md → DNS filter.
 | `ip_adguard` / `ip_oauth2proxy` | `10.255.0.31` / `10.255.0.32` | On fabric_net |
 | `adguard_mem_limit` | `256m` | Container memory limit |
 
+### Time (NTP)
+Design [ntp.md](design/ntp.md); operations.md → Time. chrony on the host.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `ntp_servers` | `["time.cloudflare.com nts", "nts.netnod.se nts", "ptbtime1.ptb.de nts"]` (three independent sources: chrony outvotes one that is wrong) | `"<host> [nts] [pool] [prefer]"` (nts: authenticated time). A federated site asks its upstream site first. `[]`: the upstream site only, or this host's own clock |
+| `ntp_serve` | `true` | Answer the network (`lan_cidr`, `security.firewall_allow`, the DHCP subnets) on UDP 123; `ntp.<domain>`; Kea hands it out (option 42) |
+| `ntp_set_clock` | `true` | `false`: chrony keeps time but never sets the clock (a container sharing its host's kernel clock) |
+| `hostname_ntp` | `ntp.<domain>` | Clients' name for the time server, a CNAME to the host (not added when you have a record of that name); `cname_ntp` (default `ntp`) changes the first label |
+| `dhcp.ntp` | `[host_ip]` | Time servers Kea hands out (IPv4); `[]` hands out none |
+
 ### 802.1X (optional)
 | Variable | Default | Notes |
 |---|---|---|

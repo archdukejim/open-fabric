@@ -18,3 +18,13 @@ client these files use.
 | `require_password_change.py` | Import an LDAP user into Keycloak and require a new password at their next login |
 | `user_has_role.py` | Whether Keycloak grants a user a realm role (directly or through a group) |
 | `verify_user_token.py` | fabric-agent: verify a signed-in person's ID token itself (signature, issuer, audience, expiry) |
+| `configure_keycloak.py` | Configure Keycloak idempotently (what `lib/keycloak_bootstrap.py` runs): realm, LDAP, roles, TOTP flow, clients |
+| `admin_client.py` | `Admin`: the admin REST client (logs in as the master-realm admin, TLS pinned to the fabric root CA) |
+| `quote.py` | `q`: URL-quote one path or query component |
+| `step.py` | One progress line of the configuration |
+| `ensure_realm.py` | The realm with its login protections (brute-force lockout, no e-mail login) |
+| `ensure_ldap_federation.py` | LDAP user federation to 389-DS (created, or updated in place) |
+| `ensure_group_mapper.py` | The LDAP group mapper, and a sync of the directory's groups |
+| `grant_role_to_group.py` | Give a group a realm role if it does not have it |
+| `ensure_mfa_flow.py` | The browser flow with TOTP required for everyone |
+| `ensure_webui_client.py` | The web UI's OIDC client (PKCE, exact redirect, TOTP flow, roles claim) |

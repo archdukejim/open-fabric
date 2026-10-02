@@ -3,8 +3,10 @@ import subprocess
 import time
 
 from fabriclib.common.console import info, ok
+from fabriclib.common.errors import ValidationError
 from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles
 from fabriclib.ldap.migrate_local_suffix import migrate_local_suffix
+from fabriclib.ldap.seed_directory import seed_directory
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
@@ -24,7 +26,7 @@ def run(ctx):
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
              install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint; restart_services
              (units to restart);
-             target_dir (lib/dirsrv.sh, lib/keycloak_bootstrap.py), vars_file, secrets_file.
+             target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6
              tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web
@@ -45,10 +47,11 @@ def run(ctx):
         ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
 
     if v.get("install_ldap", True):
-        res = subprocess.run(["bash", os.path.join(lib, "dirsrv.sh"), "seed"], capture_output=True, text=True)
-        if res.returncode != 0:
-            raise SetupError(f"389-DS seeding failed:\n{res.stdout}{res.stderr}")
-        ok("389-DS seeded (" + (res.stdout.strip().splitlines() or ["?"])[-1] + ")")
+        try:
+            out = seed_directory()
+        except ValidationError as e:
+            raise SetupError(str(e))
+        ok("389-DS seeded (" + (out.splitlines() or ["?"])[-1] + ")")
         added = ensure_default_device_roles(v, ctx.path("fabric", "config", ".default-device-roles"))
         if added:
             ok("default device roles: " + ", ".join(added))

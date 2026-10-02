@@ -16,13 +16,13 @@ def _q(s):
 def ensure_adguard_client(kc, realm, v, secret, role_reps, flow_id):
     """Purpose: Converge the Keycloak OIDC client (fabric-adguard) that oauth2-proxy signs people into AdGuard
              Home's UI with (design dns-filter.md §5).
-    Inputs:  kc — keycloak_bootstrap.Admin client; realm — realm name; v — fabric vars: hostname_adguard;
+    Inputs:  kc — admin_client.Admin client; realm — realm name; v — fabric vars: hostname_adguard;
              secret — the client secret (adguard_oidc_secret); role_reps — role representations for the
              client's scope (every fabric role); flow_id — id of the browser flow to bind (the TOTP login flow).
     Returns: "created" or "updated" ("updated" for any existing client, even when nothing changed).
     Fails:   SystemExit from kc.call on any admin API error or failed admin login; OSError / ssl errors if
              Keycloak is unreachable.
-    Feeds:   keycloak_bootstrap.main (prints "<state> client fabric-adguard") when dns_filter is adguard.
+    Feeds:   configure_keycloak (prints "<state> client fabric-adguard") when dns_filter is adguard.
     Notes:   confidential client, code flow only, the exact callback https://<hostname_adguard>/oauth2/callback,
              fullScopeAllowed off; realm roles go to a `roles` claim in the ID token, which oauth2-proxy checks
              for fabric:dns:filter. Existing attributes are kept (ours override); the mapper and scope mappings

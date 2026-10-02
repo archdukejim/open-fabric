@@ -12,7 +12,7 @@ def normalize_radius_people(mappings):
     Returns: [{"group", "vlan" (int or None), "priority" (int)}], sorted by priority, then group.
     Fails:   ValidationError: an entry that is not a dict, a bad group name, a group mapped twice (case-insensitive), a
              VLAN outside 1-4094, or a priority outside 0-9999.
-    Feeds:   deploy.py (apply), map_radius_group; tests/freeradius/run.py, tests/render.py.
+    Feeds:   deploy/merge_radius_clients (apply), map_radius_group; tests/freeradius/run.py, tests/render.py.
     """
     out, seen = [], set()
     for m in mappings or []:

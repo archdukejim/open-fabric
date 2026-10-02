@@ -82,6 +82,20 @@
 | Notes | the rfc2136.ini path is always fabric's default: a web caller can never choose `out`. |
 | Called by | `agent.server.Handler.dispatch` |
 
+## `fabricctl/lib/fabriclib/dns/find_changed_zones.py`
+
+### `find_changed_zones(src_dir, dst_dir)`
+
+| | |
+|---|---|
+| Purpose | find the rendered zone files (db.<zone>) whose records differ from the deployed ones. |
+| Inputs | src_dir — rendered bind9/data directory; dst_dir — deployed bind9/data directory. |
+| Returns | [(zone, src, dst)] for each changed zone, sorted by file name; [] if src_dir does not exist. |
+| Fails | OSError if a file cannot be read (from zone_content_changed). |
+| Feeds | deploy/install_bind9_files (the zones installed or reloaded later); tests/zone_test.py. |
+| Notes | copies nothing: installing is done by install_zone_file / reload_zone. |
+| Called by | `fabriclib.deploy.install_bind9_files.install_bind9_files` |
+
 ## `fabricctl/lib/fabriclib/dns/format_value.py`
 
 ### `format_value(rtype, record)`
@@ -94,6 +108,19 @@
 | Fails | never — dict reads with defaults. |
 | Feeds | zone_detail; the interactive zone editor (fabricctl/lib/interactive.py). |
 | Called by | `fabriclib.dns.zone_detail.zone_detail`, `interactive.edit_dns_zone` |
+
+## `fabricctl/lib/fabriclib/dns/install_zone_file.py`
+
+### `install_zone_file(src, dst, uid, gid)`
+
+| | |
+|---|---|
+| Purpose | put a rendered zone file in place for BIND9 and drop its now-stale journal. |
+| Inputs | src — rendered zone file; dst — deployed path; uid, gid — the bind user's ids. |
+| Returns | None; dst copied with a fresh mtime (so BIND sees it as newer on thaw/reload), mode 0640, and dst.jnl removed (a journal for the old file would make BIND refuse the zone: "journal out of sync"). |
+| Fails | OSError from the copy, chown or chmod. |
+| Feeds | reload_zone; deploy/install_zones_and_restart (when BIND9 is stopped or about to restart). |
+| Called by | `fabriclib.deploy.finish_without_start.finish_without_start`, `fabriclib.deploy.restart_changed.restart_changed`, `fabriclib.dns.reload_zone.reload_zone` |
 
 ## `fabricctl/lib/fabriclib/dns/list_tsig_keys.py`
 
@@ -143,9 +170,9 @@
 | Inputs | policies — {acl: {records: [host, …] \| any_name: true, record_types (default [TXT]), domain}} or None. domain — str, the fabric domain: the default zone, and what "{{ domain }}" in a policy becomes. |
 | Returns | {acl: {"domain", "record_types" (upper case), and "records" or "any_name": True}}. |
 | Fails | ValidationError "invalid ACL name …", "ACL …: invalid domain …", "…: invalid record_types …", "…: invalid record names …", "…: a policy needs records (hosts) or any_name". |
-| Feeds | deploy.py (apply), set_acl_policy. |
+| Feeds | deploy/merge_tsig_keys (apply), set_acl_policy. |
 | Notes | records win over any_name when both are given. |
-| Called by | `deploy.apply_deployment`, `fabriclib.dns.set_acl_policy.set_acl_policy` |
+| Called by | `fabriclib.deploy.merge_tsig_keys.merge_tsig_keys`, `fabriclib.dns.set_acl_policy.set_acl_policy` |
 
 ## `fabricctl/lib/fabriclib/dns/normalize_tsig_keys.py`
 
@@ -157,9 +184,9 @@
 | Inputs | keys — list of dicts: name (required, NAME_RE, unique), algorithm (default hmac-sha256, one of ALGORITHMS), domain (default `domain`; "{{ domain }}" replaced), record_types (default [TXT]), records (hosts: only _acme-challenge.<host>.<domain>), any_name (any name in the zone; never implied), primary, out (rfc2136.ini path), acls (BIND ACLs to put the key in), secret (base64 of an existing key, e.g. from another DNS server whose clients must keep working). domain — str, the fabric domain. secrets — optional {name: secret} merged in first (a secret embedded in an entry wins). |
 | Returns | (keys, embedded): the normalized list, and {name: secret} for every secret found or given. |
 | Fails | ValidationError "tsig_keys entry needs a name", "invalid or duplicate TSIG key name", "…: algorithm must be one of …", "…: invalid domain …", "…: invalid record_types …", "…: invalid record names …", "…: invalid ACL names …", "…: secret is not valid base64". |
-| Feeds | deploy.py (apply), setup/collect_vars.py, add_tsig_key, update_tsig_key, replace_tsig_secret (to check a secret); ACL_RE, LABEL_RE and RTYPE_RE are reused by normalize_acl_policies. |
+| Feeds | deploy/merge_tsig_keys (apply), setup/collect_vars.py, add_tsig_key, update_tsig_key, replace_tsig_secret (to check a secret); ACL_RE, LABEL_RE and RTYPE_RE are reused by normalize_acl_policies. |
 | Notes | records clear any_name; any_name is kept only when explicitly true. |
-| Called by | `deploy.apply_deployment`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.setup.collect_vars.collect_vars` |
+| Called by | `fabriclib.deploy.merge_tsig_keys.merge_tsig_keys`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.setup.collect_vars.collect_vars` |
 
 ## `fabricctl/lib/fabriclib/dns/ptr_for_ip.py`
 
@@ -174,6 +201,42 @@
 | Feeds | reverse_zones, zone_detail; webui/devserver.py. |
 | Notes | serving a public address's reverse zone locally would shadow someone else's network. |
 | Called by | `fabriclib.dns.reverse_zones.reverse_zones`, `fabriclib.dns.zone_detail.zone_detail`, `webui.devserver.DevState._ptr` |
+
+## `fabricctl/lib/fabriclib/dns/reload_zone.py`
+
+### `file_serial(path)`
+
+| | |
+|---|---|
+| Purpose | read the SOA serial from a zone file (the line "<n> ; Serial"). |
+| Inputs | path — zone file path. |
+| Returns | the serial as a string, or None if there is no such line. |
+| Fails | OSError if the file cannot be read. |
+| Feeds | reload_zone (the serial BIND must end up serving); tests/zone_test.py. |
+| Called by | `fabriclib.dns.reload_zone.reload_zone` |
+
+### `_served_serial(zone)`
+
+| | |
+|---|---|
+| Purpose | ask BIND9 which SOA serial it currently serves for a zone (`rndc zonestatus`). |
+| Inputs | zone — zone name. |
+| Returns | the serial as a string, or None if rndc failed, timed out or printed no serial. |
+| Fails | never raises — rndc failures become None. |
+| Feeds | reload_zone (to confirm the new file is being served). |
+| Called by | `fabriclib.dns.reload_zone.reload_zone` |
+
+### `reload_zone(zone, src, dst, uid, gid)`
+
+| | |
+|---|---|
+| Purpose | swap a zone file under a running BIND9 and make sure BIND serves the new one. |
+| Inputs | zone — zone name; src — rendered file; dst — deployed file; uid, gid — bind user's ids. Needs the bind9 container running. |
+| Returns | None. Dynamic zones are frozen, swapped and thawed; static zones (freeze fails) swapped and reloaded. Retried up to 5 times until `rndc zonestatus` shows src's serial. |
+| Fails | never raises for BIND errors: prints "Warning: BIND9 did not accept zone ..." or "... serves <zone> serial X, not Y" and returns. OSError from install_zone_file propagates. |
+| Feeds | deploy/install_zones_and_restart (live zone updates); tests/zone_test.py. |
+| Notes | freezing makes BIND write its in-memory copy to the file, and that write can land after ours and put the old zone back ("zone serial unchanged" on thaw), hence the serial check and retry. |
+| Called by | `fabriclib.deploy.finish_without_start.finish_without_start`, `fabriclib.deploy.restart_changed.restart_changed` |
 
 ## `fabricctl/lib/fabriclib/dns/remove_acl_entries.py`
 
@@ -239,9 +302,9 @@
 | Inputs | v — the vars dict; reads dns, domain (via zone_name), host_ip and each zone's zone_authority. |
 | Returns | {"zones": {zone: [{"label", "target" (FQDN with trailing dot), "ip", "source"}]} sorted by zone and label, "skipped": [{"name", "ip", "reason"}] for addresses that get no PTR}. |
 | Fails | never — addresses that cannot get a PTR are listed in "skipped". |
-| Feeds | deploy.py (apply renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones (fabricctl/lib/agent/server.py); webui/devserver.py. |
+| Feeds | deploy/apply_deployment (render_templates renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones (fabricctl/lib/agent/server.py); webui/devserver.py. |
 | Notes | one PTR per address: the first named record wins, then an apex (@) record, then the zone's `ns` host. Private IPv4 (RFC 1918, CGNAT) and IPv6 ULA only. A reverse zone written by hand in `dns:` is left alone. |
-| Called by | `agent.server.Handler.dispatch`, `deploy.apply_deployment`, `fabriclib.dns_filter.deploy_adguard._domains`, `webui.devserver.DevState.reverse` |
+| Called by | `agent.server.Handler.dispatch`, `fabriclib.deploy.apply_deployment._deploy`, `fabriclib.dns_filter.deploy_adguard._domains`, `webui.devserver.DevState.reverse` |
 
 ## `fabricctl/lib/fabriclib/dns/rfc2136_settings.py`
 
@@ -253,9 +316,22 @@
 | Inputs | v — the vars dict (host_ip, bind_dns_port default 53, domain). key — a normalized tsig_keys entry (name, algorithm, domain). secret — base64 str, written as is. |
 | Returns | str: dns_rfc2136_server, _port, _name, _secret, _algorithm (upper case) and _base_domain lines. |
 | Fails | KeyError if key has no "name". |
-| Feeds | deploy.py (writes each key's rfc2136.ini), create_zone_tsig_key, rotate_tsig_key. |
+| Feeds | deploy/render_templates (each key's rfc2136.ini), create_zone_tsig_key, rotate_tsig_key. |
 | Notes | the text holds the secret; callers must keep it private. |
-| Called by | `deploy.apply_deployment`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key`, `fabriclib.dns.rotate_tsig_key.rotate_tsig_key` |
+| Called by | `fabriclib.deploy.render_templates.render_templates`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key`, `fabriclib.dns.rotate_tsig_key.rotate_tsig_key` |
+
+## `fabricctl/lib/fabriclib/dns/rndc.py`
+
+### `rndc(args, timeout=15)`
+
+| | |
+|---|---|
+| Purpose | run an rndc command inside the bind9 container as the bind user. |
+| Inputs | args — list of rndc arguments (e.g. ["freeze", zone]; zone names come from validated vars); timeout — seconds, default 15. |
+| Returns | the subprocess.CompletedProcess (not checked: callers read returncode/stdout/stderr), or None on a timeout. |
+| Fails | never raises for a failed command; prints "rndc <args> timed out" and returns None on a timeout. |
+| Feeds | reload_zone, deploy/install_zones_and_restart (freeze before a restart, `rndc reconfig`). |
+| Called by | `fabriclib.deploy.finish_without_start.finish_without_start`, `fabriclib.deploy.restart_changed.restart_changed`, `fabriclib.dns.reload_zone._served_serial`, `fabriclib.dns.reload_zone.reload_zone` |
 
 ## `fabricctl/lib/fabriclib/dns/rotate_tsig_key.py`
 
@@ -328,7 +404,7 @@
 | Returns | the key's out, else "/opt/<name>/rfc2136.ini". |
 | Fails | KeyError if key has no name. |
 | Feeds | run_tsig_command (after-apply message). |
-| Notes | hard-codes /opt, while apply writes the file under the deploy base (deploy.py). |
+| Notes | hard-codes /opt, while apply writes the file under the deploy base (deploy/install_runtime_dirs). |
 | Called by | `fabriclib.dns.run_tsig_command.run_tsig_command` |
 
 ### `run_tsig_command(argv)`
@@ -442,6 +518,19 @@
 | Fails | ValidationError "invalid record name", "invalid IPv4 address", "invalid IPv6 address", "invalid CNAME target", "invalid mail exchange", "invalid SRV target", "TXT must be 1-255 chars …", the range messages of _int, "unsupported record type"; AttributeError if a field is not a str. |
 | Feeds | add_record; HOST_RE is reused by fabricctl/lib/interactive.py. |
 | Called by | `fabriclib.dns.add_record.add_record` |
+
+## `fabricctl/lib/fabriclib/dns/zone_content_changed.py`
+
+### `zone_content_changed(src, dst)`
+
+| | |
+|---|---|
+| Purpose | tell whether a rendered zone file differs from the deployed one, ignoring the SOA serial (which changes on every render). |
+| Inputs | src — rendered zone file path; dst — deployed zone file path. |
+| Returns | True if dst is missing or the records differ, else False. |
+| Fails | OSError if src (or an existing dst) cannot be read. |
+| Feeds | find_changed_zones. |
+| Called by | `fabriclib.dns.find_changed_zones.find_changed_zones` |
 
 ## `fabricctl/lib/fabriclib/dns/zone_detail.py`
 

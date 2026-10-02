@@ -16,7 +16,7 @@ def deploy_federation_endpoint(v, render_tmp, deploy_base):
     Returns: {"unit_changed": bool (installed or replaced: restart it), "removed": bool (stopped, disabled and
              deleted because the endpoint was turned off)}.
     Fails:   OSError copying the unit or creating the directory; subprocess.TimeoutExpired from systemctl.
-    Feeds:   deploy.py apply_deployment (the caller runs daemon-reload and restarts or starts the unit).
+    Feeds:   deploy/apply_deployment (the caller runs daemon-reload and restarts or starts the unit).
     Notes:   the socket directory <base>/federation/run is root:<nginx gid> 0750; the server makes the socket
              root:<nginx gid> 0660."""
     run_dir = os.path.join(deploy_base, "federation", "run")

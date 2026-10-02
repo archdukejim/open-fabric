@@ -26,9 +26,9 @@
 | Inputs | v — the rendered vars: deploy_base_dir, service_users.kea.gid and the normalized `dhcp`. secrets — fabric's secrets dict (kea_ddns_secret). jinja_env — Jinja environment holding kea/*.j2. bind_uid, bind_gid — int owner of the subzone file. |
 | Returns | True if either Kea config file changed (Kea must be restarted), else False. |
 | Fails | KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors from ensure_ddns_zone. |
-| Feeds | deploy.py (apply); tests/kea/run.py. |
+| Feeds | deploy/deploy_optional_parts (apply); tests/kea/run.py. |
 | Notes | config/ is root:kea 0750 and the files root:kea 0640 (the DDNS one holds the TSIG secret); leases/ and run/ are root 0750. The subzone file is made only when dhcp.ddns is not false. |
-| Called by | `deploy.apply_deployment` |
+| Called by | `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts` |
 
 ## `fabricctl/lib/fabriclib/dhcp/dhcp_overview.py`
 
@@ -96,17 +96,28 @@
 | Feeds | normalize_dhcp. |
 | Called by | `fabriclib.dhcp.normalize_dhcp.normalize_dhcp` |
 
+### `_is_v4(text)`
+
+| | |
+|---|---|
+| Purpose | whether text is an IPv4 address. |
+| Inputs | text — anything. |
+| Returns | bool. |
+| Fails | never. |
+| Feeds | normalize_dhcp (dhcp.ntp). |
+| Called by | `fabriclib.dhcp.normalize_dhcp.normalize_dhcp` |
+
 ### `normalize_dhcp(v)`
 
 | | |
 |---|---|
 | Purpose | Check `dhcp:` (and that nothing static collides with it) before anything is rendered. |
-| Inputs | v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4 network, host bits zero), pools, routers, reservations [{mac, ip, hostname}]}], ddns_subdomain (one label, default dhcp), lease_time (int 300-2592000, default 86400)}; dns (its A records). |
+| Inputs | v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4 network, host bits zero), pools, routers, reservations [{mac, ip, hostname}]}], ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default 86400)}; dns (its A records). |
 | Returns | a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` with subnets normalized (subnet as str, reservations with lower-case colon MACs and a hostname only when set). |
 | Fails | ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4 subnet, a bad pool, a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain ValueError (not a ValidationError) if routers is not an IP address. |
-| Feeds | deploy.py (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py. |
+| Feeds | deploy/check_settings (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py. |
 | Notes | a static A record inside a pool is refused because Kea would hand that address out. |
-| Called by | `deploy.apply_deployment`, `fabriclib.dhcp.add_reservation.add_reservation` |
+| Called by | `fabriclib.deploy.check_settings.check_settings`, `fabriclib.dhcp.add_reservation.add_reservation` |
 
 ## `fabricctl/lib/fabriclib/dhcp/remove_reservation.py`
 

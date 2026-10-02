@@ -24,4 +24,6 @@ Certificates from fabric's Step-CA.
 | `replace_site_ca.py` | Federation: switch a re-parented site's Step-CA files to its new CA (old ones kept) |
 | `stage_site_ca.py` | Federation: check the root site's answer (pinned root, chain, path length, our key) and lay it out for the bring-your-own-CA path |
 | `publish_ca_certs.py` | Root + intermediate for every system on `certs.<domain>` (PEM `.crt`/`.pem`, DER `.cer`/`.der`, chain `.pem`/`.p7b`, fingerprints JSON); trust them on this host |
+| `run_mint_certs_command.py` | `fabricctl --mint-certs`: mint every `extra_certs` entry (`--apply`), or ask for one, record it and mint it |
+| `run_service_cert_command.py` | `fabricctl --service-cert`: list expiry dates, then re-issue every service certificate |
 | `common/` | Helpers shared by the operations above (see its README) |

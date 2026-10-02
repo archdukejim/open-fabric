@@ -25,9 +25,9 @@
 | Inputs | v — the rendered vars: deploy_base_dir, service_users.freeradius uid/gid and what the templates use. secrets — fabric's secrets dict (radius_secrets, ldap_radius_password). jinja_env — Jinja environment whose first search path holds freeradius/config/*.j2 and freeradius/python/*.py. |
 | Returns | True if any file changed, else False. |
 | Fails | KeyError on missing vars; OSError from makedirs, chown, listing or writing; jinja2 errors while rendering. |
-| Feeds | deploy.py (apply); tests/freeradius/run.py. |
+| Feeds | deploy/deploy_optional_parts (apply); tests/freeradius/run.py. |
 | Notes | config files are root:freerad 0640 (clients.conf holds the RADIUS secrets, ldap-password the directory account's). certs/ (server.pem, server.key and ca.pem, the fabric CA that client certificates and 389-DS must chain to) is only created here; setup's certificate step fills it. |
-| Called by | `deploy.apply_deployment` |
+| Called by | `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts` |
 
 ## `fabricctl/lib/fabriclib/radius/list_auth_log.py`
 
@@ -66,9 +66,9 @@
 | Inputs | clients — list of {name, address, message_authenticator (default true), secret (optional: one a switch already has)}, or None. |
 | Returns | (clients, {name: secret}): entries {"name" (lower case), "address" (a single IP or a network), "message_authenticator" (bool)}, and the secrets taken out of them, to be kept in fabric's secrets. |
 | Fails | ValidationError: an entry that is not a dict, a bad name, a name listed twice, an address that is not an IP or network (host bits must be zero), 0/0, overlapping clients, or a bad secret. |
-| Feeds | deploy.py (apply), add_radius_client; SECRET_RE is reused by rotate_radius_secret; tests/freeradius/run.py, tests/render.py. |
+| Feeds | deploy/merge_radius_clients (apply), add_radius_client; SECRET_RE is reused by rotate_radius_secret; tests/freeradius/run.py, tests/render.py. |
 | Notes | SECRET_RE keeps a secret typeable on a switch CLI without quoting and free of `$` (FreeRADIUS expands ${...} inside quoted strings). |
-| Called by | `deploy.apply_deployment`, `fabriclib.radius.add_radius_client.add_radius_client` |
+| Called by | `fabriclib.deploy.merge_radius_clients.merge_radius_clients`, `fabriclib.radius.add_radius_client.add_radius_client` |
 
 ## `fabricctl/lib/fabriclib/radius/normalize_radius_people.py`
 
@@ -80,8 +80,8 @@
 | Inputs | mappings — list of {group, vlan (1-4094 or empty), priority (0-9999, default 100)}, or None. |
 | Returns | [{"group", "vlan" (int or None), "priority" (int)}], sorted by priority, then group. |
 | Fails | ValidationError: an entry that is not a dict, a bad group name, a group mapped twice (case-insensitive), a VLAN outside 1-4094, or a priority outside 0-9999. |
-| Feeds | deploy.py (apply), map_radius_group; tests/freeradius/run.py, tests/render.py. |
-| Called by | `deploy.apply_deployment`, `fabriclib.radius.map_radius_group.map_radius_group` |
+| Feeds | deploy/merge_radius_clients (apply), map_radius_group; tests/freeradius/run.py, tests/render.py. |
+| Called by | `fabriclib.deploy.merge_radius_clients.merge_radius_clients`, `fabriclib.radius.map_radius_group.map_radius_group` |
 
 ## `fabricctl/lib/fabriclib/radius/radius_guides.py`
 

@@ -65,7 +65,7 @@
 | Fails | yaml.YAMLError for a malformed file; OSError reading it. |
 | Feeds | create_invitation, accept_join, federation_status, join_upstream (records the upstream). |
 | Notes | holds no secrets (invitations live hashed in fabric's secrets). |
-| Called by | `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.common.signing_capacity.signing_capacity`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.dns_links.dns_links`, `fabriclib.federation.drop_relay.drop_relay`, `fabriclib.federation.federation_status.federation_status`, `fabriclib.federation.join_upstream.join_upstream`, `fabriclib.federation.relay_join.relay_join`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.setup.collect_vars._join_defaults` |
+| Called by | `fabriclib.federation.accept_join.accept_join`, `fabriclib.federation.common.signing_capacity.signing_capacity`, `fabriclib.federation.create_invitation.create_invitation`, `fabriclib.federation.dns_links.dns_links`, `fabriclib.federation.drop_relay.drop_relay`, `fabriclib.federation.federation_status.federation_status`, `fabriclib.federation.join_upstream.join_upstream`, `fabriclib.federation.relay_join.relay_join`, `fabriclib.federation.remove_site.remove_site`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.ntp.chrony_settings.chrony_settings`, `fabriclib.setup.collect_vars._join_defaults`, `fabriclib.setup.verify_install.checks` |
 
 ## `fabricctl/lib/fabriclib/federation/common/post_upstream.py`
 
@@ -138,8 +138,8 @@
 | Inputs | name — str; org_ous — the organisation's top-level OU names (ldap_organizational_units without a parent), default none. |
 | Returns | None when the name is fine, else the reason (str). |
 | Fails | never. |
-| Feeds | create_invitation, deploy.py apply_deployment. |
-| Called by | `deploy.apply_deployment`, `fabriclib.federation.create_invitation.create_invitation` |
+| Feeds | create_invitation, deploy/check_fixed_identity. |
+| Called by | `fabriclib.deploy.check_fixed_identity.check_fixed_identity`, `fabriclib.federation.create_invitation.create_invitation` |
 
 ## `fabricctl/lib/fabriclib/federation/create_invitation.py`
 
@@ -190,9 +190,9 @@
 | Inputs | v — rendered vars: federation_endpoint, service_users.nginx.gid; render_tmp — where systemd/fabric-federation.service was rendered (when on); deploy_base — install root (e.g. /opt). |
 | Returns | {"unit_changed": bool (installed or replaced: restart it), "removed": bool (stopped, disabled and deleted because the endpoint was turned off)}. |
 | Fails | OSError copying the unit or creating the directory; subprocess.TimeoutExpired from systemctl. |
-| Feeds | deploy.py apply_deployment (the caller runs daemon-reload and restarts or starts the unit). |
+| Feeds | deploy/apply_deployment (the caller runs daemon-reload and restarts or starts the unit). |
 | Notes | the socket directory <base>/federation/run is root:<nginx gid> 0750; the server makes the socket root:<nginx gid> 0660. |
-| Called by | `deploy.apply_deployment` |
+| Called by | `fabriclib.deploy.apply_deployment._deploy` |
 
 ## `fabricctl/lib/fabriclib/federation/dns_links.py`
 
@@ -215,8 +215,8 @@
 | Inputs | v — fabric vars: domain; secrets — fabric's secrets (federation_tsig: {site: secret} for each site that joined here, "upstream": secret for this site's own upstream); registry_path — the federation registry (config/federation.yaml of the install being rendered). |
 | Returns | {"children": [link + {"site", "delegate": bool, "label"}] for each site that joined here — delegated when its domain is below this site's (label: the part before .<domain>) —, "upstream": link + {"site"} or None}. A link is {key "fed-<site>", algorithm, secret, domain, address}; sites without a usable address, domain or key are left out (e.g. a site that joined before M4, until it joins again); port is the site's published DNS port (its bind_dns_port, reported at join; 53 when not). |
 | Fails | yaml/OSError from load_registry. |
-| Feeds | deploy.py apply_deployment (the bind9 templates: named.conf.zones, named.conf.keys, zone.j2). |
-| Called by | `deploy.apply_deployment` |
+| Feeds | deploy/apply_deployment (the bind9 templates: named.conf.zones, named.conf.keys, zone.j2). |
+| Called by | `fabriclib.deploy.apply_deployment._deploy` |
 
 ## `fabricctl/lib/fabriclib/federation/drop_relay.py`
 
