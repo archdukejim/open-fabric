@@ -92,7 +92,7 @@ class KeycloakOIDC:
         Inputs:  none (uses issuer, client_id and redirect_uri).
         Returns: (authorization URL str, state str, nonce str, code_verifier str).
         Fails:   never.
-        Feeds:   server.Handler.login, which stores state, nonce and verifier in App.pending and redirects to the
+        Feeds:   webui/session/start_login, which stores state, nonce and verifier in App.pending and redirects to the
                  URL.
         Notes:   prompt=login makes Keycloak ask for the password (and TOTP) every time, even with an SSO session, so
                  auth_time is fresh for the vault step-up check.
@@ -122,7 +122,7 @@ class KeycloakOIDC:
         Returns: (claims dict, id_token str, refresh_token str — "" if Keycloak sent none).
         Fails:   OIDCError 'token exchange failed (<status>)' when the status is not 200 or no id_token came back;
                  OIDCError from verify_id_token; OSError / ssl.SSLError from TLSClient.request propagate.
-        Feeds:   server.Handler.callback.
+        Feeds:   webui/session/finish_login.
         """
         status, tokens = self.client.request(
             "POST", f"{self.realm_path}/protocol/openid-connect/token",
@@ -146,7 +146,7 @@ class KeycloakOIDC:
         Fails:   OIDCError 'refresh refused (<status>)' when the SSO session was ended, the user disabled or the
                  token expired; OIDCError from verify_id_token (no nonce check); OSError / ssl.SSLError from
                  TLSClient.request propagate.
-        Feeds:   server.Handler.renew.
+        Feeds:   webui/session/renew_session.
         """
         status, tokens = self.client.request(
             "POST", f"{self.realm_path}/protocol/openid-connect/token",
@@ -163,7 +163,7 @@ class KeycloakOIDC:
                  registered for the client).
         Returns: the logout URL str.
         Fails:   never.
-        Feeds:   server.Handler.post (/logout), which redirects the browser there.
+        Feeds:   webui/routes/post_action (/logout), which redirects the browser there.
         """
         query = urllib.parse.urlencode({
             "id_token_hint": id_token,

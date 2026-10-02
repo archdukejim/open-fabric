@@ -37,9 +37,9 @@
 | Inputs | actor — str, who asks (audit). key — str, the zone key in `dns:` (dynamic_zone_var is the main domain). rtype — one of RECORD_TYPES (A, AAAA, CNAME, MX, TXT, SRV). form — dict of user fields as validate_record expects (name, ip, target, text, priority, weight, port). source — "cli" (default) or "web". Reads and writes vars.yaml under vars_lock. |
 | Returns | the stored record dict, shaped per validate_record (e.g. {"name", "ip"} for A). |
 | Fails | ValidationError "unsupported record type", "unknown zone", "a CNAME with that name already exists", or one from validate_record; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/zones/<key>/records (fabricctl/lib/agent/server.py, called by webui/server.py); the interactive zone editor (fabricctl/lib/interactive.py). |
+| Feeds | agent route POST /v1/zones/<key>/records (fabric-agent, fabricctl/lib/agent/, called by the web UI); the zone editor (menu/edit_dns_zone). |
 | Notes | only CNAME-vs-CNAME clashes are refused here; a CNAME beside other records of the same name is not checked. |
-| Called by | `agent.server.Handler.dispatch`, `interactive.edit_dns_zone` |
+| Called by | `agent.post_dns.post_dns`, `fabriclib.menu.edit_dns_zone.edit_dns_zone` |
 
 ## `fabricctl/lib/fabriclib/dns/add_tsig_key.py`
 
@@ -78,9 +78,9 @@
 | Inputs | actor — str, who asks (audit). name — str key name (stripped; validated by normalize_tsig_keys). zone — str, a forward zone name from list_zones (reverse zones are refused). scope — "acme-hosts" (TXT at _acme-challenge.<host> for `hosts` only), "acme-zone" (TXT at any _acme-challenge name; sets primary) or "any-name" (`types` at any name in the zone). hosts — iterable of str for acme-hosts (blank ones dropped). types — iterable of str from ANY_NAME_TYPES for any-name; default ("TXT",). secret — base64 str to keep an existing client's key working; None or blank for a new one. source — default "web". Reads vars.yaml. |
 | Returns | (entry, secret, rfc2136_ini_text): the stored key dict, its base64 secret and the rfc2136.ini text for its client. |
 | Fails | ValidationError "… is not one of this fabric's forward zones", "list at least one host that may prove its name", "record types must be among …", "unknown scope", or one from add_tsig_key. |
-| Feeds | agent route POST /v1/tsig (fabricctl/lib/agent/server.py, called by webui/server.py); tests/pki/run.py. |
+| Feeds | agent route POST /v1/tsig (fabric-agent, fabricctl/lib/agent/, called by the web UI); tests/pki/run.py. |
 | Notes | the rfc2136.ini path is always fabric's default: a web caller can never choose `out`. |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.post_dns.post_dns` |
 
 ## `fabricctl/lib/fabriclib/dns/find_changed_zones.py`
 
@@ -106,8 +106,8 @@
 | Inputs | rtype — str record type. record — the stored record dict (ip, canonical, text, priority, exchange, weight, port, target, value). |
 | Returns | str: the IP (A/AAAA), canonical name (CNAME), quoted text (TXT), "priority exchange" (MX), "priority weight port target" (SRV), else value or target; missing fields render as "". |
 | Fails | never — dict reads with defaults. |
-| Feeds | zone_detail; the interactive zone editor (fabricctl/lib/interactive.py). |
-| Called by | `fabriclib.dns.zone_detail.zone_detail`, `interactive.edit_dns_zone` |
+| Feeds | zone_detail; the zone editor (menu/edit_dns_zone). |
+| Called by | `fabriclib.dns.zone_detail.zone_detail`, `fabriclib.menu.edit_dns_zone.edit_dns_zone` |
 
 ## `fabricctl/lib/fabriclib/dns/install_zone_file.py`
 
@@ -143,9 +143,9 @@
 | Inputs | none. Reads vars.yaml (tsig_keys, bind_acls, bind_acl_policies, domain). |
 | Returns | [{"name", "algorithm", "types" (space-joined), "scope" (text; "no update rights" if none), "ini" (rfc2136.ini path), "acls" (sorted ACL names)}]. |
 | Fails | OSError or yaml.YAMLError from load_vars; KeyError if a stored ACL policy lacks domain or record_types (normalized policies always have them). |
-| Feeds | agent route GET /v1/tsig (fabricctl/lib/agent/server.py, called by webui/server.py); run_tsig_command (list, update, after-apply output); tests/pki/run.py. |
+| Feeds | agent route GET /v1/tsig (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_tsig_command (list, update, after-apply output); tests/pki/run.py. |
 | Notes | ACL membership counts only positive `key "<name>"` entries (a `!key` exclusion is not membership). The default "ini" is hard-coded as /opt/<name>/rfc2136.ini, while apply writes it under the deploy base. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dns.run_tsig_command.run_tsig_command` |
+| Called by | `agent.get_route.<module>`, `fabriclib.dns.run_tsig_command.run_tsig_command` |
 
 ## `fabricctl/lib/fabriclib/dns/list_zones.py`
 
@@ -157,8 +157,8 @@
 | Inputs | none. Reads vars.yaml. |
 | Returns | [{"key", "name", "records" (count over all list-valued fields), "reverse" (True for a hand-written in-addr.arpa / ip6.arpa zone)}] in vars order. |
 | Fails | OSError or yaml.YAMLError from load_vars. |
-| Feeds | agent route GET /v1/zones (fabricctl/lib/agent/server.py, called by webui/server.py); create_zone_tsig_key. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key` |
+| Feeds | agent route GET /v1/zones (fabric-agent, fabricctl/lib/agent/, called by the web UI); create_zone_tsig_key. |
+| Called by | `agent.get_route.<module>`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key` |
 
 ## `fabricctl/lib/fabriclib/dns/normalize_acl_policies.py`
 
@@ -198,9 +198,9 @@
 | Inputs | ip — str (or anything whose str() is an address). |
 | Returns | (reverse zone, label): a /24 in-addr.arpa zone and the last octet for private IPv4 (RFC 1918, CGNAT); a /64 ip6.arpa zone and 16 nibbles for IPv6 ULA; or (None, reason) for an invalid, loopback, link-local, unspecified, multicast, public or global address. |
 | Fails | never — a bad address returns (None, "not an IP address"). |
-| Feeds | reverse_zones, zone_detail; webui/devserver.py. |
+| Feeds | reverse_zones, zone_detail; the web UI's dev preview (webui/devpreview). |
 | Notes | serving a public address's reverse zone locally would shadow someone else's network. |
-| Called by | `fabriclib.dns.reverse_zones.reverse_zones`, `fabriclib.dns.zone_detail.zone_detail`, `webui.devserver.DevState._ptr` |
+| Called by | `fabriclib.dns.reverse_zones.reverse_zones`, `fabriclib.dns.zone_detail.zone_detail` |
 
 ## `fabricctl/lib/fabriclib/dns/reload_zone.py`
 
@@ -262,8 +262,8 @@
 | Inputs | actor — str, who asks (audit). key — str zone key; rtype — str record type; index — int position in that type's list. expected_name — str, the name the caller showed (so a stale view cannot delete the wrong record). source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock. |
 | Returns | the removed record dict. A type list left empty is deleted from the zone. |
 | Fails | ValidationError "record changed since it was shown; reload and try again" (unknown zone or type, index out of range, or another name); OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/zones/<key>/records/delete (fabricctl/lib/agent/server.py); fabricctl/lib/interactive.py. |
-| Called by | `agent.server.Handler.dispatch`, `interactive.edit_dns_zone` |
+| Feeds | agent route POST /v1/zones/<key>/records/delete (fabric-agent, fabricctl/lib/agent/); menu/edit_dns_zone. |
+| Called by | `agent.post_dns.post_dns`, `fabriclib.menu.edit_dns_zone.edit_dns_zone` |
 
 ## `fabricctl/lib/fabriclib/dns/remove_tsig_key.py`
 
@@ -275,9 +275,9 @@
 | Inputs | actor — str, who asks (audit). name — str key name. source — "cli" (default) or "web". Reads/writes vars.yaml; removes the key's `out` file or <deploy_base>/<name>/rfc2136.ini. |
 | Returns | None. |
 | Fails | ValidationError "no TSIG key named …"; errors from set_tsig_secrets (save_secrets) and set_key_acls; OSError removing the file; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/tsig/<name>/delete (fabricctl/lib/agent/server.py); run_tsig_command (remove); tests/pki/run.py. |
+| Feeds | agent route POST /v1/tsig/<name>/delete (fabric-agent, fabricctl/lib/agent/); run_tsig_command (remove); tests/pki/run.py. |
 | Notes | the file is deleted only if it is named rfc2136.ini, its folder only if that is <deploy_base>/<name> and now empty. The ACL clean-up is a second locked step (set_key_acls with drop_all). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dns.run_tsig_command.run_tsig_command` |
+| Called by | `agent.post_dns.post_dns`, `fabriclib.dns.run_tsig_command.run_tsig_command` |
 
 ## `fabricctl/lib/fabriclib/dns/replace_tsig_secret.py`
 
@@ -302,9 +302,9 @@
 | Inputs | v — the vars dict; reads dns, domain (via zone_name), host_ip and each zone's zone_authority. |
 | Returns | {"zones": {zone: [{"label", "target" (FQDN with trailing dot), "ip", "source"}]} sorted by zone and label, "skipped": [{"name", "ip", "reason"}] for addresses that get no PTR}. |
 | Fails | never — addresses that cannot get a PTR are listed in "skipped". |
-| Feeds | deploy/apply_deployment (render_templates renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones (fabricctl/lib/agent/server.py); webui/devserver.py. |
+| Feeds | deploy/apply_deployment (render_templates renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones (fabric-agent, fabricctl/lib/agent/); the web UI's dev preview (webui/devpreview). |
 | Notes | one PTR per address: the first named record wins, then an apex (@) record, then the zone's `ns` host. Private IPv4 (RFC 1918, CGNAT) and IPv6 ULA only. A reverse zone written by hand in `dns:` is left alone. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.deploy.apply_deployment._deploy`, `fabriclib.dns_filter.deploy_adguard._domains`, `webui.devserver.DevState.reverse` |
+| Called by | `agent.get_route.<module>`, `fabriclib.deploy.apply_deployment._deploy`, `fabriclib.dns_filter.deploy_adguard._domains` |
 
 ## `fabricctl/lib/fabriclib/dns/rfc2136_settings.py`
 
@@ -343,8 +343,8 @@
 | Inputs | actor — str, who asks (audit). name — str key name. source — default "web". Reads vars.yaml. |
 | Returns | (secret, rfc2136_ini_text). |
 | Fails | ValidationError "no TSIG key named …" (from replace_tsig_secret, or if the key vanished meanwhile); errors from save_secrets; OSError or yaml.YAMLError from load_vars. |
-| Feeds | agent route POST /v1/tsig/<name>/rotate (fabricctl/lib/agent/server.py, called by webui/server.py); tests/pki/run.py. |
-| Called by | `agent.server.Handler.dispatch` |
+| Feeds | agent route POST /v1/tsig/<name>/rotate (fabric-agent, fabricctl/lib/agent/, called by the web UI); tests/pki/run.py. |
+| Called by | `agent.post_dns.post_dns` |
 
 ## `fabricctl/lib/fabriclib/dns/run_acl_command.py`
 
@@ -467,9 +467,9 @@
 | Inputs | zone — str zone name. data_dir — folder holding db.<zone> (default BIND_DATA_DIR). Runs `docker exec -u bind bind9 rndc zonestatus <zone>` (10 s timeout). |
 | Returns | (state, message): state is "in_sync", "out_of_sync" (serving an older serial than the file), "not_loaded" or "unreachable". |
 | Fails | OSError if the zone file exists but cannot be read; a missing docker binary or a timeout gives "unreachable". |
-| Feeds | zone_detail; fabricctl/lib/interactive.py (zone editor header). |
+| Feeds | zone_detail; menu/edit_dns_zone (zone editor header). |
 | Notes | a zone file without a "; Serial" line counts as in sync once BIND serves the zone. |
-| Called by | `fabriclib.dns.zone_detail.zone_detail`, `interactive.edit_dns_zone` |
+| Called by | `fabriclib.dns.zone_detail.zone_detail`, `fabriclib.menu.edit_dns_zone.edit_dns_zone` |
 
 ## `fabricctl/lib/fabriclib/dns/update_tsig_key.py`
 
@@ -516,7 +516,7 @@
 | Inputs | rtype — "A", "AAAA", "CNAME", "MX", "TXT" or "SRV". form — dict of str: name (@, *, *.label or labels), plus ip (A/AAAA), target (CNAME, MX, SRV), priority (MX/SRV, 0-65535), weight (0-65535), port (1-65535), text (TXT: 1-255 characters without quotes, backslashes or newlines). |
 | Returns | {"name", "ip"} \| {"name", "canonical"} \| {"name", "priority", "exchange"} \| {"name", "text"} \| {"name", "priority", "weight", "port", "target"}. |
 | Fails | ValidationError "invalid record name", "invalid IPv4 address", "invalid IPv6 address", "invalid CNAME target", "invalid mail exchange", "invalid SRV target", "TXT must be 1-255 chars …", the range messages of _int, "unsupported record type"; AttributeError if a field is not a str. |
-| Feeds | add_record; HOST_RE is reused by fabricctl/lib/interactive.py. |
+| Feeds | add_record; HOST_RE is reused by menu/edit_dns. |
 | Called by | `fabriclib.dns.add_record.add_record` |
 
 ## `fabricctl/lib/fabriclib/dns/zone_content_changed.py`
@@ -542,8 +542,8 @@
 | Inputs | key — str zone key in `dns:`. Reads vars.yaml; runs sync_status (docker exec rndc). |
 | Returns | {"key", "name", "records": [{"type", "index", "name", "value", and for A/AAAA "ptr", "ptr_note"}], "status" (sync message)}. |
 | Fails | ValidationError "unknown zone"; OSError or yaml.YAMLError from load_vars or sync_status. |
-| Feeds | agent route GET /v1/zones/<key> (fabricctl/lib/agent/server.py, called by webui/server.py). |
-| Called by | `agent.server.Handler.dispatch` |
+| Feeds | agent route GET /v1/zones/<key> (fabric-agent, fabricctl/lib/agent/, called by the web UI). |
+| Called by | `agent.get_route.get_route` |
 
 ## `fabricctl/lib/fabriclib/dns/zone_name.py`
 

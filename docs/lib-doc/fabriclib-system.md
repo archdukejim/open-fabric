@@ -12,8 +12,8 @@
 | Inputs | actor — who asked (audit log); source — "cli" (default) or "web". |
 | Returns | (ok: bool, output: str) — ok when `interactive.py --apply` exited 0; output is its stdout+stderr without colour codes. An APPLY audit entry with the exit code is written either way. |
 | Fails | subprocess.TimeoutExpired after 900 s (no audit entry then); OSError from the lock or audit log. |
-| Feeds | fabric-agent (agent/server.py, source "web"); dns run_tsig_command and run_acl_command, dhcp run_dhcp_command, radius run_radius_command. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dhcp.run_dhcp_command._apply`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command.run_tsig_command`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.run_federation_command.run_federation_command`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.run_radius_command._apply` |
+| Feeds | fabric-agent (agent/ (fabric-agent), source "web"); dns run_tsig_command and run_acl_command, dhcp run_dhcp_command, radius run_radius_command. |
+| Called by | `agent.post_network.post_network`, `agent.post_route.post_route`, `fabriclib.dhcp.run_dhcp_command._apply`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command.run_tsig_command`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.run_federation_command.run_federation_command`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.radius.run_radius_command._apply` |
 
 ## `fabricctl/lib/fabriclib/system/control_stack.py`
 
@@ -64,8 +64,8 @@
 | Inputs | none (SERVICES, CONTAINERS; systemctl is-active; /etc/systemd/system/<svc>.service). |
 | Returns | [(service, systemd state or "timeout", container health)]; health is "" for host services (fabric-agent). An inactive service without a unit file is left out. |
 | Fails | FileNotFoundError without systemctl/docker; timeouts are reported as "timeout", not raised. |
-| Feeds | control_stack (status, and the unit list for stop); fabric-agent (agent/server.py) for the web UI. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.system.control_stack.control_stack` |
+| Feeds | control_stack (status, and the unit list for stop); fabric-agent (agent/ (fabric-agent)) for the web UI. |
+| Called by | `agent.get_route.<module>`, `fabriclib.system.control_stack.control_stack` |
 
 ## `fabricctl/lib/fabriclib/system/version_info.py`
 
@@ -77,5 +77,5 @@
 | Inputs | none (reads VERSION and BUILD in FABRIC_DIR, the tree this code runs from). |
 | Returns | {"version": VERSION content or "unknown", "build": BUILD content or ""}. |
 | Fails | never for missing files; OSError for other read errors. |
-| Feeds | fabric-agent (agent/server.py) for the web UI. |
-| Called by | `agent.server.Handler.dispatch` |
+| Feeds | fabric-agent (agent/ (fabric-agent)) for the web UI. |
+| Called by | `agent.get_route.<module>` |

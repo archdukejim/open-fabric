@@ -35,7 +35,7 @@ def create_person(v, actor, uid, first, last, email, source="web"):
              ..." (any other admin API error or failed admin login, raised as SystemExit by
              admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable);
              OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back.
-    Feeds:   agent route POST /v1/people (agent/server.py Handler.dispatch) -> webui
+    Feeds:   agent route POST /v1/people (agent/ (fabric-agent) Handler.dispatch) -> webui
              agentclient.create_person -> People page.
     Notes:   the user joins the plain `users` group only (never a fabric group; skipped silently if that
              group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP

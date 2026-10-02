@@ -49,7 +49,7 @@ def validate_record(rtype, form):
     Fails:   ValidationError "invalid record name", "invalid IPv4 address", "invalid IPv6 address", "invalid CNAME
              target", "invalid mail exchange", "invalid SRV target", "TXT must be 1-255 chars …", the range messages of
              _int, "unsupported record type"; AttributeError if a field is not a str.
-    Feeds:   add_record; HOST_RE is reused by fabricctl/lib/interactive.py.
+    Feeds:   add_record; HOST_RE is reused by menu/edit_dns.
     """
     name = (form.get("name") or "").strip()
     if not NAME_RE.match(name):

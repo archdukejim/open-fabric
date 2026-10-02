@@ -8,7 +8,7 @@ def radius_overview(v, log_limit=50):
     Returns: {"enabled", "server_name", "host_ip", "clients": [{"name", "address", "message_authenticator"}] (never
              secrets), "people": [{"group", "vlan", "priority"}], "log" (see list_auth_log), "log_error"}.
     Fails:   never for the journal — any error reading it goes into log_error.
-    Feeds:   agent route GET /v1/radius (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command
+    Feeds:   agent route GET /v1/radius (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command
              (status, with log_limit=0).
     """
     on = bool(v.get("install_freeradius"))

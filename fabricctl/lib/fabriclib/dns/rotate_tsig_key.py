@@ -13,7 +13,7 @@ def rotate_tsig_key(actor, name, source="web"):
     Returns: (secret, rfc2136_ini_text).
     Fails:   ValidationError "no TSIG key named …" (from replace_tsig_secret, or if the key vanished meanwhile); errors
              from save_secrets; OSError or yaml.YAMLError from load_vars.
-    Feeds:   agent route POST /v1/tsig/<name>/rotate (fabricctl/lib/agent/server.py, called by webui/server.py);
+    Feeds:   agent route POST /v1/tsig/<name>/rotate (fabric-agent, fabricctl/lib/agent/, called by the web UI);
              tests/pki/run.py.
     """
     secret = replace_tsig_secret(actor, name, None, source=source)

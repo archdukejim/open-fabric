@@ -1,0 +1,54 @@
+from agent.post_directory import post_directory
+from agent.post_dns import post_dns
+from agent.post_network import post_network
+from agent.post_pki import post_pki
+from agent.post_vault import post_vault
+from agent.read_text import read_text
+from agent.route_not_found import RouteNotFound
+from fabriclib.common.errors import ValidationError
+from fabriclib.common.load_vars import load_vars
+from fabriclib.common.write_audit import write_audit
+from fabriclib.keycloak.create_person import create_person
+from fabriclib.keycloak.reset_sign_in import reset_sign_in
+from fabriclib.system.apply_changes import apply_changes
+
+EVENT_ACTIONS = {"LOGIN", "LOGOUT", "LOGIN_DENIED"}
+
+
+def post_route(route, actor, data, perms):
+    """Purpose: answer POST /v1/<route>: route each change to the module of its area.
+    Inputs:  route — segments after /v1/ (already authorized); actor — the user recorded in the audit log; data — the
+             JSON body; perms — the token's permissions (None for a root peer).
+    Returns: the operation's JSON-serialisable result. apply: {"ok", "output"}; people: {"password"} (one-time,
+             shown once); people/<uid>/reset: {"password"} — fabric-group members only with system:admin (or root);
+             events: {} after the login audit line.
+    Fails:   ValidationError (-> 400) for an unsupported event or what fabriclib refuses; RouteNotFound (-> 404).
+    Feeds:   agent/handler.py (dispatch).
+    Notes:   POST apply only needs dns:write (rbac/required_permission), though it runs the whole deployment."""
+    area = route[:1]
+    if area in (["zones"], ["tsig"]):
+        return post_dns(route, actor, data)
+    if area in (["dhcp"], ["radius"]):
+        return post_network(route, actor, data)
+    if area == ["pki"] and len(route) == 2:
+        return post_pki(route[1], actor, data)
+    if area == ["vault"]:
+        return post_vault(route[1:], actor, data)
+    if area in (["devices"], ["roles"]):
+        return post_directory(route, actor, data)
+    if route == ["apply"]:
+        ok, output = apply_changes(actor, source="web")
+        return {"ok": ok, "output": output}
+    if route == ["people"]:
+        return {"password": create_person(load_vars(), actor, read_text(data, "uid"), read_text(data, "first"),
+                                          read_text(data, "last"), read_text(data, "email"))}
+    if len(route) == 3 and route[0] == "people" and route[2] == "reset":
+        privileged = perms is None or "system:admin" in perms     # root, or the admin bundle
+        return {"password": reset_sign_in(load_vars(), actor, route[1], privileged)}
+    if route == ["events"]:
+        action = data.get("action")
+        if action not in EVENT_ACTIONS:
+            raise ValidationError("unsupported event")
+        write_audit(actor, action, str(data.get("detail", ""))[:200], source="web")
+        return {}
+    raise RouteNotFound()

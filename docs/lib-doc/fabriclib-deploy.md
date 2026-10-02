@@ -34,9 +34,9 @@
 | Inputs | start_services — bool, default True. False (first install, `fabricctl setup` via fabriclib/setup/deploy_config.py): files are deployed, changed images built and zones swapped safely, but no service is started, restarted or reloaded (certificates may not exist yet). Paths from deploy_paths() (env DEPLOY_BASE_DIR, CUSTOM_VARS_PATH, SECRETS_FILE_OVERRIDE, LINK_VARS_PATH, read at call time). Must run as root. |
 | Returns | set of systemd units whose configuration changed. With start_services=True they have been restarted (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them. |
 | Fails | sys.exit(1) after an "Error: …" line for every refusal (ValidationError): secrets that cannot be loaded (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings, dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or ldap_base_dn not valid or not what they were at install; a template that does not render; an image build that fails (start_services=False); BIND9 refusing `rndc reconfig`. A bad link-vars file is only reported. OSError from file operations propagates. |
-| Feeds | lib/deploy.py (`python3 deploy.py`, fabriclib/setup/deploy_config.py, images/switch_image.py), interactive.apply_mode (`fabricctl --apply`, the menu, system/apply_changes.py for the web UI). |
+| Feeds | lib/deploy.py (`python3 deploy.py`, fabriclib/setup/deploy_config.py, images/switch_image.py), menu/apply_and_report (`fabricctl --apply`, the vars editor, system/apply_changes.py for the web UI). |
 | Notes | no --pull on image builds: apply never takes a new base image implicitly. The deployed vars are archived to <fabric>/archive/<stamp>-vars.yaml before being replaced. |
-| Called by | `fabriclib.setup.deploy_config.run`, `interactive.apply_mode` |
+| Called by | `fabriclib.menu.apply_and_report.apply_and_report`, `fabriclib.setup.deploy_config.run` |
 
 ## `fabricctl/lib/fabriclib/deploy/archive_vars.py`
 

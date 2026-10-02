@@ -14,8 +14,8 @@ def unmap_radius_group(actor, group, source="cli"):
     Returns: None.
     Fails:   ValidationError "group … is not mapped for 802.1X"; OSError or yaml.YAMLError from vars_lock / load_vars /
              save_vars / write_audit.
-    Feeds:   agent route POST /v1/radius/people/<group>/delete (fabricctl/lib/agent/server.py, called by
-             webui/server.py); run_radius_command (unmap-group).
+    Feeds:   agent route POST /v1/radius/people/<group>/delete (fabric-agent, fabricctl/lib/agent/, called by
+             the web UI); run_radius_command (unmap-group).
     """
     with vars_lock():
         data = load_vars()

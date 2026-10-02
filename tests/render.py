@@ -430,3 +430,9 @@ for _flag in ("--mint-certs", "--service-cert", "--render-jinja", "--print", "--
               "--update-containers", "--client-cert", "--keycloak-sync", "--version"):
     assert f'"{_flag}"' in _cli, f"cli.py does not route {_flag}"
 print('every fabricctl subcommand and flag reaches cli.py')
+
+# the vars editor turns typed text into YAML values (fabriclib/menu/parse_value.py)
+from fabriclib.menu.parse_value import parse_value  # noqa: E402
+assert [parse_value(t) for t in ("", "null", "''", "TRUE", "false", "42", "4.2", "eth0")] == \
+    [None, None, None, True, False, 42, "4.2", "eth0"]
+print('vars editor: typed values parsed (null, booleans, integers, text)')

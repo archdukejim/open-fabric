@@ -7,7 +7,7 @@ def user_permissions(claims):
              role's permissions there).
     Returns: set of permission names without the "fabric:" prefix, limited to known PERMISSIONS.
     Fails:   never for a verified token (non-str roles are ignored).
-    Feeds:   agent/server.py Handler.authorize (the permission check and self.perms, which decides
+    Feeds:   agent/handler.py Handler.authorize (the permission check and self.perms, which decides
              reset_sign_in's `privileged`).
     """
     roles = claims.get("roles") or []

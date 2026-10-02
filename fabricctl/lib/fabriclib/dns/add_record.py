@@ -18,8 +18,8 @@ def add_record(actor, key, rtype, form, source="cli"):
     Returns: the stored record dict, shaped per validate_record (e.g. {"name", "ip"} for A).
     Fails:   ValidationError "unsupported record type", "unknown zone", "a CNAME with that name already exists", or one
              from validate_record; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/zones/<key>/records (fabricctl/lib/agent/server.py, called by webui/server.py); the
-             interactive zone editor (fabricctl/lib/interactive.py).
+    Feeds:   agent route POST /v1/zones/<key>/records (fabric-agent, fabricctl/lib/agent/, called by the web UI); the
+             zone editor (menu/edit_dns_zone).
     Notes:   only CNAME-vs-CNAME clashes are refused here; a CNAME beside other records of the same name is not checked.
     """
     if rtype not in RECORD_TYPES:

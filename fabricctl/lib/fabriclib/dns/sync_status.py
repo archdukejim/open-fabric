@@ -14,7 +14,7 @@ def sync_status(zone, data_dir=BIND_DATA_DIR):
              or "unreachable".
     Fails:   OSError if the zone file exists but cannot be read; a missing docker binary or a timeout gives
              "unreachable".
-    Feeds:   zone_detail; fabricctl/lib/interactive.py (zone editor header).
+    Feeds:   zone_detail; menu/edit_dns_zone (zone editor header).
     Notes:   a zone file without a "; Serial" line counts as in sync once BIND serves the zone.
     """
     file_serial = None

@@ -8,7 +8,7 @@ def list_zones():
     Returns: [{"key", "name", "records" (count over all list-valued fields), "reverse" (True for a hand-written
              in-addr.arpa / ip6.arpa zone)}] in vars order.
     Fails:   OSError or yaml.YAMLError from load_vars.
-    Feeds:   agent route GET /v1/zones (fabricctl/lib/agent/server.py, called by webui/server.py); create_zone_tsig_key.
+    Feeds:   agent route GET /v1/zones (fabric-agent, fabricctl/lib/agent/, called by the web UI); create_zone_tsig_key.
     """
     data = load_vars()
     zones = []

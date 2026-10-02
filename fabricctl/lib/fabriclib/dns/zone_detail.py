@@ -14,7 +14,7 @@ def zone_detail(key):
     Returns: {"key", "name", "records": [{"type", "index", "name", "value", and for A/AAAA "ptr", "ptr_note"}], "status"
              (sync message)}.
     Fails:   ValidationError "unknown zone"; OSError or yaml.YAMLError from load_vars or sync_status.
-    Feeds:   agent route GET /v1/zones/<key> (fabricctl/lib/agent/server.py, called by webui/server.py).
+    Feeds:   agent route GET /v1/zones/<key> (fabric-agent, fabricctl/lib/agent/, called by the web UI).
     """
     data = load_vars()
     zone = (data.get("dns") or {}).get(key)

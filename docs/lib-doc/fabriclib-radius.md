@@ -12,8 +12,8 @@
 | Inputs | actor — str, who asks (audit). name — str (lower-cased; a-z, 0-9, -; up to 32). address — str IP address or network (not 0/0, no overlap with other clients). message_authenticator — bool, default True. secret — str the device already has (16-128 printable, no spaces, quotes, backslashes or $), or None for a random 32-character one. source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock. |
 | Returns | the shared secret (str), to be shown once. |
 | Fails | ValidationError "802.1X is off (install_freeradius: false)" or one from normalize_radius_clients (name, duplicate, address, overlap, secret); errors from save_secrets; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/radius/clients (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command (add-client). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.radius.run_radius_command.run_radius_command` |
+| Feeds | agent route POST /v1/radius/clients (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command (add-client). |
+| Called by | `agent.post_network.post_network`, `fabriclib.radius.run_radius_command.run_radius_command` |
 
 ## `fabricctl/lib/fabriclib/radius/deploy_freeradius.py`
 
@@ -53,8 +53,8 @@
 | Inputs | actor — str, who asks (audit). group — str group name (matched case-insensitively). vlan — 1-4094, or None / "" / 0 for none. priority — 0-9999, lower wins when a person is in several groups (default 100). source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock. |
 | Returns | the saved mapping {"group", "vlan", "priority"}. |
 | Fails | ValidationError "802.1X is off (install_freeradius: false)" or one from normalize_radius_people; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/radius/people (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command (map-group). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.radius.run_radius_command.run_radius_command` |
+| Feeds | agent route POST /v1/radius/people (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command (map-group). |
+| Called by | `agent.post_network.post_network`, `fabriclib.radius.run_radius_command.run_radius_command` |
 
 ## `fabricctl/lib/fabriclib/radius/normalize_radius_clients.py`
 
@@ -93,8 +93,8 @@
 | Inputs | v — the vars dict (host_ip, hostname_radius, hostname_certs, domain, radius_clients, radius_people, deploy_base_dir). root_pem — the fabric root CA as PEM; None reads <deploy_base>/stepca/data/certs/root_ca.crt. |
 | Returns | {"host_ip", "server_name", "certs_url", "domain", "clients" (names), "people" (group names), "windows": {"tls" \| "ttls": {"filename", "script"}}}. |
 | Fails | OSError if the root CA file cannot be read; binascii.Error from windows_setup_script on a malformed PEM. |
-| Feeds | agent route GET /v1/radius/guides (fabricctl/lib/agent/server.py, called by webui/server.py for webui/views.py); webui/devserver.py; tests/render.py. |
-| Called by | `agent.server.Handler.dispatch`, `webui.devserver.sample_radius_guides` |
+| Feeds | agent route GET /v1/radius/guides (fabric-agent, fabricctl/lib/agent/, called by the web UI for webui/views); the web UI's dev preview (webui/devpreview); tests/render.py. |
+| Called by | `agent.get_route.<module>`, `webui.devpreview.sample_radius_guides.sample_radius_guides` |
 
 ## `fabricctl/lib/fabriclib/radius/radius_overview.py`
 
@@ -106,8 +106,8 @@
 | Inputs | v — the vars dict (install_freeradius, hostname_radius, host_ip, radius_clients, radius_people). log_limit — how many recent decisions to read (default 50). |
 | Returns | {"enabled", "server_name", "host_ip", "clients": [{"name", "address", "message_authenticator"}] (never secrets), "people": [{"group", "vlan", "priority"}], "log" (see list_auth_log), "log_error"}. |
 | Fails | never for the journal — any error reading it goes into log_error. |
-| Feeds | agent route GET /v1/radius (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command (status, with log_limit=0). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.radius.run_radius_command.run_radius_command` |
+| Feeds | agent route GET /v1/radius (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command (status, with log_limit=0). |
+| Called by | `agent.get_route.<module>`, `fabriclib.radius.run_radius_command.run_radius_command` |
 
 ## `fabricctl/lib/fabriclib/radius/remove_radius_client.py`
 
@@ -119,8 +119,8 @@
 | Inputs | actor — str, who asks (audit). name — str (lower-cased). source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock; writes fabric's secrets. |
 | Returns | None. |
 | Fails | ValidationError "no RADIUS client …"; errors from save_secrets; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/radius/clients/<name>/delete (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command (remove-client). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.radius.run_radius_command.run_radius_command` |
+| Feeds | agent route POST /v1/radius/clients/<name>/delete (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command (remove-client). |
+| Called by | `agent.post_network.post_network`, `fabriclib.radius.run_radius_command.run_radius_command` |
 
 ## `fabricctl/lib/fabriclib/radius/rotate_radius_secret.py`
 
@@ -132,8 +132,8 @@
 | Inputs | actor — str, who asks (audit). name — str (lower-cased). secret — str matching SECRET_RE, or None for a random 32-character one. source — "cli" (default) or "web". Reads vars.yaml under vars_lock. |
 | Returns | the secret (str), to be shown once. |
 | Fails | ValidationError "the secret must be 16-128 printable characters, …", "no RADIUS client …"; errors from save_secrets; OSError or yaml.YAMLError from the vars helpers. |
-| Feeds | agent route POST /v1/radius/clients/<name>/rotate (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command (rotate-secret). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.radius.run_radius_command.run_radius_command` |
+| Feeds | agent route POST /v1/radius/clients/<name>/rotate (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command (rotate-secret). |
+| Called by | `agent.post_network.post_network`, `fabriclib.radius.run_radius_command.run_radius_command` |
 
 ## `fabricctl/lib/fabriclib/radius/run_radius_command.py`
 
@@ -181,8 +181,8 @@
 | Inputs | actor — str, who asks (audit). group — str group name (matched case-insensitively). source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock. |
 | Returns | None. |
 | Fails | ValidationError "group … is not mapped for 802.1X"; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/radius/people/<group>/delete (fabricctl/lib/agent/server.py, called by webui/server.py); run_radius_command (unmap-group). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.radius.run_radius_command.run_radius_command` |
+| Feeds | agent route POST /v1/radius/people/<group>/delete (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_radius_command (unmap-group). |
+| Called by | `agent.post_network.post_network`, `fabriclib.radius.run_radius_command.run_radius_command` |
 
 ## `fabricctl/lib/fabriclib/radius/windows_lan_profile.py`
 

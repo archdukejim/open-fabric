@@ -17,7 +17,7 @@ def remove_device(v, actor, name, source="web"):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
-    Feeds:   agent/server.py Handler.directory (POST /v1/devices/<name>/delete) -> webui agentclient.delete_device.
+    Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>/delete) -> webui agentclient.delete_device.
     Notes:   certificates issued to it stay valid until they expire (revoke them separately). Audited as
              DEVICE_REMOVE.
     """

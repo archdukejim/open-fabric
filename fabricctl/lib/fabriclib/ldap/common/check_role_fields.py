@@ -9,7 +9,7 @@ def check_role_fields(fields):
     Returns: {"description", "permissions" (sorted, unique), "vlan" (int or None), "priority" (int)}.
     Fails:   ValidationError "unknown permission: ..."; "VLAN must be 1 to 4094 (or empty)"; "priority must
              be 0 to 1000"; "description: one line, at most 200 characters".
-    Feeds:   add_role, update_role; webui/devserver.py (preview server).
+    Feeds:   add_role, update_role; the web UI's dev preview (webui/devpreview).
     """
     perms = sorted(set(fields.get("permissions") or []))
     unknown = [p for p in perms if p not in PERMISSIONS]

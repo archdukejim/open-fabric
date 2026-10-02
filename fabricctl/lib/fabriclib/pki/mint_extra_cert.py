@@ -32,7 +32,7 @@ def mint_extra_cert(v, entry):
     Fails:   ValidationError "output directory does not exist: ..."; mint_offline_cert's ValidationError
              (invalid name, "step-ca refused: ..."); KeyError without "cn"; OSError from move / chown.
     Feeds:   setup/mint_extra_certs.py mint_extra_certs; fabriclib/cli.py `extra-cert` (fabricctl
-             --mint-certs from pki/run_mint_certs_command / interactive.py).
+             --mint-certs from pki/run_mint_certs_command / menu/mint_certificate_menu).
     """
     crt_out, key_out, owner = extra_cert_paths(entry)
     if not os.path.isdir(os.path.dirname(crt_out)):

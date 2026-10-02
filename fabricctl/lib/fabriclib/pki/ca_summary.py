@@ -13,7 +13,7 @@ def ca_summary(v):
              "root": describe_cert dict, "intermediate": describe_cert dict (first certificate of the file)}.
     Fails:   OSError if a CA file is missing or unreadable; ValueError if pki_manual_max_days is not a
              number; ValidationError from to_pem / describe_cert (openssl) if a file holds no certificate.
-    Feeds:   agent route GET /v1/pki/ca (agent/server.py Handler.dispatch) -> webui agentclient.ca_summary
+    Feeds:   agent route GET /v1/pki/ca (agent/ (fabric-agent) Handler.dispatch) -> webui agentclient.ca_summary
              -> the PKI page.
     """
     out = {"domain": v.get("domain", ""), "certs_url": f"http://{v.get('hostname_certs', '')}/", "max_days": int(v.get("pki_manual_max_days")

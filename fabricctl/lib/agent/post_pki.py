@@ -1,0 +1,30 @@
+from agent.read_strings import read_strings
+from agent.read_text import read_text
+from fabriclib.common.errors import ValidationError
+from fabriclib.common.load_vars import load_vars
+from fabriclib.pki.convert_cert import convert_cert
+from fabriclib.pki.describe_csr import describe_csr
+from fabriclib.pki.inspect_pem import inspect_pem
+from fabriclib.pki.issue_key_pair import issue_key_pair
+from fabriclib.pki.sign_csr import sign_csr
+
+
+def post_pki(op, actor, data):
+    """Purpose: the manual PKI operations of POST /v1/pki/<op> (one fabriclib.pki file each).
+    Inputs:  op — "describe-csr" | "sign" | "issue" | "inspect" | "convert"; actor — str; data — body with csr, days,
+             device, cn, sans, key_type, data, cert, key as each operation needs (text fields must be strings).
+    Returns: the fabriclib result: describe_csr, sign_csr, issue_key_pair, inspect_pem or convert_cert.
+    Fails:   ValidationError("unknown operation") for another op, or from the readers and fabriclib (-> 400).
+    Feeds:   agent/post_route.py (POST pki/<op>)."""
+    if op == "describe-csr":
+        return describe_csr(read_text(data, "csr"))
+    if op == "sign":
+        return sign_csr(load_vars(), actor, read_text(data, "csr"), data.get("days"), read_text(data, "device"))
+    if op == "issue":
+        return issue_key_pair(load_vars(), actor, read_text(data, "cn"), read_strings(data, "sans"),
+                              read_text(data, "key_type"), data.get("days"), read_text(data, "device"))
+    if op == "inspect":
+        return inspect_pem(load_vars(), read_text(data, "data"))
+    if op == "convert":
+        return convert_cert(load_vars(), actor, read_text(data, "cert"), read_text(data, "key"))
+    raise ValidationError("unknown operation")

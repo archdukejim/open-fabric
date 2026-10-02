@@ -147,7 +147,7 @@ def apply_deployment(start_services=True):
              build that fails (start_services=False); BIND9 refusing `rndc reconfig`. A bad link-vars file is only
              reported. OSError from file operations propagates.
     Feeds:   lib/deploy.py (`python3 deploy.py`, fabriclib/setup/deploy_config.py, images/switch_image.py),
-             interactive.apply_mode (`fabricctl --apply`, the menu, system/apply_changes.py for the web UI).
+             menu/apply_and_report (`fabricctl --apply`, the vars editor, system/apply_changes.py for the web UI).
     Notes:   no --pull on image builds: apply never takes a new base image implicitly. The deployed vars are archived
              to <fabric>/archive/<stamp>-vars.yaml before being replaced."""
     print("Starting native Python deployment...")

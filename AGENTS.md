@@ -53,9 +53,10 @@ The repo must stay easy to navigate. For all of our own code:
 - Templates stay under `fabricctl/jinja/<service>/`; tests mirror the code
   layout under `tests/<domain>/`; docs under `docs/`, designs under
   `docs/design/`.
-- Existing large files (`interactive.py`, `agent/server.py`, the web UI's
-  `server.py`, `views.py`, …) predate this rule. **Split them when you touch
-  them**; they are tracked in the stale-code register (S7) until done.
+- The large files that predated this rule were split in 2026-10 (stale-code
+  S7). The entry points that remain (`deploy.py`, `interactive.py`,
+  `keycloak_bootstrap.py`, `manage.sh`, `agent/server.py`, the web UI's
+  `server.py` and `devserver.py`) only route: keep it that way.
 
 ## 3. Stale code
 

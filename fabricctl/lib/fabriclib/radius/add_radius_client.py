@@ -24,7 +24,7 @@ def add_radius_client(actor, name, address, message_authenticator=True, secret=N
     Fails:   ValidationError "802.1X is off (install_freeradius: false)" or one from normalize_radius_clients (name,
              duplicate, address, overlap, secret); errors from save_secrets; OSError or yaml.YAMLError from vars_lock /
              load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/radius/clients (fabricctl/lib/agent/server.py, called by webui/server.py);
+    Feeds:   agent route POST /v1/radius/clients (fabric-agent, fabricctl/lib/agent/, called by the web UI);
              run_radius_command (add-client).
     """
     secret = secret or "".join(_random.choice(string.ascii_letters + string.digits) for _ in range(32))

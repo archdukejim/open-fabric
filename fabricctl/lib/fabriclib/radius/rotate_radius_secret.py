@@ -19,8 +19,8 @@ def rotate_radius_secret(actor, name, secret=None, source="cli"):
     Returns: the secret (str), to be shown once.
     Fails:   ValidationError "the secret must be 16-128 printable characters, …", "no RADIUS client …"; errors from
              save_secrets; OSError or yaml.YAMLError from the vars helpers.
-    Feeds:   agent route POST /v1/radius/clients/<name>/rotate (fabricctl/lib/agent/server.py, called by
-             webui/server.py); run_radius_command (rotate-secret).
+    Feeds:   agent route POST /v1/radius/clients/<name>/rotate (fabric-agent, fabricctl/lib/agent/, called by
+             the web UI); run_radius_command (rotate-secret).
     """
     name = str(name).strip().lower()
     if secret is not None and not SECRET_RE.match(secret):

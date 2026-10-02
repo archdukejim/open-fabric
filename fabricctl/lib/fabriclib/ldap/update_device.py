@@ -39,7 +39,7 @@ def update_device(v, actor, name, fields, source="web"):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
-    Feeds:   agent/server.py Handler.directory (POST /v1/devices/<name>) -> webui agentclient.save_device.
+    Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>) -> webui agentclient.save_device.
     Notes:   the roles are the device's own attribute, so no role entry is written. Audited as DEVICE_UPDATE.
     """
     directory = read_directory(v)

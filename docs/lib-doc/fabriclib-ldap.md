@@ -12,7 +12,7 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — host-name label (stripped, lower-cased, DEVICE_NAME_RE); fields — {type, macs, owner (username), description, enabled (default True), roles} (check_device_fields); source — default "web". |
 | Returns | the normalised device name. |
 | Fails | ValidationError "device name: a host name label — ..."; "device <name> already exists"; check_device_fields' messages; "no such user: <owner>" (from the directory); run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/devices) -> webui agentclient.save_device. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/devices) -> webui agentclient.save_device. |
 | Notes | runs as cn=device_admin; audited as DEVICE_ADD. |
 | Called by | — (no static caller) |
 
@@ -26,7 +26,7 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — stripped, lower-cased, ROLE_NAME_RE; fields — {permissions, vlan, priority, description} (check_role_fields); source — default "web". |
 | Returns | the normalised role name. |
 | Fails | ValidationError "role name: lowercase letters, digits, '-' and '_'"; check_role_fields' messages; "that name is already taken"; run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/roles) -> webui agentclient.save_role. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/roles) -> webui agentclient.save_role. |
 | Notes | audited as ROLE_ADD. |
 | Called by | — (no static caller) |
 
@@ -40,9 +40,9 @@
 | Inputs | fields — dict: type (DEVICE_TYPES, default "other"), macs (list, any common spelling), owner (username, optional), description, enabled (default True), roles (list of role names); directory — read_directory result; name — the device being saved (its own MACs do not clash). |
 | Returns | {"type", "macs" (normalised, de-duplicated), "owner", "description", "enabled" (bool), "roles" (sorted, unique)}. |
 | Fails | ValidationError "type must be one of ..."; normalize_mac's "not a MAC address: ..." / "... is a multicast address, not a device"; "MAC ... already belongs to device ..."; "invalid owner username: ..."; "description: one line, at most 200 characters"; "no such role: ...". |
-| Feeds | add_device, update_device; webui/devserver.py (preview server). |
+| Feeds | add_device, update_device; the web UI's dev preview (webui/devpreview). |
 | Notes | a MAC may belong to one device only, so MAC authentication stays unambiguous. The owner's existence is checked later, in the directory. |
-| Called by | `fabriclib.ldap.add_device.add_device`, `fabriclib.ldap.update_device.update_device`, `webui.devserver.DevState.save` |
+| Called by | `fabriclib.ldap.add_device.add_device`, `fabriclib.ldap.update_device.update_device` |
 
 ## `fabricctl/lib/fabriclib/ldap/common/check_role_fields.py`
 
@@ -54,8 +54,8 @@
 | Inputs | fields — dict: permissions (list, each in ldap/constants PERMISSIONS), vlan (empty or 1..4094), priority (0..1000, default 100), description. |
 | Returns | {"description", "permissions" (sorted, unique), "vlan" (int or None), "priority" (int)}. |
 | Fails | ValidationError "unknown permission: ..."; "VLAN must be 1 to 4094 (or empty)"; "priority must be 0 to 1000"; "description: one line, at most 200 characters". |
-| Feeds | add_role, update_role; webui/devserver.py (preview server). |
-| Called by | `fabriclib.ldap.add_role.add_role`, `fabriclib.ldap.update_role.update_role`, `webui.devserver.DevState.save` |
+| Feeds | add_role, update_role; the web UI's dev preview (webui/devpreview). |
+| Called by | `fabriclib.ldap.add_role.add_role`, `fabriclib.ldap.update_role.update_role` |
 
 ## `fabricctl/lib/fabriclib/ldap/common/normalize_mac.py`
 
@@ -107,8 +107,8 @@
 | Inputs | v — fabric vars (read_directory). |
 | Returns | {"devices": list_devices, "roles": list_roles, "types": DEVICE_TYPES, "permissions": {permission: [what it grants, what enforces it]}}. |
 | Fails | run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent route GET /v1/devices (agent/server.py Handler.dispatch) -> webui agentclient.device_overview -> Devices, Roles and PKI pages. |
-| Called by | `agent.server.Handler.dispatch` |
+| Feeds | agent route GET /v1/devices (agent/ (fabric-agent) Handler.dispatch) -> webui agentclient.device_overview -> Devices, Roles and PKI pages. |
+| Called by | `agent.get_route.<module>` |
 
 ## `fabricctl/lib/fabriclib/ldap/ensure_admin_user.py`
 
@@ -148,9 +148,9 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — device name (DEVICE_NAME_RE); fingerprint — SHA-256 as 32 colon-separated hex pairs (upper-cased); link — True adds, False removes; source — default "web". |
 | Returns | None. Idempotent: adding a present or removing an absent fingerprint is not an error. |
 | Fails | ValidationError "invalid device name: ..."; "not a SHA-256 fingerprint"; "no such entry" (no such device); run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/devices/<name>/certs) -> webui agentclient.link_device_cert; pki/issue_key_pair, pki/sign_csr. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>/certs) -> webui agentclient.link_device_cert; pki/issue_key_pair, pki/sign_csr. |
 | Notes | audited as DEVICE_CERT_LINK or DEVICE_CERT_UNLINK. |
-| Called by | `agent.server.Handler.directory`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
+| Called by | `agent.post_directory.post_directory`, `fabriclib.pki.issue_key_pair.issue_key_pair`, `fabriclib.pki.sign_csr.sign_csr` |
 
 ## `fabricctl/lib/fabriclib/ldap/list_devices.py`
 
@@ -162,8 +162,8 @@
 | Inputs | v — fabric vars (used only when directory is not given); directory — optional read_directory result, default a fresh read. |
 | Returns | list sorted by name of read_directory's device dicts with "owner" as a username and "roles" (names, by priority), "permissions" (union of the roles; [] while disabled), "vlan" (from the lowest-priority-number role that sets one; None while disabled), "vlan_from" (that role or ""). |
 | Fails | read_directory's / run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired) when it reads. |
-| Feeds | device_overview; webui/devserver.py (preview server). |
-| Called by | `fabriclib.ldap.device_overview.device_overview`, `webui.devserver.DevState.overview` |
+| Feeds | device_overview; the web UI's dev preview (webui/devpreview). |
+| Called by | `fabriclib.ldap.device_overview.device_overview` |
 
 ## `fabricctl/lib/fabriclib/ldap/list_people.py`
 
@@ -176,7 +176,7 @@
 | Returns | {"users": [{uid, name, mail, locked, groups (names under ou=groups)}] sorted by uid, "groups": [{name, members (count)}] sorted by name, "keycloak_url": the realm's admin console URL}. |
 | Fails | run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
 | Feeds | agent route GET /v1/people -> webui agentclient.list_people -> People page. |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.get_route.<module>` |
 
 ## `fabricctl/lib/fabriclib/ldap/list_roles.py`
 
@@ -215,7 +215,7 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — an existing device; source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "no device named ..."; run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/devices/<name>/delete) -> webui agentclient.delete_device. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>/delete) -> webui agentclient.delete_device. |
 | Notes | certificates issued to it stay valid until they expire (revoke them separately). Audited as DEVICE_REMOVE. |
 | Called by | — (no static caller) |
 
@@ -229,7 +229,7 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — ROLE_NAME_RE; source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "invalid role name: ..."; "role <name> still has <n> device(s); take them out first"; "no such entry"; run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/roles/<name>/delete) -> webui agentclient.delete_role. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/roles/<name>/delete) -> webui agentclient.delete_role. |
 | Notes | audited as ROLE_REMOVE. |
 | Called by | — (no static caller) |
 
@@ -269,7 +269,7 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — an existing device; fields — same shape as add_device (check_device_fields); source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "no device named ..."; check_device_fields' messages; "no such user: <owner>" (from the directory); run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/devices/<name>) -> webui agentclient.save_device. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>) -> webui agentclient.save_device. |
 | Notes | the roles are the device's own attribute, so no role entry is written. Audited as DEVICE_UPDATE. |
 | Called by | — (no static caller) |
 
@@ -283,6 +283,6 @@
 | Inputs | v — fabric vars; actor — str, for the audit; name — ROLE_NAME_RE; fields — as add_role (check_role_fields); source — default "web". |
 | Returns | None. |
 | Fails | ValidationError "invalid role name: ..."; check_role_fields' messages; "no such entry" (no such role); run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such entry", "that name is already taken", "the directory refused the change ...", "directory error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired). |
-| Feeds | agent/server.py Handler.directory (POST /v1/roles/<name>) -> webui agentclient.save_role. |
+| Feeds | agent/ (fabric-agent) Handler.directory (POST /v1/roles/<name>) -> webui agentclient.save_role. |
 | Notes | audited as ROLE_UPDATE. |
 | Called by | — (no static caller) |

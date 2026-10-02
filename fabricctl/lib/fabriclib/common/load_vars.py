@@ -11,7 +11,7 @@ def load_vars(path=VARS_FILE):
     Returns: dict of the settings; {} if the file does not exist or is empty.
     Fails:   yaml.YAMLError on invalid YAML; OSError (e.g. PermissionError) if it cannot be read.
     Feeds:   dns/*, dhcp/add_reservation, dhcp/remove_reservation, radius/* (client and group edits),
-             secrets/load_secrets, secrets/save_secrets, agent/server.py, interactive.py."""
+             secrets/load_secrets, secrets/save_secrets, agent/ (fabric-agent), menu/ (the vars editor)."""
     if not os.path.exists(path):
         return {}
     with open(path) as f:

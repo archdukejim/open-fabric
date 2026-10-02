@@ -14,8 +14,8 @@ def remove_radius_client(actor, name, source="cli"):
     Returns: None.
     Fails:   ValidationError "no RADIUS client …"; errors from save_secrets; OSError or yaml.YAMLError from vars_lock /
              load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/radius/clients/<name>/delete (fabricctl/lib/agent/server.py, called by
-             webui/server.py); run_radius_command (remove-client).
+    Feeds:   agent route POST /v1/radius/clients/<name>/delete (fabric-agent, fabricctl/lib/agent/, called by
+             the web UI); run_radius_command (remove-client).
     """
     name = str(name).strip().lower()
     with vars_lock():

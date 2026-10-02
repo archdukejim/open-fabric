@@ -25,7 +25,7 @@
 | Fails | ValidationError: bad endpoint, key id, server name, label or PEMs; no vault key yet; that device key is already a method; no present method can vouch for the new one; the device's unwrap does not match; the device refuses Encrypt/Decrypt (any other exception, wrapped). On the last two the certificate folder is removed again. OSError writing the files. |
 | Feeds | agent route POST /v1/vault/slots/add-hsm, `fabricctl vault add-kmip` (run_vault_command), tests/openbao/run.py. |
 | Notes | the certificates and client key are root 0400 in <openbao_key_dir>/kmip-<id>/. Revoking fabric's client on the device, or disabling the key there, is the kill switch. Audited as VAULT_SLOT_ADD. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/add_security_key_slot.py`
 
@@ -61,7 +61,7 @@
 | Fails | ValidationError: library not allowed; bad label, PIN or key id; no vault key yet; the token is already a method; nothing present to vouch; from pkcs11_session, _generate or _check_existing; the token's unwrap does not match. Once the PIN is saved any failure removes it again (pkcs11.discard) and re-raises (ValueError, PyKCS11Error, OSError as they come). |
 | Feeds | agent route POST /v1/vault/slots/add-security-key, `fabricctl vault add-key` (run_vault_command), tests/openbao/run.py. |
 | Notes | the PIN is kept root 0400 on this host (pin-<slot id>): the token is the factor, like a stick, but its key cannot be copied. The kill-switch udev rule needs exactly one USB device whose serial matches the token's; otherwise it is off and the method's detail says so. A pair made here stays on the token if enrolment fails. Rewrites the udev rules; audited as VAULT_SLOT_ADD. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/add_usb_slot.py`
 
@@ -75,7 +75,7 @@
 | Fails | ValidationError: bad label; not a whole disk on this host; not USB; mounted; no vault key yet; this stick is already a method (by UUID); nothing present to vouch; wipefs or mkfs failed; the key read back does not match. From usb.wrap / usb.unwrap: ValueError, ValidationError, OSError. After mkfs the stick is already erased; nothing is rolled back. |
 | Feeds | agent route POST /v1/vault/slots/add-usb, `fabricctl vault add-usb` (run_vault_command), tests/openbao/run.py. |
 | Notes | ext4, label FABRIC-KEY, a UUID fabric chooses, root_owner 0:0. Duplicates are found by that UUID, not the serial: cheap sticks share one generic serial (seen on hardware: "General_UDisk-0:0"). udev is re-triggered after mkfs, or its database keeps the old ID_FS_UUID and the kill-switch rule never matches when the stick is pulled (found on real hardware). Rewrites the udev rules; audited as VAULT_SLOT_ADD. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/common/approle_login.py`
 
@@ -426,7 +426,7 @@
 | Returns | {"tokens": [security keys by USB vendor], "disks": [USB disks]} plus "pkcs11": list_pkcs11_tokens(v) when v is given. |
 | Fails | as _disks; list_pkcs11_tokens skips libraries that fail. |
 | Feeds | agent route GET /v1/vault/devices (web UI), add_security_key_slot (the token's USB serial for the kill switch). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.vault.add_security_key_slot.add_security_key_slot` |
+| Called by | `agent.get_route.<module>`, `fabriclib.vault.add_security_key_slot.add_security_key_slot` |
 
 ## `fabricctl/lib/fabriclib/vault/ensure_vault_key.py`
 
@@ -505,7 +505,7 @@
 | Returns | [{id, type, label, device (summary or path), present, key_id, stale, added, detail, tested}]; key_id is the current version if the slot holds it, else the versions it holds; stale when it lacks the current one. [] before the first method. |
 | Fails | ValidationError from slot_type for an unknown type in the store (the whole list fails); errors from a type's present() are caught (present False). |
 | Feeds | agent route GET /v1/vault/slots (web UI), `fabricctl vault slots` (run_vault_command), tests/openbao/run.py. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.get_route.get_route`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/remove_slot.py`
 
@@ -519,7 +519,7 @@
 | Fails | ValidationError: no such method; no other method holds the current key (never the last); none of them is present to vouch. Errors from the type's forget (before the store is saved) or discard (after) propagate, e.g. ValidationError or OSError. |
 | Feeds | agent route POST /v1/vault/slots/<id>/remove, `fabricctl vault remove` (run_vault_command), tests/openbao/run.py. |
 | Notes | the store is re-signed with the key a remaining method gives. A local file is shredded; a USB stick's copy only if it is plugged in, otherwise it stays readable on the stick until the key is rotated. Rewrites the udev rules; audited as VAULT_SLOT_REMOVE. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/revoke_token.py`
 
@@ -558,7 +558,7 @@
 | Fails | ValidationError: no store, or a rotation already in progress (previous_key_id set); no method present. An error wrapping the new key on a present method (from its slot type) stops before the store is saved. Errors from restart() or later propagate and leave the store with previous_key_id set. |
 | Feeds | agent route POST /v1/vault/rotate, `fabricctl vault rotate` (run_vault_command), tests/openbao/run.py. |
 | Notes | steps: store saved with both keys and seal.hcl naming new (current) and old (previous); unlock and restart, so OpenBao re-wraps itself with the new key; old copies forgotten, store saved with the new key only, dropped methods discarded; unlock and restart with only the new key (proves it opens the vault); RAM copies wiped. The store can unlock both keys before anything restarts, so an interruption never leaves the vault without a way in. Audited as VAULT_ROTATE. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/run_vault_command.py`
 
@@ -571,7 +571,7 @@
 | Returns | None. |
 | Fails | subprocess.CalledProcessError if systemctl fails (e.g. fabric-unlock finds no method); subprocess.TimeoutExpired; ValidationError from wait_active. |
 | Feeds | the restart callable of rotate_vault_key, from run_vault_command (rotate) and the agent route POST /v1/vault/rotate. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ### `_status(v)`
 
@@ -928,7 +928,7 @@
 | Fails | ValidationError: no such method; it could not unwrap the key (with the first reason obtain_key recorded). |
 | Feeds | agent route POST /v1/vault/slots/<id>/test, `fabricctl vault test` (run_vault_command), tests/openbao/run.py. |
 | Notes | attended: a security key that saw a wrong PIN is still tried; a correct login clears that state. Audited as VAULT_SLOT_TEST, ok or FAILED. |
-| Called by | `agent.server.Handler.vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
+| Called by | `agent.post_vault.post_vault`, `fabriclib.vault.run_vault_command.run_vault_command` |
 
 ## `fabricctl/lib/fabriclib/vault/unlock_vault.py`
 
@@ -980,7 +980,7 @@
 | Returns | {url, key (_key_state), reachable} and, when reachable: initialized, sealed, version, seal_type, storage, recovery_seal, mounts [{path, type, version, description}], auth [paths], optionally secrets {version, updated} (metadata of fabric/secrets, never a value) and error (why a part is missing). |
 | Fails | OpenBao errors (ValidationError) are caught into "error"; OSError from _key_state propagates. |
 | Feeds | agent route GET /v1/vault (webui agentclient.vault_status), run_vault_command._status, setup/setup_openbao, setup/verify_install, tests/openbao/run.py. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.verify_install.checks`, `fabriclib.vault.run_vault_command._status` |
+| Called by | `agent.get_route.<module>`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.verify_install.checks`, `fabriclib.vault.run_vault_command._status` |
 
 ## `fabricctl/lib/fabriclib/vault/wipe_runtime_keys.py`
 

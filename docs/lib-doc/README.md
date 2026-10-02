@@ -6,12 +6,12 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 
 | Page | Covers | Functions | Files |
 |---|---|---|---|
-| [fabricctl-agent](fabricctl-agent.md) | fabric-agent: the permission-checked host API behind the web UI | 17 | 1 |
+| [fabricctl-agent](fabricctl-agent.md) | fabric-agent: the permission-checked host API behind the web UI | 21 | 12 |
 | [fabricctl-jinja](fabricctl-jinja.md) | Code that runs inside service containers (389-DS seeding, FreeRADIUS policy) | 24 | 8 |
-| [fabricctl-lib](fabricctl-lib.md) | The deploy engine, the interactive editor, Keycloak bootstrap, shell helpers | 25 | 3 |
+| [fabricctl-lib](fabricctl-lib.md) | Entry points: the deploy engine, the vars editor, the Keycloak configuration | 9 | 2 |
 | [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 29 | 19 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 5 | 1 |
-| [fabriclib-deploy](fabriclib-deploy.md) |  | 29 | 24 |
+| [fabriclib-deploy](fabriclib-deploy.md) | The deploy engine: secrets, settings, render, install, restart | 29 | 24 |
 | [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 12 | 9 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 43 | 32 |
 | [fabriclib-dns_filter](fabriclib-dns_filter.md) |  | 3 | 2 |
@@ -20,7 +20,8 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 29 | 20 |
 | [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 21 | 21 |
 | [fabriclib-logs](fabriclib-logs.md) | Optional log forwarding (Fluent Bit) | 4 | 3 |
-| [fabriclib-ntp](fabriclib-ntp.md) |  | 6 | 5 |
+| [fabriclib-menu](fabriclib-menu.md) | The vars editor (fabricctl --interactive), --print and --apply | 17 | 12 |
+| [fabriclib-ntp](fabriclib-ntp.md) | Time: chrony on the host, its settings and checks | 6 | 5 |
 | [fabriclib-pki](fabriclib-pki.md) | Certificates: service certificates, manual issuing, CSR signing, conversion | 44 | 35 |
 | [fabriclib-radius](fabriclib-radius.md) | Optional 802.1X (FreeRADIUS): clients, groups, setup guides, decisions | 16 | 14 |
 | [fabriclib-rbac](fabriclib-rbac.md) | Who may do what: permissions, bundles, route table | 2 | 2 |
@@ -30,4 +31,4 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-system](fabriclib-system.md) | Service status, start/stop, apply, version | 6 | 5 |
 | [fabriclib-vault](fabriclib-vault.md) | OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass | 81 | 43 |
 | [installers](installers.md) | The Debian package wrapper | 2 | 1 |
-| [webui](webui.md) | Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview | 140 | 6 |
+| [webui](webui.md) | Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview | 150 | 109 |

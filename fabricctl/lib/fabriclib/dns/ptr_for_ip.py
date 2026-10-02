@@ -12,7 +12,7 @@ def ptr_for_ip(ip):
              ip6.arpa zone and 16 nibbles for IPv6 ULA; or (None, reason) for an invalid, loopback, link-local,
              unspecified, multicast, public or global address.
     Fails:   never — a bad address returns (None, "not an IP address").
-    Feeds:   reverse_zones, zone_detail; webui/devserver.py.
+    Feeds:   reverse_zones, zone_detail; the web UI's dev preview (webui/devpreview).
     Notes:   serving a public address's reverse zone locally would shadow someone else's network.
     """
     try:

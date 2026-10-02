@@ -29,7 +29,7 @@ def create_zone_tsig_key(actor, name, zone, scope, hosts=(), types=("TXT",), sec
              client.
     Fails:   ValidationError "… is not one of this fabric's forward zones", "list at least one host that may prove its
              name", "record types must be among …", "unknown scope", or one from add_tsig_key.
-    Feeds:   agent route POST /v1/tsig (fabricctl/lib/agent/server.py, called by webui/server.py); tests/pki/run.py.
+    Feeds:   agent route POST /v1/tsig (fabric-agent, fabricctl/lib/agent/, called by the web UI); tests/pki/run.py.
     Notes:   the rfc2136.ini path is always fabric's default: a web caller can never choose `out`.
     """
     forward = {z["name"] for z in list_zones() if not z["reverse"]}

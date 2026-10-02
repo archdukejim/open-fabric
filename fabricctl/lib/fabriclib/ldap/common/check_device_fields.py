@@ -13,7 +13,7 @@ def check_device_fields(fields, directory, name):
     Fails:   ValidationError "type must be one of ..."; normalize_mac's "not a MAC address: ..." / "... is a
              multicast address, not a device"; "MAC ... already belongs to device ..."; "invalid owner
              username: ..."; "description: one line, at most 200 characters"; "no such role: ...".
-    Feeds:   add_device, update_device; webui/devserver.py (preview server).
+    Feeds:   add_device, update_device; the web UI's dev preview (webui/devpreview).
     Notes:   a MAC may belong to one device only, so MAC authentication stays unambiguous. The owner's
              existence is checked later, in the directory.
     """

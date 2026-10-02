@@ -10,8 +10,8 @@ def radius_guides(v, root_pem=None):
     Returns: {"host_ip", "server_name", "certs_url", "domain", "clients" (names), "people" (group names), "windows":
              {"tls" | "ttls": {"filename", "script"}}}.
     Fails:   OSError if the root CA file cannot be read; binascii.Error from windows_setup_script on a malformed PEM.
-    Feeds:   agent route GET /v1/radius/guides (fabricctl/lib/agent/server.py, called by webui/server.py for
-             webui/views.py); webui/devserver.py; tests/render.py.
+    Feeds:   agent route GET /v1/radius/guides (fabric-agent, fabricctl/lib/agent/, called by the web UI for
+             webui/views); the web UI's dev preview (webui/devpreview); tests/render.py.
     """
     if root_pem is None:
         with open(ca_files(v)[0]) as f:

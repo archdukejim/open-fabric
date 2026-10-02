@@ -2,7 +2,20 @@
 
 # fabricctl-agent
 
-## `fabricctl/lib/agent/server.py`
+## `fabricctl/lib/agent/get_route.py`
+
+### `get_route(route)`
+
+| | |
+|---|---|
+| Purpose | answer GET /v1/<route>: one fabriclib read operation per route. |
+| Inputs | route — list of path segments after /v1/ (already authorized by the handler). |
+| Returns | the operation's JSON-serialisable result. zones/<key>: zone_detail; vault/slots: the unlock methods with this host's name. |
+| Fails | RouteNotFound for any other route (-> 404); whatever the operation raises (ValidationError -> 400). |
+| Feeds | agent/handler.py (dispatch). |
+| Called by | `agent.handler.Handler.dispatch` |
+
+## `fabricctl/lib/agent/handler.py`
 
 ### `Handler.address_string(self)`
 
@@ -22,7 +35,7 @@
 | Purpose | write one request log line to stderr (the systemd journal of fabric-agent). |
 | Inputs | fmt — %-format string; args — its values (from BaseHTTPRequestHandler). |
 | Returns | None. |
-| Fails | never in practice (a bad format would raise TypeError from the base class's own calls). |
+| Fails | never in practice. |
 | Feeds | BaseHTTPRequestHandler (every request and error). |
 | Called by | — (no static caller) |
 
@@ -33,9 +46,9 @@
 | Purpose | send a complete JSON response. |
 | Inputs | status — int HTTP status; obj — any JSON-serialisable object. |
 | Returns | None; status line, Content-Type application/json, Content-Length and the body are written. |
-| Fails | TypeError if obj is not JSON-serialisable (inside dispatch's try it becomes a 500); OSError (BrokenPipeError) if the peer has gone. |
+| Fails | TypeError if obj is not JSON-serialisable (inside dispatch it becomes a 500); OSError (BrokenPipeError) if the peer has gone. |
 | Feeds | dispatch (every answer). |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.handler.Handler.dispatch` |
 
 ### `Handler.peer_uid(self)`
 
@@ -46,7 +59,7 @@
 | Returns | int uid. |
 | Fails | OSError if the socket option cannot be read (not a unix socket). |
 | Feeds | dispatch (allowed_uids check), authorize (root peers skip the token). |
-| Called by | `agent.server.Handler.authorize`, `agent.server.Handler.dispatch` |
+| Called by | `agent.handler.Handler.authorize`, `agent.handler.Handler.dispatch` |
 
 ### `Handler.authorize(self, method, route)`
 
@@ -57,7 +70,7 @@
 | Returns | None when allowed, with self.user = the token's preferred_username and self.perms = its permission set (both None for a root peer); otherwise (status, error): (401, reason) when verify_user_token rejects the token or it is missing; (403, "not allowed") when required_permission lists no permission for the route (default deny); (403, "you need the permission <p>") when the token lacks it ("session" needs none). |
 | Fails | exceptions other than ValidationError (e.g. KeyError on a token without preferred_username, OSError from load_vars) propagate to dispatch, which answers 500. |
 | Feeds | dispatch; self.user feeds actor, self.perms the people-reset privilege check. |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.handler.Handler.dispatch` |
 
 ### `Handler.body(self)`
 
@@ -66,9 +79,9 @@
 | Purpose | read and parse the request's JSON body. |
 | Inputs | none; reads the Content-Length header and self.rfile. An empty body counts as {}. |
 | Returns | dict, the parsed object. |
-| Fails | ValidationError("request too large") over MAX_BODY (64 KiB), ValidationError("expected a JSON object") for any other JSON value (both -> 400 in dispatch); ValueError / json.JSONDecodeError for a bad Content-Length or invalid JSON (-> 400 "malformed request"). A negative Content-Length is not refused: read(-n) then waits for the peer to close the connection. |
+| Fails | ValidationError("request too large") over MAX_BODY (64 KiB), ValidationError("expected a JSON object") for any other JSON value (both -> 400 in dispatch); ValueError / json.JSONDecodeError for a bad Content-Length or invalid JSON (-> 400 "malformed request"). |
 | Feeds | dispatch (every POST). |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.handler.Handler.dispatch` |
 
 ### `Handler.actor(self, data)`
 
@@ -78,8 +91,8 @@
 | Inputs | data — the request body; its "actor" is used only for root peers (no token). |
 | Returns | str — the verified token's user when there is one, else data["actor"]. |
 | Fails | ValidationError("invalid actor") (-> 400) when a root peer's actor is missing or does not match ACTOR_RE (1-64 characters of letters, digits, . _ @ -, starting with a letter or digit). |
-| Feeds | dispatch -> every fabriclib change operation and write_audit. |
-| Called by | `agent.server.Handler.dispatch` |
+| Feeds | dispatch -> post_route and every fabriclib change operation. |
+| Called by | `agent.handler.Handler.dispatch` |
 
 ### `Handler.do_GET(self)`
 
@@ -107,48 +120,95 @@
 
 | | |
 |---|---|
-| Purpose | route one /v1/ request to exactly one fabriclib operation and reply with its result as JSON. |
-| Inputs | method — "GET" or "POST"; self.path (URL-decoded path segments; the query string is ignored), the Authorization header (see authorize) and, for POST, the JSON body (see body; actor from actor()). GET: version, services, zones, zones/<key>, audit, pki/ca, pki/issued, tsig, reverse-zones, devices, people, dhcp, radius, radius/guides, vault, vault/slots, vault/devices. POST: zones/<key>/records[/delete], apply, pki/<op>, tsig, tsig/<name>/rotate\|delete, vault/..., devices/..., roles/..., dhcp/reservations[/<mac>/delete], radius/clients[/<name>/rotate\|delete], radius/people[/<group>/delete], people, people/<uid>/reset, events. |
-| Returns | None; replies 200 with the operation's result (DHCP and RADIUS changes run apply_changes and include "applied" and the last 2000 characters of its output; secrets and one-time passwords are returned once). |
-| Fails | never raises; replies 403 "peer not allowed" when the peer uid is not in allowed_uids; 404 "not found" for a path outside /v1 or an unknown route; 401/403 from authorize; 400 with the message for ValidationError (bad input, unsupported record type or event, invalid index, fabriclib refusals); 400 "malformed request" for ValueError/JSON errors; 500 "internal error" (traceback to stderr) for anything else. |
-| Feeds | do_GET, do_POST. Calls fabriclib: dns (list_zones, zone_detail, add_record, remove_record, list_tsig_keys, create_zone_tsig_key, rotate_tsig_key, remove_tsig_key, reverse_zones), system (version_info, service_status, apply_changes), common (read_audit, write_audit), pki (ca_summary, list_issued), ldap (device_overview, list_people), dhcp, radius, vault (vault_status, list_slots, detect_devices), keycloak (create_person, reset_sign_in), plus pki, vault and directory below. |
-| Notes | POST apply only needs dns:write (required_permission), though it runs the whole deployment. |
-| Called by | `agent.server.Handler.do_GET`, `agent.server.Handler.do_POST` |
+| Purpose | route one /v1/ request to its route module and reply with the result as JSON. |
+| Inputs | method — "GET" or "POST"; self.path (URL-decoded path segments; the query string is ignored), the Authorization header (see authorize) and, for POST, the JSON body (see body; actor from actor()). |
+| Returns | None; replies 200 with the result (get_route for GET, post_route for POST). |
+| Fails | never raises; replies 403 "peer not allowed" when the peer uid is not in allowed_uids; 404 "not found" for a path outside /v1 or an unknown route; 401/403 from authorize; 400 with the message for ValidationError; 400 "malformed request" for ValueError/JSON errors; 500 "internal error" (traceback to stderr) for anything else. |
+| Feeds | do_GET, do_POST. |
+| Called by | `agent.handler.Handler.do_GET`, `agent.handler.Handler.do_POST` |
 
-### `Handler.pki(op, actor, data)`
+## `fabricctl/lib/agent/post_directory.py`
+
+### `post_directory(route, actor, data)`
+
+| | |
+|---|---|
+| Purpose | devices and device roles in 389-DS, POST /v1/devices/... and /v1/roles/... (fabriclib.ldap, bound as cn=device_admin). |
+| Inputs | route — ["devices"\|"roles"] plus [], [<name>], [<name>,"delete"] or (devices only) [<name>,"certs"]; actor — str; data — body: name, fields (read_fields), sha256, link. |
+| Returns | {"name": ...} for an add; the result of update_*/remove_* or link_device_cert otherwise ({} when None). |
+| Fails | ValidationError("unknown operation") for another route, or from the readers and fabriclib (-> 400). |
+| Feeds | agent/post_route.py (POST devices/..., roles/...). |
+| Called by | `agent.post_route.post_route` |
+
+## `fabricctl/lib/agent/post_dns.py`
+
+### `post_dns(route, actor, data)`
+
+| | |
+|---|---|
+| Purpose | DNS changes: POST /v1/zones/<key>/records[/delete] and /v1/tsig[/<name>/rotate\|delete]. |
+| Inputs | route — segments after /v1/; actor — the verified user; data — the body: type, name, ip\|target\|… for a record (index for a delete); name, zone, scope, hosts, types, secret for a TSIG key. |
+| Returns | the new record; {"key", "secret", "ini"} for a new key (the secret shown once); {"secret", "ini"} for a rotation; {} for a TSIG delete; remove_record's result for a record delete. |
+| Fails | ValidationError for an unsupported record type, an invalid index or what fabriclib refuses (-> 400); RouteNotFound for another route. |
+| Feeds | agent/post_route.py. |
+| Called by | `agent.post_route.post_route` |
+
+## `fabricctl/lib/agent/post_network.py`
+
+### `post_network(route, actor, data)`
+
+| | |
+|---|---|
+| Purpose | DHCP reservations and 802.1X settings, each saved and applied at once: POST /v1/dhcp/reservations[/<mac>/delete], /v1/radius/clients[/<name>/rotate\|delete], /v1/radius/people[/<group>/delete]. |
+| Inputs | route — segments after /v1/; actor — the verified user; data — the body (mac, ip, hostname; name, address, message_authenticator, secret; group, vlan, priority). |
+| Returns | the saved item (reservation, mapping) or the client's secret (shown once), with "applied" (bool) and the last 2000 characters of the apply's output. |
+| Fails | ValidationError from the readers and fabriclib (-> 400); RouteNotFound for another route. |
+| Feeds | agent/post_route.py. |
+| Called by | `agent.post_route.post_route` |
+
+## `fabricctl/lib/agent/post_pki.py`
+
+### `post_pki(op, actor, data)`
 
 | | |
 |---|---|
 | Purpose | the manual PKI operations of POST /v1/pki/<op> (one fabriclib.pki file each). |
 | Inputs | op — "describe-csr" \| "sign" \| "issue" \| "inspect" \| "convert"; actor — str; data — body with csr, days, device, cn, sans, key_type, data, cert, key as each operation needs (text fields must be strings). |
 | Returns | the fabriclib result: describe_csr, sign_csr, issue_key_pair, inspect_pem or convert_cert. |
-| Fails | ValidationError("unknown operation") for another op, or from text/strings and the fabriclib function (-> 400); other exceptions -> 500 in dispatch. |
-| Feeds | dispatch (POST pki/<op>). |
-| Called by | `agent.server.Handler.dispatch` |
+| Fails | ValidationError("unknown operation") for another op, or from the readers and fabriclib (-> 400). |
+| Feeds | agent/post_route.py (POST pki/<op>). |
+| Called by | `agent.post_route.post_route` |
 
-### `Handler.vault(route, actor, data)`
+## `fabricctl/lib/agent/post_route.py`
+
+### `post_route(route, actor, data, perms)`
+
+| | |
+|---|---|
+| Purpose | answer POST /v1/<route>: route each change to the module of its area. |
+| Inputs | route — segments after /v1/ (already authorized); actor — the user recorded in the audit log; data — the JSON body; perms — the token's permissions (None for a root peer). |
+| Returns | the operation's JSON-serialisable result. apply: {"ok", "output"}; people: {"password"} (one-time, shown once); people/<uid>/reset: {"password"} — fabric-group members only with system:admin (or root); events: {} after the login audit line. |
+| Fails | ValidationError (-> 400) for an unsupported event or what fabriclib refuses; RouteNotFound (-> 404). |
+| Feeds | agent/handler.py (dispatch). |
+| Notes | POST apply only needs dns:write (rbac/required_permission), though it runs the whole deployment. |
+| Called by | `agent.handler.Handler.dispatch` |
+
+## `fabricctl/lib/agent/post_vault.py`
+
+### `post_vault(route, actor, data)`
 
 | | |
 |---|---|
 | Purpose | changes to OpenBao's unlock methods, POST /v1/vault/... (fabriclib.vault). |
 | Inputs | route — segments after "vault": ["slots","add-usb"], ["slots","add-hsm"], ["slots","add-security-key"], ["slots",<id>,"test"], ["slots",<id>,"remove"], ["rotate"]; actor — str; data — body (disk, label, endpoint, key_id, ca, cert, key, server_name, module, token, pin as each needs). |
 | Returns | {"id": slot id} for an add; {"ok": bool} for test and remove; rotate_vault_key's result for rotate (it restarts OpenBao through restart_openbao). |
-| Fails | ValidationError("unknown operation") for another route, or from text() and fabriclib (-> 400); other exceptions -> 500 in dispatch. |
-| Feeds | dispatch (POST vault/...). |
-| Called by | `agent.server.Handler.dispatch` |
+| Fails | ValidationError("unknown operation") for another route, or from the readers and fabriclib (-> 400). |
+| Feeds | agent/post_route.py (POST vault/...). |
+| Called by | `agent.post_route.post_route` |
 
-### `Handler.directory(route, actor, data)`
+## `fabricctl/lib/agent/read_fields.py`
 
-| | |
-|---|---|
-| Purpose | devices and device roles in 389-DS, POST /v1/devices/... and /v1/roles/... (fabriclib.ldap, bound as cn=device_admin). |
-| Inputs | route — ["devices"\|"roles"] plus [], [<name>], [<name>,"delete"] or (devices only) [<name>,"certs"]; actor — str; data — body: name, fields (see fields), sha256, link. |
-| Returns | {"name": ...} for an add; the result of update_*/remove_* or link_device_cert otherwise (dispatch replies {} when it is None). |
-| Fails | ValidationError("unknown operation") for another route, or from fields()/text() and fabriclib (-> 400); other exceptions -> 500 in dispatch. |
-| Feeds | dispatch (POST devices/..., roles/...). |
-| Called by | `agent.server.Handler.dispatch` |
-
-### `fields(data)`
+### `read_fields(data)`
 
 | | |
 |---|---|
@@ -156,21 +216,12 @@
 | Inputs | data — the request body; data["fields"] must be an object of at most 20 entries whose values are text, booleans, or lists of at most 100 strings. Missing or empty means {}. |
 | Returns | dict, the fields unchanged. |
 | Fails | ValidationError("fields must be an object") or ("field <k> has an unsupported value") (-> 400). |
-| Feeds | Handler.directory (add_device, add_role, update_device, update_role). |
-| Called by | `agent.server.Handler.directory` |
+| Feeds | post_directory (add_device, add_role, update_device, update_role). |
+| Called by | `agent.post_directory.post_directory` |
 
-### `text(data, field)`
+## `fabricctl/lib/agent/read_strings.py`
 
-| | |
-|---|---|
-| Purpose | read one text field from a request body. |
-| Inputs | data — the request body; field — str, the key. |
-| Returns | str, the value; "" when absent. |
-| Fails | ValidationError("<field> must be text") when present but not a string (-> 400). |
-| Feeds | Handler.dispatch, pki, vault, directory. |
-| Called by | `agent.server.Handler.directory`, `agent.server.Handler.dispatch`, `agent.server.Handler.pki`, `agent.server.Handler.vault` |
-
-### `strings(data, field)`
+### `read_strings(data, field)`
 
 | | |
 |---|---|
@@ -178,8 +229,23 @@
 | Inputs | data — the request body; field — str, the key. |
 | Returns | list of str (at most 100); [] when absent or empty. |
 | Fails | ValidationError("<field> must be a list of text") for anything else (-> 400). |
-| Feeds | Handler.dispatch (tsig hosts/types), Handler.pki (sans). |
-| Called by | `agent.server.Handler.dispatch`, `agent.server.Handler.pki` |
+| Feeds | post_dns (TSIG hosts and types), post_pki (sans). |
+| Called by | `agent.post_dns.post_dns`, `agent.post_pki.post_pki` |
+
+## `fabricctl/lib/agent/read_text.py`
+
+### `read_text(data, field)`
+
+| | |
+|---|---|
+| Purpose | read one text field from a request body. |
+| Inputs | data — the request body; field — str, the key. |
+| Returns | str, the value; "" when absent. |
+| Fails | ValidationError("<field> must be text") when present but not a string (-> 400). |
+| Feeds | every post_* route module. |
+| Called by | `agent.post_directory.post_directory`, `agent.post_dns.post_dns`, `agent.post_network.post_network`, `agent.post_pki.post_pki`, `agent.post_route.post_route`, `agent.post_vault.post_vault` |
+
+## `fabricctl/lib/agent/server.py`
 
 ### `main()`
 
@@ -189,6 +255,6 @@
 | Inputs | command-line --socket (path, required; an existing file there is removed), --socket-gid (int, required: the webui container's group), --allow-uid (int, repeatable: peer uids allowed besides root). Set by systemd/fabric-agent.service.j2 (socket <base>/webui/agent/agent.sock). |
 | Returns | never returns normally (serve_forever). |
 | Fails | argparse exits 2 on missing/invalid arguments; OSError if the socket cannot be created, chowned or chmodded (must run as root). |
-| Feeds | the fabric-agent systemd unit; webui/agentclient.py is its client. |
+| Feeds | the fabric-agent systemd unit; webui/agentclient/ is its client. |
 | Notes | the socket is created under umask 0117, then set to root:<socket-gid> 0660. |
 | Called by | `agent.server.<module>` |

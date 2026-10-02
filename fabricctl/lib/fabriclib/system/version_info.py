@@ -8,7 +8,7 @@ def version_info():
     Inputs:  none (reads VERSION and BUILD in FABRIC_DIR, the tree this code runs from).
     Returns: {"version": VERSION content or "unknown", "build": BUILD content or ""}.
     Fails:   never for missing files; OSError for other read errors.
-    Feeds:   fabric-agent (agent/server.py) for the web UI."""
+    Feeds:   fabric-agent (agent/ (fabric-agent)) for the web UI."""
     def read(name):
         try:
             with open(os.path.join(FABRIC_DIR, name)) as f:

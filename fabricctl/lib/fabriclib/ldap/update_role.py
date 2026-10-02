@@ -26,7 +26,7 @@ def update_role(v, actor, name, fields, source="web"):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
-    Feeds:   agent/server.py Handler.directory (POST /v1/roles/<name>) -> webui agentclient.save_role.
+    Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/roles/<name>) -> webui agentclient.save_role.
     Notes:   audited as ROLE_UPDATE.
     """
     if not ROLE_NAME_RE.match(str(name)):

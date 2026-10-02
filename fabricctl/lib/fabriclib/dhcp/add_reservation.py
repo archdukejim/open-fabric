@@ -21,7 +21,7 @@ def add_reservation(actor, mac, ip, hostname="", source="cli"):
              normalize_dhcp (bad MAC, inside a pool, duplicate MAC or address, bad hostname, a static A record in a
              pool); plain ValueError from normalize_dhcp if a stored router is not an address; OSError or yaml.YAMLError
              from vars_lock / load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/dhcp/reservations (fabricctl/lib/agent/server.py, called by webui/server.py);
+    Feeds:   agent route POST /v1/dhcp/reservations (fabric-agent, fabricctl/lib/agent/, called by the web UI);
              run_dhcp_command (reserve).
     Notes:   the whole `dhcp:` block is validated again (as if install_kea were on) before anything is saved.
     """

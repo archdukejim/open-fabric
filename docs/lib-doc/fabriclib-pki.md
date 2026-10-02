@@ -12,8 +12,8 @@
 | Inputs | v — fabric vars: deploy_base_dir (CA files via ca_files), domain, hostname_certs, pki_manual_max_days (default DEFAULT_MAX_DAYS, 1825). Reads root_ca.crt and intermediate_ca.crt. |
 | Returns | {"domain", "certs_url": "http://<hostname_certs>/", "max_days": int, "root": describe_cert dict, "intermediate": describe_cert dict (first certificate of the file)}. |
 | Fails | OSError if a CA file is missing or unreadable; ValueError if pki_manual_max_days is not a number; ValidationError from to_pem / describe_cert (openssl) if a file holds no certificate. |
-| Feeds | agent route GET /v1/pki/ca (agent/server.py Handler.dispatch) -> webui agentclient.ca_summary -> the PKI page. |
-| Called by | `agent.server.Handler.dispatch` |
+| Feeds | agent route GET /v1/pki/ca (agent/ (fabric-agent) Handler.dispatch) -> webui agentclient.ca_summary -> the PKI page. |
+| Called by | `agent.get_route.<module>` |
 
 ## `fabricctl/lib/fabriclib/pki/common/artifacts_dir.py`
 
@@ -209,7 +209,7 @@
 | Fails | ValidationError "no certificate given"; to_pem's messages (bad input); "give exactly one private key"; "the private key could not be read (encrypted keys are not supported)"; "the private key does not belong to this certificate"; openssl's first error line (openssl helper); subprocess.CalledProcessError from export_p12; OSError from temp files or the audit log. |
 | Feeds | agent route POST /v1/pki/convert (Handler.pki) -> webui agentclient.convert_cert -> PKI page. |
 | Notes | a certificate that verifies against this fabric's CA gets the fabric chain; any other keeps the chain it came with. The key only lives in 0600 files in a 0700 temp directory removed on return and is not kept; the .p12 password is generated and returned once. Audited as PKI_CONVERT. |
-| Called by | `agent.server.Handler.pki` |
+| Called by | `agent.post_pki.post_pki` |
 
 ## `fabricctl/lib/fabriclib/pki/describe_csr.py`
 
@@ -223,7 +223,7 @@
 | Fails | ValidationError "give exactly one certificate signing request"; to_pem's messages; openssl's first error line if the request cannot be parsed. |
 | Feeds | agent route POST /v1/pki/describe-csr -> webui agentclient.describe_csr; inspect_pem; sign_csr (refuses unless problems is empty); sign_site_ca (key and signature checks). |
 | Notes | CA:TRUE is only reported: the CSR's own extensions are never copied, fabric issues a leaf (serverAuth + clientAuth) from its template whatever the CSR asks for. |
-| Called by | `agent.server.Handler.pki`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
+| Called by | `agent.post_pki.post_pki`, `fabriclib.pki.inspect_pem.inspect_pem`, `fabriclib.pki.sign_csr.sign_csr`, `fabriclib.pki.sign_site_ca.sign_site_ca` |
 
 ## `fabricctl/lib/fabriclib/pki/export_p12.py`
 
@@ -264,7 +264,7 @@
 | Returns | {"kind": "cert", "items": [{"info": describe_cert dict, "trusted": bool, "text": openssl -text}]} for at most the first 10 certificates, or {"kind": "csr", "items": [{"info": {subject, sans, key, ca_requested, problems}, "trusted": None, "text"}]}. |
 | Fails | ValidationError "that is a private key: it was not read or stored. ..." for any input holding "PRIVATE KEY"; describe_csr's messages when the input is not a certificate (e.g. "no csr found in the input"); openssl's first error line. |
 | Feeds | agent route POST /v1/pki/inspect -> webui agentclient.inspect_pem -> PKI page. |
-| Called by | `agent.server.Handler.pki` |
+| Called by | `agent.post_pki.post_pki` |
 
 ## `fabricctl/lib/fabriclib/pki/install_cert.py`
 
@@ -305,7 +305,7 @@
 | Fails | ValidationError "the name ... is not a host name, IP address or e-mail address"; "invalid alternative names: ..."; "key type must be one of ..."; valid_days' messages; "no device named ..." (require_device); "invalid certificate name: ..." from mint_offline_cert (an IPv6 or e-mail CN with + or % passes valid_san but not CN_RE); "step-ca refused: ..." (run_step); link_device_cert / run_dirsrv errors (raised after issuing); CalledProcessError from export_p12; OSError. |
 | Feeds | agent route POST /v1/pki/issue -> webui agentclient.issue_key_pair -> PKI page. |
 | Notes | a module lock serialises minting because artifact file names derive from the CN; the artifacts are deleted right after reading. Recorded in the ledger (record_issued, kind "keypair") and audited as PKI_ISSUE. |
-| Called by | `agent.server.Handler.pki` |
+| Called by | `agent.post_pki.post_pki` |
 
 ## `fabricctl/lib/fabriclib/pki/list_issued.py`
 
@@ -318,7 +318,7 @@
 | Returns | list of ledger entries (when, actor, source, kind, subject, sans, serial, not_after, sha256, key, device) each plus "status": "valid" \| "expires soon" (under 30 days) \| "expired"; [] when there is no ledger. Lines that do not parse are skipped. |
 | Fails | OSError if the ledger exists but cannot be read. |
 | Feeds | agent route GET /v1/pki/issued -> webui agentclient.list_issued -> PKI page (issued view). |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.get_route.<module>` |
 
 ## `fabricctl/lib/fabriclib/pki/make_site_ca_request.py`
 
@@ -369,8 +369,8 @@
 | Inputs | v — fabric vars; entry — {cn (required), sans, days (365), kty ("RSA"), size (4096), is_ca, path_len (0), out_dir (default: the sudo user's home)}; no "crv" is passed on, so an EC entry gets step's default curve. |
 | Returns | the crt path (chain, 0644); the key lies next to it (0600); both owned by the sudo user and replacing any existing files. |
 | Fails | ValidationError "output directory does not exist: ..."; mint_offline_cert's ValidationError (invalid name, "step-ca refused: ..."); KeyError without "cn"; OSError from move / chown. |
-| Feeds | setup/mint_extra_certs.py mint_extra_certs; fabriclib/cli.py `extra-cert` (fabricctl --mint-certs from pki/run_mint_certs_command / interactive.py). |
-| Called by | `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.setup.mint_extra_certs.mint_extra_certs` |
+| Feeds | setup/mint_extra_certs.py mint_extra_certs; fabriclib/cli.py `extra-cert` (fabricctl --mint-certs from pki/run_mint_certs_command / menu/mint_certificate_menu). |
+| Called by | `fabriclib.menu.mint_certificate_menu.mint_certificate_menu`, `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.setup.mint_extra_certs.mint_extra_certs` |
 
 ## `fabricctl/lib/fabriclib/pki/mint_offline_cert.py`
 
@@ -521,7 +521,7 @@
 | Fails | ValidationError "cannot sign: <problems>"; describe_csr's messages; valid_days' messages; "no device named ..."; "step-ca refused: ..." (run_step); "refusing: the signed certificate would be a CA"; link_device_cert / run_dirsrv errors (raised after signing); OSError. |
 | Feeds | agent route POST /v1/pki/sign -> webui agentclient.sign_csr -> PKI page. |
 | Notes | the leaf template sets serverAuth + clientAuth, the CSR's names and fabric's subject defaults; the CSR's own extensions are ignored. The CSR goes to a random-named artifact file (O_EXCL, 0640, step user) that is removed afterwards. Ledger kind "csr"; audited as PKI_SIGN_CSR. |
-| Called by | `agent.server.Handler.pki` |
+| Called by | `agent.post_pki.post_pki` |
 
 ## `fabricctl/lib/fabriclib/pki/sign_site_ca.py`
 

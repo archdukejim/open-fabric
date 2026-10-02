@@ -15,8 +15,8 @@ def remove_record(actor, key, rtype, index, expected_name, source="cli"):
     Returns: the removed record dict. A type list left empty is deleted from the zone.
     Fails:   ValidationError "record changed since it was shown; reload and try again" (unknown zone or type, index out
              of range, or another name); OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/zones/<key>/records/delete (fabricctl/lib/agent/server.py);
-             fabricctl/lib/interactive.py.
+    Feeds:   agent route POST /v1/zones/<key>/records/delete (fabric-agent, fabricctl/lib/agent/);
+             menu/edit_dns_zone.
     """
     with vars_lock():
         data = load_vars()

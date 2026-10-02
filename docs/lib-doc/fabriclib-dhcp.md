@@ -12,9 +12,9 @@
 | Inputs | actor — str, who asks (audit). mac — str, aa:bb:cc:dd:ee:ff or with dashes (normalized by normalize_dhcp). ip — str address inside one of dhcp.subnets, outside its pools. hostname — str, one DNS label; optional. source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock. |
 | Returns | the saved reservation {"mac", "ip", optional "hostname"}. |
 | Fails | ValidationError "… is not an IPv4 address" (unparseable), "… is in none of the DHCP subnets", or one from normalize_dhcp (bad MAC, inside a pool, duplicate MAC or address, bad hostname, a static A record in a pool); plain ValueError from normalize_dhcp if a stored router is not an address; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/dhcp/reservations (fabricctl/lib/agent/server.py, called by webui/server.py); run_dhcp_command (reserve). |
+| Feeds | agent route POST /v1/dhcp/reservations (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command (reserve). |
 | Notes | the whole `dhcp:` block is validated again (as if install_kea were on) before anything is saved. |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+| Called by | `agent.post_network.post_network`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
 ## `fabricctl/lib/fabriclib/dhcp/deploy_kea.py`
 
@@ -40,8 +40,8 @@
 | Inputs | v — the vars dict (install_kea, dhcp, domain). Asks Kea's control socket when DHCP is on. |
 | Returns | {"enabled", "interfaces", "subnets", "lease_time", "ddns_zone" ("" when DDNS is off), "leases" (see list_leases), "leases_error" (why leases could not be read, else "")}. |
 | Fails | never for Kea problems — a ValidationError from list_leases goes into leases_error; other errors propagate. |
-| Feeds | agent route GET /v1/dhcp (fabricctl/lib/agent/server.py, called by webui/server.py); run_dhcp_command (status, leases). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+| Feeds | agent route GET /v1/dhcp (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command (status, leases). |
+| Called by | `agent.get_route.<module>`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
 ## `fabricctl/lib/fabriclib/dhcp/ensure_ddns_zone.py`
 
@@ -129,9 +129,9 @@
 | Inputs | actor — str, who asks (audit). mac — str (case, and - or :, do not matter). source — "cli" (default) or "web". Reads/writes vars.yaml under vars_lock. |
 | Returns | None. |
 | Fails | ValidationError "no reservation for …"; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
-| Feeds | agent route POST /v1/dhcp/reservations/<mac>/delete (fabricctl/lib/agent/server.py, called by webui/server.py); run_dhcp_command (unreserve). |
+| Feeds | agent route POST /v1/dhcp/reservations/<mac>/delete (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command (unreserve). |
 | Notes | only the first subnet holding the MAC is changed (normalize_dhcp keeps MACs unique). |
-| Called by | `agent.server.Handler.dispatch`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+| Called by | `agent.post_network.post_network`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
 ## `fabricctl/lib/fabriclib/dhcp/run_dhcp_command.py`
 

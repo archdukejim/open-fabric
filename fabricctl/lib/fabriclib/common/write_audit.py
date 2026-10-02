@@ -14,7 +14,7 @@ def write_audit(actor, action, detail, source="cli", path=AUDIT_FILE):
     Returns: None.
     Fails:   OSError if the log folder or file cannot be written. Journal errors are ignored.
     Feeds:   nearly every change operation (dns, dhcp, ldap, keycloak, pki, radius, vault, images/switch_image,
-             system/apply_changes, secrets), agent/server.py and interactive.py."""
+             system/apply_changes, secrets), agent/ (fabric-agent) and menu/save_menu_change (the vars editor)."""
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     stamp = datetime.datetime.now().isoformat(timespec="seconds")
     line = f"[{stamp}] User: {actor} ({source}) | Action: {action} | {detail}"

@@ -13,7 +13,7 @@ def device_overview(v):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
-    Feeds:   agent route GET /v1/devices (agent/server.py Handler.dispatch) -> webui
+    Feeds:   agent route GET /v1/devices (agent/ (fabric-agent) Handler.dispatch) -> webui
              agentclient.device_overview -> Devices, Roles and PKI pages.
     """
     directory = read_directory(v)

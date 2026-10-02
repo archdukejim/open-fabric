@@ -12,9 +12,9 @@
 | Inputs | method — "GET" or "POST" (anything else allows nothing); route — the path after /v1/ as a list or tuple of segments. |
 | Returns | a permission name (e.g. "dns:write"), "session" (any signed-in fabric user), or None (route not allowed). |
 | Fails | never — an unknown route gives None. |
-| Feeds | agent/server.py Handler.authorize (None -> 403 "not allowed"). |
+| Feeds | agent/handler.py Handler.authorize (None -> 403 "not allowed"). |
 | Notes | an exact entry wins; otherwise the first same-length pattern in table order where "*" matches any one segment. |
-| Called by | `agent.server.Handler.authorize` |
+| Called by | `agent.handler.Handler.authorize` |
 
 ## `fabricctl/lib/fabriclib/rbac/user_permissions.py`
 
@@ -26,5 +26,5 @@
 | Inputs | claims — verified ID-token claims (dict); reads "roles" (Keycloak also lists a composite role's permissions there). |
 | Returns | set of permission names without the "fabric:" prefix, limited to known PERMISSIONS. |
 | Fails | never for a verified token (non-str roles are ignored). |
-| Feeds | agent/server.py Handler.authorize (the permission check and self.perms, which decides reset_sign_in's `privileged`). |
-| Called by | `agent.server.Handler.authorize` |
+| Feeds | agent/handler.py Handler.authorize (the permission check and self.perms, which decides reset_sign_in's `privileged`). |
+| Called by | `agent.handler.Handler.authorize` |

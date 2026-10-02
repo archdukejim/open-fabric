@@ -71,9 +71,9 @@
 | Inputs | v — fabric vars (keycloak_admin: ip_keycloak, hostname_keycloak, webui_realm or domain, root CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao). |
 | Returns | the one-time password (token_urlsafe(15)): shown once, stored nowhere. |
 | Fails | ValidationError "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused: ..." (any other admin API error or failed admin login, raised as SystemExit by admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable); OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back. |
-| Feeds | agent route POST /v1/people (agent/server.py Handler.dispatch) -> webui agentclient.create_person -> People page. |
+| Feeds | agent route POST /v1/people (agent/ (fabric-agent) Handler.dispatch) -> webui agentclient.create_person -> People page. |
 | Notes | the user joins the plain `users` group only (never a fabric group; skipped silently if that group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP enrolment, at the first sign-in. If a step after the creation fails the account stays, without a known password (reset_sign_in recovers it). Audited as PERSON_CREATE. |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.post_route.post_route` |
 
 ## `fabricctl/lib/fabriclib/keycloak/ensure_adguard_client.py`
 
@@ -315,7 +315,7 @@
 | Fails | ValidationError "no user <uid>"; "<uid> is in a fabric group (...): only an admin can reset their sign-in"; "Keycloak refused: ..." (admin API error or failed login); load_secrets' ValidationError; OSError / ssl errors if Keycloak is unreachable. |
 | Feeds | agent route POST /v1/people/<uid>/reset -> webui agentclient.reset_sign_in -> People page. |
 | Notes | members of fabric groups (admins, auditors, operators, ...) need `privileged`: otherwise the helpdesk could take over an admin's single sign-on (OpenBao's UI needs no client certificate). Audited as PERSON_RESET. |
-| Called by | `agent.server.Handler.dispatch` |
+| Called by | `agent.post_route.post_route` |
 
 ## `fabricctl/lib/fabriclib/keycloak/step.py`
 
@@ -366,6 +366,6 @@
 | Inputs | v — fabric vars (via _client); token — the bearer token string ("" when absent). |
 | Returns | the verified claims (dict), with preferred_username and the `roles` claim. |
 | Fails | ValidationError "not signed in" (no token); "sign-in token refused: <reason>" (OIDCError: signature, issuer, audience, expiry); "sign-in cannot be checked: <error>" (config or keys unreachable); "sign-in token has no user". |
-| Feeds | agent/server.py Handler.authorize (then required_permission, user_permissions). |
+| Feeds | agent/handler.py Handler.authorize (then required_permission, user_permissions). |
 | Notes | RS256 signature against the realm's keys fetched over TLS pinned to the fabric root CA, issuer, audience (the web UI client), expiry. The web UI forwards the token with every call, so a compromised web UI container cannot act beyond a signed-in user's rights. |
-| Called by | `agent.server.Handler.authorize` |
+| Called by | `agent.handler.Handler.authorize` |

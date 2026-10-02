@@ -21,7 +21,7 @@ def list_tsig_keys():
              (rfc2136.ini path), "acls" (sorted ACL names)}].
     Fails:   OSError or yaml.YAMLError from load_vars; KeyError if a stored ACL policy lacks domain or record_types
              (normalized policies always have them).
-    Feeds:   agent route GET /v1/tsig (fabricctl/lib/agent/server.py, called by webui/server.py); run_tsig_command
+    Feeds:   agent route GET /v1/tsig (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_tsig_command
              (list, update, after-apply output); tests/pki/run.py.
     Notes:   ACL membership counts only positive `key "<name>"` entries (a `!key` exclusion is not membership). The
              default "ini" is hard-coded as /opt/<name>/rfc2136.ini, while apply writes it under the deploy base.

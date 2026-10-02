@@ -31,7 +31,7 @@ def service_status():
     Returns: [(service, systemd state or "timeout", container health)]; health is "" for host services
              (fabric-agent). An inactive service without a unit file is left out.
     Fails:   FileNotFoundError without systemctl/docker; timeouts are reported as "timeout", not raised.
-    Feeds:   control_stack (status, and the unit list for stop); fabric-agent (agent/server.py) for the web UI."""
+    Feeds:   control_stack (status, and the unit list for stop); fabric-agent (agent/ (fabric-agent)) for the web UI."""
     result = []
     for svc in SERVICES:
         try:

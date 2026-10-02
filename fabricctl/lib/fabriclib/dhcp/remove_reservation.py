@@ -14,8 +14,8 @@ def remove_reservation(actor, mac, source="cli"):
     Returns: None.
     Fails:   ValidationError "no reservation for …"; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars /
              write_audit.
-    Feeds:   agent route POST /v1/dhcp/reservations/<mac>/delete (fabricctl/lib/agent/server.py, called by
-             webui/server.py); run_dhcp_command (unreserve).
+    Feeds:   agent route POST /v1/dhcp/reservations/<mac>/delete (fabric-agent, fabricctl/lib/agent/, called by
+             the web UI); run_dhcp_command (unreserve).
     Notes:   only the first subnet holding the MAC is changed (normalize_dhcp keeps MACs unique).
     """
     mac = str(mac).strip().lower().replace("-", ":")

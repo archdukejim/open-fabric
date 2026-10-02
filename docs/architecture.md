@@ -34,7 +34,8 @@ This document provides an in-depth breakdown of the `fabric` infrastructure, cov
 │   ├── link-vars-template.yaml
 │   └── VERSION
 ├── webui/                # Open Fabric, the control-plane web UI (its own container)
-│   ├── server.py, views.py, agentclient.py, oidc.py, tlsclient.py, devserver.py
+│   ├── server.py, handler.py, oidc.py, tlsclient.py, devserver.py; security/, session/, routes/,
+│   │   views/ (+ templates/, static/), agentclient/, devpreview/
 │   └── Dockerfile
 ├── installers/
 │   └── deb/              # the Debian package: assemble-tree.sh, build-deb.sh, install-from-checkout.sh

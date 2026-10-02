@@ -209,8 +209,13 @@ finally:
 
 prod = views.overview({"user": "u", "csrf": "x", "version": {"version": "1", "build": ""}}, [])
 check("production pages never show the banner", "DEV PREVIEW" not in prod)
-src = open(os.path.join(WEBUI, "server.py")).read()
-check("the production server has no dev switch", "devserver" not in src and '"dev"' not in src and "DEV" not in src)
+# every production file of the server (all of webui/ but the preview's own entry point and folder)
+prod_files = [os.path.join(d, f) for d, _, fs in os.walk(WEBUI) for f in fs if f.endswith(".py")
+              and "devpreview" not in d and "__pycache__" not in d and f != "devserver.py"]
+src = "".join(open(p).read() for p in prod_files)
+check(f"the production server has no dev switch ({len(prod_files)} files): never imports the preview",
+      len(prod_files) > 30 and "import devserver" not in src and "webui.devpreview" not in src
+      and "devpreview import" not in src and '"dev"' not in src and "DEV" not in src)
 check("dev server listens on 127.0.0.1 unless told otherwise",
       'default="127.0.0.1"' in open(os.path.join(WEBUI, "devserver.py")).read())
 sys.exit(1 if FAILED else 0)

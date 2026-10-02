@@ -128,7 +128,7 @@ The web app (TLS header checks, OIDC, sessions, HTML) holds no privilege: no Doc
 | Item | Location |
 |------|----------|
 | Container | `fabric-web` — `/opt/webui/docker-compose.yml` from `fabricctl/jinja/webui/docker-compose.yml.j2`; image `image_webui` (`fabric/web:local`) built locally from `webui/Dockerfile` (the validated, digest-pinned Debian base `image_debian` + `python3`, `python3-jinja2`, `openssl`, `ca-certificates`, `tini`); memory limit 96 MB on 3-4 GB hosts; logs to the host journal (`journalctl -u fabric-web`, or `docker logs fabric-web`) |
-| Container code | `webui/` (`server.py`, `oidc.py`, `tlsclient.py`, `agentclient.py`, `views.py`; stdlib + `jinja2`), copied to `/opt/webui/build/app/` at deploy time and baked into the image |
+| Container code | `webui/` (`server.py` and `handler.py`, the gates in `security/` and `session/`, `routes/`, the pages in `views/` with `templates/` and `static/`, the agent client in `agentclient/`, `oidc.py`, `tlsclient.py`; stdlib + `jinja2`), copied to `/opt/webui/build/app/` at deploy time and baked into the image |
 | Container user | `service_users.webui` (default uid/gid `912`) + `group_add` nginx gid; `read_only`, `cap_drop: ALL`, `no-new-privileges`, tmpfs `/tmp`; `ip_webui` (default `10.255.0.80`) on `fabric_net` |
 | Container mounts | `/opt/webui/config` → `/config` (ro); `/opt/stepca/data/certs` → `/certs` (ro, public CA certs only); `/opt/webui/run` → `/run/webui`; `/opt/webui/agent` → `/agent` (ro) |
 | Config | `/opt/webui/config/webui.json` (webui uid, `0400`; contains the OIDC client secret; in-container paths incl. `agent_socket`) — from `fabricctl/jinja/webui/webui.json.j2` |
@@ -352,7 +352,7 @@ docker run --rm -p 127.0.0.1:8080:8080 --entrypoint /usr/bin/python3 \
     fabric/web:local /app/webui/devserver.py --bind 0.0.0.0     # from the image, on a fabric host
 ```
 
-It renders the real pages (`views.py`) with sample data under an orange **DEV PREVIEW** banner. `--as <bundle>` (e.g. `--as fabric-auditor`) shows the pages as that bundle sees them; the default is every permission. Changes work in memory only — there is no fabric-agent, nothing is saved, rendered or reloaded, and a restart resets everything. `/preview/denied` shows a refused sign-in. It is a separate entry point on purpose: the production server (`server.py`) has no dev switch, so a real install can never run without sign-in. It listens on 127.0.0.1 unless told otherwise; never expose it.
+It renders the real pages (`webui/views`) with sample data (`webui/devpreview/`) under an orange **DEV PREVIEW** banner. `--as <bundle>` (e.g. `--as fabric-auditor`) shows the pages as that bundle sees them; the default is every permission. Changes work in memory only — there is no fabric-agent, nothing is saved, rendered or reloaded, and a restart resets everything. `/preview/denied` shows a refused sign-in. It is a separate entry point on purpose: the production server (`server.py`) has no dev switch, so a real install can never run without sign-in. It listens on 127.0.0.1 unless told otherwise; never expose it.
 
 ## Troubleshooting
 

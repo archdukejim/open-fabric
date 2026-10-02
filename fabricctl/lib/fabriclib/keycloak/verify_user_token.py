@@ -38,7 +38,7 @@ def verify_user_token(v, token):
     Fails:   ValidationError "not signed in" (no token); "sign-in token refused: <reason>" (OIDCError:
              signature, issuer, audience, expiry); "sign-in cannot be checked: <error>" (config or keys
              unreachable); "sign-in token has no user".
-    Feeds:   agent/server.py Handler.authorize (then required_permission, user_permissions).
+    Feeds:   agent/handler.py Handler.authorize (then required_permission, user_permissions).
     Notes:   RS256 signature against the realm's keys fetched over TLS pinned to the fabric root CA, issuer,
              audience (the web UI client), expiry. The web UI forwards the token with every call, so a
              compromised web UI container cannot act beyond a signed-in user's rights.

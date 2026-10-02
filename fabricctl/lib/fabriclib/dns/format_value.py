@@ -5,7 +5,7 @@ def format_value(rtype, record):
     Returns: str: the IP (A/AAAA), canonical name (CNAME), quoted text (TXT), "priority exchange" (MX), "priority weight
              port target" (SRV), else value or target; missing fields render as "".
     Fails:   never — dict reads with defaults.
-    Feeds:   zone_detail; the interactive zone editor (fabricctl/lib/interactive.py).
+    Feeds:   zone_detail; the zone editor (menu/edit_dns_zone).
     """
     if rtype in ("A", "AAAA"):
         return str(record.get("ip", ""))

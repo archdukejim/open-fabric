@@ -11,7 +11,7 @@ def reverse_zones(v):
              "skipped": [{"name", "ip", "reason"}] for addresses that get no PTR}.
     Fails:   never — addresses that cannot get a PTR are listed in "skipped".
     Feeds:   deploy/apply_deployment (render_templates renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones
-             (fabricctl/lib/agent/server.py); webui/devserver.py.
+             (fabric-agent, fabricctl/lib/agent/); the web UI's dev preview (webui/devpreview).
     Notes:   one PTR per address: the first named record wins, then an apex (@) record, then the zone's `ns` host.
              Private IPv4 (RFC 1918, CGNAT) and IPv6 ULA only. A reverse zone written by hand in `dns:` is left alone.
     """

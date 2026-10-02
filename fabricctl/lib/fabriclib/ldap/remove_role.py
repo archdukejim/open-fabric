@@ -25,7 +25,7 @@ def remove_role(v, actor, name, source="web"):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
-    Feeds:   agent/server.py Handler.directory (POST /v1/roles/<name>/delete) -> webui agentclient.delete_role.
+    Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/roles/<name>/delete) -> webui agentclient.delete_role.
     Notes:   audited as ROLE_REMOVE.
     """
     if not ROLE_NAME_RE.match(str(name)):

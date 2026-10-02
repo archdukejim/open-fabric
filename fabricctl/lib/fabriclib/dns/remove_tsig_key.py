@@ -20,7 +20,7 @@ def remove_tsig_key(actor, name, source="cli"):
     Returns: None.
     Fails:   ValidationError "no TSIG key named …"; errors from set_tsig_secrets (save_secrets) and set_key_acls;
              OSError removing the file; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/tsig/<name>/delete (fabricctl/lib/agent/server.py); run_tsig_command (remove);
+    Feeds:   agent route POST /v1/tsig/<name>/delete (fabric-agent, fabricctl/lib/agent/); run_tsig_command (remove);
              tests/pki/run.py.
     Notes:   the file is deleted only if it is named rfc2136.ini, its folder only if that is <deploy_base>/<name> and
              now empty. The ACL clean-up is a second locked step (set_key_acls with drop_all).

@@ -42,7 +42,7 @@ Paths are relative to `fabricctl/lib/` unless they start with `fabricctl/`,
 | B13 | `fabricctl/jinja/openbao/openbao.hcl.j2:39-54` | OpenBao's audit logs are never rotated (grow on the Pi's disk). |
 | B14 | `fabricctl/jinja/nginx/nginx.conf.j2:145-173` | Step-CA's vhost terminates TLS: mTLS renew/rekey cannot work through `ca.<domain>:443`. |
 | B15 | `fabricctl/jinja/bind9/data/zone.j2:18,27` | A domain zone without `zone_authority` gets `NS ns.<domain>` with no address for it. |
-| B16 | `webui/views.py:64`, `webui/server.py:624` | The Audit log link shows to everyone (403 for most); custom bundles with `pki:sign` but no `devices:read` get 403 on sign/issue. |
+| B16 | `webui/templates/base.html` (Audit log link), `webui/routes/stepca_page.py` | The Audit log link shows to everyone (403 for most); custom bundles with `pki:sign` but no `devices:read` get 403 on sign/issue. |
 | B17 | `cli.py:93` | `fabricctl --help` refuses non-root users. |
 | B18 | `fabricctl/jinja/systemd/fabric-agent.service.j2` | `IPAddressDeny=any` likely blocks adding a KMIP HSM on the LAN from the web UI (only tested against a local PyKMIP). |
 
@@ -58,7 +58,7 @@ Paths are relative to `fabricctl/lib/` unless they start with `fabricctl/`,
 
 ## P4 — lower-risk security and robustness
 
-- `webui/server.py:509` `next=` accepts control characters (possible open redirect after sign-in, unverified); `webui/server.py:513` unbounded pending logins for 10 min.
+- `webui/session/start_login.py` `next=` accepts control characters (possible open redirect after sign-in, unverified); pending logins are unbounded for 10 min (same file).
 - `webui/oidc.py:222-228` some malformed tokens raise the wrong error type (still refused).
 - `fabricctl/jinja/freeradius/python/fabric_radius.py:85,146` unauthenticated User-Name goes into the decision log unescaped (log-line forging).
 - `vault/add_usb_slot.py:64` a failed USB enrolment leaves the key on the stick; `vault/add_kmip_slot.py:21` KMIP client key briefly on disk-backed `/tmp`.

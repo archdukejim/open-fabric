@@ -17,7 +17,7 @@ def map_radius_group(actor, group, vlan=None, priority=100, source="cli"):
     Returns: the saved mapping {"group", "vlan", "priority"}.
     Fails:   ValidationError "802.1X is off (install_freeradius: false)" or one from normalize_radius_people; OSError or
              yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit.
-    Feeds:   agent route POST /v1/radius/people (fabricctl/lib/agent/server.py, called by webui/server.py);
+    Feeds:   agent route POST /v1/radius/people (fabric-agent, fabricctl/lib/agent/, called by the web UI);
              run_radius_command (map-group).
     """
     with vars_lock():

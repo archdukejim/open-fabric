@@ -9,7 +9,7 @@ def dhcp_overview(v):
     Returns: {"enabled", "interfaces", "subnets", "lease_time", "ddns_zone" ("" when DDNS is off), "leases" (see
              list_leases), "leases_error" (why leases could not be read, else "")}.
     Fails:   never for Kea problems — a ValidationError from list_leases goes into leases_error; other errors propagate.
-    Feeds:   agent route GET /v1/dhcp (fabricctl/lib/agent/server.py, called by webui/server.py); run_dhcp_command
+    Feeds:   agent route GET /v1/dhcp (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command
              (status, leases).
     """
     d = v.get("dhcp") or {}

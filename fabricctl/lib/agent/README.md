@@ -9,6 +9,16 @@ arbitrary commands.
 
 | File | What |
 |---|---|
-| `server.py` | The agent: socket server, peer and token checks (`fabriclib/rbac`), routing of each `/v1/...` request to its fabriclib function |
+| `server.py` | Entry point (systemd): the socket server (root:webui 0660) and the route list |
+| `handler.py` | One request: peer uid (SO_PEERCRED), token and permission (`fabriclib/rbac`), body and actor, errors as JSON replies |
+| `get_route.py` | GET routes: one fabriclib read each |
+| `post_route.py` | POST routes by area; apply, people, login events |
+| `post_dns.py` | Zone records, TSIG keys |
+| `post_network.py` | DHCP reservations and 802.1X settings, each applied at once |
+| `post_pki.py` | Manual PKI: describe or sign a CSR, issue, inspect, convert |
+| `post_vault.py` | OpenBao's unlock methods, rotating the vault key |
+| `post_directory.py` | Devices and device roles in 389-DS |
+| `read_text.py` / `read_strings.py` / `read_fields.py` | Checked fields of a request body |
+| `route_not_found.py` | `RouteNotFound`: the handler answers 404 |
 | `__init__.py` | Empty; makes `agent` a package |
 | `README.md` | This file |

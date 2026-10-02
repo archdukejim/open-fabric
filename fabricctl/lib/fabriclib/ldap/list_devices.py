@@ -12,7 +12,7 @@ def list_devices(v, directory=None):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired) when it reads.
-    Feeds:   device_overview; webui/devserver.py (preview server).
+    Feeds:   device_overview; the web UI's dev preview (webui/devpreview).
     """
     directory = directory or read_directory(v)
     out = []
