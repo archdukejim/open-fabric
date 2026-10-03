@@ -43,7 +43,7 @@ python3 "$REPO/tests/render.py" "$W/rendered" >/dev/null || { echo "FAIL render"
 R="$W/rendered"
 docker network create --subnet 10.255.0.0/24 fabric_net >/dev/null
 # Build contexts go where deploy.py puts them (/opt/<svc>/build)
-for s in bind9 stepca keycloak dirsrv; do mkdir -p "$BASE/$s"; cp -a "$REPO/fabricctl/jinja/$s/build" "$BASE/$s/build"; done
+for s in bind9 stepca keycloak dirsrv; do mkdir -p "$BASE/$s"; cp -a "$REPO/packaging/images/$s" "$BASE/$s/build"; done
 
 # ---- PKI: root -> intermediate -> leaves -----------------------------
 cd "$W"
@@ -181,7 +181,7 @@ echo "--- dirsrv"
 mkdir -p "$BASE/dirsrv/data/tls/ca" "$BASE/dirsrv/seed"
 cp ldap.crt "$BASE/dirsrv/data/tls/server.crt"; cp ldap.key "$BASE/dirsrv/data/tls/server.key"
 cp root.crt int.crt "$BASE/dirsrv/data/tls/ca/"
-cp "$R"/dirsrv/seed/*.ldif "$BASE/dirsrv/seed/"; cp "$REPO/fabricctl/jinja/dirsrv/seed.py" "$BASE/dirsrv/seed/"
+cp "$R"/dirsrv/seed/*.ldif "$BASE/dirsrv/seed/"; cp "$REPO/src/containers/dirsrv/seed.py" "$BASE/dirsrv/seed/"
 chown -R 601:601 "$BASE/dirsrv/data"; chown -R 0:601 "$BASE/dirsrv/seed"; chmod 750 "$BASE/dirsrv/seed"; chmod 640 "$BASE/dirsrv/seed"/*
 check "dirsrv builds and becomes healthy" "up dirsrv && wait_healthy dirsrv"
 check "dirsrv hardened: $(hardened dirsrv 1 | tr -d '\n')" "hardened dirsrv 1 >/dev/null"

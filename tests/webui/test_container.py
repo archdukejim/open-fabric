@@ -22,7 +22,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
+sys.path[0:0] = [os.path.join(REPO, "src"), REPO]
 from fabriclib.rbac.permissions import BUNDLES  # noqa: E402
 
 
@@ -165,7 +165,7 @@ kc.socket = ctx.wrap_socket(kc.socket, server_side=True)
 threading.Thread(target=kc.serve_forever, daemon=True).start()
 
 # ------------------------------------------- fabric-agent (host, root)
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.makedirs(f"{W}/fabric/config")
 open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
 open(f"{W}/fabric/config/vars.yaml", "w").write(

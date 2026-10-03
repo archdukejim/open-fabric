@@ -68,7 +68,7 @@ def free_port():
 
 # ---------------------------------------------------------------- the upstream: tree, root CA, vars
 shutil.rmtree(W, ignore_errors=True)
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)     # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)     # the installed tree
 os.makedirs(f"{W}/fabric/config")
 data = f"{W}/hq/stepca/data"
 for d in ("certs", "secrets", "artifacts"):

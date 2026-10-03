@@ -49,14 +49,14 @@ def until(fn, seconds=60):
 def py(container, code, network=None):
     """Run fabriclib code inside a container (a running one, or a fresh one on network)."""
     if network:
-        cmd = ["docker", "run", "--rm", "--network", network, "-v", f"{REPO}/fabricctl/lib:/fabric-lib:ro",
+        cmd = ["docker", "run", "--rm", "--network", network, "-v", f"{REPO}/src:/fabric-lib:ro",
                "-e", "PYTHONPATH=/fabric-lib", IMAGE, "python3", "-c", code]
     else:
         cmd = ["docker", "exec", "-e", "PYTHONPATH=/fabric-lib", container, "python3", "-c", code]
     return sh(cmd, ok=False).stdout.strip()
 
 
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
@@ -64,8 +64,8 @@ from fabriclib.ntp.chrony_settings import chrony_settings  # noqa: E402
 from fabriclib.ntp.deploy_chrony import deploy_chrony  # noqa: E402
 from fabriclib.ntp.normalize_ntp import normalize_ntp  # noqa: E402
 
-env = jinja_env(os.path.join(REPO, "fabricctl", "jinja"))
-lock = read_images_lock(os.path.join(REPO, "fabricctl"))
+env = jinja_env(os.path.join(REPO, "templates"))
+lock = read_images_lock(os.path.join(REPO, "config"))
 
 
 def cleanup():
@@ -149,7 +149,7 @@ sh(["docker", "network", "create", "--subnet", SUB_A, NET_A])
 sh(["docker", "network", "create", "--subnet", SUB_B, NET_B])
 try:
     sh(["docker", "run", "-d", "--name", "ntp-srv", "--network", NET_A, "--ip", SRV_A,
-        "-v", f"{srv_root}/etc/chrony:/etc/chrony:ro", "-v", f"{REPO}/fabricctl/lib:/fabric-lib:ro",
+        "-v", f"{srv_root}/etc/chrony:/etc/chrony:ro", "-v", f"{REPO}/src:/fabric-lib:ro",
         IMAGE, "chronyd", "-d", "-x", "-f", "/etc/chrony/chrony.conf"])
     sh(["docker", "network", "connect", "--ip", SRV_B, NET_B, "ntp-srv"])
     status = {}
@@ -173,7 +173,7 @@ try:
 
     # a second site whose upstream is the first: it syncs from it
     sh(["docker", "run", "-d", "--name", "ntp-site", "--network", NET_A, "--ip", SITE_IP,
-        "-v", f"{site_root}/etc/chrony:/etc/chrony:ro", "-v", f"{REPO}/fabricctl/lib:/fabric-lib:ro",
+        "-v", f"{site_root}/etc/chrony:/etc/chrony:ro", "-v", f"{REPO}/src:/fabric-lib:ro",
         IMAGE, "chronyd", "-d", "-x", "-f", "/etc/chrony/chrony.conf"])
     site = {}
 

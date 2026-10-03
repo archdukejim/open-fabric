@@ -12,7 +12,7 @@ import tempfile
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.keep_original import keep_original  # noqa: E402
 from fabriclib.common.restore_original import restore_original  # noqa: E402
@@ -31,7 +31,7 @@ from fabriclib.undo.undo_group import undo_group  # noqa: E402
 from fabriclib.undo.uninstall_plan import uninstall_plan  # noqa: E402
 
 FAILED = 0
-JINJA = os.path.join(REPO, "fabricctl", "jinja")
+JINJA = os.path.join(REPO, "templates")
 
 
 def check(name, cond, detail=""):

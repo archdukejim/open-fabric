@@ -69,10 +69,10 @@ ldap_keycloak_password: KcPass1
 webui_oidc_secret: OidcSecret1
 EOF
 
-run1=$(PYTHONPATH="$REPO" python3 "$REPO/fabricctl/lib/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/fabric-secrets.yml 2>&1)
+run1=$(PYTHONPATH="$REPO/src:$REPO" python3 "$REPO/src/ux/cli/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/fabric-secrets.yml 2>&1)
 echo "$run1" | sed 's/^/    /'
 check "bootstrap run 1 succeeds" "grep -q 'Keycloak configuration complete' <<<\"\$run1\""
-run2=$(PYTHONPATH="$REPO" python3 "$REPO/fabricctl/lib/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/fabric-secrets.yml 2>&1)
+run2=$(PYTHONPATH="$REPO/src:$REPO" python3 "$REPO/src/ux/cli/keycloak_bootstrap.py" --vars opt/fabric/config/vars.yaml --secrets opt/fabric/config/fabric-secrets.yml 2>&1)
 echo "$run2" | sed 's/^/    /'
 check "bootstrap run 2 converges (no creates)" "grep -q 'complete' <<<\"\$run2\" && ! grep -q 'created' <<<\"\$run2\""
 

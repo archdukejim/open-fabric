@@ -6,7 +6,7 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 from fabriclib.federation import accept_join as aj  # noqa: E402

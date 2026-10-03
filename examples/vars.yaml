@@ -1,0 +1,65 @@
+# ============================================================
+# FABRIC — CONFIGURATION
+# Use with: sudo fabricctl setup --file vars.yaml
+# Every setting and its default: the manual, 2.1 (docs/volume_2_technologies_and_features/; templates/vars.yaml.j2)
+# ============================================================
+domain: example.com
+hostname: fabric
+friendly_name: "Example Org"
+service_mark: ""
+care_of: ""
+trademark: ""
+copyright: ""
+contact_email: ""
+contact_phone: ""
+address_line1: ""
+address_line2: ""
+
+# ============================================================
+# NETWORK & DNS
+# ============================================================
+lan_cidr: 192.168.1.0/24
+lan_gateway: 192.168.1.1
+host_ip: 192.168.1.100
+fabric_subnet: 10.255.0.0/24
+
+dns:
+  dynamic_zone_var:
+    zone_authority: true
+# TSIG keys for RFC2136 clients (deny by default): `records` allows only
+# _acme-challenge.<record>.<domain>; the secret is generated and kept in OpenBao.
+tsig_keys:
+- { name: acme-npm, algorithm: hmac-sha256, domain: '{{ domain }}', records: [npm], record_types: [TXT] }
+
+# ============================================================
+# CERTIFICATES / PKI
+# ============================================================
+ca_name: Example Org CA
+cert_country: US
+cert_province: State
+cert_city: City
+cert_org: Example Org
+cert_ou: IT
+
+# Uncomment to use your own pre-generated root/intermediate CAs instead of letting Step-CA mint one
+# byoc: true
+# ca_crt_path: "/path/to/root_ca.crt"
+# ica_crt_path: "/path/to/ica.crt"
+# ica_key_path: "/path/to/ica.key"
+
+# ============================================================
+# FEATURE FLAGS
+# ============================================================
+install_keycloak: true      # Keycloak SSO + Postgres; the web UI needs it
+# install_webui: true       # Open Fabric web UI (default on with Keycloak)
+# install_ldap: true        # 389 Directory Server (default on)
+# install_kea: false        # DHCP (set `dhcp:` too)
+# install_freeradius: false # 802.1X (set `radius_clients:` too; needs install_ldap)
+# install_fluentbit: false  # log forwarding (set `log_forwarding:` too)
+
+# ============================================================
+# HEAVY WORKLOADS
+# ============================================================
+# Uncomment to move the Keycloak and Postgres databases to an external volume or separate disk.
+# keycloak_data_dir: /mnt/ext_drive/keycloak/data
+# postgres_data_dir: /mnt/ext_drive/postgres/data

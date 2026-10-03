@@ -8,7 +8,7 @@ import tempfile
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                                "fabricctl", "lib"))
+                                "src"))
 from fabriclib.federation.directory_links import directory_links  # noqa: E402
 
 BASE = "dc=lan"

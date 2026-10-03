@@ -59,13 +59,13 @@ shutil.rmtree(W, ignore_errors=True)
 data = f"{W}/stepca/data"
 for d in ("certs", "secrets", "templates/certs", "artifacts"):
     os.makedirs(f"{data}/{d}")
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.makedirs(f"{W}/fabric/config")
 with open(f"{data}/secrets/password", "w") as f:
     f.write(base64.b64encode(os.urandom(24)).decode())
 env = jinja2.Environment()
 for tpl in ("leaf", "subca"):
-    src = open(f"{REPO}/fabricctl/jinja/stepca/{tpl}.tpl.j2").read()
+    src = open(f"{REPO}/templates/stepca/{tpl}.tpl.j2").read()
     with open(f"{data}/templates/certs/{tpl}.tpl", "w") as f:
         f.write(env.from_string(src).render(cert_country="US", cert_province="CA", cert_city="Test",
                                             cert_org="Fabric Test", cert_ou="IT"))

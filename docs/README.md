@@ -29,6 +29,7 @@ The manual is fabric's only source of truth: architecture, decisions, procedures
 - 2.9 Disk encryption
 - 2.10 Joining Linux machines
 - 2.11 Windows domain: Samba AD
+- 2.12 Third-party licences
 
 ## [Volume 3 — Operations](volume_3_operations/README.md)
 

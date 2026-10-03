@@ -18,7 +18,9 @@ import os
 import re
 import sys
 
-from product_code import REPO, tracked_files
+# the shared helpers live with the generator in scripts/docs/
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts", "docs"))  # noqa: E501
+from product_code import REPO, tracked_files  # noqa: E402
 
 SKIP_README = {"__init__.py", "README.md"}     # a README need not list itself or package markers
 
@@ -73,7 +75,7 @@ def check_readmes():
 
 def _vars_template_keys():
     keys = set()
-    for line in _read("fabricctl/jinja/vars.yaml.j2").splitlines():
+    for line in _read("templates/vars.yaml.j2").splitlines():
         m = re.match(r"^([a-z][a-z0-9_]*):", line)
         if m:
             keys.add(m.group(1))
@@ -92,7 +94,7 @@ def check_vars():
     documented = set(re.findall(r"^###+\s+(?:\d+(?:\.\d+)+\s+)?`([a-z][a-z0-9_]*)`", doc, re.M))
     documented |= set(re.findall(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", doc, re.M))
     # a setting read only where it is used (`x | default(...)` in a template, v.get("x") in code) is real too
-    code = "\n".join(_read(p) for p in tracked_files("fabricctl", "webui")
+    code = "\n".join(_read(p) for p in tracked_files("src", "templates")
                      if p.endswith((".j2", ".py", ".sh")) and not p.endswith("vars.yaml.j2"))
     used = {k for k in documented - keys
             if re.search(rf"(\{{\{{-?\s*{k}\b|\b{k}\s*\||get\(\s*['\"]{k}['\"]|\[['\"]{k}['\"]\])", code)}
@@ -105,12 +107,12 @@ def _cli_commands():
     """(command, subcommand or None) pairs from cli.py's docstring and every
     `fabricctl <cmd> <sub>` in a USAGE string."""
     cmds = set()
-    doc = ast.get_docstring(ast.parse(_read("fabricctl/lib/fabriclib/cli.py"))) or ""
+    doc = ast.get_docstring(ast.parse(_read("src/fabriclib/cli.py"))) or ""
     for m in re.finditer(r"^\s+fabricctl ([a-z][a-z-]*)(?: ([a-z|-]+))?", doc, re.M):
         subs = [s for s in (m.group(2) or "").split("|") if s and not s.startswith("-")]
         cmds.add((m.group(1), None))
         cmds.update((m.group(1), s) for s in subs)
-    for path in tracked_files("fabricctl/lib/fabriclib"):
+    for path in tracked_files("src/fabriclib"):
         if path.endswith(".py"):
             for usage in re.findall(r'USAGE = """(.*?)"""', _read(path), re.S):
                 for m in re.finditer(r"fabricctl ([a-z][a-z-]*) ([a-z][a-z-]*)", usage):
@@ -134,7 +136,7 @@ def check_cli():
 
 
 def _routes_in_table():
-    src = ast.parse(_read("fabricctl/lib/fabriclib/rbac/required_permission.py"))
+    src = ast.parse(_read("src/fabriclib/rbac/required_permission.py"))
     routes = set()
     for node in src.body:
         if isinstance(node, ast.Assign) and node.targets[0].id in ("GET", "POST"):
@@ -171,7 +173,7 @@ def check_permissions():
     Returns: problems, one per permission not mentioned as `area:action`.
     Fails:   OSError / SyntaxError if permissions.py is unreadable.
     Feeds:   main."""
-    src = ast.parse(_read("fabricctl/lib/fabriclib/rbac/permissions.py"))
+    src = ast.parse(_read("src/fabriclib/rbac/permissions.py"))
     perms = next(ast.literal_eval(n.value) for n in src.body
                  if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "PERMISSIONS")
     doc = _manual("1.5")
@@ -201,7 +203,7 @@ def check_steps():
     Returns: problems, one per step name not mentioned as `name`.
     Fails:   OSError if a file is missing.
     Feeds:   main."""
-    steps = re.findall(r'^\s+\("([a-z]+)", ', _read("fabricctl/lib/fabriclib/setup/steps.py"), re.M)
+    steps = re.findall(r'^\s+\("([a-z]+)", ', _read("src/fabriclib/setup/steps.py"), re.M)
     doc = _manual("4.1")
     return [f"setup step `{s}` is not in the manual (4.1)" for s in steps if f"`{s}`" not in doc]
 

@@ -57,7 +57,7 @@ def free_port():
 def install(name, site, domain, password, extra=None):
     """An install tree of its own (code, config) and a Step-CA data folder for site `site`."""
     tree = f"{W}/{name}"
-    subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", tree], check=True)
+    subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", tree], check=True)
     os.makedirs(f"{tree}/fabric/config")
     data = f"{tree}/stepca/data"
     for d in ("certs", "secrets", "artifacts", "config"):
@@ -112,7 +112,7 @@ def become_upstream(data, staged, root_pem):
 try:
     shutil.rmtree(W, ignore_errors=True)
     main_tree = f"{W}/main"
-    subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", main_tree], check=True)
+    subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", main_tree], check=True)
     sys.path.insert(0, f"{main_tree}/fabric/lib")
     from fabriclib.common.errors import ValidationError  # noqa: E402
     from fabriclib.federation.join_upstream import join_upstream  # noqa: E402

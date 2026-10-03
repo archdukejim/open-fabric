@@ -20,6 +20,7 @@ Engineering notes, troubleshooting, trade-offs and blockers.
 ## 5.4 Blockers and deferred work
 
 - [5.4.1 Deferred work and what unblocks it](5.4.1-deferred-work.md)
+- [5.4.2 Known gaps](5.4.2-known-gaps.md)
 
 ## 5.5 Reasoning and trade-offs
 

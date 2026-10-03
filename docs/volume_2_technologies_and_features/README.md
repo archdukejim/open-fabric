@@ -56,3 +56,9 @@ Technologies, hardware, vendors and integrations.
 ## 2.11 Windows domain: Samba AD
 
 - [2.11.1 Samba AD beside fabric's directory](2.11.1-samba-ad.md)
+
+## 2.12 Third-party licences
+
+The home chapter for third-party licences (5.8).
+
+- [2.12.1 Third-party licences](2.12.1-third-party-licences.md)

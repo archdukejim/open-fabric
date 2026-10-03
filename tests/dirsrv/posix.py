@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 
-sys.path[0:0] = [os.path.join(os.environ["REPO"], "fabricctl", "lib"), os.environ["REPO"]]
+sys.path[0:0] = [os.path.join(os.environ["REPO"], "src"), os.environ["REPO"]]
 from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities  # noqa: E402
 
 BASE = os.environ["BASE"]

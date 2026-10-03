@@ -58,7 +58,7 @@ shutil.rmtree(W, ignore_errors=True)
 root_data = f"{W}/hq/stepca/data"
 for d in ("certs", "secrets", "artifacts"):
     os.makedirs(f"{root_data}/{d}")
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)    # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)    # the installed tree
 os.makedirs(f"{W}/fabric/config")
 with open(f"{root_data}/secrets/password", "w") as f:
     f.write("Root-Pw-1")
@@ -228,7 +228,7 @@ sh(["docker", "rm", "-f", "sitecatest"], ok=False)
 # what failed on a real joined site while intermediate_ca.crt carried the root
 os.makedirs(f"{data}/templates/certs", exist_ok=True)
 with open(f"{data}/templates/certs/leaf.tpl", "w") as f:
-    f.write(jinja2.Environment().from_string(open(f"{REPO}/fabricctl/jinja/stepca/leaf.tpl.j2").read()).render(
+    f.write(jinja2.Environment().from_string(open(f"{REPO}/templates/stepca/leaf.tpl.j2").read()).render(
         cert_country="US", cert_province="CA", cert_city="Test", cert_org="Fabric Test", cert_ou="IT"))
 sh(["chown", "-R", f"{STEP_UID}:{STEP_UID}", data])
 crt, key = mint_offline_cert({"deploy_base_dir": f"{W}/branch1", "image_stepca": IMAGE, "service_users": USERS},

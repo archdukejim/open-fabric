@@ -12,7 +12,7 @@ import tempfile
 REPO, BASE = os.environ["REPO"], os.environ["BASE"]
 LOCAL = f"ou=pi-core,{BASE}"
 W = tempfile.mkdtemp(prefix="fabric-migrate-")
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)   # the installed tree
 sys.path.insert(0, f"{W}/fabric/lib")
 from fabriclib.ldap.migrate_local_suffix import migrate_local_suffix  # noqa: E402
 

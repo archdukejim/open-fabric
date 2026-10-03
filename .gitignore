@@ -11,5 +11,5 @@ fabricctl/BUILD
 __pycache__/
 *.pyc
 
-# built packages (installers/deb/build-deb.sh)
+# built packages (packaging/deb/build-deb.sh)
 dist/

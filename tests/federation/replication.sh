@@ -9,7 +9,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO:-$(cd "$HERE/../.." && pwd)}"
-LIB="$REPO/fabricctl/lib"
+LIB="$REPO/src"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 W="$OUT/replication"
 BASE="dc=lan,dc=test"; ROOT_PART="ou=lan,$BASE"; SITE_PART="ou=lab,$BASE"
@@ -19,7 +19,7 @@ check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $
 cleanup() { docker rm -f dsroot dssite >/dev/null 2>&1; docker network rm "$NET" >/dev/null 2>&1; }
 cleanup; rm -rf "$W"; mkdir -p "$W"; cd "$W"
 docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 \
-  --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabricctl/jinja/dirsrv/build" >/dev/null || { echo "FAIL image"; exit 1; }
+  --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/packaging/images/dirsrv" >/dev/null || { echo "FAIL image"; exit 1; }
 docker network create "$NET" >/dev/null
 
 # one CA for the organisation, a server certificate per site
@@ -139,7 +139,7 @@ check "and the root's new changes reach the site" "seen dssite 'uid=bob,ou=users
 schema=$(py "
 import re
 from fabriclib.common.jinja_env import jinja_env
-text = jinja_env('$REPO/fabricctl/jinja').get_template('dirsrv/seed/05-schema.ldif.j2').render()
+text = jinja_env('$REPO/templates').get_template('dirsrv/seed/05-schema.ldif.j2').render()
 print(repr([l for l in text.splitlines() if re.match(r'(attributeTypes|objectClasses): ', l)]))")
 for ds in dsroot dssite; do
   dm "$ds" "

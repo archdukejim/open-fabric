@@ -20,7 +20,7 @@ import time
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.federation.dns_links import dns_links  # noqa: E402
 
@@ -58,7 +58,7 @@ def until(fn, seconds=40):
     return False
 
 
-env = jinja_env(os.path.join(REPO, "fabricctl", "jinja"))
+env = jinja_env(os.path.join(REPO, "templates"))
 KEY = base64.b64encode(os.urandom(32)).decode()
 
 
@@ -95,7 +95,7 @@ def start(site):
 try:
     shutil.rmtree(W, ignore_errors=True)
     debian = sh([sys.executable, os.path.join(REPO, "tests", "image_ref.py"), "debian"]).stdout.strip()
-    sh(["docker", "build", "-q", "-t", IMAGE, "--build-arg", f"BASE_IMAGE={debian}", f"{REPO}/fabricctl/jinja/bind9/build"])
+    sh(["docker", "build", "-q", "-t", IMAGE, "--build-arg", f"BASE_IMAGE={debian}", f"{REPO}/packaging/images/bind9"])
     sh(f"docker network rm {NET}", ok=False)
     sh(f"docker network create --subnet {SUBNET} {NET}")
 
