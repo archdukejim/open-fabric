@@ -36,10 +36,11 @@ def _kea(parts, form):
         return actions.remove_reservation(parts[1]), f"Reservation for {parts[1]} removed."
     if parts == ["subnets"]:
         res = actions.add_subnet(form.get("network", ""), form.get("name", ""), form.get("vlan", ""),
-                                 form.get("router", ""), _pools(form.get("pools")), form.get("notes", ""))
+                                 form.get("router", ""), _pools(form.get("pools")), form.get("notes", ""),
+                                 form.get("allow_overlap", ""))
         return res, f"Subnet {res['subnet']['subnet']} ({res['subnet']['name']}) added."
     if parts == ["subnets", "update"]:
-        fields = {k: form.get(k, "") for k in ("name", "vlan", "router", "notes")}
+        fields = {k: form.get(k, "") for k in ("name", "vlan", "router", "notes", "allow_overlap")}
         fields.update(add_pools=_pools(form.get("add_pools")), remove_pools=_pools(form.get("remove_pools")))
         res = actions.update_subnet(form.get("subnet", ""), fields)
         return res, f"Subnet {res['subnet']['subnet']} saved."

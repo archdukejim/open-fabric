@@ -13,10 +13,10 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-consent](fabriclib-consent.md) |  | 25 | 18 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 5 | 1 |
 | [fabriclib-deploy](fabriclib-deploy.md) | The deploy engine: secrets, settings, render, install, restart | 30 | 25 |
-| [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 35 | 26 |
+| [fabriclib-dhcp](fabriclib-dhcp.md) | Optional DHCP (Kea): settings, config, reservations, leases | 36 | 26 |
 | [fabriclib-dns](fabriclib-dns.md) | Zones, records, reverse zones, TSIG keys, ACLs, BIND reloads | 43 | 32 |
 | [fabriclib-dns_filter](fabriclib-dns_filter.md) |  | 3 | 2 |
-| [fabriclib-federation](fabriclib-federation.md) |  | 34 | 26 |
+| [fabriclib-federation](fabriclib-federation.md) |  | 42 | 33 |
 | [fabriclib-images](fabriclib-images.md) | Container images: status, update with rollback, prune | 14 | 10 |
 | [fabriclib-keycloak](fabriclib-keycloak.md) | Keycloak: people, roles, sign-in resets, token verification | 29 | 20 |
 | [fabriclib-ldap](fabriclib-ldap.md) | 389-DS: devices, device roles, people, the admin user | 24 | 24 |

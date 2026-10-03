@@ -72,16 +72,19 @@ def normalize_dhcp(v):
     """Purpose: Check `dhcp:` (and that nothing static collides with it) before anything is rendered.
     Inputs:  v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4
              network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a
-             record, fabric configures no switch), notes (at most 500 characters), pools, routers, options,
+             record, fabric configures no switch), notes (at most 500 characters), allow_overlap (why it may
+             overlap another site's network, at most 200 characters), pools, routers, options,
              reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes
              (design dhcp-management.md §2), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default
-             this host), lease_time (int 300-2592000, default 86400)}; dns (its A records).
+             this host), lease_time (int 300-2592000, default 86400)}; dns (its A records); fabric_subnet
+             (default 10.255.0.0/24: no DHCP subnet may overlap it).
     Returns: a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` normalized: every subnet with its id
              (_subnet_ids: existing installs keep the ids their position gave them), subnet as str, name/vlan/
              notes/options only when set, reservations with lower-case colon MACs and a hostname / options only
              when set; options, option_defs and client_classes normalized (left out when empty).
     Fails:   ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4
-             subnet, a bad or repeated id, name or vlan, notes too long, a bad pool or two pools overlapping
+             subnet, a subnet overlapping fabric_subnet, a bad or repeated id, name or vlan, notes or
+             allow_overlap too long, a bad pool or two pools overlapping
              (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
              pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain
              ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options,
@@ -107,6 +110,7 @@ def normalize_dhcp(v):
     if not isinstance(raw, list) or not all(isinstance(s, dict) for s in raw):
         raise ValidationError("dhcp.subnets: a list of subnets")
     subnets, pools_all, seen_ips, seen_macs, names, vlans = [], [], set(), set(), set(), set()
+    fabric_net = ipaddress.ip_network(str(v.get("fabric_subnet") or "10.255.0.0/24"), strict=False)
     for s, sid in zip(raw, _subnet_ids(raw)):
         try:
             net = ipaddress.ip_network(str(s.get("subnet")), strict=True)
@@ -132,6 +136,15 @@ def normalize_dhcp(v):
             if len(notes) > NOTES_MAX:
                 raise ValidationError(f"{net}: notes are at most {NOTES_MAX} characters")
             meta["notes"] = notes
+        if s.get("allow_overlap"):
+            reason = str(s["allow_overlap"]).strip()
+            if len(reason) > 200 or "\n" in reason:
+                raise ValidationError(f"{net}: allow_overlap is one line of at most 200 characters (why it may "
+                                      "overlap another site's network)")
+            meta["allow_overlap"] = reason
+        if net.overlaps(fabric_net):
+            raise ValidationError(f"{net} overlaps fabric's own container network {fabric_net} (fabric_subnet): "
+                                  "clients there could not reach this site's services")
         pools = [_pool(p, net) for p in s.get("pools") or []]
         for lo, hi in pools:
             other = next((f"{a} - {b}" for a, b in pools_all if lo <= b and a <= hi), None)
@@ -162,7 +175,8 @@ def normalize_dhcp(v):
             reservations.append({"mac": mac, "ip": str(ip), **({"hostname": host} if host else {}),
                                  **({"options": ropts} if ropts else {})})
         sopts = normalize_options(s.get("options"), f"subnet {meta.get('name', net)}")
-        subnets.append({**{k: x for k, x in s.items() if k not in ("name", "vlan", "notes", "options")},
+        own = ("name", "vlan", "notes", "options", "allow_overlap")
+        subnets.append({**{k: x for k, x in s.items() if k not in own},
                         **meta, "subnet": str(net), "reservations": reservations,
                         **({"options": sopts} if sopts else {})})
     if not subnets:

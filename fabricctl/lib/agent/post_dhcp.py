@@ -50,8 +50,9 @@ def post_dhcp(route, actor, data):
              /v1/dhcp/subnets/delete, /v1/dhcp/options, /v1/dhcp/options/delete, /v1/dhcp/classes,
              /v1/dhcp/classes/<name>/delete.
     Inputs:  route — segments after /v1/; actor — the verified user; data — the body: mac, ip, hostname
-             (reservations); network, name, vlan, router, pools, notes (add); subnet (name or network), name, vlan,
-             router, notes, add_pools, remove_pools (update; a field left out stays, "" clears it); subnet, force
+             (reservations); network, name, vlan, router, pools, notes, allow_overlap (add); subnet (name or
+             network), name, vlan, router, notes, allow_overlap, add_pools, remove_pools (update; a field left out
+             stays, "" clears it); subnet, force
              (delete); option, data, subnet | class | mac, always_send (options); name, test, next_server,
              boot_file (classes).
     Returns: the saved item, with "applied" (bool) and the last 2000 characters of the apply's output.
@@ -68,9 +69,11 @@ def post_dhcp(route, actor, data):
         vlan = _vlan(data)
         result = {"subnet": add_subnet(actor, read_text(data, "network"), read_text(data, "name"),
                                        None if vlan is KEEP else vlan, read_text(data, "router") or None,
-                                       read_strings(data, "pools"), read_text(data, "notes"), source="web")}
+                                       read_strings(data, "pools"), read_text(data, "notes"),
+                                       read_text(data, "allow_overlap"), source="web")}
     elif sub == ["subnets", "update"]:
-        fields = {k: (read_text(data, k) if k in data else KEEP) for k in ("name", "router", "notes")}
+        fields = {k: (read_text(data, k) if k in data else KEEP)
+                  for k in ("name", "router", "notes", "allow_overlap")}
         result = {"subnet": update_subnet(actor, read_text(data, "subnet"), vlan=_vlan(data),
                                           add_pools=read_strings(data, "add_pools"),
                                           remove_pools=read_strings(data, "remove_pools"), source="web", **fields)}

@@ -156,7 +156,7 @@
 | | |
 |---|---|
 | Purpose | DHCP changes from the Kea tab, each saved and applied at once (design dhcp-management.md §4): POST /v1/dhcp/reservations[/<mac>/delete], /v1/dhcp/subnets, /v1/dhcp/subnets/update, /v1/dhcp/subnets/delete, /v1/dhcp/options, /v1/dhcp/options/delete, /v1/dhcp/classes, /v1/dhcp/classes/<name>/delete. |
-| Inputs | route — segments after /v1/; actor — the verified user; data — the body: mac, ip, hostname (reservations); network, name, vlan, router, pools, notes (add); subnet (name or network), name, vlan, router, notes, add_pools, remove_pools (update; a field left out stays, "" clears it); subnet, force (delete); option, data, subnet \| class \| mac, always_send (options); name, test, next_server, boot_file (classes). |
+| Inputs | route — segments after /v1/; actor — the verified user; data — the body: mac, ip, hostname (reservations); network, name, vlan, router, pools, notes, allow_overlap (add); subnet (name or network), name, vlan, router, notes, allow_overlap, add_pools, remove_pools (update; a field left out stays, "" clears it); subnet, force (delete); option, data, subnet \| class \| mac, always_send (options); name, test, next_server, boot_file (classes). |
 | Returns | the saved item, with "applied" (bool) and the last 2000 characters of the apply's output. |
 | Fails | ValidationError from the readers and fabriclib (-> 400); RouteNotFound for another route. |
 | Feeds | agent/post_route.py. |

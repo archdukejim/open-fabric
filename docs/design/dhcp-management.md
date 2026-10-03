@@ -1,6 +1,6 @@
 # Design: DHCP management — subnets, pools, options, client classes, address plan
 
-Status: **being built** (owner request 2026-10-01): settings, Kea's own check, commands and the Kea tab done; the address plan across sites (§5) next. Milestone M8 of
+Status: **built** (owner request 2026-10-01): settings, Kea's own check, commands, the Kea tab and the address plan across sites (§5). The Federation tab's view of the plan comes with M6. Milestone M8 of
 [federation.md](federation.md) §8a, built before M5; the address plan rides
 on M5's site-to-upstream sync and is shown in M6's Federation tab.
 
@@ -81,6 +81,26 @@ subnet it belongs to ("VLAN 20 (iot, 192.168.20.0/24)").
 - `fabric_subnet` is checked against every real network too (the same on every site and harmless
   there, but a LAN using it would be unreachable from that site's containers).
 - `fabricctl federation networks`; the Federation tab (M6) shows site → network → VLAN → notes.
+
+**How it is built** (2026-10-02): the plan lives in the directory and rides on M5's replication — no new
+federation endpoint, and every site has the whole plan locally:
+
+- Each site writes its networks (`site_networks`: the LAN and every DHCP subnet, with name, VLAN, notes and
+  `allow_overlap`) as `fabricNetwork` entries into `ou=networks` of **its own part**, which replicates up.
+  `fabricctl directory sync` and its 5-minute timer do it on every federated install.
+- The **root** gathers every site's entries — its own and the copies of the sites' parts it holds — into
+  `ou=address-plan` of the **organisation**, which replicates down read-only to every site.
+- **Checks:** a DHCP change that would make a subnet overlap another site's network is refused before it is
+  saved (overlaps that already existed do not block other changes); a joining site sends its networks and
+  the upstream refuses overlaps before it signs anything (after the invitation is verified, so the plan
+  cannot be probed); `--allow-overlap "<why>"` on a subnet allows it. With the directory away, the edit is
+  allowed and the next sync's plan shows any overlap; the join is checked against the upstream's own
+  networks at least.
+- `fabric_subnet` is refused for a DHCP subnet locally (normalize_dhcp).
+- Schema: `fabricNetwork` (structural: cn, `fabricCidr`, `fabricSite`, `fabricVlan`, `fabricNetworkKind`,
+  `fabricAllowOverlap`, description) in fabric's own OID arc.
+- Tests: `tests/federation/address_plan.py` (the rules) and `replication.sh` (two real 389-DS: publish,
+  replicate up, gather, replicate down, find an overlap).
 
 ## 6. Not in scope
 

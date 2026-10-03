@@ -24,5 +24,11 @@ their own local network (design [federation.md](../../../../docs/design/federati
 | `federation_status.py` | Standalone, upstream or site; the endpoint; joined sites; open invitations |
 | `set_federation_endpoint.py` | Turn the federation endpoint on or off (certificate first) and apply |
 | `deploy_federation_endpoint.py` | Deploy step: the `fabric-federation` unit and the socket directory nginx mounts (or their removal) |
-| `run_federation_command.py` | `fabricctl federation status / enable / disable / invite / invitations / revoke` |
+| `site_networks.py` | This site's networks for the address plan: the LAN and every DHCP subnet (name, VLAN, notes, overlap reason) |
+| `publish_site_networks.py` | Write this site's networks into `ou=networks` of its part (replicated up) |
+| `publish_address_plan.py` | On the root: gather every site's networks into `ou=address-plan` of the organisation (replicated down) |
+| `read_address_plan.py` | The address plan from this site's own copy |
+| `network_conflicts.py` | Which of this site's networks overlap another site's (and whether a reason allows it) |
+| `show_networks.py` | `fabricctl federation networks`: the plan and its overlaps |
+| `run_federation_command.py` | `fabricctl federation status / enable / disable / invite / invitations / revoke / networks` |
 | `common/` | Helpers shared by the operations above (see its README) |

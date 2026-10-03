@@ -1029,7 +1029,7 @@ Shared secrets are not settings: they live in OpenBao (`radius_secrets`); `fabri
 |---|---|---|
 | `install_kea` | `false` | Kea 3.0 LTS serves DHCP (operations.md → DHCP) |
 | `dhcp.interfaces` | — | Host interface(s) to serve, e.g. `[eth0]`; UDP 67 is opened on them only |
-| `dhcp.subnets` | — | `[{subnet, id, name, vlan, notes, pools: ["a - b"], routers, options, reservations: [{mac, ip, hostname, options}]}]`; `id` is Kea's subnet id (stored by fabric on the first change; leases are tied to it), `name` one label unique per site, `vlan` 1–4094 unique (a record only), `notes` up to 500 characters; pools do not overlap; reservations inside the subnet, outside its pools |
+| `dhcp.subnets` | — | `[{subnet, id, name, vlan, notes, pools: ["a - b"], routers, options, reservations: [{mac, ip, hostname, options}]}]`; `id` is Kea's subnet id (stored by fabric on the first change; leases are tied to it), `name` one label unique per site, `vlan` 1–4094 unique (a record only), `notes` up to 500 characters, `allow_overlap` why it may overlap another site's network (federation's address plan, up to 200 characters); no subnet may overlap `fabric_subnet`; pools do not overlap; reservations inside the subnet, outside its pools |
 | `dhcp.options` | `[]` | Options for every subnet: `{name \| code, data, space, csv_format, always_send}`; one named like fabric's own (`domain-name-servers`, `ntp-servers`, `domain-name`, `domain-search`) replaces it |
 | `dhcp.option_defs` | `[]` | `{name, code, type, space, array, record_types}`: options Kea has no name for |
 | `dhcp.client_classes` | `[]` | `{name, test (Kea expression), options, next_server, server_hostname, boot_file_name}` |

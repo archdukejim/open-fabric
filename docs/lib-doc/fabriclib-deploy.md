@@ -101,7 +101,7 @@
 | Returns | dict — fabric_dir (the tree this code runs from), repo_dir (its parent: a checkout), base (deploy base), target (<base>/fabric), config (<target>/config), vars, secrets, link_vars, federation (the registry), jinja (<fabric_dir>/jinja), render (/tmp/fabric-render). |
 | Fails | never. |
 | Feeds | apply_deployment and every deploy step. |
-| Called by | `fabriclib.deploy.apply_deployment.apply_deployment`, `fabriclib.dhcp.common.edit_dhcp.edit_dhcp` |
+| Called by | `fabriclib.deploy.apply_deployment.apply_deployment`, `fabriclib.dhcp.common.edit_dhcp._check_address_plan`, `fabriclib.dhcp.common.edit_dhcp.edit_dhcp` |
 
 ## `fabricctl/lib/fabriclib/deploy/finish_without_start.py`
 

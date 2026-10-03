@@ -9,6 +9,7 @@ from fabriclib.federation.list_invitations import list_invitations
 from fabriclib.federation.remove_site import remove_site
 from fabriclib.federation.reparent_site import reparent_site
 from fabriclib.federation.revoke_invitation import revoke_invitation
+from fabriclib.federation.show_networks import show_networks
 from fabriclib.federation.set_federation_endpoint import set_federation_endpoint
 from fabriclib.setup.errors import SetupError
 from fabriclib.system.apply_changes import apply_changes
@@ -23,6 +24,7 @@ USAGE = """usage: fabricctl federation status                 this install's pla
                                                    talks) through that site, which only relays
        fabricctl federation relay direct           on a site: stop using its relay node, talk to the upstream
        fabricctl federation invitations            open invitations
+       fabricctl federation networks               the address plan: every site's networks, VLANs, notes, overlaps
        fabricctl federation remove <site>          forget a site that joined here (its CA stays valid until it expires)
        fabricctl federation reparent [@FILE|-]     on a site: move under the parent whose invitation you paste
        fabricctl federation revoke <id|site>       withdraw an open invitation
@@ -40,7 +42,7 @@ def _when(epoch):
 
 def run_federation_command(ctx, argv):
     """Purpose: `fabricctl federation status | enable | disable | invite | invitations | revoke | remove | reparent |
-             relay` —
+             relay | networks` —
              joining sites to
              this install without the web UI (design federation.md §4).
     Inputs:  ctx — SetupContext with state loaded (ctx.vars: the rendered vars); argv — list of str after
@@ -95,6 +97,12 @@ def run_federation_command(ctx, argv):
             if not rows:
                 print("no open invitations")
             return 0
+        if cmd == "networks" and not args:
+            try:
+                return 1 if show_networks(v) else 0
+            except RuntimeError as e:                # the directory answered with an error
+                print(f"error: {e}", file=sys.stderr)
+                return 1
         if cmd == "relay" and args == ["direct"]:
             relay = drop_relay("root")
             print(f"relay {relay.get('site')} dropped: this site talks to its upstream directly")

@@ -135,6 +135,50 @@ dm dsroot "c.add_s(\"uid=bob,ou=users,$BASE\", ldap.modlist.addModlist({'objectC
 check "changes made while the root was down arrive when it is back" "seen dsroot 'cn=camera,$SITE_PART'"
 check "and the root's new changes reach the site" "seen dssite 'uid=bob,ou=users,$BASE'"
 
+# ---- the address plan across sites (dhcp-management.md §5), over the same replication
+schema=$(py "
+import re
+from fabriclib.common.jinja_env import jinja_env
+text = jinja_env('$REPO/fabricctl/jinja').get_template('dirsrv/seed/05-schema.ldif.j2').render()
+print(repr([l for l in text.splitlines() if re.match(r'(attributeTypes|objectClasses): ', l)]))")
+for ds in dsroot dssite; do
+  dm "$ds" "
+for line in $schema:
+    kind, value = line.split(': ', 1)
+    try:
+        c.modify_s('cn=schema', [(ldap.MOD_ADD, kind, [value.encode()])])
+    except ldap.TYPE_OR_VALUE_EXISTS:
+        pass" >/dev/null
+done
+plan=$(py "
+import json
+from fabriclib.federation.publish_site_networks import publish_site_networks as pub
+site = {'site_name': 'lab', 'ldap_base_dn': '$BASE', 'ldap_local_dn': '$SITE_PART', 'lan_cidr': '10.20.0.0/24',
+        'install_kea': True, 'dhcp': {'subnets': [{'subnet': '10.21.0.0/24', 'name': 'iot', 'vlan': 21,
+                                                   'notes': 'cameras'}]}}
+root = {'site_name': 'lan', 'ldap_base_dn': '$BASE', 'ldap_local_dn': '$ROOT_PART', 'lan_cidr': '10.10.0.0/24'}
+print(json.dumps([pub(site, container='dssite'), pub(root, container='dsroot'), pub(site, container='dssite')]))" 2>&1)
+echo "    published: $plan"
+check "each site writes its networks into its own part; a second run changes nothing" \
+    "python3 -c 'import json,sys; a=json.loads(sys.argv[1]); sys.exit(not (len(a[0][\"added\"]) == 2 and a[1][\"added\"] == [\"lan\"] and not any(a[2].values())))' '$plan'"
+check "the site's networks reach the root with its part" "seen dsroot 'cn=iot,ou=networks,$SITE_PART'"
+gathered=$(py "
+from fabriclib.federation.publish_address_plan import publish_address_plan as gather
+print(gather({'ldap_base_dn': '$BASE'}, container='dsroot'))" 2>&1)
+echo "    root gathered: $gathered"
+check "the root gathers every site's networks into the organisation's address plan" "grep -q \"'sites': \['lab', 'lan'\]\" <<<\"\$gathered\""
+check "the plan reaches the site (its own read-only copy)" "seen dssite 'cn=lab iot,ou=address-plan,$BASE'"
+verdict=$(py "
+from fabriclib.federation.read_address_plan import read_address_plan as read
+from fabriclib.federation.network_conflicts import network_conflicts as clash
+plan = read({'ldap_base_dn': '$BASE'}, container='dssite')
+ok_plan = sorted((p['site'], p['cidr'], p['vlan']) for p in plan) == [('lab', '10.20.0.0/24', None), ('lab', '10.21.0.0/24', 21), ('lan', '10.10.0.0/24', None)]
+own = clash([{'name': 'iot', 'cidr': '10.21.0.0/24'}], plan, 'lab')
+other = clash([{'name': 'new', 'cidr': '10.10.0.128/25'}], plan, 'lab')
+allowed = clash([{'name': 'new', 'cidr': '10.10.0.128/25', 'allow_overlap': 'lab only, never routed'}], plan, 'lab')
+print('OK' if ok_plan and not own and other and other[0]['other_site'] == 'lan' and not other[0]['allowed']
+      and allowed[0]['allowed'] else (plan, own, other))" 2>&1)
+check "at the site: the plan lists every site's networks; a network overlapping another site's is found (a reason allows it)" "grep -qx OK <<<\"\$verdict\""
 echo "sites: {}" > "$W/root.yaml"
 gone=$(py "
 from fabriclib.federation.configure_directory_links import configure_directory_links as links

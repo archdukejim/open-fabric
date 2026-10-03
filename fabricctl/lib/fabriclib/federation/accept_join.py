@@ -13,6 +13,9 @@ from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.common.save_registry import save_registry
 from fabriclib.federation.common.signing_capacity import signing_capacity
 from fabriclib.federation.constants import DOMAIN_RE, SITE_NAME_RE
+from fabriclib.federation.network_conflicts import network_conflicts
+from fabriclib.federation.read_address_plan import read_address_plan
+from fabriclib.federation.site_networks import site_networks
 from fabriclib.pki.sign_site_ca import sign_site_ca
 from fabriclib.secrets.load_secrets import load_secrets
 from fabriclib.secrets.save_secrets import save_secrets
@@ -30,6 +33,36 @@ def _port(value):
     return int(value) if str(value).isdigit() and 0 < int(value) < 65536 else 53
 
 
+def _check_networks(v, site, networks):
+    """Purpose: refuse a joining site whose networks overlap another site's (design dhcp-management.md §5): the
+             upstream's copy of the address plan, plus its own networks (the plan may not list them yet).
+    Inputs:  v — the upstream's vars; site — the joining site's name; networks — what the request reported
+             ([{name, cidr, allow_overlap}]; an older fabric sends none).
+    Returns: None.
+    Fails:   ValidationError "the site's networks …" for a malformed list, or naming each overlap without an
+             allow_overlap reason.
+    Feeds:   accept_join."""
+    if not isinstance(networks, list) or len(networks) > 256:
+        raise ValidationError("the site's networks are not a list")
+    mine = []
+    for n in networks:
+        try:
+            cidr = str(ipaddress.ip_network(str(n["cidr"]), strict=False))
+        except (KeyError, TypeError, ValueError):
+            raise ValidationError("the site's networks are not valid") from None
+        mine.append({"name": str(n.get("name") or cidr)[:64], "cidr": cidr,
+                     "allow_overlap": str(n.get("allow_overlap") or "")[:200]})
+    try:
+        plan = read_address_plan(v)
+    except (ValidationError, RuntimeError):      # 389-DS not answering: at least this site's own networks
+        plan = []
+    plan += [{**n, "site": v.get("site_name")} for n in site_networks(v)]
+    bad = [c for c in network_conflicts(mine, plan, site) if not c["allowed"]]
+    if bad:
+        raise ValidationError("; ".join(f"{c['cidr']} overlaps {c['other_cidr']} of site {c['other_site']}"
+                                        for c in bad) + ": give the joining site other networks")
+
+
 def accept_join(v, req, client_ip="", now=None):
     """Purpose: On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
@@ -38,7 +71,8 @@ def accept_join(v, req, client_ip="", now=None):
              hostname_federation, hostname_ldap and
              the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join
              request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP),
-             optional "ldap_host" (its LDAPS name, default ldap.<domain>)};
+             optional "ldap_host" (its LDAPS name, default ldap.<domain>), optional "networks" (its LAN and DHCP
+             subnets: refused when they overlap another site's, _check_networks)};
              client_ip — str for the audit; now — epoch seconds, default time.time().
     Returns: {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain":
              PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its
@@ -49,7 +83,8 @@ def accept_join(v, req, client_ip="", now=None):
              "ldap_port"} — the directory link's secret (replication both ways, kept here as
              federation_replication[site]; §3.2a) and this site's LDAPS name, "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
-    Fails:   ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or
+    Fails:   ValidationError "the join request is incomplete"; overlapping networks (_check_networks, before
+             anything is signed or recorded); "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
              so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has
              joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can
@@ -84,6 +119,7 @@ def accept_join(v, req, client_ip="", now=None):
         registry = load_registry()
         if site in registry["sites"]:
             raise ValidationError(f"site {site} has joined already")
+        _check_networks(v, site, req.get("networks") or [])     # invitation verified first: no probing the plan
         cap = signing_capacity(v)
         signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation",
                               nest=int(entry.get("nest") or 0), as_parent=cap["as_parent"])

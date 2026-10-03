@@ -19,8 +19,9 @@ USAGE = """usage: fabricctl dhcp status                       subnets (name, VLA
        fabricctl dhcp reserve <mac> <ip> [<hostname>]
        fabricctl dhcp unreserve <mac>
        fabricctl dhcp add-subnet <network> --name N [--vlan V] [--router IP] [--pool "a - b"]... [--notes T]
+                                 [--allow-overlap "<why>"]
        fabricctl dhcp set-subnet <name|network> [--name N] [--vlan V|none] [--router IP|none] [--notes T]
-                                 [--add-pool "a - b"]... [--remove-pool "a - b"]...
+                                 [--add-pool "a - b"]... [--remove-pool "a - b"]... [--allow-overlap "<why>"|none]
        fabricctl dhcp remove-subnet <name|network> [--force]
        fabricctl dhcp option set <name|code> <data> [--subnet S | --class C | --mac M] [--always-send]
        fabricctl dhcp option unset <name|code> [--subnet S | --class C | --mac M]
@@ -28,7 +29,7 @@ USAGE = """usage: fabricctl dhcp status                       subnets (name, VLA
        fabricctl dhcp class remove <name>
    every change applies at once unless --no-apply"""
 FLAGS = {"--name", "--vlan", "--router", "--pool", "--notes", "--add-pool", "--remove-pool", "--subnet", "--class",
-         "--mac", "--test", "--next-server", "--boot-file"}
+         "--mac", "--test", "--next-server", "--boot-file", "--allow-overlap"}
 
 
 def _apply(args):
@@ -162,7 +163,8 @@ def run_dhcp_command(v, argv):
             return _apply(args)
         if cmd == "add-subnet" and len(pos) == 1 and "--name" in one:
             s = add_subnet("root", pos[0], one["--name"], _vlan(one["--vlan"]) if "--vlan" in one else None,
-                           one.get("--router"), vals.get("--pool", []), one.get("--notes", ""), source="cli")
+                           one.get("--router"), vals.get("--pool", []), one.get("--notes", ""),
+                           one.get("--allow-overlap", ""), source="cli")
             print(f"subnet {s['subnet']} ({s['name']}, id {s['id']}) added")
             return _apply(args)
         if cmd == "set-subnet" and len(pos) == 1:
@@ -170,7 +172,7 @@ def run_dhcp_command(v, argv):
                               vlan=KEEP if "--vlan" not in one else _vlan(one["--vlan"]),
                               router=_keep(one, "--router"), notes=one.get("--notes", KEEP),
                               add_pools=vals.get("--add-pool", []), remove_pools=vals.get("--remove-pool", []),
-                              source="cli")
+                              allow_overlap=_keep(one, "--allow-overlap"), source="cli")
             print(f"subnet {s['subnet']} changed")
             return _apply(args)
         if cmd == "remove-subnet" and len(pos) == 1:

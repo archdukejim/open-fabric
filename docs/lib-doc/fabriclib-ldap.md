@@ -279,10 +279,10 @@
 
 | | |
 |---|---|
-| Purpose | `fabricctl directory sync`: directory upkeep on this install — POSIX identities and replication links. |
+| Purpose | `fabricctl directory sync`: directory upkeep on this install — POSIX identities, replication links and, when federated, the address plan (this site's networks; on the root site the whole plan: design dhcp-management.md §5). |
 | Inputs | v — fabric vars; args — the words after `directory`: sync [--quiet]. |
 | Returns | exit status: 0, 2 for usage. |
-| Fails | ValidationError / RuntimeError from ensure_posix_identities or configure_directory_links. |
+| Fails | ValidationError / RuntimeError from ensure_posix_identities, configure_directory_links, publish_site_networks or publish_address_plan. |
 | Feeds | cli.py (`directory`), fabric-directory-sync.service. |
 | Called by | `fabriclib.cli.main` |
 

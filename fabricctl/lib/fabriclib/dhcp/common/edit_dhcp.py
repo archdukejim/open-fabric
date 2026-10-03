@@ -1,5 +1,7 @@
 import copy
+import os
 
+from fabriclib.common.errors import ValidationError
 from fabriclib.common.jinja_env import jinja_env
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.save_vars import save_vars
@@ -8,6 +10,37 @@ from fabriclib.common.write_audit import write_audit
 from fabriclib.deploy.deploy_paths import deploy_paths
 from fabriclib.dhcp.check_kea_config import check_kea_config
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp
+from fabriclib.federation.network_conflicts import network_conflicts
+from fabriclib.federation.read_address_plan import read_address_plan
+from fabriclib.federation.site_networks import site_networks
+
+
+def _check_address_plan(before, data):
+    """Purpose: refuse a change that makes a subnet overlap another site's network (design dhcp-management.md
+             §5), checked against this site's copy of the address plan. Overlaps that were there before the change
+             do not block it (`fabricctl federation networks` lists them). Not federated, or the directory not
+             answering (the sync checks again later): nothing to check.
+    Inputs:  before — the settings before the change; data — with the new dhcp block (site_name, ldap_base_dn,
+             lan_cidr, dhcp).
+    Returns: None.
+    Fails:   ValidationError naming each new overlap without an allow_overlap reason.
+    Feeds:   edit_dhcp."""
+    if not os.path.exists(deploy_paths()["federation"]) or not data.get("site_name"):
+        return
+    try:
+        plan = read_address_plan(data)
+    except (ValidationError, RuntimeError):
+        return
+    def key(c):
+        return c["cidr"], c["other_site"], c["other_cidr"]
+    old = {key(c) for c in network_conflicts(site_networks(before), plan, data["site_name"])}
+    bad = [c for c in network_conflicts(site_networks(data), plan, data["site_name"])
+           if not c["allowed"] and key(c) not in old]
+    if bad:
+        raise ValidationError("; ".join(f"{c['cidr']} ({c['name']}) overlaps {c['other_cidr']} ({c['other_name']}) "
+                                        f"of site {c['other_site']}" for c in bad)
+                              + ". Choose another network, or give a reason with --allow-overlap if the two are "
+                                "never routed together")
 
 
 def edit_dhcp(actor, event, change, source="cli"):
@@ -19,16 +52,19 @@ def edit_dhcp(actor, event, change, source="cli"):
              that changes the dict in place and returns (result, audit detail str); source — "cli" or "web".
     Returns: (result of change, the saved dhcp block).
     Fails:   ValidationError from change, normalize_dhcp or Kea's check (check_kea_config: an option Kea does not
-             know, data that does not fit, a class expression it cannot parse) — nothing is saved then, so a
+             know, data that does not fit, a class expression it cannot parse) or the address plan (a subnet
+             overlapping another site's network without allow_overlap) — nothing is saved then, so a
              refused change never breaks the next apply; OSError or yaml.YAMLError from vars_lock / load_vars /
              save_vars / write_audit.
     Feeds:   dhcp/add_subnet, update_subnet, remove_subnet, set_option, unset_option, add_client_class,
              remove_client_class."""
     with vars_lock():
         data = load_vars()
+        before = copy.deepcopy(data)
         dhcp = normalize_dhcp({**data, "dhcp": copy.deepcopy(data.get("dhcp") or {}), "install_kea": True})
         result, detail = change(dhcp)
         data["dhcp"] = normalize_dhcp({**data, "dhcp": dhcp, "install_kea": True})
+        _check_address_plan(before, data)
         if data.get("install_kea"):         # vars.yaml holds the rendered settings: render Kea's file from them
             text = jinja_env(deploy_paths()["jinja"]).get_template("kea/kea-dhcp4.conf.j2").render(**data)
             check_kea_config(data.get("image_kea", "fabric/kea:local"), "kea-dhcp4.conf", text)

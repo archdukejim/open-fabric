@@ -15,14 +15,25 @@
 | Feeds | accept_join (the site record's dns_port). |
 | Called by | `fabriclib.federation.accept_join.accept_join` |
 
+### `_check_networks(v, site, networks)`
+
+| | |
+|---|---|
+| Purpose | refuse a joining site whose networks overlap another site's (design dhcp-management.md §5): the upstream's copy of the address plan, plus its own networks (the plan may not list them yet). |
+| Inputs | v — the upstream's vars; site — the joining site's name; networks — what the request reported ([{name, cidr, allow_overlap}]; an older fabric sends none). |
+| Returns | None. |
+| Fails | ValidationError "the site's networks …" for a malformed list, or naming each overlap without an allow_overlap reason. |
+| Feeds | accept_join. |
+| Called by | `fabriclib.federation.accept_join.accept_join` |
+
 ### `accept_join(v, req, client_ip='', now=None)`
 
 | | |
 |---|---|
 | Purpose | On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time invitation, sign the site's intermediate CA with the root key, record the site and use up the invitation. |
-| Inputs | v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip, hostname_federation, hostname_ldap and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP), optional "ldap_host" (its LDAPS name, default ldap.<domain>)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
+| Inputs | v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip, hostname_federation, hostname_ldap and the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP), optional "ldap_host" (its LDAPS name, default ldap.<domain>), optional "networks" (its LAN and DHCP subnets: refused when they overlap another site's, _check_networks)}; client_ip — str for the audit; now — epoch seconds, default time.time(). |
 | Returns | {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain": PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>", "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this site's published DNS port) (kept here in fabric's secrets as federation_tsig[site]; design federation.md M4), "directory": {"secret", "ldap_host", "ldap_port"} — the directory link's secret (replication both ways, kept here as federation_replication[site]; §3.2a) and this site's LDAPS name, "org": {"org_domain", "ldap_base_dn", friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}. |
-| Fails | ValidationError "the join request is incomplete"; "the site's domain/address is not valid" or "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message, so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can retry); ValidationError from load_secrets/save_secrets; OSError. |
+| Fails | ValidationError "the join request is incomplete"; overlapping networks (_check_networks, before anything is signed or recorded); "the site's domain/address is not valid" or "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message, so a caller learns nothing about which); "the invitation was made for site <x>"; "site <x> has joined already"; sign_site_ca's messages (the invitation is kept, so a corrected request can retry); ValidationError from load_secrets/save_secrets; OSError. |
 | Feeds | the federation endpoint (fabricctl/lib/federation/server.py, POST /v1/join). |
 | Notes | the secret is compared by its SHA-256 in constant time; audited as FED_JOIN (actor "site:<name>", with the client address) and, on refusal, FED_JOIN_REFUSED. |
 | Called by | — (no static caller) |
@@ -101,6 +112,19 @@
 | Fails | ValidationError "the upstream refused: <its message>" (a 4xx/5xx with an error); "cannot reach the upstream's federation endpoint at <host> (<address>): ..." (network or TLS, including a certificate not from the pinned root or not naming host); "the upstream's answer is not JSON". |
 | Feeds | join_upstream. |
 | Called by | `fabriclib.federation.join_upstream.join_upstream`, `fabriclib.federation.relay_join.relay_join` |
+
+## `fabricctl/lib/fabriclib/federation/common/run_in_directory.py`
+
+### `run_in_directory(code, inputs, container='dirsrv', timeout=120)`
+
+| | |
+|---|---|
+| Purpose | run a short Python program in the 389-DS container, bound as Directory Manager over its local socket, and return what it prints as JSON (the address plan's readers and writers). |
+| Inputs | code — Python source using `c`, `ldap` and `e` (see _PRELUDE) that prints one JSON value last; inputs — {name: str} passed as environment variables F_<name> (never on argv); container — the dirsrv container (tests pass theirs); timeout — seconds. |
+| Returns | the JSON value the program printed last. |
+| Fails | ValidationError when 389-DS is not running; RuntimeError with the container's message for anything else; subprocess.TimeoutExpired. |
+| Feeds | federation/publish_site_networks, publish_address_plan, read_address_plan. |
+| Called by | `fabriclib.federation.publish_address_plan.publish_address_plan`, `fabriclib.federation.publish_site_networks.publish_site_networks`, `fabriclib.federation.read_address_plan.read_address_plan` |
 
 ## `fabricctl/lib/fabriclib/federation/common/save_registry.py`
 
@@ -318,7 +342,7 @@
 | | |
 |---|---|
 | Purpose | On a node being set up with `--join`: join the upstream that made the invitation (design federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root, send the join over TLS verified against that root, check and stage the signed intermediate, and record the upstream. |
-| Inputs | v — fabric vars: service_users.step, image_stepca (make_site_ca_request); invitation — the invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key); work_dir — where the site CA key, request and certificates are kept; domain — this site's own domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder for federation.yaml and its lock (default: next to this code — setup runs from the package, so it passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded (re-parenting: the invitation's upstream becomes this site's parent), default False; dns_port — the port this site's DNS is published on (bind_dns_port), default 53: linked sites send zone transfers and notifies there. |
+| Inputs | v — fabric vars: service_users.step, image_stepca (make_site_ca_request), lan_cidr and the DHCP subnets (site_networks: sent so the upstream can refuse networks that overlap another site's); invitation — the invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key); work_dir — where the site CA key, request and certificates are kept; domain — this site's own domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder for federation.yaml and its lock (default: next to this code — setup runs from the package, so it passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded (re-parenting: the invitation's upstream becomes this site's parent), default False; dns_port — the port this site's DNS is published on (bind_dns_port), default 53: linked sites send zone transfers and notifies there. |
 | Returns | {"vars": settings for this install — byoc, ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path, site_ca_depth (stage_site_ca), site_name, org_domain, ldap_base_dn and the organisation's friendly_name / cert_* —, "upstream": {"site_name", "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had, "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry), "replication_secret": the directory link's secret (likewise, federation_replication["upstream"])}. The upstream record keeps its LDAPS name and port (ldap_host, ldap_port) for replication. |
 | Fails | ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError. |
 | Feeds | setup step `join` (fabriclib/setup/join_federation.py). |
@@ -348,6 +372,58 @@
 | Fails | ValidationError from load_secrets (OpenBao locked); OSError. |
 | Feeds | run_federation_command (invitations), federation_status. |
 | Called by | `fabriclib.federation.federation_status.federation_status`, `fabriclib.federation.run_federation_command.run_federation_command` |
+
+## `fabricctl/lib/fabriclib/federation/network_conflicts.py`
+
+### `network_conflicts(mine, plan, site)`
+
+| | |
+|---|---|
+| Purpose | which of this site's networks overlap another site's (design dhcp-management.md §5): two sites routed together must never share addresses. |
+| Inputs | mine — this site's networks (site_networks); plan — the address plan (read_address_plan: entries with "site", "name", "cidr", "allow_overlap"); site — this site's name (its own entries are skipped). |
+| Returns | list of {"name", "cidr", "other_site", "other_name", "other_cidr", "allowed" (the reason when either side gave one with allow_overlap, else "")}, sorted by this site's network. |
+| Fails | ValueError for a network that is not one (the plan is written by fabric, so only on corruption). |
+| Feeds | dhcp/common/edit_dhcp (refuses unallowed ones), accept_join (refuses at join), federation/run_federation_command (`networks`: shown as conflicts). |
+| Called by | `fabriclib.dhcp.common.edit_dhcp._check_address_plan`, `fabriclib.federation.accept_join._check_networks`, `fabriclib.federation.show_networks.show_networks` |
+
+## `fabricctl/lib/fabriclib/federation/publish_address_plan.py`
+
+### `publish_address_plan(v, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | on the root site: gather every site's networks — its own and the copies of the sites' parts it holds — into ou=address-plan of the organisation, which replication copies read-only to every site, so each site can check new networks against all others even while the root is away (design dhcp-management.md §5). |
+| Inputs | v — fabric vars: ldap_base_dn; container — the dirsrv container (tests pass theirs). |
+| Returns | {"sites": [names in the plan], "added", "changed", "removed": counts}. |
+| Fails | ValidationError when 389-DS is not running; RuntimeError for other directory errors. |
+| Feeds | ldap/run_directory_command (`fabricctl directory sync` and its timer, on the root site only). |
+| Called by | `fabriclib.ldap.run_directory_command.run_directory_command` |
+
+## `fabricctl/lib/fabriclib/federation/publish_site_networks.py`
+
+### `publish_site_networks(v, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | write this site's networks (site_networks: the LAN and every DHCP subnet, with name, VLAN, notes) into ou=networks of its own part of the directory, so M5 replication carries them to the parent and the root, which gathers the address plan (design dhcp-management.md §5). |
+| Inputs | v — fabric vars: site_name, ldap_local_dn (ou=<site>,<base>), lan_cidr, install_kea, dhcp; container — the dirsrv container (tests pass theirs). |
+| Returns | {"added": [names], "changed": [names], "removed": [DNs]} — nothing when the directory already says the same. |
+| Fails | ValidationError when 389-DS is not running; RuntimeError for other directory errors. |
+| Feeds | ldap/run_directory_command (`fabricctl directory sync` and its 5-minute timer, federated installs). |
+| Called by | `fabriclib.ldap.run_directory_command.run_directory_command` |
+
+## `fabricctl/lib/fabriclib/federation/read_address_plan.py`
+
+### `read_address_plan(v, container='dirsrv')`
+
+| | |
+|---|---|
+| Purpose | the address plan across sites, from this site's own copy of the organisation (design dhcp-management.md §5): every site's networks with name, VLAN, kind and notes. |
+| Inputs | v — fabric vars: ldap_base_dn; container — the dirsrv container (tests pass theirs). |
+| Returns | list of {"site", "name", "cidr", "vlan", "kind", "notes", "allow_overlap"}, sorted by site and network; [] before the root has published a plan. |
+| Fails | ValidationError when 389-DS is not running; RuntimeError for other directory errors. |
+| Feeds | federation/run_federation_command (`networks`), dhcp/common/edit_dhcp and accept_join (overlap checks). |
+| Called by | `fabriclib.dhcp.common.edit_dhcp._check_address_plan`, `fabriclib.federation.accept_join._check_networks`, `fabriclib.federation.show_networks.show_networks` |
 
 ## `fabricctl/lib/fabriclib/federation/relay_join.py`
 
@@ -422,7 +498,7 @@
 
 | | |
 |---|---|
-| Purpose | `fabricctl federation status \| enable \| disable \| invite \| invitations \| revoke \| remove \| reparent \| relay` — joining sites to this install without the web UI (design federation.md §4). |
+| Purpose | `fabricctl federation status \| enable \| disable \| invite \| invitations \| revoke \| remove \| reparent \| relay \| networks` — joining sites to this install without the web UI (design federation.md §4). |
 | Inputs | ctx — SetupContext with state loaded (ctx.vars: the rendered vars); argv — list of str after "federation" (default status). |
 | Returns | exit status: 0 success; 1 a ValidationError or a failed apply; 2 usage (printed to stderr). |
 | Fails | ValidationError is caught (exit 1); OSError and errors from set_federation_endpoint other than ValidationError propagate. |
@@ -443,3 +519,29 @@
 | Feeds | run_federation_command (enable, disable). |
 | Notes | turning on issues the endpoint's certificate before the apply, so nginx never loads the vhost without it. Turning off stops new joins only: sites that joined stay. Audited as FED_ENDPOINT_ON / FED_ENDPOINT_OFF. |
 | Called by | `fabriclib.federation.run_federation_command.run_federation_command` |
+
+## `fabricctl/lib/fabriclib/federation/show_networks.py`
+
+### `show_networks(v)`
+
+| | |
+|---|---|
+| Purpose | print the address plan across sites for `fabricctl federation networks` (design dhcp-management.md §5): site → network → VLAN → kind → notes, then every overlap between sites (with the reason when one was given). |
+| Inputs | v — fabric vars: ldap_base_dn, site_name, lan_cidr, dhcp (this site's networks are shown from its settings until the root's plan lists them). |
+| Returns | the number of overlaps without a reason (0: none). |
+| Fails | ValidationError / RuntimeError from read_address_plan (389-DS not running). |
+| Feeds | federation/run_federation_command (`networks`). |
+| Called by | `fabriclib.federation.run_federation_command.run_federation_command` |
+
+## `fabricctl/lib/fabriclib/federation/site_networks.py`
+
+### `site_networks(v)`
+
+| | |
+|---|---|
+| Purpose | the networks this site uses, as the address plan across sites records them (design dhcp-management.md §5): its LAN and every DHCP subnet, with name, VLAN, notes and an overlap reason. |
+| Inputs | v — fabric vars: lan_cidr; install_kea and dhcp.subnets [{subnet, name, vlan, notes, allow_overlap}]. |
+| Returns | list of {"name", "cidr", "kind" ("lan" \| "dhcp"), "vlan" (int or None), "notes", "allow_overlap"}, one per distinct network (a DHCP subnet that is the LAN itself is listed once, as the DHCP subnet with its name); names are unique (a subnet without a name is named by its network). |
+| Fails | never for missing settings (an empty list); ValueError for a lan_cidr that is not a network. |
+| Feeds | federation/publish_site_networks, federation/join_upstream (sent at join), accept_join and dhcp/common/edit_dhcp (overlap checks). |
+| Called by | `fabriclib.dhcp.common.edit_dhcp._check_address_plan`, `fabriclib.federation.accept_join._check_networks`, `fabriclib.federation.join_upstream.join_upstream`, `fabriclib.federation.publish_site_networks.publish_site_networks`, `fabriclib.federation.show_networks.show_networks` |

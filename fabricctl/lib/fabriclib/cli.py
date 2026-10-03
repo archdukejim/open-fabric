@@ -13,7 +13,7 @@
                                  DHCP (optional Kea): subnets, leases, reservations, options, client classes
   fabricctl radius status|log|add-client|rotate-secret|remove-client
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
-  fabricctl federation status|enable|disable|invite|invitations|revoke
+  fabricctl federation status|enable|disable|invite|invitations|revoke|networks
                                  sites joining this install (setup --join on the new site)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
   fabricctl logs status|set-password elastic

@@ -31,14 +31,14 @@
 
 ## `fabricctl/lib/fabriclib/dhcp/add_subnet.py`
 
-### `add_subnet(actor, subnet, name, vlan=None, router=None, pools=(), notes='', source='cli')`
+### `add_subnet(actor, subnet, name, vlan=None, router=None, pools=(), notes='', allow_overlap='', source='cli')`
 
 | | |
 |---|---|
 | Purpose | add a DHCP subnet with its name, VLAN record, router, pools and notes (design dhcp-management.md §4). Applied by the next apply. |
-| Inputs | actor — who asks (audit); subnet — network ("192.168.20.0/24"); name — one DNS label, unique; vlan — 1-4094 or None (a record: fabric configures no switch); router — address in the subnet or None; pools — "first - last" strings; notes — free text (at most 500 characters); source — "cli" or "web". |
+| Inputs | actor — who asks (audit); subnet — network ("192.168.20.0/24"); name — one DNS label, unique; vlan — 1-4094 or None (a record: fabric configures no switch); router — address in the subnet or None; pools — "first - last" strings; notes — free text (at most 500 characters); allow_overlap — why it may overlap another site's network (federation's address plan), "" for none; source — "cli" or "web". |
 | Returns | the saved subnet (normalized, with its new id: one above the highest in use, never reused while the others keep theirs). |
-| Fails | ValidationError from normalize_dhcp (bad network, name or vlan taken, pool outside the subnet or overlapping another, …); OSError / yaml.YAMLError from edit_dhcp. |
+| Fails | ValidationError from normalize_dhcp (bad network, name or vlan taken, pool outside the subnet or overlapping another, …) or edit_dhcp (Kea's check; another site's network overlapped); OSError / yaml.YAMLError from edit_dhcp. |
 | Feeds | run_dhcp_command (add-subnet), agent route POST /v1/dhcp/subnets. |
 | Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
@@ -58,6 +58,17 @@
 
 ## `fabricctl/lib/fabriclib/dhcp/common/edit_dhcp.py`
 
+### `_check_address_plan(before, data)`
+
+| | |
+|---|---|
+| Purpose | refuse a change that makes a subnet overlap another site's network (design dhcp-management.md §5), checked against this site's copy of the address plan. Overlaps that were there before the change do not block it (`fabricctl federation networks` lists them). Not federated, or the directory not answering (the sync checks again later): nothing to check. |
+| Inputs | before — the settings before the change; data — with the new dhcp block (site_name, ldap_base_dn, lan_cidr, dhcp). |
+| Returns | None. |
+| Fails | ValidationError naming each new overlap without an allow_overlap reason. |
+| Feeds | edit_dhcp. |
+| Called by | `fabriclib.dhcp.common.edit_dhcp.edit_dhcp` |
+
 ### `edit_dhcp(actor, event, change, source='cli')`
 
 | | |
@@ -65,7 +76,7 @@
 | Purpose | one change to `dhcp:` in vars.yaml, the way every DHCP command makes it: under the vars lock, on the normalized settings (so every subnet keeps a stored id), the whole block checked again — by fabric and, when DHCP is on, by Kea itself on the configuration it would get — before it is saved, then audited. Applied by the next apply. |
 | Inputs | actor — who asks (audit); event — the audit event (e.g. "DHCP_SUBNET_ADD"); change — function(dhcp) that changes the dict in place and returns (result, audit detail str); source — "cli" or "web". |
 | Returns | (result of change, the saved dhcp block). |
-| Fails | ValidationError from change, normalize_dhcp or Kea's check (check_kea_config: an option Kea does not know, data that does not fit, a class expression it cannot parse) — nothing is saved then, so a refused change never breaks the next apply; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
+| Fails | ValidationError from change, normalize_dhcp or Kea's check (check_kea_config: an option Kea does not know, data that does not fit, a class expression it cannot parse) or the address plan (a subnet overlapping another site's network without allow_overlap) — nothing is saved then, so a refused change never breaks the next apply; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
 | Feeds | dhcp/add_subnet, update_subnet, remove_subnet, set_option, unset_option, add_client_class, remove_client_class. |
 | Called by | `fabriclib.dhcp.add_client_class.add_client_class`, `fabriclib.dhcp.add_subnet.add_subnet`, `fabriclib.dhcp.remove_client_class.remove_client_class`, `fabriclib.dhcp.remove_subnet.remove_subnet`, `fabriclib.dhcp.set_option.set_option`, `fabriclib.dhcp.unset_option.unset_option`, `fabriclib.dhcp.update_subnet.update_subnet` |
 
@@ -265,9 +276,9 @@
 | | |
 |---|---|
 | Purpose | Check `dhcp:` (and that nothing static collides with it) before anything is rendered. |
-| Inputs | v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4 network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a record, fabric configures no switch), notes (at most 500 characters), pools, routers, options, reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes (design dhcp-management.md §2), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default 86400)}; dns (its A records). |
+| Inputs | v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4 network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a record, fabric configures no switch), notes (at most 500 characters), allow_overlap (why it may overlap another site's network, at most 200 characters), pools, routers, options, reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes (design dhcp-management.md §2), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default 86400)}; dns (its A records); fabric_subnet (default 10.255.0.0/24: no DHCP subnet may overlap it). |
 | Returns | a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` normalized: every subnet with its id (_subnet_ids: existing installs keep the ids their position gave them), subnet as str, name/vlan/ notes/options only when set, reservations with lower-case colon MACs and a hostname / options only when set; options, option_defs and client_classes normalized (left out when empty). |
-| Fails | ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4 subnet, a bad or repeated id, name or vlan, notes too long, a bad pool or two pools overlapping (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options, normalize_option_defs and normalize_client_classes. |
+| Fails | ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4 subnet, a subnet overlapping fabric_subnet, a bad or repeated id, name or vlan, notes or allow_overlap too long, a bad pool or two pools overlapping (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options, normalize_option_defs and normalize_client_classes. |
 | Feeds | deploy/check_settings (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py. |
 | Notes | a static A record inside a pool is refused because Kea would hand that address out. |
 | Called by | `fabriclib.deploy.check_settings.check_settings`, `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.common.edit_dhcp.edit_dhcp` |
@@ -434,12 +445,12 @@
 
 ## `fabricctl/lib/fabriclib/dhcp/update_subnet.py`
 
-### `update_subnet(actor, which, name=KEEP, vlan=KEEP, router=KEEP, notes=KEEP, add_pools=(), remove_pools=(), source='cli')`
+### `update_subnet(actor, which, name=KEEP, vlan=KEEP, router=KEEP, notes=KEEP, add_pools=(), remove_pools=(), allow_overlap=KEEP, source='cli')`
 
 | | |
 |---|---|
 | Purpose | change a DHCP subnet's name, VLAN record, router, notes or pools (design dhcp-management.md §4). Its network and id stay (leases are tied to the id). Applied by the next apply. |
-| Inputs | actor — who asks (audit); which — the subnet's name or network; name, vlan, router, notes — the new value, None or "" to clear it, KEEP (default) to leave it; add_pools / remove_pools — "first - last" strings; source — "cli" or "web". |
+| Inputs | actor — who asks (audit); which — the subnet's name or network; name, vlan, router, notes, allow_overlap (why it may overlap another site's network) — the new value, None or "" to clear it, KEEP (default) to leave it; add_pools / remove_pools — "first - last" strings; source — "cli" or "web". |
 | Returns | the saved subnet (normalized). |
 | Fails | ValidationError: no such subnet; a pool to remove that is not there; anything normalize_dhcp refuses (name or vlan taken, pool overlapping, a reservation now inside a pool, …); OSError / yaml.YAMLError. |
 | Feeds | run_dhcp_command (set-subnet), agent route POST /v1/dhcp/subnets/<subnet>. |

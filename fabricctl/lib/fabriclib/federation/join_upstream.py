@@ -11,6 +11,7 @@ from fabriclib.federation.common.post_upstream import post_upstream
 from fabriclib.federation.common.save_registry import save_registry
 from fabriclib.federation.constants import DOMAIN_RE
 from fabriclib.federation.decode_invitation import decode_invitation
+from fabriclib.federation.site_networks import site_networks
 from fabriclib.pki.make_site_ca_request import make_site_ca_request
 from fabriclib.pki.stage_site_ca import stage_site_ca
 
@@ -23,7 +24,9 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root,
              send the join over TLS verified against that root, check and stage the signed intermediate, and
              record the upstream.
-    Inputs:  v — fabric vars: service_users.step, image_stepca (make_site_ca_request); invitation — the
+    Inputs:  v — fabric vars: service_users.step, image_stepca (make_site_ca_request), lan_cidr and the DHCP
+             subnets (site_networks: sent so the upstream can refuse networks that overlap another site's);
+             invitation — the
              invitation text (decode_invitation); password — this site's ca_password (encrypts its CA key);
              work_dir — where the site CA key, request and certificates are kept; domain — this site's own
              domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder
@@ -71,7 +74,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     answer = post_upstream(inv["address"], inv["host"], root, "/v1/join",
                            {"id": inv["id"], "secret": inv["secret"], "site": inv["site"], "csr": req["csr"],
                             "domain": domain, "address": address, "federation_host": f"federation.{domain}",
-                            "via": inv["via"], "dns_port": int(dns_port), "ldap_host": f"ldap.{domain}"},
+                            "via": inv["via"], "dns_port": int(dns_port), "ldap_host": f"ldap.{domain}",
+                            "networks": site_networks(v)},
                            port=https_port)
     if not isinstance(answer, dict) or answer.get("root", "").strip() != root.strip():
         raise ValidationError("the upstream answered with a different root")

@@ -340,7 +340,9 @@ print("\n".join(line for line in nested.stdout.splitlines() if line.startswith((
       or nested.stdout[-2000:] + nested.stderr[-2000:])
 check("nested sites: nested.py passed", nested.returncode == 0, nested.stderr[-400:])
 
-for title, cmd in (("the replication plan (directory_links.py)",
+for title, cmd in (("the address plan's rules (address_plan.py)",
+                    [sys.executable, os.path.join(REPO, "tests", "federation", "address_plan.py")]),
+                   ("the replication plan (directory_links.py)",
                     [sys.executable, os.path.join(REPO, "tests", "federation", "directory_links.py")]),
                    ("directory replication with two real 389-DS (replication.sh)",
                     ["bash", os.path.join(REPO, "tests", "federation", "replication.sh")])):

@@ -681,6 +681,21 @@ leaves the site. Joins, refusals and invitations are audited (`FED_*`).
 An upstream whose CA was brought in (`byoc`) has no root key on the host and cannot sign a site's CA
 online yet.
 
+### The address plan (every site's networks)
+
+Each federated site publishes its networks — the LAN and every DHCP subnet, with name, VLAN and notes — into
+its part of the directory every 5 minutes (`fabricctl directory sync`); the root gathers them into one plan
+that every site keeps a copy of. So no two sites hand out the same addresses:
+
+```bash
+sudo fabricctl federation networks        # site, network, name, VLAN, kind, notes; then any OVERLAP
+```
+
+A DHCP subnet that would overlap another site's network is refused when it is added or changed, and a site
+whose networks overlap another's cannot join. Networks that are never routed together may overlap on
+purpose: `sudo fabricctl dhcp add-subnet … --allow-overlap "<why>"` (or `set-subnet`). A subnet may never use
+`fabric_subnet` (fabric's own container network).
+
 ## OpenBao (secrets)
 
 OpenBao is a core service: installed by `fabricctl setup` (step `vault`),
