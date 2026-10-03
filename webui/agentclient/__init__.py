@@ -21,6 +21,7 @@ from webui.agentclient.delete_tsig_key import delete_tsig_key  # noqa: F401
 from webui.agentclient.describe_csr import describe_csr  # noqa: F401
 from webui.agentclient.device_overview import device_overview  # noqa: F401
 from webui.agentclient.dhcp_overview import dhcp_overview  # noqa: F401
+from webui.agentclient.host_changes import host_changes  # noqa: F401
 from webui.agentclient.inspect_pem import inspect_pem  # noqa: F401
 from webui.agentclient.issue_key_pair import issue_key_pair  # noqa: F401
 from webui.agentclient.link_device_cert import link_device_cert  # noqa: F401

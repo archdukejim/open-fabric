@@ -964,7 +964,8 @@ Every `fabricctl` subcommand (Python, `fabricctl/lib/fabriclib/`; `sudo fabricct
 | `sudo fabricctl client-cert <user> [--days N]` | Web UI client certificate for another admin (`~/fabric-admin/<user>.p12`, default 365 days) |
 | `sudo fabricctl certs [--force]` | Renew service certificates (and `extra_certs`) that are missing, expiring within 30 days, missing a name or not from this CA (`--force`: all service certificates); restarts only the running services whose certificates changed |
 | `sudo fabricctl reinstall [--yes]` | Uninstall + setup, keeping config, secrets, the CA, certificates and OpenBao (data and vault key). Directory users/groups and Keycloak's database are **not** kept; the first admin is re-created with a new login kit. Asks first unless `--yes` |
-| `sudo fabricctl uninstall` | Remove fabric (asks: export all data to a folder you choose? purge the package too?); see [install.md](install.md#reinstall--uninstall) |
+| `sudo fabricctl setup --undo <group>` | Revert one host change fabric made (`runtime`, `firewall`, `trust`, `time`, `resolver`) and record it as declined — see [install.md](install.md#changes-to-the-host-asked-first) |
+| `sudo fabricctl uninstall` | Remove fabric (lists what happens to each host change, then asks: export all data to a folder you choose? purge the package too?); see [install.md](install.md#reinstall--uninstall) |
 | `sudo fabricctl restore <folder> [--yes]` | Bring back a fabric exported by `uninstall --export` (or `apt purge`); see [install.md](install.md#reinstall--uninstall) |
 
 `setup`, `reinstall`, `uninstall` and `restore` take `--deploy-base DIR` (as two words) for an install outside `/opt`; the package's `/usr/bin/fabricctl` runs every other command from `/opt/fabric`. An unknown command prints the list and exits 2.

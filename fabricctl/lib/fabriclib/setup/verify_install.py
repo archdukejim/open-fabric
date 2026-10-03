@@ -6,6 +6,8 @@ import subprocess
 from fabriclib.common.console import err, ok
 from fabriclib.common.dns_query import dns_query
 from fabriclib.common.sudo_owner import sudo_owner
+from fabriclib.consent.allowed_to_change import allowed_to_change
+from fabriclib.consent.plan_trust import plan_trust
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.keycloak.user_has_role import user_has_role
 from fabriclib.ntp.chrony_settings import chrony_settings
@@ -47,7 +49,7 @@ def _ldap_bind(uri, dn, password):
 
 def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
-             trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin
+             trust (unless the `trust` host change was declined), LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin
              (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter
              (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off
              — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site),
@@ -124,8 +126,9 @@ def checks(ctx):
     rc, code = _curl(f"https://{v['hostname_stepca']}/acme/acme/directory", v["hostname_stepca"], v["ip_nginx"], 443,
                      root_ca)
     add("Step-CA ACME directory reachable (API unaffected)", rc == 0 and code == "200", f"HTTP {code}")
-    rc, code = _curl(f"https://{v['hostname_landing']}/", v["hostname_landing"], v["ip_nginx"], 443, None)
-    add("this host trusts the fabric CA (system store)", rc == 0, f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
+    if allowed_to_change(ctx.config_dir, "trust", plan_trust(v), unasked_install=True):    # not when declined
+        rc, code = _curl(f"https://{v['hostname_landing']}/", v["hostname_landing"], v["ip_nginx"], 443, None)
+        add("this host trusts the fabric CA (system store)", rc == 0, f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
 
     if v.get("install_ldap", True):
         res = subprocess.run(["openssl", "s_client", "-connect", f"{v['ip_ldap']}:3636",

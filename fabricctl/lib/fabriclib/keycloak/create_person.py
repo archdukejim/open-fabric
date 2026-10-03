@@ -1,9 +1,9 @@
 import os
 import re
-import secrets
 import urllib.parse
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.common.one_time_password import one_time_password
 from fabriclib.common.write_audit import write_audit
 from fabriclib.keycloak.keycloak_admin import keycloak_admin
 from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities
@@ -32,7 +32,7 @@ def create_person(v, actor, uid, first, last, email, source="web"):
              CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and
              simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit
              source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao).
-    Returns: the one-time password (token_urlsafe(15)): shown once, stored nowhere. The person also gets their
+    Returns: the one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored nowhere. The person also gets their
              POSIX identity at once (ldap/ensure_posix_identities; if that fails, the 5-minute timer gives it).
     Fails:   ValidationError "people are created at the root site …" at a federated site (M5: the directory is a
              read-only copy there); "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address
@@ -56,7 +56,7 @@ def create_person(v, actor, uid, first, last, email, source="web"):
         raise ValidationError("first and last name: letters and simple punctuation, at most 60")
     if not MAIL_RE.match(email or ""):
         raise ValidationError("e-mail address looks wrong")
-    password = secrets.token_urlsafe(15)
+    password = one_time_password()
     try:
         kc, realm = keycloak_admin(v, load_secrets())
         r = _q(realm)

@@ -163,7 +163,7 @@
 | Fails | AgentError — the socket is missing/refused/timed out (OSError), the reply is not JSON (ValueError), or any status other than 200/400/401/403 (e.g. 404 unknown route, 500 agent internal error); ValidationError — 400: fabriclib rejected the input; message is the agent's "error", safe to show; AuthError — 401: the agent did not accept the ID token (missing, expired, not valid); PermissionDenied — 403: the token lacks the permission the route needs (fabriclib/rbac/required_permission.py), the route is not in that table, or the peer uid is refused; TypeError from json.dumps if `body` is not JSON-serialisable (not wrapped). |
 | Feeds | every agent call in webui/agentclient/. |
 | Notes | webui/handler.Handler.handle_request maps these to: 400 page, redirect to /login, 403 page, 503 page. |
-| Called by | `webui.agentclient.add_client_class.add_client_class`, `webui.agentclient.add_radius_client.add_radius_client`, `webui.agentclient.add_record.add_record`, `webui.agentclient.add_reservation.add_reservation`, `webui.agentclient.add_subnet.add_subnet`, `webui.agentclient.apply_changes.apply_changes`, `webui.agentclient.audit.audit`, `webui.agentclient.ca_summary.ca_summary`, `webui.agentclient.convert_cert.convert_cert`, `webui.agentclient.create_person.create_person`, `webui.agentclient.create_tsig_key.create_tsig_key`, `webui.agentclient.delete_device.delete_device`, `webui.agentclient.delete_record.delete_record`, `webui.agentclient.delete_role.delete_role`, `webui.agentclient.delete_tsig_key.delete_tsig_key`, `webui.agentclient.describe_csr.describe_csr`, `webui.agentclient.device_overview.device_overview`, `webui.agentclient.dhcp_overview.dhcp_overview`, `webui.agentclient.inspect_pem.inspect_pem`, `webui.agentclient.issue_key_pair.issue_key_pair`, `webui.agentclient.link_device_cert.link_device_cert`, `webui.agentclient.list_issued.list_issued`, `webui.agentclient.list_people.list_people`, `webui.agentclient.list_tsig_keys.list_tsig_keys`, `webui.agentclient.list_zones.list_zones`, `webui.agentclient.map_radius_group.map_radius_group`, `webui.agentclient.radius_guides.radius_guides`, `webui.agentclient.radius_overview.radius_overview`, `webui.agentclient.read_audit.read_audit`, `webui.agentclient.remove_client_class.remove_client_class`, `webui.agentclient.remove_radius_client.remove_radius_client`, `webui.agentclient.remove_reservation.remove_reservation`, `webui.agentclient.remove_subnet.remove_subnet`, `webui.agentclient.reset_sign_in.reset_sign_in`, `webui.agentclient.reverse_zones.reverse_zones`, `webui.agentclient.rotate_radius_secret.rotate_radius_secret`, `webui.agentclient.rotate_tsig_key.rotate_tsig_key`, `webui.agentclient.save_device.save_device`, `webui.agentclient.save_role.save_role`, `webui.agentclient.service_status.service_status`, `webui.agentclient.set_option.set_option`, `webui.agentclient.sign_csr.sign_csr`, `webui.agentclient.unmap_radius_group.unmap_radius_group`, `webui.agentclient.unset_option.unset_option`, `webui.agentclient.update_subnet.update_subnet`, `webui.agentclient.vault_add_kmip.vault_add_kmip`, `webui.agentclient.vault_add_security_key.vault_add_security_key`, `webui.agentclient.vault_add_usb.vault_add_usb`, `webui.agentclient.vault_devices.vault_devices`, `webui.agentclient.vault_rotate.vault_rotate`, `webui.agentclient.vault_slot_action.vault_slot_action`, `webui.agentclient.vault_slots.vault_slots`, `webui.agentclient.vault_status.vault_status`, `webui.agentclient.version_info.version_info`, `webui.agentclient.zone_detail.zone_detail` |
+| Called by | `webui.agentclient.add_client_class.add_client_class`, `webui.agentclient.add_radius_client.add_radius_client`, `webui.agentclient.add_record.add_record`, `webui.agentclient.add_reservation.add_reservation`, `webui.agentclient.add_subnet.add_subnet`, `webui.agentclient.apply_changes.apply_changes`, `webui.agentclient.audit.audit`, `webui.agentclient.ca_summary.ca_summary`, `webui.agentclient.convert_cert.convert_cert`, `webui.agentclient.create_person.create_person`, `webui.agentclient.create_tsig_key.create_tsig_key`, `webui.agentclient.delete_device.delete_device`, `webui.agentclient.delete_record.delete_record`, `webui.agentclient.delete_role.delete_role`, `webui.agentclient.delete_tsig_key.delete_tsig_key`, `webui.agentclient.describe_csr.describe_csr`, `webui.agentclient.device_overview.device_overview`, `webui.agentclient.dhcp_overview.dhcp_overview`, `webui.agentclient.host_changes.host_changes`, `webui.agentclient.inspect_pem.inspect_pem`, `webui.agentclient.issue_key_pair.issue_key_pair`, `webui.agentclient.link_device_cert.link_device_cert`, `webui.agentclient.list_issued.list_issued`, `webui.agentclient.list_people.list_people`, `webui.agentclient.list_tsig_keys.list_tsig_keys`, `webui.agentclient.list_zones.list_zones`, `webui.agentclient.map_radius_group.map_radius_group`, `webui.agentclient.radius_guides.radius_guides`, `webui.agentclient.radius_overview.radius_overview`, `webui.agentclient.read_audit.read_audit`, `webui.agentclient.remove_client_class.remove_client_class`, `webui.agentclient.remove_radius_client.remove_radius_client`, `webui.agentclient.remove_reservation.remove_reservation`, `webui.agentclient.remove_subnet.remove_subnet`, `webui.agentclient.reset_sign_in.reset_sign_in`, `webui.agentclient.reverse_zones.reverse_zones`, `webui.agentclient.rotate_radius_secret.rotate_radius_secret`, `webui.agentclient.rotate_tsig_key.rotate_tsig_key`, `webui.agentclient.save_device.save_device`, `webui.agentclient.save_role.save_role`, `webui.agentclient.service_status.service_status`, `webui.agentclient.set_option.set_option`, `webui.agentclient.sign_csr.sign_csr`, `webui.agentclient.unmap_radius_group.unmap_radius_group`, `webui.agentclient.unset_option.unset_option`, `webui.agentclient.update_subnet.update_subnet`, `webui.agentclient.vault_add_kmip.vault_add_kmip`, `webui.agentclient.vault_add_security_key.vault_add_security_key`, `webui.agentclient.vault_add_usb.vault_add_usb`, `webui.agentclient.vault_devices.vault_devices`, `webui.agentclient.vault_rotate.vault_rotate`, `webui.agentclient.vault_slot_action.vault_slot_action`, `webui.agentclient.vault_slots.vault_slots`, `webui.agentclient.vault_status.vault_status`, `webui.agentclient.version_info.version_info`, `webui.agentclient.zone_detail.zone_detail` |
 
 ## `webui/agentclient/convert_cert.py`
 
@@ -293,6 +293,19 @@
 | Returns | {"enabled", "interfaces", "lease_time", "ddns_zone", "subnets": [...], "leases": [...], "leases_error"} (fabriclib.dhcp.dhcp_overview). |
 | Fails | the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401), PermissionDenied (403). |
 | Feeds | webui/routes/get_page for "/kea". |
+| Called by | — (no static caller) |
+
+## `webui/agentclient/host_changes.py`
+
+### `host_changes()`
+
+| | |
+|---|---|
+| Purpose | What fabric may change on this host, by group, for the overview page (design host-consent.md §3, step 7). Agent route: GET /v1/host-changes (status:read). |
+| Inputs | none. |
+| Returns | list of {"group", "title", "state": "approved"\|"declined"\|"not asked", "when", "by", "relaxation"}; [] for an install set up before fabric asked. |
+| Fails | the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401), PermissionDenied (403). |
+| Feeds | webui/routes/get_page for "/" (views.overview). |
 | Called by | — (no static caller) |
 
 ## `webui/agentclient/inspect_pem.py`
@@ -1434,7 +1447,7 @@
 |---|---|
 | Purpose | Route a signed-in GET to its page. |
 | Inputs | h — the request handler (send, deny); sess — dict from find_session; path — str: /, /bind9, /stepca, /dirsrv, /openbao, /kea, /freeradius, /audit; query — dict (view, zone, device, name, slot, msg, err as each page uses them). |
-| Returns | 200 page (overview, BIND9, Step-CA, directory, OpenBao, Kea, FreeRADIUS with its setup guides for view switches / windows, audit log). |
+| Returns | 200 page (overview with the host changes fabric may make, BIND9, Step-CA, directory, OpenBao, Kea, FreeRADIUS with its setup guides for view switches / windows, audit log). |
 | Fails | 404 for any other path; agent errors propagate to handle_request (400, redirect to /login, 403, 503). |
 | Feeds | handler.Handler.handle_request. |
 | Called by | `webui.handler.Handler.handle_request` |
@@ -1955,12 +1968,12 @@
 
 ## `webui/views/overview.py`
 
-### `overview(ctx, services)`
+### `overview(ctx, services, host_changes=())`
 
 | | |
 |---|---|
-| Purpose | The Overview tab: one tile per service with a traffic light and a link to its tab. |
-| Inputs | ctx — page context (webui/session/page_context); services — list of (name, systemd state, container health) from agentclient.service_status(); names are described via SERVICES. |
+| Purpose | The Overview tab: one tile per service with a traffic light and a link to its tab; then the host changes fabric may make (approved, declined with what that leaves unmanaged). |
+| Inputs | ctx — page context (webui/session/page_context); services — list of (name, systemd state, container health) from agentclient.service_status(); names are described via SERVICES; host_changes — agentclient.host_changes(): what fabric may change on the host, by group ([] for an install set up before fabric asked). |
 | Returns | HTML str. |
 | Fails | Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller left out). |
 | Feeds | webui/routes/get_page (/); devserver; tests/webui/test_devserver.py. |

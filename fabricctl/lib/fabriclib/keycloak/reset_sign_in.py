@@ -1,7 +1,7 @@
-import secrets
 import urllib.parse
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.common.one_time_password import one_time_password
 from fabriclib.common.write_audit import write_audit
 from fabriclib.keycloak.fabric_groups import fabric_groups
 from fabriclib.keycloak.keycloak_admin import keycloak_admin
@@ -24,7 +24,7 @@ def reset_sign_in(v, actor, uid, privileged=False, source="web"):
     Inputs:  v — fabric vars (keycloak_admin, fabric_groups); actor — str, for the audit; uid — username
              (exact match); privileged — bool: the caller is root or holds system:admin (admin bundle);
              source — default "web". Reads Keycloak admin credentials via load_secrets.
-    Returns: the new one-time password (token_urlsafe(15)): shown once, stored nowhere.
+    Returns: the new one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored nowhere.
     Fails:   ValidationError "no user <uid>"; "<uid> is in a fabric group (...): only an admin can reset
              their sign-in"; "Keycloak refused: ..." (admin API error or failed login); load_secrets'
              ValidationError; OSError / ssl errors if Keycloak is unreachable.
@@ -33,7 +33,7 @@ def reset_sign_in(v, actor, uid, privileged=False, source="web"):
              helpdesk could take over an admin's single sign-on (OpenBao's UI needs no client certificate).
              Audited as PERSON_RESET.
     """
-    password = secrets.token_urlsafe(15)
+    password = one_time_password()
     try:
         kc, realm = keycloak_admin(v, load_secrets())
         r = _q(realm)

@@ -173,7 +173,9 @@ Before its first step, setup lists every change it would make **outside fabric's
 | `trust` | fabric's CA in the host's trust store | the host does not trust fabric's CA (shown in status) |
 | `time` | chrony's configuration | chrony keeps its own configuration (shown in status) |
 
-Answers are recorded in `config/consent.yaml`; a re-run asks again only about changes not approved before. `apply`, the web UI and the timers never ask: a change that needs a new answer waits for `sudo fabricctl setup`. `fabricctl status` lists the answers.
+Answers are recorded in `config/consent.yaml`; a re-run asks again only about changes not approved before. `apply`, the web UI and the timers never ask: a change that needs a new answer waits for `sudo fabricctl setup`. `fabricctl status` and the web UI's Overview list the answers.
+
+Before fabric first changes a host file (`daemon.json`, chrony's files, `/etc/resolv.conf`) it keeps a copy in `config/host-originals/`, and it notes whether ufw was on. `sudo fabricctl setup --undo GROUP` reverts one recommended change (`runtime`, `firewall`, `trust`, `time`; `resolver` once `use_host_dns` is true), says what it will do and asks first (`--yes` unattended), then records the answer as no; `--approve GROUP` makes the change again. The groups fabric needs (`packages`, `services`, `accounts`) are undone only by uninstall.
 
 ### Options
 
@@ -184,6 +186,7 @@ Answers are recorded in `config/consent.yaml`; a re-run asks again only about ch
 | `--yes`, `-y` | Accept the plan without asking (approves no host change) |
 | `--approve <groups>` | Allow these host changes without asking (comma-separated, repeatable, or `all`) |
 | `--decline <groups>` | Refuse these host changes (recommended ones are then left unmanaged and shown in status) |
+| `--undo <group>` | Revert one host change fabric made and record it as declined; nothing else runs (above) |
 | `--offline` | Never download; packages and images must already be present |
 | `--deploy-base <dir>` | Install root (default `/opt`) |
 | `--step <name>` | Run only this step (repeatable); the plan is not shown. An unknown name is refused |
@@ -342,7 +345,7 @@ secrets goes back into OpenBao and is shredded.
 
 `fabricctl uninstall` is the recommended way: the export goes only where you
 say, so nothing is left in `/var` or anywhere else. Every question is asked
-before anything is touched: export first (default yes, to
+before anything is touched, after a list of what happens to each host change fabric made (removed, undone or kept): export first (default yes, to
 `~/fabric-export-<time>` of the account that ran `sudo`)? remove the package
 too (default no)? then type `yes`. The export folder must be an absolute
 path, new or empty, and not inside anything the uninstall deletes; otherwise
@@ -350,12 +353,16 @@ it is refused and nothing changes. With `--yes` the export choice must be
 given (`--export DIR` or `--no-export`).
 
 It removes every service and `fabric.target`, the containers, the
-`fabric_net` network, fabric's locally built images, fabric's `DOCKER-USER`
-rules, the `/opt/<service>` folders (and TSIG credential folders), the vault
-key and unlock-method files, the USB kill-switch rule, the service accounts,
-the CA from the host trust store, the resolver drop-in and a checkout-era
-`/usr/local/bin/fabricctl`. Docker, downloaded images and other containers
-are not touched; ufw stays enabled.
+`fabric_net` network, fabric's locally built images, the `/opt/<service>`
+folders (and TSIG credential folders), the vault key and unlock-method files,
+the USB kill-switch rule, the service accounts and a checkout-era
+`/usr/local/bin/fabricctl`. It undoes the host changes: fabric's ufw rules,
+`DOCKER-USER` rules and `fabric-firewall.service` (ufw switched off again if it
+was off before fabric), the resolver (stub listener and `/etc/resolv.conf`
+back), chrony's files as they were, and the CA in the host trust store.
+Docker's daemon settings stay (putting them back restarts Docker: run
+`sudo fabricctl setup --undo runtime` first if you want that), as do apt
+packages. Docker, downloaded images and other containers are not touched.
 
 | Command | fabric install | Package | Export |
 |---|---|---|---|

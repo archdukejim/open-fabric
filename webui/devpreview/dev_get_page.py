@@ -17,7 +17,7 @@ def dev_get_page(h, path, query):
     if path == "/static/app.css":
         return h.send(200, views.css(), "text/css; charset=utf-8")
     if path == "/":
-        return h.send(200, views.overview(ctx, state.data["services"]))
+        return h.send(200, views.overview(ctx, state.data["services"], state.data["host_changes"]))
     if path == "/bind9":
         section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"
         key = query.get("zone") or next(iter(state.data["zones"]))

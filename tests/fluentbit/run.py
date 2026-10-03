@@ -159,9 +159,22 @@ def write_audit(marker):
         f.write(json.dumps({"type": "request", "request": {"path": "sys/health", "id": marker}}) + "\n")
 
 
-time.sleep(3)
-write_audit("mark-one")
-check("delivered to syslog over verified TLS", until(lambda: any("mark-one" in x for x in SYSLOG)),
+def write_until_seen(marker, seen, timeout=90):
+    """Write the marker every 5 s until seen: the tail starts at the file's end (read_from_head off), so a line
+    written before Fluent Bit has opened the file is never read."""
+    end, due = time.time() + timeout, 0
+    while time.time() < end:
+        if time.time() >= due:
+            write_audit(marker)
+            due = time.time() + 5
+        if seen():
+            return True
+        time.sleep(1)
+    return False
+
+
+check("delivered to syslog over verified TLS",
+      write_until_seen("mark-one", lambda: any("mark-one" in x for x in SYSLOG)),
       SYSLOG[-2:] + [sh("docker logs fluentbit", ok=False).stderr[-600:]])
 check("delivered to Elasticsearch over verified TLS, with the password from OpenBao",
       until(lambda: any("mark-one" in x for x in BULK))
@@ -188,9 +201,17 @@ syslog_cert["name"] = "siem"
 check("buffered on disk: delivered once the destination is right again",
       until(lambda: any("mark-two" in x for x in SYSLOG), 120), sh("docker logs fluentbit", ok=False).stderr[-600:])
 
-st = log_status(V)
-check("fabricctl logs status: both destinations with records sent",
-      st.get("reachable") and len(st["outputs"]) == 2 and all(m["sent"] > 0 for m in st["outputs"].values()), st)
+status = {}
+
+
+def both_sent():
+    """Fluent Bit counts a record as sent once its flush returns, a moment after the receiver has it."""
+    status.update(log_status(V))
+    return status.get("reachable") and len(status["outputs"]) == 2 and all(
+        m["sent"] > 0 for m in status["outputs"].values())
+
+
+check("fabricctl logs status: both destinations with records sent", until(both_sent, 30), status)
 
 sh(f"docker compose -f {W}/fluentbit/docker-compose.yml down", ok=False)
 sh(f"docker network rm {NET}", ok=False)

@@ -330,6 +330,8 @@ check("security headers present", "default-src 'none'" in hd.get("Content-Securi
 
 st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
 check("overview tab renders service health", st == 200 and "Overview" in body and "services healthy" in body, st)
+check("overview: the host changes through the agent (this test install was never asked: says so)",
+      "Host changes" in body and "Not asked yet" in body, body[-600:])
 st, hd, sc, body = req("GET", "/kea", ALICE, cookie=session)
 check("Kea tab: DHCP off on this host, how to turn it on", st == 200 and "DHCP is off" in body and "install_kea" in body,
       (st, body[:300]))

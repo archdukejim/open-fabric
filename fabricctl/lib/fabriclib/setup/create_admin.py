@@ -1,9 +1,9 @@
 import os
-import secrets
 import shutil
 import subprocess
 
 from fabriclib.common.console import info, ok, warn
+from fabriclib.common.one_time_password import one_time_password
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.keycloak.require_password_change import require_password_change
 from fabriclib.ldap.ensure_admin_user import ensure_admin_user
@@ -83,7 +83,7 @@ def run(ctx):
     os.chown(folder, uid, gid)
 
     if people_written_here(os.path.join(ctx.config_dir, "federation.yaml")):
-        password = secrets.token_urlsafe(18)
+        password = one_time_password(24)
         state = ensure_admin_user(v, user, password, v.get("webui_admin_email") or f"{user}@{v['domain']}")
         if state.startswith("created"):
             require_password_change(v, ctx.secrets, user)

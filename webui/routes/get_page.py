@@ -12,14 +12,14 @@ def get_page(h, sess, path, query):
     Inputs:  h — the request handler (send, deny); sess — dict from find_session; path — str: /, /bind9, /stepca,
              /dirsrv, /openbao, /kea, /freeradius, /audit; query — dict (view, zone, device, name, slot, msg, err as
              each page uses them).
-    Returns: 200 page (overview, BIND9, Step-CA, directory, OpenBao, Kea, FreeRADIUS with its setup guides for view
+    Returns: 200 page (overview with the host changes fabric may make, BIND9, Step-CA, directory, OpenBao, Kea, FreeRADIUS with its setup guides for view
              switches / windows, audit log).
     Fails:   404 for any other path; agent errors propagate to handle_request (400, redirect to /login, 403, 503).
     Feeds:   handler.Handler.handle_request.
     """
     ctx = page_context(sess)
     if path == "/":
-        return h.send(200, views.overview(ctx, actions.service_status()))
+        return h.send(200, views.overview(ctx, actions.service_status(), actions.host_changes()))
     if path == "/bind9":
         return bind9_page(h, ctx, query)
     if path == "/stepca":

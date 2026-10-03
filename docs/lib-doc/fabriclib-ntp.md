@@ -28,12 +28,12 @@
 
 ## `fabricctl/lib/fabriclib/ntp/deploy_chrony.py`
 
-### `deploy_chrony(v, registry_path, jinja_env, root='/', manage_units=True)`
+### `deploy_chrony(v, registry_path, jinja_env, root='/', manage_units=True, config_dir=None)`
 
 | | |
 |---|---|
 | Purpose | the host's time service (design ntp.md): chrony configured by fabric, keeping this host's clock and serving the network. |
-| Inputs | v — vars (chrony_settings; ntp_set_clock); registry_path — config/federation.yaml (the upstream site's address); jinja_env — loads chrony/chrony.conf.j2; root — "/" (tests: a scratch tree); manage_units — systemctl calls (False in tests). |
+| Inputs | v — vars (chrony_settings; ntp_set_clock); registry_path — config/federation.yaml (the upstream site's address); jinja_env — loads chrony/chrony.conf.j2; root — "/" (tests: a scratch tree); manage_units — systemctl calls (False in tests); config_dir — the install's config folder: the host's own files are kept there before fabric first writes them (None: not kept). |
 | Returns | True if chrony's configuration changed (chrony restarted when manage_units). |
 | Fails | ValidationError from normalize_ntp (through chrony_settings); OSError writing; CalledProcessError from systemctl. |
 | Feeds | deploy/deploy_optional_parts (every apply: the upstream site or the subnets may have changed). |

@@ -17,6 +17,7 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `apply_changes.py` | Render and apply the configuration (as `fabricctl --apply`) on the host. Agent route: POST /v1/apply (dns:write), timeout 960 s. |
 | `audit.py` | Write a login event to the audit log, best effort so an agent outage never blocks a denial. Agent route: POST /v1/events (session). |
 | `ca_summary.py` | The CA certificates, where devices fetch them, and the signing limits, for the Step-CA page. Agent route: GET /v1/pki/ca (pki:read). |
+| `host_changes.py` | What fabric may change on this host, by group (approved, declined with what that leaves unmanaged). Agent route: GET /v1/host-changes (status:read). |
 | `connection.py` | Make every later agent call from this thread carry `token`, which fabric-agent verifies and checks permissions against. |
 | `constants.py` | (constants) |
 | `convert_cert.py` | Re-package a certificate (and optional key) into other formats. Agent route: POST /v1/pki/convert (pki:issue). |

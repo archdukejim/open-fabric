@@ -29,6 +29,16 @@ SAMPLE = {
     "services": [("nginx", "active", "healthy"), ("bind9", "active", "healthy"), ("stepca", "active", "healthy"),
                  ("ldap", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),
                  ("openbao", "active", "healthy"), ("fabric-web", "active", "healthy"), ("fabric-agent", "active", "")],
+    "host_changes": [
+        {"group": g, "title": t, "state": st, "when": "2026-10-03T09:12:40+00:00" if st != "not asked" else "",
+         "by": "admin" if st != "not asked" else "", "relaxation": r}
+        for g, t, st, r in (
+            ("packages", "Packages", "approved", ""), ("runtime", "Docker daemon settings", "approved", ""),
+            ("services", "fabric's own services", "approved", ""), ("accounts", "Service accounts", "approved", ""),
+            ("resolver", "Host DNS resolver", "not asked", ""), ("firewall", "Host firewall", "approved", ""),
+            ("trust", "Host trust store", "declined", "this host does not trust fabric's CA: tools on the host (curl, "
+                                                     "apt, browsers) reject fabric's certificates unless given the CA"),
+            ("time", "Time service (chrony)", "approved", ""))],
     "zones": {
         "dynamic_zone_var": {"name": "home.arpa", "records": [
             ("A", "fabric", "192.168.1.53"), ("A", "@", "192.168.1.53"), ("A", "nas", "192.168.1.10"),

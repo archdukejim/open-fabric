@@ -13,7 +13,7 @@
 | Returns | True when there is nothing to change, or every change was approved; False otherwise (declined, never asked, or a change that was not part of what was approved). |
 | Fails | yaml.YAMLError / OSError from load_consent. |
 | Feeds | the setup steps and deploy parts that change the host (check_consent), apply. |
-| Called by | `fabriclib.consent.check_consent.check_consent`, `fabriclib.deploy.apply_deployment.apply_deployment`, `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts`, `fabriclib.setup.init_pki._publish_ca_certs` |
+| Called by | `fabriclib.consent.check_consent.check_consent`, `fabriclib.deploy.apply_deployment.apply_deployment`, `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts`, `fabriclib.setup.init_pki._publish_ca_certs`, `fabriclib.setup.verify_install.checks` |
 
 ## `fabricctl/lib/fabriclib/consent/ask_consent.py`
 
@@ -86,8 +86,8 @@
 | Inputs | config_dir — the install's config folder. |
 | Returns | list of {"group", "title", "state": "approved"\|"declined"\|"not asked", "when", "by", "relaxation" (the consequence when declined, else "")}, in GROUPS order; [] for an install set up before consent existed (no consent.yaml). |
 | Fails | yaml.YAMLError / OSError from load_consent. |
-| Feeds | system/service_status (`fabricctl status`). |
-| Called by | `fabriclib.consent.show_consent_status.show_consent_status` |
+| Feeds | show_consent_status (`fabricctl status`); fabric-agent GET /v1/host-changes (the web UI's Overview). |
+| Called by | `agent.get_route.<module>`, `fabriclib.consent.show_consent_status.show_consent_status` |
 
 ## `fabricctl/lib/fabriclib/consent/load_consent.py`
 
@@ -100,7 +100,7 @@
 | Returns | {group: {"answer": "yes"\|"no", "changes": [str, ...], "when": ISO time, "by": user}}; {} when nothing was asked yet. None when the install has no consent.yaml at all (an install set up before consent existed, or not set up). |
 | Fails | yaml.YAMLError on a malformed file; OSError reading it. |
 | Feeds | allowed_to_change, ask_consent, consent_status. |
-| Called by | `fabriclib.consent.allowed_to_change.allowed_to_change`, `fabriclib.consent.ask_consent.ask_consent`, `fabriclib.consent.consent_status.consent_status` |
+| Called by | `fabriclib.consent.allowed_to_change.allowed_to_change`, `fabriclib.consent.ask_consent.ask_consent`, `fabriclib.consent.consent_status.consent_status`, `fabriclib.undo.undo_group.undo_group` |
 
 ## `fabricctl/lib/fabriclib/consent/plan_accounts.py`
 
@@ -194,7 +194,7 @@
 | Returns | {group: [change, ...]} in GROUPS order, groups with nothing to change left out. |
 | Fails | SetupError from plan_accounts (an id taken by another account); errors of the plan_* functions. |
 | Feeds | setup/run_setup (ask_consent). |
-| Called by | `fabriclib.setup.run_setup.main` |
+| Called by | `fabriclib.setup.run_setup.main`, `fabriclib.undo.undo_group.undo_group` |
 
 ## `fabricctl/lib/fabriclib/consent/plan_packages.py`
 
@@ -272,7 +272,7 @@
 | Returns | list of str (one entry: the files and update-ca-certificates). |
 | Fails | never. |
 | Feeds | consent/plan_host_changes, setup/init_pki. |
-| Called by | `fabriclib.consent.plan_host_changes.plan_host_changes`, `fabriclib.setup.init_pki._publish_ca_certs`, `fabriclib.setup.init_pki.run` |
+| Called by | `fabriclib.consent.plan_host_changes.plan_host_changes`, `fabriclib.setup.init_pki._publish_ca_certs`, `fabriclib.setup.init_pki.run`, `fabriclib.setup.verify_install.checks` |
 
 ## `fabricctl/lib/fabriclib/consent/planned_vars.py`
 
@@ -298,7 +298,7 @@
 | Returns | None; consent.yaml written atomically. |
 | Fails | OSError. |
 | Feeds | ask_consent. |
-| Called by | `fabriclib.consent.ask_consent.ask_consent` |
+| Called by | `fabriclib.consent.ask_consent.ask_consent`, `fabriclib.undo.undo_group.undo_group` |
 
 ## `fabricctl/lib/fabriclib/consent/show_consent_status.py`
 

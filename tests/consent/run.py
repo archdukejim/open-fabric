@@ -14,6 +14,8 @@ import yaml
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
+from fabriclib.common.keep_original import keep_original  # noqa: E402
+from fabriclib.common.restore_original import restore_original  # noqa: E402
 from fabriclib.consent import plan_accounts as pa  # noqa: E402
 from fabriclib.consent.allowed_to_change import allowed_to_change  # noqa: E402
 from fabriclib.consent.ask_consent import ask_consent  # noqa: E402
@@ -21,8 +23,12 @@ from fabriclib.consent.check_consent import check_consent  # noqa: E402
 from fabriclib.consent.consent_status import consent_status  # noqa: E402
 from fabriclib.consent.plan_firewall import plan_firewall  # noqa: E402
 from fabriclib.deploy.render_vars import render_vars  # noqa: E402
+from fabriclib.security.ufw_rule import ufw_rule  # noqa: E402
 from fabriclib.setup.errors import SetupError  # noqa: E402
 from fabriclib.setup.upgrade_vars import upgrade_vars  # noqa: E402
+from fabriclib.undo import undo_runtime as ur  # noqa: E402
+from fabriclib.undo.undo_group import undo_group  # noqa: E402
+from fabriclib.undo.uninstall_plan import uninstall_plan  # noqa: E402
 
 FAILED = 0
 JINJA = os.path.join(REPO, "fabricctl", "jinja")
@@ -152,6 +158,70 @@ final, _ = render_vars(jinja_env(JINJA), {}, {"domain": "lan.test", "hostname": 
                                               "lan_cidr": "10.0.0.0/24", "lan_gateway": "10.0.0.1"})
 check("the settings render without secrets (a fresh install plans before anything exists)",
       final["service_users"]["bind"]["uid"] == 600)
+
+print("--- undoing a host change (setup --undo, uninstall)")
+host = tempfile.mkdtemp()                         # stands in for the host's files
+orig = os.path.join(host, "etc", "app.conf")
+os.makedirs(os.path.dirname(orig))
+open(orig, "w").write("theirs\n")
+kept = keep_original(orig, cfg)
+open(orig, "w").write("# fabric: ours\n")
+check("the host's file is kept once, before fabric's first change; a later change does not replace the copy",
+      kept and not keep_original(orig, cfg) and restore_original(orig, cfg) == "restored"
+      and open(orig).read() == "theirs\n" and restore_original(orig, cfg) is None)
+new = os.path.join(host, "etc", "new.conf")
+keep_original(new, cfg)
+open(new, "w").write("x")
+link = os.path.join(host, "etc", "resolv.conf")
+os.symlink("/run/systemd/resolve/stub-resolv.conf", link)
+keep_original(link, cfg)
+os.remove(link)
+os.symlink("/run/systemd/resolve/resolv.conf", link)
+check("a file fabric added is removed again; a symlink gets its own target back",
+      restore_original(new, cfg) == "removed" and not os.path.exists(new) and restore_original(link, cfg) == "restored"
+      and os.readlink(link) == "/run/systemd/resolve/stub-resolv.conf")
+ours = os.path.join(host, "etc", "ours.conf")
+open(ours, "w").write("# fabric: rendered by fabricctl\n")
+check("a file already fabric's (an install from before copies were kept) is not taken for the original",
+      not keep_original(ours, cfg, marker="# fabric") and restore_original(ours, cfg) is None)
+check("fabric's ufw rules: the same words add and delete them",
+      ufw_rule("ssh", "10.0.0.0/24") == ["from", "10.0.0.0/24", "to", "any", "port", "22", "proto", "tcp"]
+      and ufw_rule("dhcp", "eth1") == ["in", "on", "eth1", "to", "any", "port", "67", "proto", "udp"])
+daemon = os.path.join(host, "daemon.json")
+ur.DAEMON_JSON = daemon
+open(daemon, "w").write('{"data-root": "/srv/docker", "icc": false, "no-new-privileges": true, "live-restore": false,'
+                        ' "log-opts": {"max-size": "10m", "max-file": "3", "labels": "a"}}')
+before = open(daemon).read()
+done = ur.undo_runtime(cfg, restart=False)
+check("without a kept copy only the keys still holding fabric's values leave daemon.json (an admin's value stays)",
+      yaml.safe_load(open(daemon)) == {"data-root": "/srv/docker", "live-restore": False, "log-opts": {"labels": "a"}}
+      and done and "no copy" in done[0], (open(daemon).read(), done))
+open(daemon, "w").write(before)
+keep_original(daemon, cfg)
+open(daemon, "w").write('{"icc": false}')
+check("with a kept copy daemon.json is put back exactly",
+      ur.undo_runtime(cfg, restart=False)[0].endswith("put back as it was") and open(daemon).read() == before)
+
+
+class Ctx:
+    def __init__(self, config_dir, v):
+        self.config_dir, self.vars = config_dir, v
+
+
+fresh = tempfile.mkdtemp()
+check("undo refuses the kinds fabric needs (uninstall removes those), naming the way",
+      "fabricctl uninstall" in refused(lambda: undo_group(Ctx(cfg, {}), "accounts", True, True)))
+check("undo refuses the resolver while BIND needs port 53",
+      "use_host_dns" in refused(lambda: undo_group(Ctx(cfg, {"use_host_dns": False}), "resolver", True, True)))
+check("undo refuses on an install never asked (setup asks first), and an unknown group",
+      "set up before" in refused(lambda: undo_group(Ctx(fresh, {}), "trust", True, True))
+      and "unknown" in refused(lambda: undo_group(Ctx(cfg, {}), "bogus", True, True)))
+check("undo without --yes never runs unattended",
+      "--yes" in refused(lambda: undo_group(Ctx(cfg, {"domain_file": "x"}), "trust", False, False)))
+rows = {t: (how, what) for t, how, what in uninstall_plan()}
+check("uninstall lists every kind of host change: removed, undone or kept (Docker's settings: how to undo first)",
+      len(rows) == 8 and rows["Service accounts"][0] == "removed" and rows["Host firewall"][0] == "undone"
+      and rows["Docker daemon settings"][0] == "kept" and "--undo runtime" in rows["Docker daemon settings"][1], rows)
 
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
 sys.exit(1 if FAILED else 0)

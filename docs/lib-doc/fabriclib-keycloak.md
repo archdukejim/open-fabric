@@ -69,7 +69,7 @@
 |---|---|
 | Purpose | Helpdesk `people:create`: create a realm user in Keycloak (which writes the account to 389-DS) with a one-time password. |
 | Inputs | v — fabric vars (keycloak_admin: ip_keycloak, hostname_keycloak, webui_realm or domain, root CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao). |
-| Returns | the one-time password (token_urlsafe(15)): shown once, stored nowhere. The person also gets their POSIX identity at once (ldap/ensure_posix_identities; if that fails, the 5-minute timer gives it). |
+| Returns | the one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored nowhere. The person also gets their POSIX identity at once (ldap/ensure_posix_identities; if that fails, the 5-minute timer gives it). |
 | Fails | ValidationError "people are created at the root site …" at a federated site (M5: the directory is a read-only copy there); "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address looks wrong"; "<uid> (or that e-mail address) already exists" (HTTP 409); "Keycloak refused: ..." (any other admin API error or failed admin login, raised as SystemExit by admin_client.Admin); load_secrets' ValidationError (OpenBao sealed or unreachable); OSError / ssl errors if Keycloak is unreachable; IndexError if the new user cannot be read back. |
 | Feeds | agent route POST /v1/people (agent/post_route.py) -> webui agentclient.create_person -> People page. |
 | Notes | the user joins the plain `users` group only (never a fabric group; skipped silently if that group does not exist). The password is temporary: Keycloak asks for a new one, then TOTP enrolment, at the first sign-in. If a step after the creation fails the account stays, without a known password (reset_sign_in recovers it). Audited as PERSON_CREATE. |
@@ -311,7 +311,7 @@
 |---|---|
 | Purpose | Helpdesk `people:reset`: give a person a new one-time password, remove their TOTP (they enrol again) and end their sessions. |
 | Inputs | v — fabric vars (keycloak_admin, fabric_groups); actor — str, for the audit; uid — username (exact match); privileged — bool: the caller is root or holds system:admin (admin bundle); source — default "web". Reads Keycloak admin credentials via load_secrets. |
-| Returns | the new one-time password (token_urlsafe(15)): shown once, stored nowhere. |
+| Returns | the new one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored nowhere. |
 | Fails | ValidationError "no user <uid>"; "<uid> is in a fabric group (...): only an admin can reset their sign-in"; "Keycloak refused: ..." (admin API error or failed login); load_secrets' ValidationError; OSError / ssl errors if Keycloak is unreachable. |
 | Feeds | agent route POST /v1/people/<uid>/reset -> webui agentclient.reset_sign_in -> People page. |
 | Notes | members of fabric groups (admins, auditors, operators, ...) need `privileged`: otherwise the helpdesk could take over an admin's single sign-on (OpenBao's UI needs no client certificate). Audited as PERSON_RESET. |

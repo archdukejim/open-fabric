@@ -13,7 +13,7 @@
 | Returns | None. |
 | Fails | never in practice — only an OSError from writing to a closed stdout. |
 | Feeds | setup/run_setup.py, setup/choose_plan.py (console output only). |
-| Called by | `fabriclib.consent.ask_consent.ask_consent`, `fabriclib.setup.choose_plan.choose_plan`, `fabriclib.setup.run_setup.main` |
+| Called by | `fabriclib.consent.ask_consent.ask_consent`, `fabriclib.setup.choose_plan.choose_plan`, `fabriclib.setup.run_setup.main`, `fabriclib.undo.undo_group.undo_group` |
 
 ### `info(text)`
 
@@ -35,7 +35,7 @@
 | Returns | None. |
 | Fails | never in practice — only an OSError from writing to a closed stdout. |
 | Feeds | most setup steps (deploy_config, start_services, verify_install, …) and run_setup. |
-| Called by | `fabriclib.setup.backup_install.backup_install`, `fabriclib.setup.collect_vars.collect_vars`, `fabriclib.setup.condition_host.run`, `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.configure_network.run`, `fabriclib.setup.create_accounts.run`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.deploy_config.run`, `fabriclib.setup.export_install.export_install`, `fabriclib.setup.harden_docker.run`, `fabriclib.setup.init_pki.run`, `fabriclib.setup.join_federation.run`, `fabriclib.setup.mint_extra_certs.mint_extra_certs`, `fabriclib.setup.mint_service_certs.run`, `fabriclib.setup.preflight.run`, `fabriclib.setup.renew_service_certs.renew_service_certs`, `fabriclib.setup.restore_install.restore_install`, `fabriclib.setup.run_setup.main`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.start_bootstrap.run`, `fabriclib.setup.start_services.run`, `fabriclib.setup.uninstall.uninstall` |
+| Called by | `fabriclib.setup.backup_install.backup_install`, `fabriclib.setup.collect_vars.collect_vars`, `fabriclib.setup.condition_host.run`, `fabriclib.setup.configure_firewall.run`, `fabriclib.setup.configure_network.run`, `fabriclib.setup.create_accounts.run`, `fabriclib.setup.create_admin.run`, `fabriclib.setup.deploy_config.run`, `fabriclib.setup.export_install.export_install`, `fabriclib.setup.harden_docker.run`, `fabriclib.setup.init_pki.run`, `fabriclib.setup.join_federation.run`, `fabriclib.setup.mint_extra_certs.mint_extra_certs`, `fabriclib.setup.mint_service_certs.run`, `fabriclib.setup.preflight.run`, `fabriclib.setup.renew_service_certs.renew_service_certs`, `fabriclib.setup.restore_install.restore_install`, `fabriclib.setup.run_setup.main`, `fabriclib.setup.setup_openbao.run`, `fabriclib.setup.start_bootstrap.run`, `fabriclib.setup.start_services.run`, `fabriclib.setup.uninstall.uninstall`, `fabriclib.undo.undo_group.undo_group` |
 
 ### `warn(text)`
 
@@ -180,6 +180,19 @@
 | Feeds | deploy/apply_deployment (and render_templates), dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py, radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites. |
 | Called by | `fabriclib.consent.planned_vars.planned_vars`, `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.dhcp.common.edit_dhcp.edit_dhcp`, `fabriclib.logs.run_logs_command.run_logs_command`, `fabriclib.system.render_template_file.render_template_file` |
 
+## `fabricctl/lib/fabriclib/common/keep_original.py`
+
+### `keep_original(path, config_dir, marker=None)`
+
+| | |
+|---|---|
+| Purpose | keep a copy of a host file as it was before fabric first changes it, so `fabricctl setup --undo` and uninstall can put it back (design host-consent.md §4). |
+| Inputs | path — the host file about to change (absolute); config_dir — the install's config folder (None: keep nothing, e.g. tests on a scratch tree); marker — text that marks the file as fabric's own (its first line): a file holding it is not an original (an install set up before originals were kept). |
+| Returns | True when a record was made now: a copy, a ".link" file with a symlink's target, or an ".absent" file when the path did not exist; False when a record exists already (only the first is kept), config_dir is None or the file is fabric's own. |
+| Fails | OSError reading the file or writing the record. |
+| Feeds | setup/harden_docker, setup/configure_firewall (ufw's state), setup/configure_network, ntp/deploy_chrony; undone by common/restore_original. |
+| Called by | `fabriclib.ntp.deploy_chrony.deploy_chrony`, `fabriclib.setup.configure_network.run`, `fabriclib.setup.harden_docker.run` |
+
 ## `fabricctl/lib/fabriclib/common/load_vars.py`
 
 ### `load_vars(path=VARS_FILE)`
@@ -192,6 +205,19 @@
 | Fails | yaml.YAMLError on invalid YAML; OSError (e.g. PermissionError) if it cannot be read. |
 | Feeds | dns/*, dhcp/add_reservation, dhcp/remove_reservation, radius/* (client and group edits), secrets/load_secrets, secrets/save_secrets, agent/ (fabric-agent), menu/ (the vars editor). |
 | Called by | `agent.get_route.<module>`, `agent.get_route.get_route`, `agent.handler.Handler.authorize`, `agent.post_dhcp.post_dhcp`, `agent.post_directory.post_directory`, `agent.post_pki.post_pki`, `agent.post_route.post_route`, `agent.post_vault.post_vault`, `fabriclib.deploy.apply_deployment._prepare`, `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.common.edit_dhcp.edit_dhcp`, `fabriclib.dhcp.remove_reservation.remove_reservation`, `fabriclib.dns.add_acl_entries.add_acl_entries`, `fabriclib.dns.add_record.add_record`, `fabriclib.dns.add_tsig_key.add_tsig_key`, `fabriclib.dns.create_zone_tsig_key.create_zone_tsig_key`, `fabriclib.dns.list_tsig_keys.list_tsig_keys`, `fabriclib.dns.list_zones.list_zones`, `fabriclib.dns.remove_acl_entries.remove_acl_entries`, `fabriclib.dns.remove_record.remove_record`, `fabriclib.dns.remove_tsig_key.remove_tsig_key`, `fabriclib.dns.replace_tsig_secret.replace_tsig_secret`, `fabriclib.dns.rotate_tsig_key.rotate_tsig_key`, `fabriclib.dns.run_acl_command.run_acl_command`, `fabriclib.dns.run_tsig_command._stored_key`, `fabriclib.dns.set_acl_policy.set_acl_policy`, `fabriclib.dns.set_key_acls.set_key_acls`, `fabriclib.dns.update_tsig_key.update_tsig_key`, `fabriclib.dns.zone_detail.zone_detail`, `fabriclib.federation.reparent_site.reparent_site`, `fabriclib.federation.set_federation_endpoint.set_federation_endpoint`, `fabriclib.menu.apply_and_report.apply_and_report`, `fabriclib.menu.edit_dns_zone.edit_dns_zone`, `fabriclib.menu.edit_links.edit_links`, `fabriclib.menu.print_vars.print_vars`, `fabriclib.menu.run_vars_menu.run_vars_menu`, `fabriclib.pki.run_mint_certs_command.run_mint_certs_command`, `fabriclib.radius.add_radius_client.add_radius_client`, `fabriclib.radius.map_radius_group.map_radius_group`, `fabriclib.radius.remove_radius_client.remove_radius_client`, `fabriclib.radius.rotate_radius_secret.rotate_radius_secret`, `fabriclib.radius.unmap_radius_group.unmap_radius_group`, `fabriclib.secrets.load_secrets.load_secrets`, `fabriclib.secrets.save_secrets.save_secrets`, `fabriclib.system.render_template_file.render_template_file`, `federation.server.Handler.do_GET`, `federation.server.Handler.do_POST` |
+
+## `fabricctl/lib/fabriclib/common/one_time_password.py`
+
+### `one_time_password(length=20)`
+
+| | |
+|---|---|
+| Purpose | a random password for a person (a one-time password at creation or reset) that every password policy fabric sets accepts: 389-DS wants 3 of its 4 character kinds (passwordMinCategories, 00-config.ldif), and a plain token_urlsafe misses digits and "-"/"_" together about once in 60. |
+| Inputs | length — characters (default 20, at least 12: passwordMinLength). |
+| Returns | str of URL-safe characters with at least one lower-case letter, one capital, one digit and one of "-_", in random order (operating system CSPRNG). |
+| Fails | ValueError for a length under 12. |
+| Feeds | keycloak/create_person, keycloak/reset_sign_in, setup/create_admin. |
+| Called by | `fabriclib.keycloak.create_person.create_person`, `fabriclib.keycloak.reset_sign_in.reset_sign_in`, `fabriclib.setup.create_admin.run` |
 
 ## `fabricctl/lib/fabriclib/common/read_audit.py`
 
@@ -231,6 +257,19 @@
 | Fails | yaml.YAMLError on invalid YAML; OSError if unreadable. |
 | Feeds | jinja_env (packages_lock global, used by the kea templates); tests/kea/run.py. |
 | Called by | `fabriclib.common.jinja_env.jinja_env` |
+
+## `fabricctl/lib/fabriclib/common/restore_original.py`
+
+### `restore_original(path, config_dir)`
+
+| | |
+|---|---|
+| Purpose | put a host file back as it was before fabric first changed it (design host-consent.md §4). |
+| Inputs | path — the host file (absolute); config_dir — the install's config folder holding the record made by common/keep_original. |
+| Returns | "restored" (the copy or the symlink is back), "removed" (the file did not exist before fabric: it is gone again) or None (no record: fabric does not know what was there, nothing is touched). The record is removed once used. |
+| Fails | OSError writing the host file. |
+| Feeds | undo/undo_runtime, undo/undo_time, undo/undo_resolver. |
+| Called by | `fabriclib.undo.undo_resolver.undo_resolver`, `fabriclib.undo.undo_runtime.undo_runtime`, `fabriclib.undo.undo_time.undo_time` |
 
 ## `fabricctl/lib/fabriclib/common/run.py`
 

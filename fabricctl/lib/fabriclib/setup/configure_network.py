@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from fabriclib.common.console import ok
+from fabriclib.common.keep_original import keep_original
 from fabriclib.consent.check_consent import check_consent
 from fabriclib.consent.plan_resolver import plan_resolver
 
@@ -15,7 +16,8 @@ def run(ctx):
              dns_server (default 8.8.8.8), config_dir (the `resolver` consent, asked before the first step).
     Returns: None; fabric_net exists (an existing one is not checked or changed). Without use_host_dns: the
              resolved drop-in RESOLVED_DROPIN is written and /etc/resolv.conf re-linked to systemd-resolved's
-             file, restarting it — only when the drop-in changed.
+             file, restarting it — only when the drop-in changed (the first time
+             both are kept as they were: common/keep_original).
     Fails:   SetupError when the resolver change was not approved; CalledProcessError from `docker network create` or `systemctl restart systemd-resolved`; OSError
              on the files.
     Feeds:   setup step `network`, run by run_setup via STEPS."""
@@ -35,6 +37,9 @@ def run(ctx):
     old = open(RESOLVED_DROPIN).read() if os.path.exists(RESOLVED_DROPIN) else None
     if old != content:
         check_consent(ctx.config_dir, "resolver", plan_resolver(ctx.vars))
+        if old is None:                     # the first change: keep what was there (uninstall puts it back)
+            keep_original("/etc/resolv.conf", ctx.config_dir)
+            keep_original(RESOLVED_DROPIN, ctx.config_dir)
         with open(RESOLVED_DROPIN, "w") as f:
             f.write(content)
         if os.path.islink("/etc/resolv.conf") or os.path.exists("/etc/resolv.conf"):

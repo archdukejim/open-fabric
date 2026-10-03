@@ -1,6 +1,9 @@
+import os
+
 from agent.route_not_found import RouteNotFound
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.read_audit import read_audit
+from fabriclib.consent.consent_status import consent_status
 from fabriclib.dhcp.dhcp_overview import dhcp_overview
 from fabriclib.dns.list_tsig_keys import list_tsig_keys
 from fabriclib.dns.list_zones import list_zones
@@ -22,6 +25,7 @@ from fabriclib.vault.vault_status import vault_status
 READS = {
     ("version",): lambda: version_info(),
     ("services",): lambda: service_status(),
+    ("host-changes",): lambda: consent_status(os.path.join(load_vars()["deploy_base_dir"], "fabric", "config")),
     ("zones",): lambda: list_zones(),
     ("audit",): lambda: read_audit(),
     ("pki", "ca"): lambda: ca_summary(load_vars()),

@@ -9,7 +9,7 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabricctl-agent](fabricctl-agent.md) | fabric-agent: the permission-checked host API behind the web UI | 24 | 13 |
 | [fabricctl-jinja](fabricctl-jinja.md) | Code that runs inside service containers (389-DS seeding, FreeRADIUS policy) | 24 | 8 |
 | [fabricctl-lib](fabricctl-lib.md) | Entry points: the deploy engine, the vars editor, the Keycloak configuration | 9 | 2 |
-| [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 29 | 19 |
+| [fabriclib-common](fabriclib-common.md) | Shared helpers: paths, vars file, locking, audit, rendering, console output | 32 | 22 |
 | [fabriclib-consent](fabriclib-consent.md) |  | 25 | 18 |
 | [fabriclib-core](fabriclib-core.md) | fabriclib's command router (cli.py) | 5 | 1 |
 | [fabriclib-deploy](fabriclib-deploy.md) | The deploy engine: secrets, settings, render, install, restart | 30 | 25 |
@@ -27,9 +27,10 @@ Every function of `fabricctl/`, `webui/` and `installers/`: its purpose, inputs,
 | [fabriclib-radius](fabriclib-radius.md) | Optional 802.1X (FreeRADIUS): clients, groups, setup guides, decisions | 16 | 14 |
 | [fabriclib-rbac](fabriclib-rbac.md) | Who may do what: permissions, bundles, route table | 2 | 2 |
 | [fabriclib-secrets](fabriclib-secrets.md) | fabric's own secrets: file or OpenBao | 11 | 9 |
-| [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 4 | 3 |
-| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 80 | 37 |
+| [fabriclib-security](fabriclib-security.md) | Host firewall for Docker-published ports | 5 | 4 |
+| [fabriclib-setup](fabriclib-setup.md) | fabricctl setup / doctor / uninstall / restore: one step per file | 82 | 37 |
 | [fabriclib-system](fabriclib-system.md) | Service status, start/stop, apply, version | 6 | 5 |
+| [fabriclib-undo](fabriclib-undo.md) |  | 8 | 7 |
 | [fabriclib-vault](fabriclib-vault.md) | OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass | 81 | 43 |
 | [installers](installers.md) | The Debian package wrapper | 2 | 1 |
-| [webui](webui.md) | Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview | 162 | 118 |
+| [webui](webui.md) | Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview | 163 | 119 |

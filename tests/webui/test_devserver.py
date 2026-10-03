@@ -96,6 +96,9 @@ try:
           st == 200 and 'download="device.home.arpa.key"' in page and "only copy of the private key" in page)
     page = req("GET", "/")[3]
     check("overview shows one status light per service", page.count('class="light ok"') == 9 and "pill" not in page.split("<section class=\"tiles\">")[1])
+    check("overview lists the host changes: a declined one with what it leaves unmanaged",
+          "Host changes" in page and "Host trust store" in page and "declined" in page
+          and "does not trust fabric&#39;s CA" in page and "not asked" in page, page[-800:])
     st, _, _, page = req("GET", "/bind9?view=reverse")
     check("reverse zones generated from forward A/AAAA records",
           st == 200 and "1.168.192.in-addr.arpa" in page and "20.168.192.in-addr.arpa" in page

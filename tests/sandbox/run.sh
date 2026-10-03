@@ -103,6 +103,25 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
+echo "--- undoing one host change (host-consent.md §4): trust, then approved again"
+UFW_BEFORE=$(in_box 'cat /opt/fabric/config/host-originals/ufw.state' 2>/dev/null)
+check "the host's own files were kept before fabric first changed them (chrony's, ufw's state)" \
+    "in_box 'test -f /opt/fabric/config/host-originals/etc/chrony/chrony.conf' && ! in_box 'grep -q \"^# fabric\" /opt/fabric/config/host-originals/etc/chrony/chrony.conf' && [ -n '$UFW_BEFORE' ]"
+in_box 'fabricctl setup --undo trust --non-interactive' > "$OUT/undo-refused.log" 2>&1
+check "setup --undo unattended without --yes changes nothing" \
+    "grep -q 'pass --yes' '$OUT/undo-refused.log' && in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1"
+in_box 'fabricctl setup --undo trust --non-interactive --yes' > "$OUT/undo-trust.log" 2>&1
+check "setup --undo trust: fabric's CA out of the host trust store, recorded as declined (status shows it)" \
+    "! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && in_box 'fabricctl status' | grep -qE '^  trust +declined'"
+in_box 'fabricctl doctor' > "$OUT/doctor-undo.log" 2>&1
+check "doctor passes with trust declined (it no longer expects the host to trust the CA)" \
+    "! grep -q '✗' '$OUT/doctor-undo.log' && ! grep -q 'this host trusts the fabric CA' '$OUT/doctor-undo.log'"
+in_box 'fabricctl setup --approve trust --step pki --non-interactive --yes' > "$OUT/undo-reapprove.log" 2>&1
+check "setup --approve trust puts the CA back in the host trust store" \
+    "in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && in_box 'fabricctl status' | grep -qE '^  trust +approved'"
+in_box 'fabricctl setup --undo accounts --non-interactive --yes' > "$OUT/undo-accounts.log" 2>&1
+check "setup --undo refuses what fabric needs (accounts), naming uninstall" "grep -q 'fabricctl uninstall' '$OUT/undo-accounts.log'"
+
 echo "--- POSIX identities (domain-join.md step 1)"
 docker cp "$REPO/tests/sandbox/posix_check.py" "$NAME:/root/posix_check.py"
 check "the admin has a POSIX identity: uidNumber from the users range, group users, /home/<uid>" \
@@ -545,6 +564,11 @@ check "the package was purged too, and nothing was written to /var/backups"     
 check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui|kea-dhcp4|kea-ddns|freeradius)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,kea,freeradius,fabric-agent}.service' >/dev/null 2>&1"
 check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /opt/kea /opt/freeradius /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl /etc/fabric /usr/lib/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id fabric-vault' >/dev/null 2>&1"
 check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
+check "uninstall listed every host change first (removed, undone, kept)" \
+    "grep -qE 'Host firewall +undone' '$OUT/uninstall.log' && grep -qE 'Docker daemon settings +kept' '$OUT/uninstall.log' && grep -qE 'Service accounts +removed' '$OUT/uninstall.log'"
+check "uninstall put chrony's own configuration back and left ufw as it was before fabric ($UFW_BEFORE)" \
+    "! in_box 'grep -q \"^# fabric\" /etc/chrony/chrony.conf' && ! in_box 'ufw status' | grep -qE '22/tcp|123/udp' \
+     && in_box 'ufw status' | grep -q \"Status: $UFW_BEFORE\""
 
 echo "--- fabricctl restore: the same fabric back from the export"
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > "$OUT/apt-restore.log" 2>&1

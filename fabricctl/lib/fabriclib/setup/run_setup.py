@@ -5,6 +5,7 @@
   sudo fabricctl setup --file vars.yaml     answers from a file (asks only for what is missing)
   sudo fabricctl setup --file vars.yaml --non-interactive --yes --approve all   fully unattended
   sudo fabricctl setup --step certs         run one step (see --list)
+  sudo fabricctl setup --undo firewall      undo one kind of host change and record it as declined
   sudo fabricctl doctor                     run only the end-to-end checks
 """
 import argparse
@@ -24,6 +25,7 @@ from fabriclib.setup.errors import SetupError  # noqa: E402
 from fabriclib.setup.read_join_invitation import read_join_invitation  # noqa: E402
 from fabriclib.setup.steps import STEPS  # noqa: E402
 from fabriclib.setup.verify_install import run as verify  # noqa: E402
+from fabriclib.undo.undo_group import undo_group  # noqa: E402
 
 NEEDS_INPUT = {"preflight", "host", "docker", "join", "deploy"}   # before the rendered vars exist
 
@@ -34,7 +36,8 @@ def main(argv=None):
     Inputs:  argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline,
              --non-interactive, --yes/-y, --approve GROUPS / --decline GROUPS (host changes, repeatable),
              --step NAME (repeatable), --join [@FILE|-] (join an upstream fabric; read_join_invitation),
-             --list, --doctor (hidden, used by doctor).
+             --undo GROUP (undo/undo_group: revert one host change, nothing else runs), --list, --doctor (hidden,
+             used by doctor).
     Returns: exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted.
              A full run leaves the install converged; the steps before deploy (preflight, host, docker,
              deploy) collect vars first, and the plan is shown only when no --step is given. Before the first
@@ -57,6 +60,9 @@ def main(argv=None):
     ap.add_argument("--decline", action="append", metavar="GROUPS",
                     help="refuse these host changes (recommended ones are then left unmanaged and shown in status)")
     ap.add_argument("--step", action="append", help="run only this step (repeatable)")
+    ap.add_argument("--undo", metavar="GROUP",
+                    help="undo one kind of host change fabric made (runtime, firewall, trust, time, resolver) and "
+                         "record it as declined; nothing else runs")
     ap.add_argument("--join", metavar="@FILE", nargs="?", const="",
                     help="join an upstream fabric as a new site (a fresh install): paste the invitation from "
                          "`fabricctl federation invite` at the prompt, or give @FILE or - (stdin)")
@@ -77,6 +83,10 @@ def main(argv=None):
     ctx = SetupContext(deploy_base=args.deploy_base, user_vars_file=args.file, offline=args.offline,
                        non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=invitation)
     try:
+        if args.undo:
+            ctx.load_state()
+            undo_group(ctx, args.undo, interactive=not ctx.non_interactive, assume_yes=args.yes)
+            return 0
         if args.doctor:
             ctx.load_state()
             heading("fabric doctor")

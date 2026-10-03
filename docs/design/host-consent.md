@@ -1,7 +1,8 @@
 # Design: asking before fabric changes the host
 
-Status: **built** (owner decision 2026-10-02; `fabriclib/consent/`, suite `tests/consent`). Not built yet: the web UI
-listing (status shows it), uninstall listing its undo per group (it keeps its own confirmation), `setup --undo`.
+Status: **built** (owner decision 2026-10-02; `fabriclib/consent/`, `fabriclib/undo/`, suite `tests/consent`): the
+questions, the checks, `fabricctl status` and the web UI's Overview, uninstall listing what it does per group, `setup
+--undo` (2026-10-03).
 
 ## 1. The rule
 
@@ -63,8 +64,9 @@ its networks and images.
    *waiting for approval: `sudo fabricctl setup --step firewall`*. They never widen an approval.
 7. **Status** (`fabricctl status`, the web UI) lists every group: approved, declined (with the relaxation it
    means) or waiting.
-8. **Uninstall** lists the host changes it will undo, per group, and asks once; `--purge` keeps its prompts.
-   *(planned: today uninstall keeps its own "Type 'yes'" confirmation.)*
+8. **Uninstall** lists, per group, what it removes (services, accounts), undoes (firewall, resolver, time, trust) or
+   keeps (packages; Docker's daemon settings, since putting them back restarts Docker — `setup --undo runtime` first),
+   before its questions and its confirmation.
 9. **Explicit commands are their own consent.** A command that exists to change the host — `fabricctl vault
    add-usb` writing its udev rule, `fabricctl uninstall` — is the admin's request; it is not asked again.
 
@@ -84,8 +86,22 @@ Decisions made while building (2026-10-02):
 
 An existing install has no `consent.yaml`. The next setup shows the plan for everything already in place and
 asks once (non-interactive: `--approve`). Declining a recommended group stops managing it from then on; what
-was changed earlier is left as it is and reported, not reverted silently (`fabricctl setup --undo GROUP`,
-planned, reverts on request).
+was changed earlier is left as it is and reported, not reverted silently: `fabricctl setup --undo GROUP` reverts it on
+request.
+
+**Undo** (built 2026-10-03, `fabriclib/undo/`):
+
+- Before fabric first changes a host file it keeps it in `config/host-originals/<path>` (`common/keep_original`): a
+  copy, a symlink's target, or a note that it did not exist; ufw's on/off state likewise. Only the first copy is kept,
+  and a file already carrying fabric's marker is never taken for the original. Installs from before this have no
+  copies: undo then removes only fabric's values (`daemon.json`) or says the file stays as fabric wrote it (chrony).
+- `setup --undo GROUP` works for the recommended groups (`runtime`, `firewall`, `trust`, `time`) and `resolver` once
+  `use_host_dns` is true. It says what it will do and what that leaves unmanaged, asks (`--yes` unattended, never
+  without it), undoes, and records the group as declined with the changes setup would make now — so setup, apply
+  and the timers leave it alone and status shows the relaxation. `--approve GROUP` makes the change again.
+- `packages`, `services` and `accounts` are fabric itself: only uninstall undoes them. An install never asked (no
+  `consent.yaml`) is refused: setup asks first.
+- `doctor` checks the host's trust in fabric's CA only while `trust` is approved.
 
 ## 5. Related
 
@@ -97,6 +113,10 @@ planned, reverts on request).
   replacing systemd-timesyncd); fabricctl's prompts are in `fabricctl setup`, never in package scripts.
 
 ## 6. Build
+
+`fabriclib/undo/`: one `undo_<group>.py` per group fabric can revert, `undo_group.py` (`setup --undo`), `uninstall_plan.py`
+(uninstall's list); `common/keep_original.py` / `common/restore_original.py`. The web UI's Overview reads
+`GET /v1/host-changes` (`status:read`).
 
 `fabriclib/consent/`: `plan_host_changes.py` (the groups' plans, one `plan_<group>.py` each), `ask_consent.py`
 (the grouped questions), `allowed_to_change.py` / `check_consent.py` (the checks steps and apply make),

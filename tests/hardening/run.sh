@@ -185,10 +185,14 @@ cp "$R"/dirsrv/seed/*.ldif "$BASE/dirsrv/seed/"; cp "$REPO/fabricctl/jinja/dirsr
 chown -R 601:601 "$BASE/dirsrv/data"; chown -R 0:601 "$BASE/dirsrv/seed"; chmod 750 "$BASE/dirsrv/seed"; chmod 640 "$BASE/dirsrv/seed"/*
 check "dirsrv builds and becomes healthy" "up dirsrv && wait_healthy dirsrv"
 check "dirsrv hardened: $(hardened dirsrv 1 | tr -d '\n')" "hardened dirsrv 1 >/dev/null"
-seed() {
+backends() {
     docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null &&
-    docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"' >/dev/null &&
-    docker exec dirsrv sh -c 'python3 /seed/seed.py /seed/*.ldif'
+    docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"' >/dev/null
+}
+# as ldap/seed_directory.py: the healthcheck can pass a moment before LDAPI accepts connections
+seed() {
+    for _ in $(seq 1 12); do backends && break; sleep 5; done
+    backends && docker exec dirsrv sh -c 'python3 /seed/seed.py /seed/*.ldif'
 }
 check "dirsrv seeds on a read-only root" "seed | tee '$W/seed.log' | grep -q 'seed: '"
 

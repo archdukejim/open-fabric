@@ -4,6 +4,7 @@ import subprocess
 import time
 
 from fabriclib.common.console import info, ok, warn
+from fabriclib.common.keep_original import keep_original
 from fabriclib.consent.check_consent import check_consent
 from fabriclib.consent.plan_runtime import plan_runtime
 from fabriclib.security.hardened_daemon_settings import DAEMON_JSON, HARDENED, hardened_daemon_settings
@@ -15,7 +16,8 @@ def run(ctx):
              if anything changed.
     Inputs:  ctx — SetupContext: vars security.docker_daemon_hardening (default True), config_dir (the `runtime`
              consent: without it nothing is written). Reads DAEMON_JSON.
-    Returns: None; daemon.json converged and Docker restarted only when it changed. With the setting false it
+    Returns: None; daemon.json converged (its earlier content kept once, common/keep_original) and Docker
+             restarted only when it changed. With the setting false it
              only warns — settings written earlier are not removed.
     Fails:   json.JSONDecodeError on an unparseable daemon.json; CalledProcessError from `systemctl restart
              docker`; SetupError when Docker does not answer `docker info` within about 60 s; AttributeError
@@ -31,6 +33,7 @@ def run(ctx):
         return
     if not check_consent(ctx.config_dir, "runtime", plan_runtime(ctx.vars)):
         return
+    keep_original(DAEMON_JSON, ctx.config_dir)          # `setup --undo runtime` puts it back
     os.makedirs(os.path.dirname(DAEMON_JSON), exist_ok=True)
     with open(DAEMON_JSON, "w") as f:
         json.dump(merged, f, indent=2)

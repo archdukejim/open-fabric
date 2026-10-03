@@ -121,6 +121,32 @@ for who, pw in (('$USERDN', os.environ['P']), ('cn=group_admin,ou=admins,$LOCAL'
     print(who.split(',')[0], 'org', len(org), 'site', len(site))" 2>&1)
 check "a person and another service account read the organisation, not the site part" \
     "grep -qx 'uid=jim org 1 site 0' <<<\"\$part\" && grep -qx 'cn=group_admin org 1 site 0' <<<\"\$part\""
+# the one-time passwords fabric gives people (create, reset, the first admin) always pass 389-DS's policy
+# (3 of 4 character kinds): a plain token_urlsafe failed about once in 60 (common/one_time_password.py)
+PWS=$(PYTHONPATH="$REPO/fabricctl/lib" python3 -c "
+from fabriclib.common.one_time_password import one_time_password
+print(' '.join(one_time_password() for _ in range(40)))")
+pwpol=$(docker exec -e PWS="$PWS" -e DM="$DM_PW" dstest python3 -c "
+import ldap, os
+old, ok = 'JimPass!23', 0
+try:
+    for new in os.environ['PWS'].split():
+        c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$USERDN', old)
+        c.passwd_s('$USERDN', old, new); old = new; ok += 1
+    c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('$USERDN', old)
+    try:
+        c.passwd_s('$USERDN', old, 'abcdefghijklmnopqrstu'); print('WEAK ACCEPTED')
+    except ldap.CONSTRAINT_VIOLATION:
+        print('WEAK REFUSED')
+except ldap.LDAPError as e:
+    print('REFUSED', repr(new), type(e).__name__, e.args[0].get('info', ''))
+finally:     # jim's fixture password back (set as Directory Manager, as the suite set it) for the keycloak suite
+    c = ldap.initialize('ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket'); c.simple_bind_s('cn=Directory Manager', os.environ['DM'])
+    c.modify_s('$USERDN', [(ldap.MOD_REPLACE, 'userPassword', [b'JimPass!23'])])
+print('CHANGED', ok)" 2>&1)
+echo "$pwpol" | grep -v '^CHANGED' | sed 's/^/    /'
+check "40 generated one-time passwords all pass the directory's password policy; a weak one is refused" \
+    "grep -qx 'CHANGED 40' <<<\"\$pwpol\" && grep -qx 'WEAK REFUSED' <<<\"\$pwpol\""
 
 # ---- POSIX identities (fabriclib/ldap/ensure_posix_identities.py, the DNA plugin)
 echo "--- POSIX identities"

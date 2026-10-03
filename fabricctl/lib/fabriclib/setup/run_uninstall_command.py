@@ -9,6 +9,7 @@ from fabriclib.setup.check_export_dir import check_export_dir
 from fabriclib.setup.context import SetupContext
 from fabriclib.setup.export_install import export_install
 from fabriclib.setup.uninstall import uninstall
+from fabriclib.undo.uninstall_plan import uninstall_plan
 
 USAGE = """usage: fabricctl uninstall                      asks: export first? where? remove the package too?
        fabricctl uninstall --yes (--export DIR | --no-export) [--purge-package]"""
@@ -33,9 +34,21 @@ def _package_installed():
     return res.returncode == 0 and "install ok installed" in res.stdout
 
 
+def _show_plan():
+    """Purpose: print what uninstall does with each kind of host change fabric made, before anything is asked.
+    Inputs:  none (undo/uninstall_plan).
+    Returns: None.
+    Fails:   never.
+    Feeds:   run_uninstall_command."""
+    print("Changes fabric made to this host:")
+    for title, how, what in uninstall_plan():
+        print(f"  {title:<24} {how:<8} {what}")
+
+
 def run_uninstall_command(args, deploy_base):
     """Purpose: `fabricctl uninstall`: offer to export all of fabric's data to a folder you choose, remove
-             fabric, and optionally the fabricctl package too. Every question is asked before anything is touched.
+             fabric, and optionally the fabricctl package too. What happens to each host change fabric made is listed
+             first (undo/uninstall_plan); every question is asked before anything is touched.
     Inputs:  args — --yes/-y, --export DIR, --no-export, --purge-package; deploy_base — install root.
              Unattended (--yes) the export choice must be explicit. Interactive otherwise.
     Returns: 0 when removed (package purge result is printed, not returned); 1 when refused or not confirmed.
@@ -51,9 +64,11 @@ def run_uninstall_command(args, deploy_base):
         if "--yes" in args or "-y" in args:
             if not export and "--no-export" not in args:
                 raise ValidationError("with --yes, choose --export DIR or --no-export")
+            _show_plan()
         else:
             print(f"This removes fabric from this host: every service, its data, the CA and the vault "
                   f"({ctx.deploy_base}, /etc/fabric/openbao). Docker and other containers are not touched.")
+            _show_plan()
             if not export and "--no-export" not in args:
                 if input("Export all of fabric's data first (config, secrets, CA, directory, vault + key)? "
                          "[Y/n] ").strip().lower() in ("", "y", "yes"):

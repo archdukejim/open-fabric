@@ -17,4 +17,21 @@
 </div>
 {% endfor %}
 </section>
+<h2>Host changes</h2>
+{% if host_changes %}
+<p class="muted">What fabric may change on this host outside its own folders. Answers are given at <code>sudo fabricctl setup</code>; <code>--undo GROUP</code> reverts one.</p>
+<table>
+<thead><tr><th>Change</th><th>Answer</th><th>When</th><th>By</th></tr></thead>
+<tbody>
+{% for c in host_changes %}
+<tr><td>{{ c.title }}</td>
+<td>{% if c.state == 'approved' %}approved{% elif c.state == 'declined' %}<span class="warn-text">declined</span>{% else %}<span class="muted">not asked</span>{% endif %}
+{% if c.relaxation %}<div class="muted">{{ c.relaxation }}</div>{% endif %}</td>
+<td>{{ c.when }}</td><td>{{ c.by }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% else %}
+<p class="muted">Not asked yet: this install was set up before fabric asked about host changes. The next <code>sudo fabricctl setup</code> asks before changing anything.</p>
+{% endif %}
 {% endblock %}

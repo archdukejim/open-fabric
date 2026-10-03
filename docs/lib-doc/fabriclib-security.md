@@ -52,3 +52,16 @@
 | Fails | json.JSONDecodeError on an unparseable file; OSError reading it. |
 | Feeds | setup/harden_docker (writes merged), consent/plan_runtime (asks first). |
 | Called by | `fabriclib.consent.plan_runtime.plan_runtime`, `fabriclib.setup.harden_docker.run` |
+
+## `fabricctl/lib/fabriclib/security/ufw_rule.py`
+
+### `ufw_rule(kind, what)`
+
+| | |
+|---|---|
+| Purpose | the ufw rule fabric adds for one network or interface, as the words after `ufw allow` (and after `ufw delete allow` to remove it). |
+| Inputs | kind — "ssh" (22/tcp from a CIDR), "ntp" (123/udp from a CIDR) or "dhcp" (67/udp in on an interface); what — the CIDR or the interface. |
+| Returns | list of str. |
+| Fails | KeyError for another kind. |
+| Feeds | setup/configure_firewall (adds, forgets), undo/undo_firewall (removes). |
+| Called by | `fabriclib.setup.configure_firewall._forget_rules`, `fabriclib.setup.configure_firewall.run`, `fabriclib.undo.undo_firewall.undo_firewall` |

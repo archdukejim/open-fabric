@@ -230,15 +230,26 @@
 | Feeds | run (lockout guard). |
 | Called by | `fabriclib.setup.configure_firewall.run` |
 
-### `_forget_rules(record, allowed, port, proto, what)`
+### `_forget_rules(config_dir, kind, allowed, what)`
 
 | | |
 |---|---|
-| Purpose | remove the ufw rules fabric added earlier for networks no longer allowed; record the current ones. |
-| Inputs | record — the file listing the networks fabric opened the port for last time; allowed — the networks now; port, proto — the rule's port and protocol (str); what — the service's name for messages. |
-| Returns | None; record rewritten with allowed. Rules fabric did not add are never touched. |
-| Fails | OSError writing record (a failing `ufw delete` is ignored: the rule may be gone already). |
+| Purpose | remove the ufw rules fabric added earlier for networks or interfaces no longer allowed; record the current ones. |
+| Inputs | config_dir — the install's config folder (security/ufw_rule RECORDS: what fabric opened last time); kind — "ssh", "ntp" or "dhcp"; allowed — the networks or interfaces now; what — the service's name for messages. |
+| Returns | None; the record rewritten with allowed. Rules fabric did not add are never touched. |
+| Fails | OSError writing the record (a failing `ufw delete` is ignored: the rule may be gone already). |
 | Feeds | run. |
+| Called by | `fabriclib.setup.configure_firewall.run` |
+
+### `_keep_ufw_state(config_dir)`
+
+| | |
+|---|---|
+| Purpose | record once whether ufw was on before fabric first enabled it, so undoing the firewall can leave it as it was (design host-consent.md §4). |
+| Inputs | config_dir — the install's config folder (<config>/host-originals/ufw.state). |
+| Returns | None; the record written only when absent ("active" or "inactive"). |
+| Fails | OSError writing it; FileNotFoundError without ufw. |
+| Feeds | run; read by undo/undo_firewall. |
 | Called by | `fabriclib.setup.configure_firewall.run` |
 
 ### `run(ctx)`
@@ -246,8 +257,8 @@
 | | |
 |---|---|
 | Purpose | default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service. |
-| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123 from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks removed: config/.firewall-ntp-allowed) — the rules come from security/firewall_rules; vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
-| Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed — config/.firewall-ssh-allowed records fabric's own), UNIT written, enabled and restarted, DOCKER-USER rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is). Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
+| Inputs | ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123 from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks removed: config/.firewall-ntp-allowed; DHCP likewise) — the rules come from security/firewall_rules; vars_file, target_dir, config_dir. Env SSH_CONNECTION. |
+| Returns | None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed — config/.firewall-ssh-allowed records fabric's own; whether ufw was on before is recorded once for undo), UNIT written, enabled and restarted, DOCKER-USER rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is). Off: DOCKER-USER opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left as it is. |
 | Fails | SetupError when the SSH client is outside every allowed CIDR (would lock the operator out); CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an invalid CIDR. |
 | Feeds | setup step `firewall`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -260,7 +271,7 @@
 |---|---|
 | Purpose | create the Docker network fabric_net (the services' private bridge) and, when use_host_dns is false, point the host resolver at dns_server with the stub listener off (frees port 53). |
 | Inputs | ctx — SetupContext: vars fabric_subnet (default 10.255.0.0/24), use_host_dns (default True), dns_server (default 8.8.8.8), config_dir (the `resolver` consent, asked before the first step). |
-| Returns | None; fabric_net exists (an existing one is not checked or changed). Without use_host_dns: the resolved drop-in RESOLVED_DROPIN is written and /etc/resolv.conf re-linked to systemd-resolved's file, restarting it — only when the drop-in changed. |
+| Returns | None; fabric_net exists (an existing one is not checked or changed). Without use_host_dns: the resolved drop-in RESOLVED_DROPIN is written and /etc/resolv.conf re-linked to systemd-resolved's file, restarting it — only when the drop-in changed (the first time both are kept as they were: common/keep_original). |
 | Fails | SetupError when the resolver change was not approved; CalledProcessError from `docker network create` or `systemctl restart systemd-resolved`; OSError on the files. |
 | Feeds | setup step `network`, run by run_setup via STEPS. |
 | Called by | — (no static caller) |
@@ -505,7 +516,7 @@
 |---|---|
 | Purpose | merge the HARDENED settings into /etc/docker/daemon.json (existing keys kept) and restart Docker if anything changed. |
 | Inputs | ctx — SetupContext: vars security.docker_daemon_hardening (default True), config_dir (the `runtime` consent: without it nothing is written). Reads DAEMON_JSON. |
-| Returns | None; daemon.json converged and Docker restarted only when it changed. With the setting false it only warns — settings written earlier are not removed. |
+| Returns | None; daemon.json converged (its earlier content kept once, common/keep_original) and Docker restarted only when it changed. With the setting false it only warns — settings written earlier are not removed. |
 | Fails | json.JSONDecodeError on an unparseable daemon.json; CalledProcessError from `systemctl restart docker`; SetupError when Docker does not answer `docker info` within about 60 s; AttributeError if vars `security` is null. |
 | Feeds | setup step `docker`, run by run_setup via STEPS. |
 | Notes | no-new-privileges, no icc on the default bridge, no userland proxy, live-restore, bounded logs. |
@@ -771,7 +782,7 @@
 | | |
 |---|---|
 | Purpose | `fabricctl setup` / `fabricctl doctor`: parse options, collect settings, show the plan and run the selected steps of STEPS in order. |
-| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --approve GROUPS / --decline GROUPS (host changes, repeatable), --step NAME (repeatable), --join [@FILE\|-] (join an upstream fabric; read_join_invitation), --list, --doctor (hidden, used by doctor). |
+| Inputs | argv — option list (None: sys.argv[1:]): --file, --deploy-base (default /opt), --offline, --non-interactive, --yes/-y, --approve GROUPS / --decline GROUPS (host changes, repeatable), --step NAME (repeatable), --join [@FILE\|-] (join an upstream fabric; read_join_invitation), --undo GROUP (undo/undo_group: revert one host change, nothing else runs), --list, --doctor (hidden, used by doctor). |
 | Returns | exit status: 0 done (or --list printed), 1 a SetupError (message printed), 130 interrupted. A full run leaves the install converged; the steps before deploy (preflight, host, docker, deploy) collect vars first, and the plan is shown only when no --step is given. Before the first step every change outside fabric's own tree is asked about, by group (consent; --yes approves none). |
 | Fails | SystemExit(2) from argparse on bad options; SystemExit("setup cancelled") when Quit is chosen in the plan; any exception other than SetupError/KeyboardInterrupt from a step (CalledProcessError, CommandError, ValidationError, OSError) propagates as a traceback. |
 | Feeds | cli main (`setup`, `doctor`) and this file's `__main__`. |
@@ -801,11 +812,22 @@
 | Feeds | run_uninstall_command. |
 | Called by | `fabriclib.setup.run_uninstall_command.run_uninstall_command` |
 
+### `_show_plan()`
+
+| | |
+|---|---|
+| Purpose | print what uninstall does with each kind of host change fabric made, before anything is asked. |
+| Inputs | none (undo/uninstall_plan). |
+| Returns | None. |
+| Fails | never. |
+| Feeds | run_uninstall_command. |
+| Called by | `fabriclib.setup.run_uninstall_command.run_uninstall_command` |
+
 ### `run_uninstall_command(args, deploy_base)`
 
 | | |
 |---|---|
-| Purpose | `fabricctl uninstall`: offer to export all of fabric's data to a folder you choose, remove fabric, and optionally the fabricctl package too. Every question is asked before anything is touched. |
+| Purpose | `fabricctl uninstall`: offer to export all of fabric's data to a folder you choose, remove fabric, and optionally the fabricctl package too. What happens to each host change fabric made is listed first (undo/uninstall_plan); every question is asked before anything is touched. |
 | Inputs | args — --yes/-y, --export DIR, --no-export, --purge-package; deploy_base — install root. Unattended (--yes) the export choice must be explicit. Interactive otherwise. |
 | Returns | 0 when removed (package purge result is printed, not returned); 1 when refused or not confirmed. Leaves the export folder (root only) when one was chosen. |
 | Fails | ValidationError (bad/missing export choice or folder from check_export_dir, or OpenBao unreachable in export_secrets) is printed with USAGE, exit 1, before anything is removed; CalledProcessError from export copying (the stack is stopped by then) and OSError from uninstall propagate; EOFError from input(). |
@@ -895,9 +917,9 @@
 
 | | |
 |---|---|
-| Purpose | remove fabric from this host: units, fabric.target, containers, fabric_net, local images, DOCKER-USER rules, data folders, the OpenBao key and runtime folders, the image rollback record (and /etc/fabric once empty), service accounts, CA trust, the CLI wrapper and the resolver drop-in. |
+| Purpose | remove fabric from this host: units, fabric.target, containers, fabric_net, local images, the host changes it made (undo/: its firewall rules — ufw off again if it was off before —, the resolver, chrony's files, CA trust), data folders, the OpenBao key and runtime folders, the image rollback record (and /etc/fabric once empty), service accounts and the CLI wrapper (undo/uninstall_plan lists it). |
 | Inputs | ctx — SetupContext (state reloaded): vars keycloak_data_dir/postgres_data_dir (deleted when outside deploy_base), tsig_keys names (their <deploy_base>/<name> folders), openbao_runtime_dir, openbao_admin_dir, openbao_udev_rules, openbao_key_dir, service_users, domain_file. |
-| Returns | None. Only fabric's own objects are touched (no global Docker prune, no Docker restart); ufw stays enabled. The vault data and key are gone afterwards — export first to keep them. |
+| Returns | None. Only fabric's own objects are touched (no global Docker prune, no Docker restart: Docker's daemon settings stay, as do apt packages). The vault data and key are gone afterwards — export first to keep them. |
 | Fails | OSError from shutil.rmtree for the external data and key folders or os.remove; every command failure (systemctl, docker, iptables, userdel, update-ca-certificates) is ignored. |
 | Feeds | cli main (`reinstall`), run_uninstall_command. |
 | Called by | `fabriclib.cli.main`, `fabriclib.setup.run_uninstall_command.run_uninstall_command` |
@@ -944,7 +966,7 @@
 
 | | |
 |---|---|
-| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust, LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site), and every installed service. |
+| Purpose | the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host trust (unless the `trust` host change was declined), LDAPS, LDAP role binds and plaintext refusal, web UI gates, fabric-agent socket, first admin (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site), and every installed service. |
 | Inputs | ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port, install_ldap/webui/keycloak, federation_endpoint, install_adguard, webui_admin_user/role), secrets (LDAP passwords, Keycloak), Step-CA root, the agent socket, ~/fabric-admin of the sudo user. |
 | Returns | list of (name, passed: bool, detail: str). |
 | Fails | ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading root_ca.crt; subprocess.TimeoutExpired from the LDAPS probe (15 s); struct.error/IndexError from dns_query on a malformed reply. Check failures are results, not exceptions. |

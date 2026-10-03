@@ -10,7 +10,7 @@ def consent_status(config_dir):
              (the consequence when declined, else "")}, in GROUPS order; [] for an install set up before consent
              existed (no consent.yaml).
     Fails:   yaml.YAMLError / OSError from load_consent.
-    Feeds:   system/service_status (`fabricctl status`)."""
+    Feeds:   show_consent_status (`fabricctl status`); fabric-agent GET /v1/host-changes (the web UI's Overview)."""
     groups = load_consent(config_dir)
     if groups is None:
         return []

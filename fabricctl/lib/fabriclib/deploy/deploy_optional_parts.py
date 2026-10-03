@@ -36,7 +36,7 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
         if not allowed_to_change(paths["config"], "time", plan_time(), unasked_install=True):
             print("  time: chrony left as it is (the `time` host change is not approved; "
                   "`sudo fabricctl setup --approve time` allows it)")
-        elif deploy_chrony(final_vars, paths["federation"], jinja_env):
+        elif deploy_chrony(final_vars, paths["federation"], jinja_env, config_dir=paths["config"]):
             print("  time: chrony configuration updated")
     # Kea (optional): its configs (leases are kept across restarts) and the DHCP subzone, created once
     if final_vars.get("install_kea") and deploy_kea(final_vars, secrets, jinja_env, *service_user(final_vars, "bind")):
