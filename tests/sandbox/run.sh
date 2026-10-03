@@ -94,6 +94,7 @@ check "unattended setup without --approve changes nothing and names the groups t
      && ! in_box 'getent passwd fabric-dns'"
 in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all' 2>&1 | tee "$OUT/setup.log"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
+grep -q "fabric is ready" "$OUT/setup.log" || in_box 'journalctl --no-pager -u ldap | tail -60; docker logs dirsrv 2>&1 | tail -80' > "$OUT/setup-ldap.log" 2>&1   # diagnosis when setup fails
 check "setup did not shadow the package command" "! in_box 'test -e /usr/local/bin/fabricctl'"
 check "Docker comes from the Ubuntu archive, no apt source added" \
     "in_box 'dpkg -s docker.io docker-compose-v2 docker-buildx' | grep -c '^Status: install ok installed' | grep -qx 3 \

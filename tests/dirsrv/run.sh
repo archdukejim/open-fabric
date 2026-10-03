@@ -63,8 +63,12 @@ check "container starts healthy as uid 911 with caps dropped" start
 out=$(seed); echo "$out" | sed 's/^/    /'
 check "first seed adds tree + accounts" "grep -q 'seed: ' <<<\"\$out\" && ! grep -q 'seed: 0 added' <<<\"\$out\""
 check "first seed asks for restart (cn=config changed)" "grep -q RESTART_REQUIRED <<<\"\$out\""
+# a pid file from the container's previous life naming a PID that exists in the new one (1: tini) made ns-slapd
+# refuse to start ("already running") at random; the launcher removes stale pid files (dscontainer-launch.py)
+docker exec dstest sh -c 'echo 1 > /data/run/slapd-localhost.pid'
 docker restart dstest >/dev/null; sleep 3
 for i in $(seq 1 40); do [ "$(docker inspect -f '{{.State.Health.Status}}' dstest)" = healthy ] && break; sleep 3; done
+check "restarts with a stale pid file naming a live PID (the previous container's)"     "[ \"\$(docker inspect -f '{{.State.Health.Status}}' dstest)\" = healthy ]"
 out2=$(seed); echo "$out2" | sed 's/^/    /'
 check "second seed is a no-op (idempotent)" "grep -q 'seed: 0 added, 0 modified' <<<\"\$out2\" && ! grep -q RESTART <<<\"\$out2\""
 

@@ -7,6 +7,7 @@ services:
         BASE_IMAGE: "{{ image_debian }}"
         DS_UID: "{{ service_users.ldap.uid }}"
         DS_GID: "{{ service_users.ldap.gid }}"
+        BUILD_REV: "2"            # 2: stale pid files removed at start (dscontainer-launch.py)
     container_name: dirsrv
     # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
     # and the optional log forwarder reads everything from one place

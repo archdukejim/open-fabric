@@ -33,7 +33,7 @@ docs/lib-doc/fabriclib-dhcp.md	d61dc90893d8294c714d136985d0f1e4eb29ed7c	2026-10-
 docs/lib-doc/fabriclib-dns.md	a1ddcf5e3960b3420786d9c324cb42f8ea9bbc67	2026-10-02	
 docs/lib-doc/fabriclib-dns_filter.md	80f05ee14c775bbbefdc27dd80768b2ee2c259dc	2026-10-02	
 docs/lib-doc/fabriclib-federation.md	d12b5557747775118973b209fe687b6733ef2def	2026-10-03	
-docs/lib-doc/fabriclib-images.md	3bc960eef7c78a2b392b6362b1ac29c6b4679047	2026-10-02	
+docs/lib-doc/fabriclib-images.md	8f50ef6afba22c097cd82f923454a2e7096822ea	2026-10-03	
 docs/lib-doc/fabriclib-keycloak.md	9d7b7d8360199cc976acf443bfa4cf5dd2d2ca5c	2026-10-03	
 docs/lib-doc/fabriclib-ldap.md	a64c67f31b74144babc2d5b489a3e503474b8113	2026-10-03	
 docs/lib-doc/fabriclib-logs.md	48ed2f606e2f69d23d1d525162ad14bf6541a838	2026-10-02	
@@ -93,10 +93,10 @@ fabricctl/jinja/chrony/README.md	5ef0dd8fc433c43290a77fc0d03518a16b193992	2026-1
 fabricctl/jinja/chrony/chrony.conf.j2	ac7db36ea21194371a1b73ee684c8fb3d73dcb74	2026-10-02	
 fabricctl/jinja/dirsrv/README.md	ca8566ec2ceae9591619f07ddee69cef25aa632f	2026-10-02	
 fabricctl/jinja/dirsrv/build/.dockerignore	76683618065e127abc520ec990844339e7677973	2026-09-30	
-fabricctl/jinja/dirsrv/build/Dockerfile	c7ee7f110be2db1d9a9c5229ff7f8658d4c974b0	2026-10-02	
+fabricctl/jinja/dirsrv/build/Dockerfile	57e32541fb4ddc25646893ff2b3a3e042c73fb8a	2026-10-03	
 fabricctl/jinja/dirsrv/build/README.md	fd2bffff536863096fb64b088dd6f4609163c127	2026-09-30	
-fabricctl/jinja/dirsrv/build/dscontainer-launch.py	119434156dc6e9c189d5d0014b2de31c8cc2a2a5	2026-09-30	
-fabricctl/jinja/dirsrv/docker-compose.yml.j2	42aaa7969aeb10dd1f41a2cfa40c875ae8305d2f	2026-10-01	
+fabricctl/jinja/dirsrv/build/dscontainer-launch.py	cfead46447e3b5053de8aae4002933eb076f0d81	2026-10-03	
+fabricctl/jinja/dirsrv/docker-compose.yml.j2	f3fa6a78e0a0166da2c1d7b1c5362a0d984472f8	2026-10-03	
 fabricctl/jinja/dirsrv/seed.py	5951399aac17cb6664b73ba581846b2270031520	2026-10-02	
 fabricctl/jinja/dirsrv/seed/00-config.ldif.j2	eeda2eca1fc6770c3e8951e66282ce2953dde043	2026-10-02	
 fabricctl/jinja/dirsrv/seed/05-schema.ldif.j2	6395e1174fa2456a8ff685c14cd2cdbb5eaa829a	2026-10-03	
@@ -400,7 +400,7 @@ fabricctl/lib/fabriclib/images/built_from.py	5bb9b7dd14f590829635300bbc10b282dad
 fabricctl/lib/fabriclib/images/constants.py	5799ec3f6ed5c15392794c7409677d1ce893bf9e	2026-10-02	
 fabricctl/lib/fabriclib/images/image_status.py	950f81a44ba7241be75161aa4b4f9bfb0e8be9bc	2026-09-30	
 fabricctl/lib/fabriclib/images/installed_services.py	270ec653f87e2f58b64ed7193fb19ee1298f4ea0	2026-09-30	
-fabricctl/lib/fabriclib/images/needs_rebuild.py	3551b4111404377c806d1515f12a3bb4bcba8cbf	2026-10-02	
+fabricctl/lib/fabriclib/images/needs_rebuild.py	6034c01c7583c56c031421a467f5cc0c3940ca71	2026-10-03	
 fabricctl/lib/fabriclib/images/prune_images.py	a6f1579dab9124ef7d753d84c39c9333f800123b	2026-09-30	
 fabricctl/lib/fabriclib/images/rollback_image.py	ffe1d5d6e84e8d68bb83e68a2a7055e187e79b6f	2026-09-30	
 fabricctl/lib/fabriclib/images/run_images_command.py	8eaa420183eb61378797bf1068df965a25c1868c	2026-09-30	
@@ -696,12 +696,12 @@ tests/adguard/README.md	203fc82e8a3eb847f7cae9f340e1aee798349768	2026-10-02
 tests/adguard/run.py	1a83ff5bce44adbff5a16571e6e61d63cb601a1d	2026-10-02	
 tests/consent/README.md	b7e3e1d13946461a67ba9f01fede47325d029266	2026-10-03	
 tests/consent/run.py	eb006f286b81e1a89eae98e38ebe50b3cd928dcb	2026-10-03	
-tests/dirsrv/README.md	b231e705b4aab7d8d21210a95c6e565b182840d2	2026-10-03	
+tests/dirsrv/README.md	31b54185d8425d800abe70af0eb67fce01166310	2026-10-03	
 tests/dirsrv/admin_user.py	a69937d4c6ce2ca25e23c7bef6a51ca85efe5dbf	2026-09-30	
 tests/dirsrv/devices.py	ae10919bee70ddd659544fd164943dfe423d1c02	2026-10-01	
 tests/dirsrv/migrate.py	6b949ff731553b93d4e151f19bd04c9236c4c05d	2026-10-01	
 tests/dirsrv/posix.py	0f519e3f7deaf110225be5174bab2827f0958223	2026-10-02	
-tests/dirsrv/run.sh	456bb60e3c22026523799fbab2f9e977874abda4	2026-10-03	
+tests/dirsrv/run.sh	7a79c7598cf75b7fdc5f7800adfe17186870aea7	2026-10-03	
 tests/docs/README.md	fdb436d0aeb1c7ca339684464da9506c6a3df590	2026-09-30	
 tests/docs/call_graph.py	e9e7ff1581da838c89d95be5868fe65126fb2a40	2026-09-30	
 tests/docs/check_consistency.py	f06fe105132c93210a0fc39b4a1081ed1281ae48	2026-10-02	
@@ -755,7 +755,7 @@ tests/sandbox/posix_check.py	4aa85de6fc7fc9b21dc141f19d92bb1f42c60bc8	2026-10-02
 tests/sandbox/radius_device.py	29f2b02acaf81ecc3fffacc9d5d90049486548b4	2026-09-30	
 tests/sandbox/radius_mab.py	c9575e9fd8e3c3d52dbd77b879b9ef9a6bd148d5	2026-09-30	
 tests/sandbox/rfc2136_test.sh	21e1a72cdc0eb36df39f8f49725d5476048d3a28	2026-10-02	
-tests/sandbox/run.sh	db00c8e1ce7910cf03e08636779006df734e153a	2026-10-03	
+tests/sandbox/run.sh	5c9c210a7d144f09fcd0dc1b0b3ff180f4ac66bf	2026-10-03	
 tests/sandbox/set_lock.py	3f76da2458bc18d18fbf3efb8b176900a0984ae7	2026-09-30	
 tests/webui/README.md	10b270a62e634adc3de38374c88a60447e7b68e3	2026-09-30	
 tests/webui/test_container.py	65d28a317c1977a3c40608d9bf85f8dce7ca3f44	2026-10-03	

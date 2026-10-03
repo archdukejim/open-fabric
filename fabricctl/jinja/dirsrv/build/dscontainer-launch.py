@@ -5,7 +5,14 @@ dscontainer reaps children from a SIGCHLD handler that calls
 os.waitpid(-1, WNOHANG) unguarded. When subprocess reaps the child first the
 handler raises ChildProcessError and instance setup dies at random. tini is
 PID 1 in this image and reaps orphans, so the handler is simply not needed.
+
+It also removes a pid file left in /data/run by the container's previous life: /data is persisted, PIDs in a
+new container start low again, and ns-slapd refuses to start when the old file names a PID that some other
+process now has ("Unable to start slapd because it is already running as process 23") — at random, depending
+on PID reuse. Nothing of 389-DS runs before this entrypoint, so every pid file there is stale.
 """
+import glob
+import os
 import runpy
 import signal
 import sys
@@ -27,6 +34,8 @@ def _signal(sig, handler):
     return _real_signal(sig, handler)
 
 
+for stale in glob.glob("/data/run/*.pid"):
+    os.remove(stale)
 signal.signal = _signal
 sys.argv = [DSCONTAINER] + (sys.argv[1:] or ["-r"])
 runpy.run_path(DSCONTAINER, run_name="__main__")

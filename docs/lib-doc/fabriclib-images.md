@@ -48,9 +48,9 @@
 
 | | |
 |---|---|
-| Purpose | whether a compose file's locally built image must be rebuilt: missing, built FROM another base than its BASE_IMAGE build arg, (Kea) built with another pinned KEA_VERSION, or built for other service account ids (a *_UID/*_GID build arg against the org.fabric.ids label). |
+| Purpose | whether a compose file's locally built image must be rebuilt: missing, built FROM another base than its BASE_IMAGE build arg, (Kea) built with another pinned KEA_VERSION, from older build files (a BUILD_REV build arg against the org.fabric.rev label), or built for other service account ids (a *_UID/*_GID build arg against the org.fabric.ids label). |
 | Inputs | compose_file — str, path to a rendered docker-compose.yml. Asks Docker via built_from. |
-| Returns | bool; False when no service has a build section with BASE_IMAGE, KEA_VERSION or *_UID. |
+| Returns | bool; False when no service has a build section with BASE_IMAGE, KEA_VERSION, BUILD_REV or *_UID. |
 | Fails | OSError if the file cannot be read; yaml.YAMLError on invalid YAML; AttributeError if a service's `build` is a plain string rather than a mapping. |
 | Feeds | deploy/install_service_units (decides whether to run `docker compose build`). |
 | Called by | `fabriclib.deploy.install_service_units.install_service_units` |
