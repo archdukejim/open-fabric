@@ -88,7 +88,7 @@ def checks(ctx):
         add(f"https://{v['hostname_adguard']} asks for sign-in first (OIDC)", (rc, code) == (0, "302"),
             f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
 
-    if shutil.which("chronyc"):             # time (ntp.md): certificates, TOTP and TSIG depend on it
+    if shutil.which("chronyc"):             # time (manual 2.5.1): certificates, TOTP and TSIG depend on it
         t = time_status()
         own_only = not chrony_settings(v, os.path.join(ctx.config_dir, "federation.yaml"))["sources"]
         if t.get("error"):

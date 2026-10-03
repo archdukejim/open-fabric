@@ -29,7 +29,7 @@ def _apt_install(pkgs, hint):
 def run(ctx):
     """Purpose: host packages and Docker Engine with compose v2 and buildx (Ubuntu's docker.io; an existing
              docker-ce install is kept), running and enabled — all from the host's own apt sources, after the
-             `packages` consent (design host-consent.md).
+             `packages` consent (manual 2.7.1).
     Inputs:  ctx — SetupContext: offline (never download), config_dir (consent.yaml). Env APT_ENV for apt.
     Returns: None; missing packages installed, Docker installed if needed, docker.service enabled and answering
              `docker info`. Idempotent: nothing is installed when present. No apt source or key is added.
@@ -55,7 +55,7 @@ def run(ctx):
                                      "include universe, run `apt-get update`, then re-run setup.")
     elif not missing_packages([DOCKER_CE]):
         info("Docker comes from Docker's own repository (docker-ce): kept as it is. New hosts get Ubuntu's "
-             "docker.io; to switch, see docs/operations.md (Docker from the Ubuntu archive)")
+             "docker.io; to switch, see the manual, 4.6.1 (Docker from the Ubuntu archive)")
     sh(["systemctl", "enable", "--now", "docker"])
     for _ in range(12):
         if subprocess.run(["docker", "info"], capture_output=True).returncode == 0:

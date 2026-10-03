@@ -8,7 +8,7 @@ FLAGS = ("nts", "pool", "prefer")
 
 
 def normalize_ntp(v):
-    """Purpose: check the time settings (design ntp.md §4) before anything is rendered.
+    """Purpose: check the time settings (manual 2.5.1.5) before anything is rendered.
     Inputs:  v — the vars dict: ntp_servers (list of "<host> [nts] [pool] [prefer]", host a DNS name or an IP
              address), ntp_serve, ntp_set_clock (booleans).
     Returns: [{"host", "nts", "pool", "prefer"}] — one per ntp_servers entry, in order, flags as booleans.

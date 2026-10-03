@@ -7,7 +7,7 @@ TYPES = {"binary", "boolean", "empty", "fqdn", "int8", "int16", "int32", "ipv4-a
 
 def normalize_option_defs(defs):
     """Purpose: check dhcp.option_defs: options Kea has no name for (vendor or site-specific, e.g. a ZTP URL on
-             code 239), so options can then name them (design dhcp-management.md §2).
+             code 239), so options can then name them (manual 2.2.2.3).
     Inputs:  defs — list of {name, code, type, space (default dhcp4), array, record_types}, or None.
     Returns: the definitions normalized (space only when not dhcp4; array only when true; record_types only for
              type record).

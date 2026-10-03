@@ -12,6 +12,9 @@ The manual is fabric's only source of truth: architecture, decisions, procedures
 - 1.6 Identity: directory and sign-in
 - 1.7 Secrets: OpenBao
 - 1.8 Federation
+- 1.9 Security defaults
+- 1.10 Code conventions
+- 1.11 Function reference
 
 ## [Volume 2 — Technologies and features](volume_2_technologies_and_features/README.md)
 
@@ -60,15 +63,7 @@ The manual is fabric's only source of truth: architecture, decisions, procedures
 - 5.1 Manual alignment
 - 5.2 Stale-code register
 - 5.3 Review findings
+- 5.4 Blockers and deferred work
 - 5.5 Reasoning and trade-offs
 - 5.6 Troubleshooting
-
----
-
-**Temporary, until the alignment is done ([5.1.1](volume_5_notes_and_troubleshooting/5.1.1-alignment-plan.md)):**
-still outside the volumes; removed from this index when they have moved.
-
-| Folder | What | Moves to |
-|---|---|---|
-| [`lib-doc/`](lib-doc/README.md) | Function reference, generated from the code's docstrings (`python3 tests/docs/gen_lib_doc.py`) | 1.11 |
-| [`maintenance/`](maintenance/README.md) | `review-ledger.tsv`: when each file was last reviewed (read by `tests/docs/review_ledger.py`) | 5.3 |
+- 5.7 Environments

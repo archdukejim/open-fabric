@@ -65,7 +65,7 @@ changetype: modify
 replace: nsslapd-pluginEnabled
 nsslapd-pluginEnabled: on
 
-# POSIX identities (design domain-join.md step 1): the server hands out uidNumber itself — atomically, never
+# POSIX identities (manual 2.10.1 step 1): the server hands out uidNumber itself — atomically, never
 # twice — when an entry under ou=users becomes a posixAccount with uidNumber -1 (ldap/ensure_posix_identities).
 # The range is the users OU's uid_range. Added once: dnaNextValue moves on with every number handed out.
 {% set _users_ou = (ldap_organizational_units | default([]) | selectattr('name', 'equalto', 'users') | list | first) or {} %}

@@ -69,8 +69,7 @@ def _fabric_dirs(deploy_base, jinja_dir):
 
 
 def plan_accounts(v, deploy_base, jinja_dir):
-    """Purpose: the service accounts setup creates, and the old ones it moves away from (design host-consent.md
-             §2 `accounts`, §5): one fabric-* user and group per service_users entry, in fabric's uid band.
+    """Purpose: the service accounts setup creates, and the old ones it moves away from (manual 2.7.1.3 `accounts`, §5): one fabric-* user and group per service_users entry, in fabric's uid band.
     Inputs:  v — vars: service_users {key: {uid, gid[, name]}} (uid 0 entries are skipped; gid 0 — Keycloak's
              image convention — has no group of its own); deploy_base, jinja_dir — for _fabric_dirs.
     Returns: list of actions in order, each {"text": what the question shows, "do": "group"|"user"|"move"|"remove",

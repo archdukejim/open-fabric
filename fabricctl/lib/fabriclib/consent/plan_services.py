@@ -1,5 +1,5 @@
 def plan_services():
-    """Purpose: fabric's own units on the host (design host-consent.md §2 `services`), asked once as a kind: they
+    """Purpose: fabric's own units on the host (manual 2.7.1.3 `services`), asked once as a kind: they
              follow from the services the admin turns on, so a new fabric unit does not ask again.
     Inputs:  none.
     Returns: list of str (fixed wording, so an approval stays valid across releases).

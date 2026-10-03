@@ -2,7 +2,7 @@
 """The docs suite: the documentation says what the code does.
 
   - every product function has a structured docstring (check_docstrings.py)
-  - docs/lib-doc/ is what those docstrings say (gen_lib_doc.py --check)
+  - the function reference (manual 1.11) is what those docstrings say (gen_lib_doc.py --check)
   - docs and code agree on settings, commands, routes, permissions, suites,
     setup steps, READMEs and links (check_consistency.py)
   - every file in the repository has been reviewed (review_ledger.py)
@@ -15,7 +15,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STEPS = [("every function has a structured docstring", ["check_docstrings.py", "--summary"]),
-         ("docs/lib-doc/ matches the code", ["gen_lib_doc.py", "--check"]),
+         ("the function reference (manual 1.11) matches the code", ["gen_lib_doc.py", "--check"]),
          ("docs and code agree", ["check_consistency.py"]),
          ("every file has been reviewed", ["review_ledger.py"])]
 

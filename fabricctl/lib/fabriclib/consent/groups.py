@@ -1,4 +1,4 @@
-"""The kinds of host change fabric asks about (design host-consent.md §2), in the order setup asks.
+"""The kinds of host change fabric asks about (manual 2.7.1.3), in the order setup asks.
 
 level: "required" — declining stops setup; "recommended" — declining leaves that part unmanaged and shows a
 relaxation; "choice" — needed only because of a setting, declining asks for the other choice."""

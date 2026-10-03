@@ -6,7 +6,7 @@ from fabriclib.dhcp.common.find_subnet import find_subnet
 
 
 def remove_subnet(actor, which, leases, force=False, source="cli"):
-    """Purpose: remove a DHCP subnet, its pools and reservations (design dhcp-management.md §3-4). The other
+    """Purpose: remove a DHCP subnet, its pools and reservations (manual 2.2.2.4-4). The other
              subnets keep their ids, so their leases stay theirs. Applied by the next apply.
     Inputs:  actor — who asks (audit); which — the subnet's name or network; leases — the leases Kea holds now
              (list_leases; [] when Kea is off; None when they could not be read — then only with force);

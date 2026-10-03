@@ -1,4 +1,4 @@
-# The validated container images fabric runs (docs/design/image-updates.md).
+# The validated container images fabric runs (manual 2.6.2).
 #
 # Every image is pinned by its multi-arch index digest (amd64 + arm64): an
 # upstream push never changes what a host runs. vars.yaml.j2 takes its

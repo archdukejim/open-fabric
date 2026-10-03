@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Federation site CAs (design federation.md, M2) against the real Step-CA image: a joining site makes
+"""Federation site CAs (manual 1.8, M2) against the real Step-CA image: a joining site makes
 its key and request (make_site_ca_request), the root site signs it with its root key (sign_site_ca),
 the site checks and stages the answer (stage_site_ca), and a Step-CA started the way setup's
 bring-your-own-CA path starts it serves with that intermediate. Includes what must be refused.

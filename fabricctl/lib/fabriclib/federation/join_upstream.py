@@ -20,8 +20,7 @@ ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert
 
 def join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None,
                   http_port=80, https_port=443, replace=False, dns_port=53):
-    """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (design
-             federation.md §4 step 2): make this site's CA key and request, fetch and pin the upstream's root,
+    """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (manual 1.8.4.1 step 2): make this site's CA key and request, fetch and pin the upstream's root,
              send the join over TLS verified against that root, check and stage the signed intermediate, and
              record the upstream.
     Inputs:  v — fabric vars: service_users.step, image_stepca (make_site_ca_request), lan_cidr and the DHCP

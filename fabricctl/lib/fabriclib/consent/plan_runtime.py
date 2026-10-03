@@ -2,7 +2,7 @@ from fabriclib.security.hardened_daemon_settings import DAEMON_JSON, hardened_da
 
 
 def plan_runtime(v):
-    """Purpose: what hardening Docker's daemon changes (design host-consent.md §2 `runtime`).
+    """Purpose: what hardening Docker's daemon changes (manual 2.7.1.3 `runtime`).
     Inputs:  v — vars: security.docker_daemon_hardening (default True).
     Returns: list of str: each daemon.json key that changes, then the Docker restart it needs (which restarts
              every container on the host, not only fabric's); [] when off or already hardened.

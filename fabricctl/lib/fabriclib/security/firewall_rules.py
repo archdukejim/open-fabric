@@ -5,7 +5,7 @@ from fabriclib.ntp.chrony_settings import chrony_settings
 
 def firewall_rules(v, config_dir):
     """Purpose: the networks and interfaces fabric's host firewall opens, computed once for the setup step and for
-             the consent question that asks before it (design host-consent.md).
+             the consent question that asks before it (manual 2.7.1).
     Inputs:  v — vars: lan_cidr, security.firewall_allow (extra CIDRs), ntp_serve (default True; chrony_settings
              decides its networks), install_kea + dhcp.interfaces; config_dir — the install's config folder
              (federation.yaml, for chrony's networks).

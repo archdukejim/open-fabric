@@ -75,7 +75,7 @@ Comprehensive documentation is provided in the `docs/` directory to help you und
 - [**Test Plan**](docs/volume_4_infrequent_ops/4.8.1-manual-test-plan.md#4811-overview) — Manual test plan and which parts the suites in `tests/` automate.
 - [**Subordinate CA Setup**](docs/volume_4_infrequent_ops/4.4.1-subordinate-ca.md#4411-overview) — How to configure this stack as a downstream CA.
 - [**Disk encryption**](docs/volume_4_infrequent_ops/4.5.1-disk-encryption.md#4511-overview) — Manual: LUKS for fabric's data, unlocked by the same YubiKey or USB stick.
-- [**Function reference**](docs/lib-doc/README.md) — every function of `fabricctl/`, `webui/` and `installers/`: purpose, inputs, results, failures and what uses them (generated from the code).
+- [**Function reference**](docs/volume_1_systems_and_services/1.11.1-about-the-reference.md) — every function of `fabricctl/`, `webui/` and `installers/`: purpose, inputs, results, failures and what uses them (generated from the code).
 
 ---
 

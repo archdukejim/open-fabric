@@ -13,7 +13,7 @@ def control_stack(verb):
     Fails:   ValidationError when systemctl fails or the verb is unknown; subprocess.TimeoutExpired after 900 s.
     Feeds:   cli main (prints the rows).
     Notes:   stop names every installed unit too: stopping an inactive target would not reach them. chrony (the
-             host's time, ntp.md) is shown by status but never stopped."""
+             host's time, manual 2.5.1) is shown by status but never stopped."""
     if verb in ("start", "stop", "restart"):
         # stop: name the units too — stopping an inactive target would not
         # reach them (PartOf propagates from an active target only).

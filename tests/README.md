@@ -1,13 +1,13 @@
 # tests
 
-Suites prove behaviour against real containers (AGENTS.md §6). Run them with
+Suites prove behaviour against real containers ([4.8.2](../docs/volume_4_infrequent_ops/4.8.2-automated-tests.md#482-automated-tests)). Run them with
 `sudo tests/run-all.sh [suite ...]` (all but `sandbox` by default); each suite
 writes its log to `$FABRIC_TEST_OUT` (default `/tmp/fabric-tests`). The `docs`
 suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 
 | Suite | Where | What it proves |
 |---|---|---|
-| `docs` | [docs/](docs/) | Every function documented (Purpose/Inputs/Returns/Fails/Feeds), `docs/lib-doc/` current, docs and code agree, every file reviewed |
+| `docs` | [docs/](docs/) | Every function documented (Purpose/Inputs/Returns/Fails/Feeds), the function reference (manual 1.11) current, docs and code agree, every file reviewed |
 | `consent` | [consent/](consent/) | Asking before fabric changes the host: answers, questions, the subset rule, declined groups, the `fabric-*` accounts and their move, no containers |
 | `render` | `render.py` | Every template renders from `vars.yaml.j2`; security properties of the rendered configs; every module imports |
 | `nginx` | `nginx_check.sh` | The rendered nginx configuration passes `nginx -t` in the pinned image |

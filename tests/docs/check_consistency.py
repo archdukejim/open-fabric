@@ -44,21 +44,19 @@ def _manual(*numbers):
 def check_readmes():
     """Purpose: each folder's README.md names every file and subfolder in it.
     Inputs:  none (the repository's files; hidden folders, the repository
-             root and generated docs/lib-doc/ are exempt).
+             root is exempt).
     Returns: problems (str), one per missing README or unlisted entry.
     Fails:   never (unreadable READMEs count as missing).
     Feeds:   main."""
     folders = {}
     for p in tracked_files():
         parts = p.split("/")
-        if len(parts) < 2 or any(x.startswith(".") for x in parts[:-1]) or p.startswith("docs/lib-doc/"):
+        if len(parts) < 2 or any(x.startswith(".") for x in parts[:-1]):
             continue
         folder = "/".join(parts[:-1])
         folders.setdefault(folder, set()).add(parts[-1])
         for i in range(1, len(parts) - 1):                    # the subfolder, in its parent's README
-            parent = "/".join(parts[:i])
-            if not parent.startswith("docs/lib-doc"):
-                folders.setdefault(parent, set()).add(parts[i] + "/")
+            folders.setdefault("/".join(parts[:i]), set()).add(parts[i] + "/")
     out = []
     for folder, entries in sorted(folders.items()):
         readme = os.path.join(REPO, folder, "README.md")
@@ -122,12 +120,11 @@ def _cli_commands():
 
 def check_cli():
     """Purpose: every fabricctl command and subcommand appears in the docs.
-    Inputs:  none (cli.py, the USAGE strings; docs/*.md, README.md).
+    Inputs:  none (cli.py, the USAGE strings; the manual, README.md).
     Returns: problems, one per command not mentioned as `fabricctl <cmd> [<sub>]`.
     Fails:   OSError if cli.py is missing.
     Feeds:   main."""
-    docs = "\n".join(_read(p) for p in tracked_files("docs", "README.md") if p.endswith(".md")
-                     and not p.startswith("docs/lib-doc/"))
+    docs = "\n".join(_read(p) for p in tracked_files("docs", "README.md") if p.endswith(".md"))
     out = []
     for cmd, sub in sorted(_cli_commands(), key=lambda c: (c[0], c[1] or "")):
         pattern = rf"fabricctl {re.escape(cmd)}" + (rf"(?: [^\n`]*?)?[ |]{re.escape(sub)}\b" if sub else r"\b")
@@ -209,9 +206,27 @@ def check_steps():
     return [f"setup step `{s}` is not in the manual (4.1)" for s in steps if f"`{s}`" not in doc]
 
 
+def _anchors(path):
+    """Purpose: the heading anchors of a Markdown file, as GitHub (and the in-browser manual) make them.
+    Inputs:  path — repository-relative .md file.
+    Returns: set of anchors (lower case, punctuation other than "-" dropped, spaces as "-"); "#" lines inside code
+             fences are not headings.
+    Fails:   OSError if the file cannot be read.
+    Feeds:   check_links."""
+    out, fence = set(), False
+    for line in _read(path).split("\n"):
+        if line.lstrip().startswith("```"):
+            fence = not fence
+        elif not fence and line.startswith("#"):
+            text = line.lstrip("#").strip().lower()
+            out.add(re.sub(r"[^\w\- ]", "", text).replace(" ", "-"))
+    return out
+
+
 def check_links():
-    """Purpose: relative links in Markdown files resolve.
-    Inputs:  none (every tracked .md; http(s), mailto and pure #anchors are skipped).
+    """Purpose: relative links in Markdown files resolve: the file exists and, for a .md target, the #anchor is one
+             of its headings; a link target with whitespace in it is broken too.
+    Inputs:  none (every tracked .md; http(s) and mailto links are skipped).
     Returns: problems, one per broken link (file and target).
     Fails:   never.
     Feeds:   main."""
@@ -219,12 +234,19 @@ def check_links():
     for path in tracked_files():
         if not path.endswith(".md"):
             continue
-        for target in re.findall(r"\]\(([^)\s]+)\)", _read(path)):
-            if re.match(r"(https?:|mailto:|#)", target):
+        text = _read(path)
+        for target in re.findall(r"\]\(([^)\s]+\s[^)]*)\)", text):
+            if not re.match(r"(https?:|mailto:)", target) and "\n" not in target and not target.startswith("<"):
+                out.append(f"{path}: link with a space in its target: {target}")
+        for target in re.findall(r"\]\(([^)\s]+)\)", text):
+            if re.match(r"(https?:|mailto:)", target):
                 continue
-            rel = target.split("#", 1)[0]
-            if rel and not os.path.exists(os.path.normpath(os.path.join(REPO, os.path.dirname(path), rel))):
+            rel, _, frag = target.partition("#")
+            dest = os.path.normpath(os.path.join(os.path.dirname(path), rel)).replace("\\", "/") if rel else path
+            if not os.path.exists(os.path.join(REPO, dest)):
                 out.append(f"{path}: broken link {target}")
+            elif frag and dest.endswith(".md") and frag not in _anchors(dest):
+                out.append(f"{path}: no heading for #{frag} in {dest}")
     return out
 
 

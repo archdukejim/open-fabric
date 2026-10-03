@@ -60,7 +60,7 @@ def _forget_rules(config_dir, kind, allowed, what):
 
 def _keep_ufw_state(config_dir):
     """Purpose: record once whether ufw was on before fabric first enabled it, so undoing the firewall can leave it
-             as it was (design host-consent.md §4).
+             as it was (manual 2.7.1.5).
     Inputs:  config_dir — the install's config folder (<config>/host-originals/ufw.state).
     Returns: None; the record written only when absent ("active" or "inactive").
     Fails:   OSError writing it; FileNotFoundError without ufw.
@@ -119,7 +119,7 @@ def run(ctx):
     # SSH rules fabric added for a network that is no longer allowed (lan_cidr changed, a firewall_allow entry
     # removed) go; rules fabric did not add are never touched. The record says which are fabric's.
     _forget_rules(ctx.config_dir, "ssh", allowed, "SSH")
-    # time (ntp.md): the networks chrony answers may ask on UDP 123, nobody else
+    # time (manual 2.5.1): the networks chrony answers may ask on UDP 123, nobody else
     ntp_nets = rules["ntp"]
     for cidr in ntp_nets:
         subprocess.run(["ufw", "allow", *ufw_rule("ntp", cidr)], check=True, capture_output=True)

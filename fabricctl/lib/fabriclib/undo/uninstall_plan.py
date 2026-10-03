@@ -1,7 +1,7 @@
 from fabriclib.consent.groups import GROUPS
 from fabriclib.undo.undo_group import UNDO
 
-# what uninstall does with each kind of host change (design host-consent.md §3, step 8)
+# what uninstall does with each kind of host change (manual 2.7.1.4, step 8)
 REMOVED = {
     "services": "fabric's systemd units, fabric.target, /usr/local/bin/fabricctl and the vault unlock udev rule",
     "accounts": "the fabric-* service accounts and their groups",
@@ -14,8 +14,7 @@ KEPT = {
 
 
 def uninstall_plan():
-    """Purpose: what `fabricctl uninstall` does with each kind of host change, shown before it asks (design
-             host-consent.md §3, step 8).
+    """Purpose: what `fabricctl uninstall` does with each kind of host change, shown before it asks (manual 2.7.1.4, step 8).
     Inputs:  none.
     Returns: list of (group title, "removed" | "undone" | "kept", what) in groups.GROUPS order.
     Fails:   never.

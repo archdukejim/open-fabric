@@ -99,7 +99,7 @@ def _deploy(paths, start_services):
     units = service_units(paths["base"], final_vars)
     reverse = reverse_zones(final_vars)    # reverse zones and their PTRs come from the forward A/AAAA records
     context["reverse_zone_names"] = list(reverse["zones"])
-    # federation (federation.md M4): delegations, secondary zones and TSIG keys for the sites next to this one
+    # federation (manual 1.8 M4): delegations, secondary zones and TSIG keys for the sites next to this one
     context["federation_links"] = dns_links(final_vars, secrets, paths["federation"])
     # the parent site's admins may read this site's part where it is copied (30-aci, M5)
     context["federation_parent"] = (load_registry(paths["federation"]).get("upstream") or {}).get("site_name") or ""
@@ -163,7 +163,7 @@ def apply_deployment(start_services=True):
     try:
         if not allowed_to_change(paths["config"], "services", plan_services(), unasked_install=True):
             raise ValidationError("fabric's own services (systemd units) are not approved on this host: "
-                                  "`sudo fabricctl setup` asks (design host-consent.md)")
+                                  "`sudo fabricctl setup` asks (manual 2.7.1)")
         return _deploy(paths, start_services)
     except ValidationError as e:
         print(f"Error: {e}")

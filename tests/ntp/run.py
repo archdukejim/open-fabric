@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Time (design ntp.md) with real containers: chrony (Debian's package on fabric's pinned Debian image) run from
+"""Time (manual 2.5.1) with real containers: chrony (Debian's package on fabric's pinned Debian image) run from
 the configuration deploy_chrony generates. A site serves its network and refuses others; a second site syncs
 from it as its upstream site (federation); time_status and query_time read real chrony. Includes what must be
 refused. The containers never set the clock (-x): they share the host's kernel clock.

@@ -2,7 +2,7 @@ from fabriclib.security.firewall_rules import firewall_rules
 
 
 def plan_firewall(v, config_dir):
-    """Purpose: the host firewall changes, rule by rule (design host-consent.md §2 `firewall`): a new rule after a
+    """Purpose: the host firewall changes, rule by rule (manual 2.7.1.3 `firewall`): a new rule after a
              settings change is a new question.
     Inputs:  v — vars (security.firewall, default True; firewall_rules reads the rest); config_dir — the install's
              config folder.

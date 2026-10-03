@@ -230,7 +230,7 @@ check("kea-ddns: uid 915, no capabilities, read-only",
       insp["kt-ddns"]["Config"]["User"] == "915:915" and not hd.get("CapAdd") and hd["ReadonlyRootfs"])
 
 
-# ------------------------------------------------------------------ commands (dhcp-management.md §4)
+# ------------------------------------------------------------------ commands (manual 2.2.2.5)
 # The vars file is a scratch copy: edit_dhcp's load/save/lock/audit are pointed at it.
 import contextlib  # noqa: E402
 from fabriclib.dhcp.common import edit_dhcp as ed  # noqa: E402

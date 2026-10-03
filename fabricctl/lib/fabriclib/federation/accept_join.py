@@ -34,7 +34,7 @@ def _port(value):
 
 
 def _check_networks(v, site, networks):
-    """Purpose: refuse a joining site whose networks overlap another site's (design dhcp-management.md §5): the
+    """Purpose: refuse a joining site whose networks overlap another site's (manual 2.2.2.6): the
              upstream's copy of the address plan, plus its own networks (the plan may not list them yet).
     Inputs:  v — the upstream's vars; site — the joining site's name; networks — what the request reported
              ([{name, cidr, allow_overlap}]; an older fabric sends none).
@@ -64,7 +64,7 @@ def _check_networks(v, site, networks):
 
 
 def accept_join(v, req, client_ip="", now=None):
-    """Purpose: On the upstream: let an invited site join (design federation.md §4 step 3): check the one-time
+    """Purpose: On the upstream: let an invited site join (manual 1.8.4.1 step 3): check the one-time
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
              invitation.
     Inputs:  v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip,
@@ -79,7 +79,7 @@ def accept_join(v, req, client_ip="", now=None):
              parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>",
              "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this
              site's published DNS port) (kept here in fabric's
-             secrets as federation_tsig[site]; design federation.md M4), "directory": {"secret", "ldap_host",
+             secrets as federation_tsig[site]; manual 1.8 M4), "directory": {"secret", "ldap_host",
              "ldap_port"} — the directory link's secret (replication both ways, kept here as
              federation_replication[site]; §3.2a) and this site's LDAPS name, "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.

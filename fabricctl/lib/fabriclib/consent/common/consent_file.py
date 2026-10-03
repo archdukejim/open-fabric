@@ -2,7 +2,7 @@ import os
 
 
 def consent_file(config_dir):
-    """Purpose: where an install records its answers to the host-change questions (design host-consent.md §3).
+    """Purpose: where an install records its answers to the host-change questions (manual 2.7.1.4).
     Inputs:  config_dir — the install's config folder.
     Returns: "<config_dir>/consent.yaml" (str).
     Fails:   never.

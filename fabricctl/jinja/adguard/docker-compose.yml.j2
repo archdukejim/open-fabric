@@ -1,6 +1,6 @@
 services:
   adguardhome:
-    # The DNS filter in front of BIND (design dns-filter.md): clients ask it on host_ip:53, it forwards
+    # The DNS filter in front of BIND (manual 2.4.1): clients ask it on host_ip:53, it forwards
     # fabric's zones to BIND and the rest over DNS-over-HTTPS/TLS. Built FROM the pinned digest without the
     # binary's file capabilities (build/Dockerfile): it runs with none, on 5300 inside; Docker publishes 53
     # to it. Its UI is reached only through nginx. The sign-in (oauth2-proxy) is a unit of its own

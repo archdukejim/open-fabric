@@ -17,7 +17,7 @@ def save_consent(config_dir, groups):
     tmp = path + ".tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as f:
-        f.write("# fabric: answers to the host-change questions (docs/design/host-consent.md). Change them with\n"
+        f.write("# fabric: answers to the host-change questions (manual 2.7.1). Change them with\n"
                 "# `sudo fabricctl setup --approve GROUP` / `--decline GROUP`, not here.\n")
         yaml.safe_dump({"groups": groups}, f, sort_keys=False)
     os.replace(tmp, path)

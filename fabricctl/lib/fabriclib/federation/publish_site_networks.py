@@ -49,7 +49,7 @@ print(json.dumps(done))
 def publish_site_networks(v, container="dirsrv"):
     """Purpose: write this site's networks (site_networks: the LAN and every DHCP subnet, with name, VLAN, notes)
              into ou=networks of its own part of the directory, so M5 replication carries them to the parent and
-             the root, which gathers the address plan (design dhcp-management.md §5).
+             the root, which gathers the address plan (manual 2.2.2.6).
     Inputs:  v — fabric vars: site_name, ldap_local_dn (ou=<site>,<base>), lan_cidr, install_kea, dhcp;
              container — the dirsrv container (tests pass theirs).
     Returns: {"added": [names], "changed": [names], "removed": [DNs]} — nothing when the directory already says

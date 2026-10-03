@@ -16,8 +16,7 @@ print(json.dumps(sorted(out, key=lambda n: (n["site"], n["cidr"]))))
 
 
 def read_address_plan(v, container="dirsrv"):
-    """Purpose: the address plan across sites, from this site's own copy of the organisation (design
-             dhcp-management.md §5): every site's networks with name, VLAN, kind and notes.
+    """Purpose: the address plan across sites, from this site's own copy of the organisation (manual 2.2.2.6): every site's networks with name, VLAN, kind and notes.
     Inputs:  v — fabric vars: ldap_base_dn; container — the dirsrv container (tests pass theirs).
     Returns: list of {"site", "name", "cidr", "vlan", "kind", "notes", "allow_overlap"}, sorted by site and
              network; [] before the root has published a plan.

@@ -10,7 +10,7 @@ DOCKER_PACKAGES = ["docker.io", "docker-compose-v2", "docker-buildx"]
 
 
 def plan_packages():
-    """Purpose: the apt packages setup installs (design host-consent.md §2 `packages`), all from the host's own
+    """Purpose: the apt packages setup installs (manual 2.7.1.3 `packages`), all from the host's own
              apt sources — fabric adds none.
     Inputs:  none (asks dpkg and docker).
     Returns: {"host": [missing HOST_PACKAGES], "docker": DOCKER_PACKAGES when Docker (with compose v2 and buildx)

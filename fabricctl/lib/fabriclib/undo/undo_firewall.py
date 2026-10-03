@@ -8,7 +8,7 @@ UNIT = "/etc/systemd/system/fabric-firewall.service"
 
 
 def undo_firewall(config_dir):
-    """Purpose: undo the `firewall` host change (design host-consent.md §4): the ufw rules fabric added, its
+    """Purpose: undo the `firewall` host change (manual 2.7.1.5): the ufw rules fabric added, its
              DOCKER-USER rules and their boot unit; ufw switched off again if it was off before fabric.
     Inputs:  config_dir — the install's config folder: the records of what fabric opened (security/ufw_rule RECORDS)
              and whether ufw was on before (<config>/host-originals/ufw.state).

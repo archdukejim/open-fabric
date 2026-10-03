@@ -10,8 +10,7 @@ from fabriclib.consent.plan_trust import plan_trust
 
 
 def plan_host_changes(v, deploy_base, config_dir, jinja_dir, steps=None):
-    """Purpose: every change this setup run would make outside fabric's own tree, by group (design
-             host-consent.md §2-3), for the questions asked before the first step.
+    """Purpose: every change this setup run would make outside fabric's own tree, by group (manual 2.7.1.3-3), for the questions asked before the first step.
     Inputs:  v — the planned settings (planned_vars); deploy_base, config_dir, jinja_dir — install paths;
              steps — the setup steps that will run (None: all), so `--step firewall` asks only about the firewall.
     Returns: {group: [change, ...]} in GROUPS order, groups with nothing to change left out.

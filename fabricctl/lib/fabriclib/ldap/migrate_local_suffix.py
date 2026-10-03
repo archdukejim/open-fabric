@@ -64,7 +64,7 @@ print(json.dumps(done))
 
 
 def migrate_local_suffix(v, container="dirsrv"):
-    """Purpose: Move an install from before the directory split (design federation.md, M1) to the split
+    """Purpose: Move an install from before the directory split (manual 1.8, M1) to the split
              layout: its devices from ou=devices of the organisation suffix to ou=devices of its local suffix,
              each naming its roles (fabricRoleName, taken from the roles' old member lists); roles' member
              lists removed; the old service accounts (ou=admins,ou=accounts) and their OU deleted.

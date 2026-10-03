@@ -13,7 +13,7 @@ from fabriclib.radius.deploy_freeradius import deploy_freeradius
 def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
     """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea and
              FreeRADIUS — each only when it is on (chrony whenever it is installed and the `time` host change is
-             approved — design host-consent.md; an install set up before consent existed keeps converging).
+             approved — manual 2.7.1; an install set up before consent existed keeps converging).
     Inputs:  paths — deploy_paths() (federation, config); final_vars — rendered settings; secrets; jinja_env; links —
              dns_links() (the zones AdGuard forwards to BIND).
     Returns: {"restart": set of units to restart, "nginx": True if nginx's sign-in snippet for AdGuard changed}.
@@ -23,7 +23,7 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
     # Fluent Bit (optional): its config, destination CAs, credentials, disk buffer
     if final_vars.get("install_fluentbit") and deploy_fluentbit(final_vars, secrets, jinja_env):
         restart.add("fluentbit")
-    # DNS filter (dns-filter.md): AdGuard's config merged with what it has, oauth2-proxy's, nginx's snippet
+    # DNS filter (manual 2.4.1): AdGuard's config merged with what it has, oauth2-proxy's, nginx's snippet
     if final_vars.get("install_adguard"):
         adg = deploy_adguard(final_vars, secrets, links, jinja_env)
         if adg["adguard"]:
@@ -31,7 +31,7 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
         if adg["oauth2proxy"]:
             restart.add("adguard-auth")
         nginx = adg["nginx"]
-    # Time (ntp.md): chrony on the host, the upstream site first; installed by setup's host step
+    # Time (manual 2.5.1): chrony on the host, the upstream site first; installed by setup's host step
     if shutil.which("chronyd"):
         if not allowed_to_change(paths["config"], "time", plan_time(), unasked_install=True):
             print("  time: chrony left as it is (the `time` host change is not approved; "

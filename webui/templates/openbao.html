@@ -160,7 +160,7 @@
 {% elif view == 'disk' %}
 <section class="card"><h2>Disk encryption with your security key or USB stick</h2>
 <p class="muted">fabric does not encrypt disks: you do it once, at the console. This encrypts the volume holding fabric's data (<code>/opt</code>, <code>/etc/fabric</code>) with LUKS2, unlocked by the <strong>same YubiKey or USB stick</strong> that unlocks OpenBao. A stolen disk or SD card then reveals nothing.</p>
-<p class="flash warn">Untested with hardware by the fabric project. Try it on a spare machine first, and always keep a passphrase slot. The full guide: <code>docs/disk-encryption.md</code>.</p>
+<p class="flash warn">Untested with hardware by the fabric project. Try it on a spare machine first, and always keep a passphrase slot. The full guide: the manual (<code>/manual/</code> on the landing page), 4.5.1.</p>
 <h3>Before you start</h3>
 <ul>
 <li><strong>Keep a passphrase</strong> (offline) and back up the LUKS header after every change: <code>sudo cryptsetup luksHeaderBackup /dev/sdX2 --header-backup-file luks-header.img</code></li>

@@ -1,4 +1,4 @@
-"""The replication plan (fabriclib/federation/directory_links.py, design federation.md §3.2a) for the shapes a site
+"""The replication plan (fabriclib/federation/directory_links.py, manual 1.8.3.2) for the shapes a site
 can take: standalone, the root with a site, a leaf site, a site with sites below it (a hub), a link without its
 secret. No containers: the plan is data."""
 import os

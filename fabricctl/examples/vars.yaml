@@ -1,7 +1,7 @@
 # ============================================================
 # FABRIC — CONFIGURATION
 # Use with: sudo fabricctl setup --file vars.yaml
-# Every setting and its default: docs/vars.md (fabricctl/jinja/vars.yaml.j2)
+# Every setting and its default: the manual, 2.1 (docs/volume_2_technologies_and_features/; fabricctl/jinja/vars.yaml.j2)
 # ============================================================
 domain: example.com
 hostname: fabric

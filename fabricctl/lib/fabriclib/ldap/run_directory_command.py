@@ -19,7 +19,7 @@ USAGE = """usage: fabricctl directory sync [--quiet]
 def run_directory_command(v, args):
     """Purpose: `fabricctl directory sync`: directory upkeep on this install — POSIX identities, replication links
              and, when federated, the address plan (this site's networks; on the root site the whole plan:
-             design dhcp-management.md §5).
+             manual 2.2.2.6).
     Inputs:  v — fabric vars; args — the words after `directory`: sync [--quiet].
     Returns: exit status: 0, 2 for usage.
     Fails:   ValidationError / RuntimeError from ensure_posix_identities, configure_directory_links,

@@ -7,7 +7,7 @@ FILES = ("/etc/chrony/chrony.conf", "/etc/default/chrony", "/etc/systemd/system/
 
 
 def undo_time(config_dir, manage_units=True):
-    """Purpose: undo the `time` host change (design host-consent.md §4): chrony's files as they were before fabric
+    """Purpose: undo the `time` host change (manual 2.7.1.5): chrony's files as they were before fabric
              first wrote them, chrony restarted.
     Inputs:  config_dir — the install's config folder (the kept copies: common/keep_original); manage_units —
              systemctl calls (False in tests).

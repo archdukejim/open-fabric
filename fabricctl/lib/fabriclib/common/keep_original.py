@@ -6,7 +6,7 @@ ORIGINALS = "host-originals"     # under the install's config folder: <config>/h
 
 def keep_original(path, config_dir, marker=None):
     """Purpose: keep a copy of a host file as it was before fabric first changes it, so `fabricctl setup --undo` and
-             uninstall can put it back (design host-consent.md §4).
+             uninstall can put it back (manual 2.7.1.5).
     Inputs:  path — the host file about to change (absolute); config_dir — the install's config folder (None: keep
              nothing, e.g. tests on a scratch tree); marker — text that marks the file as fabric's own (its first
              line): a file holding it is not an original (an install set up before originals were kept).

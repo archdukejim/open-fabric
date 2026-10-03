@@ -136,7 +136,7 @@ same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
 
-# Federation (design federation.md): the endpoint's vhost, socket mount, CNAME and unit only when it is
+# Federation (manual 1.8): the endpoint's vhost, socket mount, CNAME and unit only when it is
 # on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.
 assert v2['federation_endpoint'] is False and v2['org_domain'] == v2['domain'], (v2['federation_endpoint'], v2['org_domain'])
 assert v2['hostname_federation'] == 'federation.lan.j-j.family', v2['hostname_federation']
@@ -164,7 +164,7 @@ for base, oc in (('dc=lan', 'objectClass: domain\ndc: lan'), ('o=acme,dc=lan', '
     assert f'dn: {base}\nobjectClass: top\n{oc}' in tree, tree[:400]
     assert f'dn: ou=pi-core,{base}\nobjectClass: top\nobjectClass: organizationalUnit\nou: pi-core' in tree
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
-# DNS links (design federation.md M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
+# DNS links (manual 1.8 M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
 plain = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
 assert 'type secondary' not in plain and 'also-notify' not in plain, 'no federation links: no secondaries, no notify'
 links = {'children': [{'site': 'lab', 'key': 'fed-lab', 'algorithm': 'hmac-sha256', 'secret': 'c2VjcmV0', 'delegate': True,
@@ -180,7 +180,7 @@ db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=link
                                                    zone_records=v2['dns']['dynamic_zone_var'])
 assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
-# DNS filter (dns-filter.md): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
+# DNS filter (manual 2.4.1): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
 # the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
 assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False
 assert v2['bind_dns_port'] == user.get('bind_dns_port', 53), 'with the filter off the port is what vars say (53)'
@@ -203,7 +203,7 @@ _o2p = env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg)
 assert not [ln for ln in _o2p.splitlines() if ln.strip().startswith(('client_secret', 'cookie_secret'))], \
     'oauth2-proxy secrets only via secrets.env'
 print('DNS filter: off by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
-# time (ntp.md): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
+# time (manual 2.5.1): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
 assert v2['ntp_serve'] is True and v2['ntp_set_clock'] is True and all(x.endswith(' nts') for x in v2['ntp_servers'])
 assert 'ntp' in [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']]
 own = copy.deepcopy(PRISTINE)
@@ -276,7 +276,7 @@ sn = k4["subnet4"][0]
 assert sn["pools"] == [{"pool": "192.168.7.100 - 192.168.7.199"}] and sn["reservations"][0]["ip-address"] == "192.168.7.20"
 assert k4["ddns-qualifying-suffix"] == "dhcp.lan.j-j.family." and k4["ddns-conflict-resolution-mode"] == "check-with-dhcid"
 assert k4["control-socket"]["socket-name"].startswith("/var/run/kea/") and k4["interfaces-config"]["interfaces"] == ["eth0"]
-# time (ntp.md): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
+# time (manual 2.5.1): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
 assert {"name": "ntp-servers", "data": kv["host_ip"]} in k4["option-data"], k4["option-data"]
 kv["dhcp"] = {**kv["dhcp"], "ntp": ["192.168.7.2", "192.168.7.3"]}
 assert {"name": "ntp-servers", "data": "192.168.7.2, 192.168.7.3"} in kea_json("kea-dhcp4.conf")["Dhcp4"]["option-data"]

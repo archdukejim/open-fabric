@@ -20,7 +20,7 @@ from fabriclib.system.apply_changes import apply_changes
 
 def reparent_site(ctx, actor, invitation):
     """Purpose: move this site under another parent — the root site or another site that may hold sites — with
-             an invitation from that parent (design federation.md §6): for a nested site whose parent is gone
+             an invitation from that parent (manual 1.8.5.1): for a nested site whose parent is gone
              for good, or to change where a site hangs. The site keeps its name, directory part and data; it
              gets a new CA from the new parent.
     Inputs:  ctx — SetupContext with state loaded (vars, config_dir); actor — str (audit); invitation — the new

@@ -13,7 +13,7 @@ def run(ctx):
     """Purpose: setup step `join` (only with `fabricctl setup --join`): join the upstream before
              anything is rendered, so this install is set up as a site of that fabric — its CA an
              intermediate signed by the organisation's root (bring-your-own-CA path), its organisation suffix
-             the upstream's (design federation.md §4).
+             the upstream's (manual 1.8.4.1).
     Inputs:  ctx — SetupContext: join_invitation, vars (from collect_vars: domain, host_ip, image_stepca if set),
              secrets / secrets_file (ca_password, created here if missing), config_dir, source_dir (images.lock).
     Returns: None. ctx.vars gains byoc, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain,

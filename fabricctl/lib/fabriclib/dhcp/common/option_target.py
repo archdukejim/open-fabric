@@ -4,7 +4,7 @@ from fabriclib.dhcp.common.find_subnet import find_subnet
 
 def option_target(dhcp, subnet=None, client_class=None, mac=None):
     """Purpose: the place an option command works on: every subnet (global), one subnet, one client class, or one
-             reservation (design dhcp-management.md §2: Kea's levels, most specific wins).
+             reservation (manual 2.2.2.3: Kea's levels, most specific wins).
     Inputs:  dhcp — the normalized dhcp block; subnet — a subnet's name or network; client_class — a class name;
              mac — a reservation's MAC. At most one of the three.
     Returns: (the dict whose "options" list to change, a label for messages and the audit).

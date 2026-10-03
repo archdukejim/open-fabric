@@ -5,7 +5,7 @@ PARENTS = "ca_parents.crt"
 
 def ca_parents_pem(v):
     """Purpose: the CA certificates between this site's intermediate and the root — empty for the root site and
-             for flat sites, the parent site's CA (and its parents) for a nested site (design federation.md §6).
+             for flat sites, the parent site's CA (and its parents) for a nested site (manual 1.8.5.1).
     Inputs:  v — fabric vars: deploy_base_dir.
     Returns: str PEM of zero or more certificates (stepca/data/certs/ca_parents.crt), "" when there is none.
     Fails:   OSError when the file exists but cannot be read.

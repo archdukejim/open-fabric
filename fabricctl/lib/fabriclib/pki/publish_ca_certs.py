@@ -64,7 +64,7 @@ def publish_ca_certs(certs_dir, www_dir, uid, gid, trust_prefix):
              too, as with a bring-your-own chain: only its first certificate is used); www_dir — the certs
              web root (created if missing); uid, gid — owner of the published files (nginx);
              trust_prefix — file name prefix in /usr/local/share/ca-certificates; None: publish only, do not touch
-             the host's trust store (the `trust` consent was declined, design host-consent.md).
+             the host's trust store (the `trust` consent was declined, manual 2.7.1).
     Returns: True if any published file or trust-store file changed, else False.
     Fails:   subprocess.CalledProcessError from openssl or update-ca-certificates; OSError (missing CA
              files, trust directory not writable).

@@ -7,7 +7,7 @@ from fabriclib.federation.common.save_registry import save_registry
 
 def drop_relay(actor, source="cli"):
     """Purpose: on a site that joined through a relay node: talk to its upstream directly from now on (the relay
-             is gone or no longer wanted; design federation.md §6). Nothing else changes: the relay never held
+             is gone or no longer wanted; manual 1.8.5.1). Nothing else changes: the relay never held
              anything of the site.
     Inputs:  actor — str (audit); source — default "cli".
     Returns: the relay record that was dropped (dict: site, host, address, port).

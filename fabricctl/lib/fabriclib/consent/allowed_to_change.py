@@ -3,7 +3,7 @@ from fabriclib.consent.load_consent import load_consent
 
 def allowed_to_change(config_dir, group, changes, unasked_install=False):
     """Purpose: whether fabric may make these host changes now: the group was approved and every change was among
-             the approved ones (design host-consent.md §3, step 4). Never asks.
+             the approved ones (manual 2.7.1.4, step 4). Never asks.
     Inputs:  config_dir — the install's config folder; group — a consent group (groups.GROUPS); changes — the
              changes about to be made (list of str, as the group's plan words them); unasked_install — what to
              answer for an install that has no consent.yaml at all (set up before consent existed): apply, the

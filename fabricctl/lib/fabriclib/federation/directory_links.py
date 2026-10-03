@@ -13,7 +13,7 @@ def _account(site):
 
 
 def directory_links(v, secrets, registry_path):
-    """Purpose: what this site's 389-DS replicates, as replicas and agreements (design federation.md §3.2a): the
+    """Purpose: what this site's 389-DS replicates, as replicas and agreements (manual 1.8.3.2): the
              organisation comes down from the upstream (supplied here at the root), this site's part goes up, the
              parts of the sites that joined here are kept as copies.
     Inputs:  v — fabric vars: site_name, ldap_base_dn, ldap_local_dn (this site's part); secrets — fabric's

@@ -1,4 +1,4 @@
-# fabric: rendered by fabricctl (jinja/chrony/chrony.conf.j2, design ntp.md); apply overwrites edits.
+# fabric: rendered by fabricctl (jinja/chrony/chrony.conf.j2, manual 2.5.1); apply overwrites edits.
 # Sources: this site's upstream site first (federation), then ntp_servers.
 {% for s in sources %}
 {{ 'pool' if s.pool else 'server' }} {{ s.host }} iburst{{ ' nts' if s.nts }}{{ ' prefer' if s.prefer }}

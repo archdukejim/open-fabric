@@ -2,7 +2,7 @@ import ipaddress
 
 
 def network_conflicts(mine, plan, site):
-    """Purpose: which of this site's networks overlap another site's (design dhcp-management.md §5): two sites
+    """Purpose: which of this site's networks overlap another site's (manual 2.2.2.6): two sites
              routed together must never share addresses.
     Inputs:  mine — this site's networks (site_networks); plan — the address plan (read_address_plan: entries
              with "site", "name", "cidr", "allow_overlap"); site — this site's name (its own entries are skipped).

@@ -8,7 +8,7 @@ from fabriclib.common.errors import ValidationError
 
 def replace_site_ca(v, staged):
     """Purpose: switch this site's running Step-CA to a new intermediate (a site re-parented under another
-             site or the root, design federation.md §6): the new CA certificate, its parent CAs and key replace
+             site or the root, manual 1.8.5.1): the new CA certificate, its parent CAs and key replace
              the old ones; the root stays.
     Inputs:  v — fabric vars: deploy_base_dir, service_users.step; staged — stage_site_ca's result
              (ca_crt_path, ica_crt_path, ica_key_path, ica_parents_path).

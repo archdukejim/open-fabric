@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Directory replication between two sites (design federation.md §3.2a, M5) with two real 389-DS containers:
+# Directory replication between two sites (manual 1.8.3.2, M5) with two real 389-DS containers:
 # the root (ldap.lan.test) writes the organisation, the site (ldap.lab.lan.test) writes its own part. Proves:
 # the organisation reaches the site read-only, the site's part reaches the root, writes at the wrong end are
 # refused, the site keeps answering with the root down and catches up afterwards. fabriclib's
@@ -135,7 +135,7 @@ dm dsroot "c.add_s(\"uid=bob,ou=users,$BASE\", ldap.modlist.addModlist({'objectC
 check "changes made while the root was down arrive when it is back" "seen dsroot 'cn=camera,$SITE_PART'"
 check "and the root's new changes reach the site" "seen dssite 'uid=bob,ou=users,$BASE'"
 
-# ---- the address plan across sites (dhcp-management.md §5), over the same replication
+# ---- the address plan across sites (manual 2.2.2.6), over the same replication
 schema=$(py "
 import re
 from fabriclib.common.jinja_env import jinja_env

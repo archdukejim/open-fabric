@@ -31,7 +31,7 @@ print(json.dumps(gone))
 
 
 def configure_directory_links(v, secrets, registry_path, container="dirsrv"):
-    """Purpose: make this site's 389-DS replicate as the federation says (design federation.md §3.2a): copies of the
+    """Purpose: make this site's 389-DS replicate as the federation says (manual 1.8.3.2): copies of the
              parts of the sites that joined here, the replicas, the agreements; and remove what is no longer linked.
     Inputs:  v — fabric vars (directory_links); secrets — fabric's secrets (federation_replication);
              registry_path — config/federation.yaml; container — the dirsrv container.

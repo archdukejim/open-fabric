@@ -285,7 +285,7 @@ http {
 {% endif %}
 {% if install_adguard | default(false) | bool %}
 
-    # DNS filter (design dns-filter.md §5): AdGuard Home's UI, only after OIDC sign-in through
+    # DNS filter (manual 2.4.1.6): AdGuard Home's UI, only after OIDC sign-in through
     # oauth2-proxy (fabric:dns:filter); nginx then adds AdGuard's own local login.
     server {
         listen 443 ssl;
@@ -335,7 +335,7 @@ http {
 {% endif %}
 {% if federation_endpoint | default(false) | bool %}
 
-    # Federation endpoint (design federation.md §5): other sites join here. A join
+    # Federation endpoint (manual 1.8.4.2): other sites join here. A join
     # is authenticated by its one-time invitation secret; the joining node has no
     # certificate yet. Small bodies, few requests.
     limit_req_zone $binary_remote_addr zone=federation:1m rate=6r/m;

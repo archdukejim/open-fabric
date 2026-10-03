@@ -7,7 +7,7 @@ KEEP = object()     # "not given": leave the field as it is
 
 def update_subnet(actor, which, name=KEEP, vlan=KEEP, router=KEEP, notes=KEEP, add_pools=(), remove_pools=(),
                   allow_overlap=KEEP, source="cli"):
-    """Purpose: change a DHCP subnet's name, VLAN record, router, notes or pools (design dhcp-management.md §4).
+    """Purpose: change a DHCP subnet's name, VLAN record, router, notes or pools (manual 2.2.2.5).
              Its network and id stay (leases are tied to the id). Applied by the next apply.
     Inputs:  actor — who asks (audit); which — the subnet's name or network; name, vlan, router, notes,
              allow_overlap (why it may overlap another site's network) — the new

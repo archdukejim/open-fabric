@@ -5,7 +5,7 @@ from fabriclib.common.keep_original import keep_original
 from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.ntp.chrony_settings import chrony_settings
 
-WAIT_DROPIN = """# fabric (design ntp.md): fabric's services start after time-sync.target; never wait for it forever
+WAIT_DROPIN = """# fabric (manual 2.5.1): fabric's services start after time-sync.target; never wait for it forever
 # (an offline install must start)
 [Service]
 TimeoutStartSec=90
@@ -13,7 +13,7 @@ TimeoutStartSec=90
 
 
 def deploy_chrony(v, registry_path, jinja_env, root="/", manage_units=True, config_dir=None):
-    """Purpose: the host's time service (design ntp.md): chrony configured by fabric, keeping this host's clock
+    """Purpose: the host's time service (manual 2.5.1): chrony configured by fabric, keeping this host's clock
              and serving the network.
     Inputs:  v — vars (chrony_settings; ntp_set_clock); registry_path — config/federation.yaml (the
              upstream site's address); jinja_env — loads chrony/chrony.conf.j2; root — "/" (tests: a scratch
@@ -31,7 +31,7 @@ def deploy_chrony(v, registry_path, jinja_env, root="/", manage_units=True, conf
 
     conf = jinja_env.get_template("chrony/chrony.conf.j2").render(**chrony_settings(v, registry_path))
     opts = "-F 1 " + ("-s" if v.get("ntp_set_clock", True) else "-x")
-    default = ("# fabric (design ntp.md): -s sets the clock from the drift file's time at start (no RTC); "
+    default = ("# fabric (manual 2.5.1): -s sets the clock from the drift file's time at start (no RTC); "
                "-x never sets it\n" f'DAEMON_OPTS="{opts}"\n')
     for d in ("/etc/chrony", "/etc/default", "/etc/systemd/system/chrony-wait.service.d"):
         os.makedirs(at(d), exist_ok=True)

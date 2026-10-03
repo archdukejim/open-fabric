@@ -28,8 +28,7 @@ def _org_ous(v):
 
 
 def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via=""):
-    """Purpose: On the upstream: a one-time invitation for a new site to join this fabric (design
-             federation.md §4). Only a hash of its secret is kept.
+    """Purpose: On the upstream: a one-time invitation for a new site to join this fabric (manual 1.8.4.1). Only a hash of its secret is kept.
     Inputs:  v — fabric vars: federation_endpoint (must be true), site_name (this site), domain, org_domain
              (default domain), ldap_base_dn, ldap_organizational_units, host_ip, hostname_federation,
              deploy_base_dir (the root certificate);
@@ -37,7 +36,7 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
              already; source — default "cli"; now — epoch seconds, default time.time() (tests); nest — how many
              levels of sites the new site may hold below it (its CA's path length), default 0. Made on the
              root site, the new site attaches flat; made on a site (one that may nest), it is nested under
-             that site (design federation.md §6); via — a site that joined this install, through whose
+             that site (manual 1.8.5.1); via — a site that joined this install, through whose
              endpoint the new site joins (a relay: it forwards, signs nothing), default "" (direct).
     Returns: {"invitation": "fabric-join-1.<base64url JSON>", "site", "id", "expires" (epoch), "nest", "nested"
              (True when made on a site: the new site will be nested under it), "via"}. With via, the

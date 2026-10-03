@@ -25,7 +25,7 @@ def _domains(v, links):
 
 
 def deploy_adguard(v, secrets, links, jinja_env):
-    """Purpose: Write the DNS filter's files (design dns-filter.md): AdGuard Home's configuration (fabric's keys
+    """Purpose: Write the DNS filter's files (manual 2.4.1): AdGuard Home's configuration (fabric's keys
              merged into what AdGuard has), oauth2-proxy's settings and secrets, and the nginx snippet that signs
              requests into AdGuard after OIDC.
     Inputs:  v — rendered vars: deploy_base_dir, service_users (adguard, oauth2proxy, nginx), ip_bind9, host_ip,
@@ -87,6 +87,6 @@ def deploy_adguard(v, secrets, links, jinja_env):
     inc = os.path.join(v["deploy_base_dir"], "nginx", "config", "conf.d", "adguard-auth.inc")
     os.makedirs(os.path.dirname(inc), exist_ok=True)
     changed["nginx"] = write_file_if_changed(
-        inc, "# fabric: AdGuard Home's own login, sent only after OIDC sign-in (dns-filter.md §5)\n"
+        inc, "# fabric: AdGuard Home's own login, sent only after OIDC sign-in (manual 2.4.1.6)\n"
              f'proxy_set_header Authorization "Basic {basic}";\n', 0o640, 0, n_gid)
     return changed

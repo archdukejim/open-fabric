@@ -46,7 +46,7 @@ def _stage(src, dst, uid, gid):
 
 def sign_site_ca(v, actor, site_name, csr, root_key="", root_password_file="", source="cli", nest=0,
                  as_parent=False):
-    """Purpose: Sign a joining site's intermediate CA (design federation.md §6): with the root key (a flat site,
+    """Purpose: Sign a joining site's intermediate CA (manual 1.8.5.1): with the root key (a flat site,
              or one allowed to hold nested sites), or — as_parent — with this site's own CA, for a site nested
              under this one. The joining site made the key itself (make_site_ca_request); only the request
              travels.

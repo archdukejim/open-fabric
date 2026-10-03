@@ -13,7 +13,7 @@ from fabriclib.undo.undo_runtime import undo_runtime
 from fabriclib.undo.undo_time import undo_time
 from fabriclib.undo.undo_trust import undo_trust
 
-# what undoing each group does, said before asking (design host-consent.md §4)
+# what undoing each group does, said before asking (manual 2.7.1.5)
 UNDO = {
     "runtime": ("put /etc/docker/daemon.json back as it was before fabric hardened it (without a kept copy: remove "
                 "the keys still holding fabric's values), then restart Docker — containers keep running "
@@ -32,7 +32,7 @@ UNDO = {
 
 def undo_group(ctx, group, interactive, assume_yes):
     """Purpose: `fabricctl setup --undo GROUP`: revert one kind of host change fabric made and record the answer as
-             no, so setup, apply and the timers leave it alone from then on (design host-consent.md §4).
+             no, so setup, apply and the timers leave it alone from then on (manual 2.7.1.5).
     Inputs:  ctx — SetupContext with state loaded (vars, config_dir); group — a groups.GROUPS name; interactive —
              False for --non-interactive; assume_yes — --yes (undo without asking).
     Returns: None; the change undone, what was done printed, consent.yaml records "no" for the group with the

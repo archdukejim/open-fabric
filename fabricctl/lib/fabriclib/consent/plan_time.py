@@ -2,7 +2,7 @@ import shutil
 
 
 def plan_time():
-    """Purpose: what fabric changes in the host's time service (design host-consent.md §2 `time`, ntp.md), asked
+    """Purpose: what fabric changes in the host's time service (manual 2.7.1.3 `time`, manual 2.5.1), asked
              once as a kind: the sources and served networks follow fabric's own NTP settings.
     Inputs:  none (looks for chronyd).
     Returns: list of str; [] without chrony (nothing to configure).

@@ -4,8 +4,7 @@ from fabriclib.federation.site_networks import site_networks
 
 
 def show_networks(v):
-    """Purpose: print the address plan across sites for `fabricctl federation networks` (design
-             dhcp-management.md §5): site → network → VLAN → kind → notes, then every overlap between sites
+    """Purpose: print the address plan across sites for `fabricctl federation networks` (manual 2.2.2.6): site → network → VLAN → kind → notes, then every overlap between sites
              (with the reason when one was given).
     Inputs:  v — fabric vars: ldap_base_dn, site_name, lan_cidr, dhcp (this site's networks are shown from its
              settings until the root's plan lists them).

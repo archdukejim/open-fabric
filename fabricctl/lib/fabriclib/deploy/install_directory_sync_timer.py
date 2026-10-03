@@ -9,7 +9,7 @@ TIMER = "/etc/systemd/system/fabric-directory-sync.timer"
 
 def install_directory_sync_timer(paths, final_vars, manage_units=True):
     """Purpose: the timer that gives people created in Keycloak's own console their POSIX identity within 5 minutes
-             (design domain-join.md step 1); removed when LDAP is off.
+             (manual 2.10.1 step 1); removed when LDAP is off.
     Inputs:  paths — deploy_paths() (render, jinja); final_vars — rendered settings (install_ldap); manage_units —
              systemctl calls (False in tests).
     Returns: True if a unit file changed or was removed (systemd must reload).

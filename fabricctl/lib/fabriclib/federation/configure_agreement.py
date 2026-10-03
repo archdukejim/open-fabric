@@ -55,7 +55,7 @@ print(json.dumps(state))
 
 def configure_agreement(suffix, name, host, port, bind_dn, secret, description="", reinit=False, container="dirsrv"):
     """Purpose: a replication agreement from this 389-DS (supplier or hub of `suffix`) to another site's copy, over
-             LDAPS verified against the organisation's root CA (design federation.md §3.2a).
+             LDAPS verified against the organisation's root CA (manual 1.8.3.2).
     Inputs:  suffix — the replicated suffix; name — the agreement's name (to-<site>); host — the other site's LDAP
              name (its certificate's name, resolvable here through the federation's DNS links); port — its LDAPS
              port (636); bind_dn — the link account at the other site (cn=repl-from-<this site>,cn=config); secret

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Federation invitations and joining (design federation.md, M3) with the real Step-CA image:
+"""Federation invitations and joining (manual 1.8, M3) with the real Step-CA image:
 
 an upstream ("hq") enables nothing but what the code needs here: its root CA (made with the pinned step
 CLI), its vars and secrets files, the federation endpoint's Handler (lib/federation/server.py) behind TLS

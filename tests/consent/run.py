@@ -1,4 +1,4 @@
-"""Asking before fabric changes the host (design host-consent.md): the recorded answers, the questions setup asks
+"""Asking before fabric changes the host (manual 2.7.1): the recorded answers, the questions setup asks
 (unattended and interactive), what steps may do with them, the account plan with its move from the previous
 accounts, and the upgrade of an older install's settings. No containers and nothing changed on this host: the
 answers live in a scratch folder and the account checks read (or stand in for) the host's accounts."""

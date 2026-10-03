@@ -1,7 +1,7 @@
 """fabric's service accounts before 2026-10 (key in service_users -> (name, uid, gid)). They used the names of
 Ubuntu's own packages (bind, postgres, ...) and ids Debian reserves (bind: 53, inside base-passwd's 0-99, which
 an Ubuntu release upgrade asked to remove). Installs that still have them are moved to the fabric-* accounts in
-the 600-649 band by the accounts step (design host-consent.md §5)."""
+the 600-649 band by the accounts step (manual 2.7.1.6)."""
 
 PREVIOUS_ACCOUNTS = {
     "bind": ("bind", 53, 53),

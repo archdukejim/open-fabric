@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The DNS filter (design dns-filter.md) with real containers: fabric's BIND image serving a test zone and
+"""The DNS filter (manual 2.4.1) with real containers: fabric's BIND image serving a test zone and
 AdGuard Home (the pinned image) run from the configuration deploy_adguard generates, exactly as deployed
 (built without the binary's file capabilities, run with none, DNS on 5300 inside, read-only root).
 Includes what must be refused.

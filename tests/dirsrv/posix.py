@@ -1,4 +1,4 @@
-"""POSIX identities (fabriclib/ldap/ensure_posix_identities.py, design domain-join.md step 1) against the test
+"""POSIX identities (fabriclib/ldap/ensure_posix_identities.py, manual 2.10.1 step 1) against the test
 389-DS container: the DNA plugin assigns uidNumbers server-side from the users OU's range, every person gets one
 once, unsafe names are skipped, numbers are never handed out twice. Inputs from the environment."""
 import os

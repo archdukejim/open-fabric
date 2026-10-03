@@ -4,7 +4,7 @@ from fabriclib.dhcp.common.option_target import option_target
 
 
 def unset_option(actor, option, subnet=None, client_class=None, mac=None, source="cli"):
-    """Purpose: remove an option the admin set (design dhcp-management.md §4); an option fabric sets itself
+    """Purpose: remove an option the admin set (manual 2.2.2.5); an option fabric sets itself
              (DNS, time, domain) comes back to fabric's value. Applied by the next apply.
     Inputs:  actor — who asks (audit); option — its name or code; subnet / client_class / mac — where (none:
              every subnet); source — "cli" or "web".

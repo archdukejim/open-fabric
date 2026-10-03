@@ -22,7 +22,7 @@ $ORIGIN {{ zone_name }}.
 {% endif %}
 {% if zone_name == domain %}
 {% for child in (federation_links | default({'children': []})).children if child.delegate %}
-; federation: site {{ child.site }} answers for {{ child.domain }} (design federation.md M4)
+; federation: site {{ child.site }} answers for {{ child.domain }} (manual 1.8 M4)
 {{ "%-24s" | format(child.label) }}NS      ns.{{ child.domain }}.
 {{ "%-24s" | format("ns." ~ child.label) }}A       {{ child.address }}
 {% endfor %}

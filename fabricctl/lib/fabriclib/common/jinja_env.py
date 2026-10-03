@@ -116,7 +116,7 @@ def jinja_env(template_dir):
     })
     env.tests["match"] = lambda value, pattern: bool(re.search(pattern, str(value)))
     env.globals["lookup"] = _lookup
-    # Kea (dhcp-management.md): fabric's option format to Kea's JSON, one helper per Kea list
+    # Kea (manual 2.2.2): fabric's option format to Kea's JSON, one helper per Kea list
     env.globals.update(kea_option_data=kea_option_data, kea_option_defs=kea_option_defs,
                        kea_client_classes=kea_client_classes)
     # image_* defaults: the validated, digest-pinned refs (fabric/images.lock.yaml)

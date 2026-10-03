@@ -43,7 +43,7 @@ print(json.dumps(done))
 
 
 def ensure_posix_identities(v, container="dirsrv"):
-    """Purpose: give every person in the directory a POSIX identity (design domain-join.md step 1): posixAccount
+    """Purpose: give every person in the directory a POSIX identity (manual 2.10.1 step 1): posixAccount
              with a uidNumber the server assigns (389-DS DNA plugin, the users OU's uid_range, never handed out
              twice), the `users` group as primary group, /home/<uid> and a login shell.
     Inputs:  v — fabric vars: ldap_base_dn, ldap_groups (the `users` group's gidNumber, default 5000), optional

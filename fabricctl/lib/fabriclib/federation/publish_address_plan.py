@@ -46,8 +46,7 @@ print(json.dumps(done))
 def publish_address_plan(v, container="dirsrv"):
     """Purpose: on the root site: gather every site's networks — its own and the copies of the sites' parts it
              holds — into ou=address-plan of the organisation, which replication copies read-only to every site,
-             so each site can check new networks against all others even while the root is away (design
-             dhcp-management.md §5).
+             so each site can check new networks against all others even while the root is away (manual 2.2.2.6).
     Inputs:  v — fabric vars: ldap_base_dn; container — the dirsrv container (tests pass theirs).
     Returns: {"sites": [names in the plan], "added", "changed", "removed": counts}.
     Fails:   ValidationError when 389-DS is not running; RuntimeError for other directory errors.

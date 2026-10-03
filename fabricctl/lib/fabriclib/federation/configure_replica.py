@@ -59,7 +59,7 @@ print(json.dumps(done))
 
 
 def configure_replica(suffix, role, replica_id, accounts, referral=None, container="dirsrv"):
-    """Purpose: make this 389-DS a replica of one suffix (design federation.md §3.2a): the supplier where it is
+    """Purpose: make this 389-DS a replica of one suffix (manual 1.8.3.2): the supplier where it is
              written, a hub that passes it on, or a read-only consumer; and the link accounts allowed to push to it.
     Inputs:  suffix — the replicated suffix (the organisation's base DN, or a site's part ou=<site>,<base>); role —
              "supplier", "hub" or "consumer"; replica_id — 1..65534 for a supplier (ignored otherwise: hubs and

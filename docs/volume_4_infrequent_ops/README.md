@@ -35,7 +35,9 @@ Installation, upgrades, builds and host maintenance.
 ## 4.8 Testing
 
 - [4.8.1 Manual test plan](4.8.1-manual-test-plan.md)
+- [4.8.2 Automated tests](4.8.2-automated-tests.md)
 
 ## 4.9 Development
 
 - [4.9.1 The web UI's dev preview](4.9.1-dev-preview.md)
+- [4.9.2 Working on fabric](4.9.2-working-on-fabric.md)

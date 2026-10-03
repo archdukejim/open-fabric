@@ -104,7 +104,7 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
-echo "--- undoing one host change (host-consent.md §4): trust, then approved again"
+echo "--- undoing one host change (manual 2.7.1.5): trust, then approved again"
 UFW_BEFORE=$(in_box 'cat /opt/fabric/config/host-originals/ufw.state' 2>/dev/null)
 check "the host's own files were kept before fabric first changed them (chrony's, ufw's state)" \
     "in_box 'test -f /opt/fabric/config/host-originals/etc/chrony/chrony.conf' && ! in_box 'grep -q \"^# fabric\" /opt/fabric/config/host-originals/etc/chrony/chrony.conf' && [ -n '$UFW_BEFORE' ]"
@@ -123,7 +123,7 @@ check "setup --approve trust puts the CA back in the host trust store" \
 in_box 'fabricctl setup --undo accounts --non-interactive --yes' > "$OUT/undo-accounts.log" 2>&1
 check "setup --undo refuses what fabric needs (accounts), naming uninstall" "grep -q 'fabricctl uninstall' '$OUT/undo-accounts.log'"
 
-echo "--- POSIX identities (domain-join.md step 1)"
+echo "--- POSIX identities (manual 2.10.1 step 1)"
 docker cp "$REPO/tests/sandbox/posix_check.py" "$NAME:/root/posix_check.py"
 check "the admin has a POSIX identity: uidNumber from the users range, group users, /home/<uid>" \
     "in_box 'python3 /root/posix_check.py fabricadmin' | grep -qE '^(500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-4][0-9]{4}) 5000 /home/fabricadmin /bin/bash$'"
@@ -148,7 +148,7 @@ check "with Keycloak down the sign-in still starts and DNS answers through AdGua
     "in_box 'systemctl is-active adguard-auth' | grep -qx active && in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP"
 in_box 'systemctl start keycloak' >> "$OUT/adguard-no-keycloak.log" 2>&1
 
-echo "--- Time: chrony on the host serves the LAN (ntp.md)"
+echo "--- Time: chrony on the host serves the LAN (manual 2.5.1)"
 BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
 check "time: chrony runs, configured by fabric, answering the LAN" \
     "in_box 'systemctl is-active chrony' | grep -qx active && in_box 'grep -q ^allow /etc/chrony/chrony.conf && grep -q fabric /etc/chrony/chrony.conf'"
@@ -175,7 +175,7 @@ check "kea: fabricctl dhcp leases lists the client's lease" "in_box 'fabricctl d
 in_box 'fabricctl dhcp reserve 02:00:00:00:77:01 10.77.0.50 sbxprinter' > "$OUT/dhcp-reserve.log" 2>&1
 check "kea: fabricctl dhcp reserve saves and applies; status lists it"     "grep -q 'applied' '$OUT/dhcp-reserve.log' && in_box 'fabricctl dhcp status' | grep -q '02:00:00:00:77:01  10.77.0.50'"
 check "kea: a reservation inside the pool is refused"     "! in_box 'fabricctl dhcp reserve 02:00:00:00:77:02 10.77.0.205 --no-apply' >/dev/null 2>&1"
-# DHCP management (dhcp-management.md): subnets with name/VLAN/notes, options, a client class, Kea's own check
+# DHCP management (manual 2.2.2): subnets with name/VLAN/notes, options, a client class, Kea's own check
 in_box 'fabricctl dhcp add-subnet 10.78.0.0/24 --name lab2 --vlan 78 --router 10.78.0.1 --pool "10.78.0.100 - 10.78.0.150" --notes "second lab"' > "$OUT/dhcp-subnet.log" 2>&1
 in_box 'fabricctl dhcp class add pxe-uefi --test "option[93].hex == 0x0007" --next-server 10.77.0.30 --boot-file ipxe.efi' >> "$OUT/dhcp-subnet.log" 2>&1
 in_box 'fabricctl dhcp option set tftp-server-name 10.77.0.30 --class pxe-uefi' >> "$OUT/dhcp-subnet.log" 2>&1

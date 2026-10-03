@@ -1,7 +1,7 @@
 # fabriclib
 
 fabric's own Python code, grouped by domain; one operation per file
-(see [AGENTS.md](../../../AGENTS.md) §2). Run with `fabricctl/lib` on `sys.path`
+(see [1.10.1](../../../docs/volume_1_systems_and_services/1.10.1-code-conventions.md#1101-code-conventions)). Run with `fabricctl/lib` on `sys.path`
 and import as `fabriclib.<domain>.<file>`.
 
 | Folder | What |

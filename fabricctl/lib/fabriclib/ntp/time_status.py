@@ -4,7 +4,7 @@ LOCAL_REFID = "7F7F0101"      # chrony's own clock ("local stratum …"): servin
 
 
 def time_status():
-    """Purpose: this host's time synchronisation as chrony reports it (design ntp.md §3).
+    """Purpose: this host's time synchronisation as chrony reports it (manual 2.5.1.4).
     Inputs:  none (runs `chronyc -n -c tracking` over chrony's local socket).
     Returns: {"synced": bool, "source": str, "stratum": int, "offset": float seconds (absolute), "leap": str,
              "local": bool} — synced only with a real source (not chrony's own clock, not "Not synchronised");

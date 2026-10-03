@@ -2,7 +2,7 @@ from fabriclib.consent.consent_status import consent_status
 
 
 def show_consent_status(config_dir):
-    """Purpose: print what fabric may change on this host, for `fabricctl status` (design host-consent.md §3).
+    """Purpose: print what fabric may change on this host, for `fabricctl status` (manual 2.7.1.4).
     Inputs:  config_dir — the install's config folder.
     Returns: None; one line per group, a declined group with what it leaves unmanaged; one line saying setup
              will ask when the install predates consent.

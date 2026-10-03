@@ -76,7 +76,7 @@ hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower
 hostname_radius: {{ ((cname_radius | default('radius')) ~ '.' ~ domain) | lower }}
 hostname_adguard: {{ ((cname_adguard | default('adguard')) ~ '.' ~ domain) | lower }}
 hostname_ntp: {{ ((cname_ntp | default('ntp')) ~ '.' ~ domain) | lower }}
-{# The federation endpoint (design federation.md §5): sites join this install through it. Off until
+{# The federation endpoint (manual 1.8.4.2): sites join this install through it. Off until
    `fabricctl federation enable`; the name is always computed. #}
 federation_endpoint: {{ federation_endpoint | default(false) | bool | lower }}
 hostname_federation: {{ ((cname_federation | default('federation')) ~ '.' ~ domain) | lower }}
@@ -149,7 +149,7 @@ radius_people: {{ radius_people | default([{'group': 'network-staff', 'vlan': no
                                           {'group': 'network-guests', 'vlan': none, 'priority': 100}]) | to_json }}
 ip_fluentbit: {{ ip_fluentbit | default('10.255.0.95') }}
 fluentbit_mem_limit: {{ fluentbit_mem_limit | default('64m') }}
-# DNS filter (optional, design dns-filter.md): AdGuard Home in front of BIND on host_ip:53; BIND moves to
+# DNS filter (optional, manual 2.4.1): AdGuard Home in front of BIND on host_ip:53; BIND moves to
 # bind_dns_port (5053). Clients ask AdGuard; AdGuard forwards fabric's domains to BIND and the rest over
 # DNS-over-HTTPS/TLS. Its UI: https://adguard.<domain>, OIDC sign-in through oauth2-proxy.
 dns_filter: {{ dns_filter | default('none', true) | lower }}
@@ -165,7 +165,7 @@ adguard_upstreams: {{ adguard_upstreams | default([], true) | to_json }}
 adguard_filter_lists: {{ adguard_filter_lists | default([], true) | to_json }}
 # Rules after the generated ones (fabric's own domains and this host are always allowed first).
 adguard_rules: {{ adguard_rules | default([], true) | to_json }}
-# Time (design ntp.md): chrony on the host keeps its clock and serves the network. ntp_servers: "<host> [nts]
+# Time (manual 2.5.1): chrony on the host keeps its clock and serves the network. ntp_servers: "<host> [nts]
 # [pool] [prefer]" (nts: authenticated time); a federated site asks its upstream site first. [] = the upstream
 # site only (or this host's own clock). ntp_serve: answer the LAN (UDP 123; Kea hands it out as option 42).
 # ntp_set_clock: false runs chrony without setting the clock (a container sharing its host's kernel clock).
@@ -224,7 +224,7 @@ project_containers:
 {% set _default_folders = default_service_dirs | map(attribute='folder') | list %}
 service_dirs:
 {{ (default_service_dirs + ((service_dirs | default([])) | rejectattr('folder', 'in', _default_folders) | list)) | to_nice_yaml(indent=2) | indent(2, first=True) }}
-{# fabric's service accounts (design host-consent.md §5): fabric-* names that no Ubuntu package claims, ids in
+{# fabric's service accounts (manual 2.7.1.6): fabric-* names that no Ubuntu package claims, ids in
    fabric's band 600-649 — the middle of Debian's system range (100-999): packages allocate from 100 upwards,
    useradd/systemd-sysusers from 999 downwards, and 0-99 belong to base-passwd. #}
 {% set default_service_users = {
@@ -255,7 +255,7 @@ ica_crt_path: {{ ica_crt_path | default('/home/default_admin/output/ica.crt') }}
 {% if ica_key_path is defined and ica_key_path | length > 0 %}
 ica_key_path: {{ ica_key_path }}
 {% endif %}
-{# Federation (design federation.md §6): a nested site's parent CAs (setup --join stages them) and how many
+{# Federation (manual 1.8.5.1): a nested site's parent CAs (setup --join stages them) and how many
    there are; how many levels of sites may nest below a site, decided when this install makes its own root. #}
 {% if ica_parents_path is defined and ica_parents_path | length > 0 %}
 ica_parents_path: {{ ica_parents_path }}
@@ -292,7 +292,7 @@ cert_acme_lifetime_hours: {{ cert_acme_lifetime_hours | default('720h') }}
 # DNS — BIND9
 # ============================================================
 {# With the DNS filter on, AdGuard answers clients on 53, so BIND can never be there: 53 becomes 5053
-   (dns-filter.md). With it off the port is kept as set (e.g. 5053 behind an AdGuard of your own). #}
+   (manual 2.4.1). With it off the port is kept as set (e.g. 5053 behind an AdGuard of your own). #}
 {% set _bind_port = (bind_dns_port | default(53, true)) | int %}
 bind_dns_port: {{ 5053 if (dns_filter | default('none', true) | lower) == 'adguard' and _bind_port == 53 else _bind_port }}
 bind9_doh_port: {{ bind9_doh_port | default(8053) }}
@@ -385,8 +385,7 @@ nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (st
 # ============================================================
 # LDAP — the organisation's base DN and this site's part
 # ============================================================
-{# The organisation's domain: this install's own domain unless it joined an upstream (design
-   federation.md), whose organisation it then shares. Names the organisation suffix; fixed once
+{# The organisation's domain: this install's own domain unless it joined an upstream (manual 1.8), whose organisation it then shares. Names the organisation suffix; fixed once
    installed (setup refuses a change). #}
 {% set _org_domain = (org_domain | default(domain, true)) | lower %}
 org_domain: {{ _org_domain }}
@@ -394,7 +393,7 @@ org_domain: {{ _org_domain }}
    of org_domain; a site gets its upstream's. Fixed once installed (setup refuses a change). #}
 {% set _base_dn = ((ldap_base_dn | default('', true)) or (_org_domain.split('.') | map('regex_replace', '^', 'dc=') | join(','))) | lower %}
 ldap_base_dn: {{ _base_dn }}
-# This install's site (design federation.md): names its local directory suffix, which holds this
+# This install's site (manual 1.8): names its local directory suffix, which holds this
 # install's service accounts and its devices (the organisation suffix above holds people, groups and
 # device roles). Defaults to the host name; fixed once installed (setup refuses a change).
 site_name: {{ (site_name | default(hostname, true)) | lower }}
@@ -417,7 +416,7 @@ ldap_local_dn: ou={{ (site_name | default(hostname, true)) | lower }},{{ _base_d
 ldap_groups:
 {{ _merged_groups | to_nice_yaml(indent=2) | indent(2, first=True) }}
 
-{# People's Linux identities (design domain-join.md): home folder base and login shell given with the uidNumber #}
+{# People's Linux identities (manual 2.10.1): home folder base and login shell given with the uidNumber #}
 posix_home_base: {{ posix_home_base | default('/home') }}
 posix_login_shell: {{ posix_login_shell | default('/bin/bash') }}
 

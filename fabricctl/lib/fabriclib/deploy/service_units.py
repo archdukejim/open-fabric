@@ -25,7 +25,7 @@ def service_units(base, v):
         {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
         # optional 802.1X (design §6): asks 389-DS about every device
         {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': ['ldap']},
-        # optional DNS filter (dns-filter.md): AdGuard Home on host_ip:53 in front of BIND, oauth2-proxy for its UI;
+        # optional DNS filter (manual 2.4.1): AdGuard Home on host_ip:53 in front of BIND, oauth2-proxy for its UI;
         # no requires: a BIND restart (every DNS apply) must not take the clients' DNS down with it
         {'service': 'adguard', 'compose': 'adguardhome', 'folder': 'adguard', 'requires': []},
         # its sign-in, a unit of its own: when it or Keycloak is down only AdGuard's UI is, never DNS
