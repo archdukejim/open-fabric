@@ -69,7 +69,7 @@ federation.md §3.2a.
 > **Windows domain (Samba AD)** — one forest, its first controller at the root site, a controller (read-only
 > where Samba allows) at each site, Windows join with Group Policy, 802.1X PEAP and machine authentication —
 > fed from fabric's directory, which stays the source of truth. Enrolment and Kerberos would then come from
-> AD instead, so they wait for one rescoped plan, made after M8, M6, step 3 and F4 are finished. Until then:
+> AD instead, so they wait for one rescoped plan: [samba-ad.md](samba-ad.md) (2026-10-03, for review; M6 and F4 now come after it). Until then:
 > no separate KDC is built; every password change goes through one fabric function (so a later "also write
 > to Samba" is one addition; no Windows-format hashes are stored meanwhile); login rules, sudo rules and ids
 > stay fabric-owned data written into the directory, so they can be written into AD too.
