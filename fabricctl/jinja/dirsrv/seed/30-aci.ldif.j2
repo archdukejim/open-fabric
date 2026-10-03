@@ -1,0 +1,37 @@
+{% set admins = 'ou=admins,' ~ ldap_local_dn %}
+{% set kc = 'ldap:///cn=keycloak_admin,' ~ admins %}
+# Access control. `replace` makes each list the single source of truth: ACIs
+# added by hand on a suffix entry are removed on deploy. Anything not granted
+# here is denied (389-DS is default-deny). The service accounts named here are
+# this install's own, in its site part (ou=admins,ou=<site>,<base>).
+
+# The organisation suffix: people, groups, device roles.
+dn: {{ ldap_base_dn }}
+changetype: modify
+replace: aci
+aci: (targetattr="objectClass || cn || ou || uid || uidNumber || gidNumber || homeDirectory || loginShell || gecos || memberUid || member || memberOf || description || entryUUID || nsUniqueId")(version 3.0; acl "Anonymous POSIX name service read (sssd)"; allow (read, search, compare) userdn="ldap:///anyone";)
+aci: (targetattr!="userPassword || aci")(version 3.0; acl "Authenticated users read directory"; allow (read, search, compare) userdn="ldap:///all";)
+aci: (targetattr="userPassword")(version 3.0; acl "Users change own password"; allow (write) userdn="ldap:///self";)
+aci: (targetattr="*")(version 3.0; acl "Super admin full control"; allow (all) userdn="ldap:///cn=super_admin,{{ admins }}";)
+aci: (target="ldap:///ou=groups,{{ ldap_base_dn }}")(targetattr="*")(version 3.0; acl "Group admins manage groups"; allow (all) userdn="ldap:///cn=group_admin,{{ admins }} || {{ kc }}";)
+aci: (target="ldap:///ou=groups,{{ ldap_base_dn }}")(targetattr="member || memberUid")(version 3.0; acl "Group owners manage membership"; allow (write) userattr="owner#USERDN";)
+aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(version 3.0; acl "User creators add users"; allow (add) userdn="ldap:///cn=user_creator_admin,{{ admins }} || {{ kc }}";)
+aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(targetattr="*")(version 3.0; acl "User modifiers edit users"; allow (write, read, search, compare) userdn="ldap:///cn=user_modifier_admin,{{ admins }} || {{ kc }}";)
+aci: (target="ldap:///ou=users,ou=accounts,{{ ldap_base_dn }}")(version 3.0; acl "Keycloak removes users"; allow (delete) userdn="{{ kc }}";)
+aci: (target="ldap:///ou=device-roles,{{ ldap_base_dn }}")(targetattr="*")(version 3.0; acl "Device admin manages device roles"; allow (all) userdn="ldap:///cn=device_admin,{{ admins }}";)
+
+# This site's part (a sub-suffix under the organisation): its service accounts and devices. It
+# would inherit the organisation's anonymous and authenticated read above, so it first denies
+# everyone except the accounts that need it: super_admin, the web UI's device_admin and
+# FreeRADIUS's radius_reader (deny wins over allow; Directory Manager is not subject to ACIs). At a federated
+# site the part is copied to the parent (M5, read-only there): the parent's super_admin and device_admin may read
+# it too (its RADIUS may not: devices roaming to other sites need the site's consent, decision F3).
+{% set parent_admins = ('ou=admins,ou=' ~ federation_parent ~ ',' ~ ldap_base_dn) if federation_parent | default('') else '' %}
+dn: {{ ldap_local_dn }}
+changetype: modify
+replace: aci
+aci: (targetattr="*")(version 3.0; acl "Only the accounts that need this site's part"; deny (all) userdn!="ldap:///cn=super_admin,{{ admins }} || ldap:///cn=device_admin,{{ admins }} || ldap:///cn=radius_reader,{{ admins }}{% if parent_admins %} || ldap:///cn=super_admin,{{ parent_admins }} || ldap:///cn=device_admin,{{ parent_admins }}{% endif %}";)
+aci: (targetattr="*")(version 3.0; acl "Super admin full control"; allow (all) userdn="ldap:///cn=super_admin,{{ admins }}";)
+aci: (target="ldap:///ou=devices,{{ ldap_local_dn }}")(targetattr="*")(version 3.0; acl "Device admin manages devices"; allow (all) userdn="ldap:///cn=device_admin,{{ admins }}";)
+aci: (target="ldap:///ou=devices,{{ ldap_local_dn }}")(targetattr!="aci")(version 3.0; acl "FreeRADIUS reads devices"; allow (read, search, compare) userdn="ldap:///cn=radius_reader,{{ admins }}";)
+aci: (targetattr="userPassword")(version 3.0; acl "Service accounts change own password"; allow (write) userdn="ldap:///self";)

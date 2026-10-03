@@ -1,0 +1,79 @@
+{% macro dn_for(ou_name) %}
+{% set ou = (ldap_organizational_units | selectattr('name', 'equalto', ou_name) | list)[0] %}
+{% if ou.parent is defined %}
+ou={{ ou.name }},{{ dn_for(ou.parent) | trim }}
+{% else %}
+ou={{ ou.name }},{{ ldap_base_dn }}
+{% endif %}
+{% endmacro %}
+# Directory tree. Entries are only added when missing; existing entries
+# (and anything edited through Keycloak or ldapmodify) are left alone.
+
+{% set _rdn = ldap_base_dn.split(',')[0].split('=', 1) %}
+dn: {{ ldap_base_dn }}
+objectClass: top
+{% if _rdn[0] == 'dc' %}
+objectClass: domain
+dc: {{ _rdn[1] }}
+{% else %}
+objectClass: organization
+o: {{ _rdn[1] }}
+{% endif %}
+{% set ns = namespace(done=[]) %}
+{% for _ in ldap_organizational_units %}
+{% for ou in ldap_organizational_units %}
+{% if ou.name not in ns.done and (ou.parent is not defined or ou.parent in ns.done) %}
+{% set ns.done = ns.done + [ou.name] %}
+
+dn: {{ dn_for(ou.name) | trim }}
+objectClass: top
+objectClass: organizationalUnit
+ou: {{ ou.name }}
+description: {{ ou.description }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+# This site's part, its own database under the organisation (a sub-suffix): its service accounts and
+# its devices (design federation.md §6)
+dn: {{ ldap_local_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: {{ site_name }}
+description: fabric site {{ site_name }}: its service accounts and devices
+
+dn: ou=admins,{{ ldap_local_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: admins
+description: This install's service accounts
+
+dn: ou=devices,{{ ldap_local_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: devices
+description: Network devices enrolled at this site (fabric device RBAC)
+
+dn: ou=networks,{{ ldap_local_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: networks
+description: This site's networks (LAN, DHCP subnets), replicated up for the address plan
+
+dn: ou=address-plan,{{ ldap_base_dn }}
+objectClass: top
+objectClass: organizationalUnit
+ou: address-plan
+description: Every site's networks, gathered by the root site and copied to every site (overlap checks)
+{% for grp in ldap_groups %}
+
+dn: cn={{ grp.name }},ou=groups,{{ ldap_base_dn }}
+objectClass: top
+objectClass: groupOfNames
+objectClass: posixGroup
+cn: {{ grp.name }}
+gidNumber: {{ grp.gidNumber }}
+{% if grp.description is defined %}
+description: {{ grp.description }}
+{% endif %}
+{% endfor %}

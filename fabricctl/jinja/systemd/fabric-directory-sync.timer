@@ -1,0 +1,10 @@
+[Unit]
+Description=fabric: directory upkeep every 5 minutes (POSIX identities for people created in Keycloak's console; replication links)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+
+[Install]
+WantedBy=timers.target

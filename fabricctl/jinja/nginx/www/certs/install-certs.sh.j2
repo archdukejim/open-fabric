@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+#--- Configuration -----------------------------------------------------------
+CERT_BASE="http://{{ hostname_certs }}"
+CERTS=("root-ca.crt" "intermediate-ca.crt")
+TARGET_DIR="/usr/local/share/ca-certificates"
+
+#--- Helper ------------------------------------------------------------------
+die() { echo "ERROR: $*" >&2; exit 1; }
+
+#--- Ensure we run as root (or via sudo) -------------------------------------
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run with sudo or as root."
+    exit 1
+fi
+
+#--- Create target directory if missing --------------------------------------
+mkdir -p "$TARGET_DIR"
+
+#--- Install and validate function -------------------------------------------
+install_cert() {
+    local name="$1"
+    local prefix="$2"
+    local url="${CERT_BASE}/${name}"
+    local tmp_file="/tmp/${prefix}-raw.crt"
+
+    echo "Downloading $url ..."
+    wget -nv "$url" -O "$tmp_file" || die "Failed to download $url"
+
+    # Remove any old certificates for this prefix to avoid conflicts
+    rm -f "${TARGET_DIR}/${prefix}"*.crt
+
+    # Normalize line endings to Unix style (CRLF -> LF)
+    sed -i 's/\r$//' "$tmp_file"
+
+    # Split bundle into individual certificates. 
+    # update-ca-certificates expects exactly ONE certificate per .crt file.
+    local count=0
+    local in_cert=0
+    local cert_file=""
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" == "-----BEGIN CERTIFICATE-----" ]]; then
+            count=$((count + 1))
+            cert_file="${TARGET_DIR}/${prefix}-${count}.crt"
+            in_cert=1
+            > "$cert_file" # Create or truncate the file
+        fi
+        
+        if [[ $in_cert -eq 1 ]]; then
+            echo "$line" >> "$cert_file"
+        fi
+
+        if [[ "$line" == "-----END CERTIFICATE-----" ]]; then
+            in_cert=0
+            # Validate the extracted certificate
+            if ! openssl x509 -in "$cert_file" -noout 2>/dev/null; then
+                echo "Warning: Extracted certificate $cert_file is invalid. Removing."
+                rm -f "$cert_file"
+                count=$((count - 1))
+            fi
+        fi
+    done < "$tmp_file"
+
+    # Fallback: If no PEM certificates were found, attempt to convert from DER
+    if [[ $count -eq 0 ]]; then
+        cert_file="${TARGET_DIR}/${prefix}-1.crt"
+        if openssl x509 -inform DER -in "$tmp_file" -out "$cert_file" 2>/dev/null; then
+            echo "Converted binary DER certificate to PEM."
+            count=1
+        else
+            echo "Warning: No valid PEM or DER certificates found in $url"
+        fi
+    fi
+
+    echo "Installed $count valid certificate(s) for $prefix"
+    rm -f "$tmp_file"
+}
+
+#--- Download and install each certificate ------------------------------------
+for name in "${CERTS[@]}"; do
+    prefix="fabric-{{ domain_file }}-${name%.crt}"      # fabric-<domain>-root-ca / -intermediate-ca
+    install_cert "$name" "$prefix"
+done
+
+#--- Update the system‑wide bundle -------------------------------------------
+echo "Updating CA bundle"
+update-ca-certificates --fresh || die "update-ca-certificates failed"
+
+echo "{{ friendly_name | default(domain) }} certificates installed successfully."
+
+#--- Verify installation ------------------------------------------------------
+echo "Verifying certificate installation against certificates.{{ domain }}..."
+
+# Use the explicitly updated CA bundle if it exists (Ubuntu/Debian standard)
+CA_ARGS=""
+if [[ -f "/etc/ssl/certs/ca-certificates.crt" ]]; then
+    CA_ARGS="-CAfile /etc/ssl/certs/ca-certificates.crt"
+fi
+
+VERIFY_OUT=$(echo | openssl s_client $CA_ARGS -servername "certificates.{{ domain }}" -connect "certificates.{{ domain }}:443" </dev/null 2>/dev/null | grep "Verify return code" || true)
+
+if echo "$VERIFY_OUT" | grep -q "Verify return code: 0"; then
+    echo "Verification successful: $VERIFY_OUT"
+else
+    echo "Warning: OpenSSL verification did not return 0."
+    echo "Output: $VERIFY_OUT"
+    echo "Note: If you still get code 19 (self-signed certificate in certificate chain), ensure your system's OpenSSL is configured to use the correct CA store."
+fi

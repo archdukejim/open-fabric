@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: {{ image_postgres }}
+    container_name: postgres
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
+    user: "{{ service_users.postgres.uid }}:{{ service_users.postgres.gid }}"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      # unix socket + lock files; /tmp for the entrypoint's init scripts
+      - /var/run/postgresql:uid={{ service_users.postgres.uid }},gid={{ service_users.postgres.gid }},mode=2775,size=4m
+      - /tmp:noexec,nosuid,size=16m
+    shm_size: 64m
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/etc/postgres/certs/fullchain.pem
+      - -c
+      - ssl_key_file=/etc/postgres/certs/privkey.pem
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: "{{ keycloak_db_password }}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - {{ postgres_data_dir }}:/var/lib/postgresql/data
+      - {{ deploy_base_dir }}/postgres/certs:/etc/postgres/certs:ro
+    networks:
+      fabric_net:
+        ipv4_address: "{{ ip_postgres }}"
+        aliases:
+          - postgres
+    restart: unless-stopped
+{% if host_ram_capacity | default(0) | int >= 3 %}
+{% set pg_mem = 100 if (host_ram_capacity | default(0) | int) == 3 else (200 * ((host_ram_capacity | default(0) | int) / 4)) | int %}
+    deploy:
+      resources:
+        limits:
+          memory: {{ pg_mem }}M
+{% endif %}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  fabric_net:
+    name: fabric_net
+    external: true

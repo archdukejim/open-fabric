@@ -1,0 +1,53 @@
+# Build the fabricctl .deb (Architecture: all — amd64 and arm64).
+# Every push/PR: downloadable build artifact. A tag v<VERSION>: attached to
+# the GitHub Release, so hosts install it with `apt install ./fabricctl_*.deb`.
+name: package
+
+on:
+  push:
+    branches: [fabric, main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches fabricctl/VERSION
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: test "v$(tr -d ' \n' < fabricctl/VERSION)" = "${GITHUB_REF_NAME}"
+      - name: Build
+        id: build
+        run: echo "deb=$(bash installers/deb/build-deb.sh)" >> "$GITHUB_OUTPUT"
+      - name: Inspect
+        run: |
+          dpkg-deb -I "${{ steps.build.outputs.deb }}"
+          # never ship secrets or local settings (`!` would not fail a step under bash -e)
+          if dpkg-deb -c "${{ steps.build.outputs.deb }}" | grep -E 'fabric-secrets\.yml|custom-vars\.yaml|__pycache__'; then
+            echo "::error::secrets or local files in the package"; exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fabricctl-deb
+          path: dist/*.deb
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: deb
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: fabricctl-deb
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" ./*.deb --clobber --repo "${GITHUB_REPOSITORY}" ||
+             gh release create "${GITHUB_REF_NAME}" ./*.deb --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}"

@@ -1,0 +1,36 @@
+#!/bin/bash
+# fabricctl — installed by the fabricctl package (/usr/bin/fabricctl).
+#
+# The package ships fabric in /usr/lib/fabricctl; `fabricctl setup` deploys it
+# to the install (default /opt/fabric) and runs it from there. So:
+#   setup / reinstall / uninstall / restore / help
+#                                  -> the packaged code (an upgraded package
+#                                     is what gets deployed)
+#   everything else                -> the deployed install
+set -euo pipefail
+SRC=/usr/lib/fabricctl/fabric
+INSTALL=/opt/fabric
+# the packaged code is read-only source: no bytecode caches written next to it
+# (dpkg would leave them behind on remove)
+export PYTHONDONTWRITEBYTECODE=1
+
+case "${1:-}" in
+    setup|reinstall|uninstall|restore|-h|--help|help)
+        exec python3 "$SRC/lib/fabriclib/cli.py" "$@" ;;
+    --version)
+        if [ -f "$INSTALL/lib/manage.sh" ]; then exec bash "$INSTALL/lib/manage.sh" --version; fi
+        echo "fabricctl $(cat "$SRC/VERSION") (package; not set up yet)"; exit 0 ;;
+esac
+
+if [ ! -f "$INSTALL/lib/manage.sh" ]; then
+    echo "fabric is not set up on this host yet. Run: sudo fabricctl setup   (or: --file vars.yaml)" >&2
+    exit 1
+fi
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Run as root: sudo fabricctl $*" >&2
+    exit 1
+fi
+if ! cmp -s "$SRC/VERSION" "$INSTALL/VERSION" || ! cmp -s "$SRC/BUILD" "$INSTALL/BUILD"; then
+    echo "note: the fabricctl package is newer than the running install — apply it with: sudo fabricctl setup" >&2
+fi
+exec bash "$INSTALL/lib/manage.sh" "$@"

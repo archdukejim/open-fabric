@@ -1,0 +1,34 @@
+from fabriclib.setup.common.previous_accounts import PREVIOUS_ACCOUNTS
+
+
+def upgrade_vars(data, pinned):
+    """Purpose: adjust an existing install's vars before a newer fabric re-renders them, so an upgrade never
+             changes a running image, and gets this release's service accounts.
+    Inputs:  data — the existing vars dict (modified in place); pinned — collection of image_* keys the admin
+             set explicitly (left alone).
+    Returns: list of change descriptions (str), one per image_* key dropped and one per service account moved.
+             Keys pinned by digest ("@sha256:") are kept; unpinned refs and local build names not in `pinned` are
+             deleted, so the release's validated, digest-pinned default applies. service_users entries that are
+             exactly a previous release's default (PREVIOUS_ACCOUNTS: same uid and gid, no name) are deleted, so
+             the fabric-* account in the 600-649 band applies (the accounts step moves the files); entries the
+             admin changed are kept.
+    Fails:   never — dict operations only.
+    Feeds:   collect_vars (logs each change).
+    Notes:   `fabricctl images update` is what changes images (design D21)."""
+    changes = []
+    for key in [k for k in data if k.startswith("image_") and k != "image_pins" and k not in pinned]:
+        if isinstance(data[key], str) and "@sha256:" in data[key]:
+            continue
+        del data[key]
+        changes.append(f"{key}: use this release's validated image (pinned by digest)")
+    users = data.get("service_users")
+    if isinstance(users, dict):
+        for key, ids in list(users.items()):
+            prev = PREVIOUS_ACCOUNTS.get(key)
+            if prev and isinstance(ids, dict) and "name" not in ids \
+                    and (ids.get("uid"), ids.get("gid")) == (prev[1], prev[2]):
+                del users[key]
+                changes.append(f"service account {key} ({prev[1]}:{prev[2]}): moves to this release's fabric-* account")
+        if not users:
+            del data["service_users"]
+    return changes

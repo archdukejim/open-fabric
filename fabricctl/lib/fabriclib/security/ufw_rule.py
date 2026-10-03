@@ -1,0 +1,17 @@
+# what fabric opened, by kind: files in the install's config folder (rules fabric did not add are never touched)
+RECORDS = {"ssh": ".firewall-ssh-allowed", "ntp": ".firewall-ntp-allowed", "dhcp": ".firewall-dhcp-allowed"}
+
+
+def ufw_rule(kind, what):
+    """Purpose: the ufw rule fabric adds for one network or interface, as the words after `ufw allow` (and after
+             `ufw delete allow` to remove it).
+    Inputs:  kind — "ssh" (22/tcp from a CIDR), "ntp" (123/udp from a CIDR) or "dhcp" (67/udp in on an interface);
+             what — the CIDR or the interface.
+    Returns: list of str.
+    Fails:   KeyError for another kind.
+    Feeds:   setup/configure_firewall (adds, forgets), undo/undo_firewall (removes)."""
+    if kind == "dhcp":
+        return ["in", "on", what, "to", "any", "port", "67", "proto", "udp"]
+    port, proto = {"ssh": ("22", "tcp"), "ntp": ("123", "udp")}[kind]
+    return ["from", what, "to", "any", "port", port, "proto", proto]
+

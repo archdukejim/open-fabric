@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Open Fabric · web control{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css"></head>
+<body>
+<header>
+  <a class="brand" href="/">Open Fabric <span class="subtitle">web control</span></a>
+  {% if ctx %}
+  <div class="who">
+    <a href="/audit">Audit log</a>
+    <span>{{ ctx.user }}</span>
+    <form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+    <button class="link">Sign out</button></form>
+  </div>
+  {% endif %}
+</header>
+{% if ctx and ctx.dev %}<p class="devbanner">DEV PREVIEW — sample data, no sign-in, nothing is saved or applied</p>{% endif %}
+{% if ctx %}
+<nav class="tabs">
+{% for id, href, label, optional in tabs %}
+  <a href="{{ href }}" class="tab{{ ' active' if id == tab }}">{{ label }}{% if optional %}<span class="opt">optional</span>{% endif %}</a>
+{% endfor %}
+</nav>
+{% endif %}
+<main>{% block body %}{% endblock %}</main>
+{% if ctx %}<footer>fabricctl {{ ctx.version.version }}{% if ctx.version.build %} · {{ ctx.version.build | replace('\n', ' · ') }}{% endif %}</footer>{% endif %}
+</body></html>

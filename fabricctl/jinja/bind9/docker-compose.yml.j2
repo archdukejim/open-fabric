@@ -1,0 +1,59 @@
+services:
+  bind9:
+    # Built from Debian packages on the validated Debian base: bind uid/gid baked
+    # in, runs as bind from the first instruction, no capabilities (build/Dockerfile).
+    image: fabric/bind9:local
+    build:
+      context: {{ deploy_base_dir }}/bind9/build
+      args:
+        BASE_IMAGE: "{{ image_debian }}"
+        BIND_UID: "{{ service_users.bind.uid }}"
+        BIND_GID: "{{ service_users.bind.gid }}"
+    container_name: bind9
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
+    user: "{{ service_users.bind.uid }}:{{ service_users.bind.gid }}"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /run/named:uid={{ service_users.bind.uid }},gid={{ service_users.bind.gid }},mode=0755,size=4m
+      - /tmp:noexec,nosuid,size=8m
+    ports:
+      - "{{ host_ip }}:{{ bind_dns_port }}:53/tcp"
+      - "{{ host_ip }}:{{ bind_dns_port }}:53/udp"
+    volumes:
+      - {{ deploy_base_dir }}/bind9/config:/etc/bind:ro
+      - {{ deploy_base_dir }}/bind9/data:/var/lib/bind
+      - {{ deploy_base_dir }}/bind9/log:/var/log
+      - {{ deploy_base_dir }}/bind9/cache:/var/cache/bind
+      - {{ deploy_base_dir }}/bind9/ssl:/etc/bind9/ssl:ro
+    networks:
+      fabric_net:
+        ipv4_address: "{{ ip_bind9 }}"
+        aliases:
+          - "{{ hostname_bind9 }}"
+{% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
+{% set bind_mem = 40 if (host_ram_capacity | default(0) | int) == 3 else 80 %}
+    deploy:
+      resources:
+        limits:
+          memory: {{ bind_mem }}M
+{% endif %}
+    healthcheck:
+      test: ["CMD", "rndc", "status"]
+      interval: 10s
+      start_period: 10s
+      timeout: 5s
+      retries: 3
+
+networks:
+  fabric_net:
+    name: fabric_net
+    external: true

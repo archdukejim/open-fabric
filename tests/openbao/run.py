@@ -1,0 +1,633 @@
+#!/usr/bin/env python3
+"""OpenBao against the real, pinned image, started from fabric's own compose
+template and config: the vault key and its unlock methods (key file, USB
+stick on a loop device, security key on SoftHSM2, HSM on a PyKMIP server),
+static-seal auto-unseal, init, idempotent configuration, least-privilege
+AppRoles and people's policies, break glass, root token revocation, fabric's
+secrets moved into OpenBao, rotation, tampering, the kill switch, what
+happens when the key goes missing, and hardening.
+
+    sudo python3 tests/openbao/run.py          (needs Docker, openssl, root)
+"""
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+import jinja2
+import yaml
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/openbao"
+NET, SUBNET, IP = "obtest_net", "10.254.19.0/24", "10.254.19.90"   # its own range: suites may run back to back
+HOST = "vault.lan.test"
+FAILED = 0
+
+
+def check(name, cond, detail=""):
+    global FAILED
+    FAILED += not cond
+    print(("PASS " if cond else "FAIL ") + name + ("" if cond else f"  -> {str(detail)[:400]}"))
+
+
+def sh(cmd, ok=True, **kw):
+    res = subprocess.run(cmd, shell=isinstance(cmd, str), capture_output=True, text=True, **kw)
+    if ok and res.returncode != 0:
+        raise SystemExit(f"failed: {cmd}\n{res.stdout}{res.stderr}")
+    return res
+
+
+def health(timeout=90):
+    end = time.time() + timeout
+    while time.time() < end:
+        st = sh("docker inspect -f '{{.State.Health.Status}}' openbao", ok=False).stdout.strip()
+        if st in ("healthy", "unhealthy"):
+            return st
+        time.sleep(2)
+    return st
+
+
+def compose(*args):
+    return sh(["docker", "compose", "-f", f"{W}/openbao/docker-compose.yml", *args], ok=False)
+
+
+# ---------------------------------------------------------------- layout
+sh("docker rm -f openbao >/dev/null 2>&1; true", ok=False)
+sh(f"docker network rm {NET} >/dev/null 2>&1; true", ok=False)
+shutil.rmtree(W, ignore_errors=True)
+for d in ("stepca/data/certs", "openbao/config", "openbao/data", "openbao/logs", "openbao/certs"):
+    os.makedirs(f"{W}/{d}")
+subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+os.chdir(W)
+sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout root.key -out root.crt -days 2 -subj '/CN=Test Root' "
+   "-addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign")
+sh(f"openssl req -newkey rsa:2048 -nodes -keyout bao.key -out bao.csr -subj '/CN={HOST}'")
+open("bao.ext", "w").write(f"subjectAltName=DNS:{HOST},DNS:openbao\nextendedKeyUsage=serverAuth,clientAuth\n")
+sh("openssl x509 -req -in bao.csr -CA root.crt -CAkey root.key -CAcreateserial -out bao.crt -days 2 -extfile bao.ext")
+shutil.copy("root.crt", "stepca/data/certs/root_ca.crt")
+shutil.copy("bao.crt", "openbao/certs/fullchain.pem")
+shutil.copy("bao.key", "openbao/certs/privkey.pem")
+shutil.copy("root.crt", "openbao/certs/root_ca.crt")
+sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout other.key -out other.crt -days 2 -subj '/CN=Other Root'")
+
+V = {"deploy_base_dir": W, "domain": "lan.test", "hostname_openbao": HOST, "ip_openbao": IP, "ip_bind9": "10.254.19.30",
+     "openbao_key_dir": f"{W}/keys", "openbao_runtime_dir": f"{W}/run", "openbao_seal_key_id": "fabric-1",
+     "openbao_udev_rules": f"{W}/90-fabric-unlock.rules", "openbao_admin_dir": f"{W}/admin",
+     "openbao_mem_limit": "256m",
+     "fabric_subnet": SUBNET, "service_users": {"openbao": {"uid": 913, "gid": 913}},
+     "image_openbao": sh([sys.executable, f"{REPO}/tests/image_ref.py", "openbao"]).stdout.strip()}
+env = jinja2.Environment()
+for tpl, dest in (("docker-compose.yml.j2", "openbao/docker-compose.yml"), ("openbao.hcl.j2", "openbao/config/openbao.hcl")):
+    text = env.from_string(open(f"{REPO}/fabricctl/jinja/openbao/{tpl}").read()).render(**V)
+    open(dest, "w").write(text.replace("name: fabric_net", f"name: {NET}"))
+sh(["chown", "-R", "913:913", "openbao/data", "openbao/logs"])
+sh(["chmod", "-R", "a+rX", "openbao/config", "openbao/certs"])
+sh(["chown", "913:913", "openbao/certs/privkey.pem"])
+sh(["chmod", "0400", "openbao/certs/privkey.pem"])
+sh(f"docker network create --subnet {SUBNET} {NET}")
+
+sys.path.insert(0, f"{W}/fabric/lib")
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.vault.common.approle_login import approle_login  # noqa: E402
+from fabriclib.vault.common.bao_request import bao_request  # noqa: E402
+from fabriclib.vault.configure_openbao import configure_openbao  # noqa: E402
+from fabriclib.vault.add_kmip_slot import add_kmip_slot  # noqa: E402
+from fabriclib.vault.add_security_key_slot import add_security_key_slot  # noqa: E402
+from fabriclib.vault.common.kmip_session import kmip_session  # noqa: E402
+from fabriclib.vault.add_usb_slot import add_usb_slot  # noqa: E402
+from fabriclib.vault.common.obtain_key import obtain_key  # noqa: E402
+from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens  # noqa: E402
+from fabriclib.vault.slots import pkcs11  # noqa: E402
+from fabriclib.vault.common.read_slot_store import read_slot_store  # noqa: E402
+from fabriclib.vault.vault_device_event import vault_device_event  # noqa: E402
+from fabriclib.vault.ensure_vault_key import ensure_vault_key  # noqa: E402
+from fabriclib.vault.list_slots import list_slots  # noqa: E402
+from fabriclib.vault.remove_slot import remove_slot  # noqa: E402
+from fabriclib.vault.rotate_vault_key import rotate_vault_key  # noqa: E402
+from fabriclib.vault.test_slot import test_slot  # noqa: E402
+from fabriclib.vault.unlock_vault import unlock_vault  # noqa: E402
+from fabriclib.vault.wipe_runtime_keys import wipe_runtime_keys  # noqa: E402
+from fabriclib.vault.generate_root_token import generate_root_token  # noqa: E402
+from fabriclib.vault.init_openbao import init_openbao  # noqa: E402
+from fabriclib.vault.revoke_token import revoke_token  # noqa: E402
+from fabriclib.vault.vault_status import vault_status  # noqa: E402
+from fabriclib.secrets.common.write_vault_secrets import write_vault_secrets  # noqa: E402
+from fabriclib.secrets.export_secrets import export_secrets  # noqa: E402
+from fabriclib.secrets.import_secrets import import_secrets  # noqa: E402
+from fabriclib.secrets.load_secrets import load_secrets  # noqa: E402
+from fabriclib.secrets.save_secrets import save_secrets  # noqa: E402
+from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao  # noqa: E402
+
+SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
+os.makedirs(os.path.dirname(SECRETS), exist_ok=True)
+
+# ---------------------------------------------------------------- vault key and unlock methods
+fresh = dict(V, openbao_key_dir=f"{W}/fresh-keys", deploy_base_dir=f"{W}/fresh")
+check("fresh install: a random vault key in a key-file unlock method", ensure_vault_key(fresh) == "created"
+      and [sl["type"] for sl in read_slot_store(fresh)["slots"]] == ["local"])
+os.makedirs(f"{W}/keys", mode=0o700)
+legacy = os.urandom(32)
+with open(f"{W}/keys/unseal.key", "wb") as f:           # an iteration-1 install: a bare key file
+    f.write(legacy)
+check("iteration-1 install: its key file becomes the key-file unlock method (no rotation)",
+      ensure_vault_key(V) == "migrated" and not os.path.exists(f"{W}/keys/unseal.key")
+      and open(f"{W}/keys/local-fabric-1.key", "rb").read() == legacy)
+st = os.stat(f"{W}/keys/slots.json")
+kst = os.stat(f"{W}/keys/local-fabric-1.key")
+check("store root 0600, key file root 0400, folder root 0700",
+      (st.st_uid, oct(st.st_mode & 0o777)) == (0, "0o600") and (kst.st_uid, oct(kst.st_mode & 0o777)) == (0, "0o400")
+      and oct(os.stat(f"{W}/keys").st_mode & 0o777) == "0o700")
+check("seal.hcl names the vault key; OpenBao never sees the key folder",
+      'current_key_id = "fabric-1"' in open(f"{W}/openbao/config/seal.hcl").read()
+      and "/keys" not in open(f"{W}/openbao/docker-compose.yml").read())
+check("an existing store is never replaced", ensure_vault_key(V) == "present")
+check("fabric-unlock: the key goes to RAM for the openbao user only", unlock_vault(V)["slot"] == "local"
+      and os.stat(f"{W}/run/fabric-1.key").st_uid == 913 and oct(os.stat(f"{W}/run/fabric-1.key").st_mode & 0o777) == "0o400"
+      and open(f"{W}/run/fabric-1.key", "rb").read() == legacy)
+key_bytes = legacy
+
+
+def start(action="restart"):
+    """What systemd does: fabric-unlock (start condition), start, wipe once unsealed."""
+    if not unlock_vault(V):
+        return False
+    compose(action) if action != "up" else compose("up", "-d")
+    ok_ = health() == "healthy"
+    wipe_runtime_keys(V)
+    return ok_
+
+
+# ---------------------------------------------------------------- container
+up = compose("up", "-d")
+check("compose file starts the pinned image", up.returncode == 0, up.stderr[-400:])
+if up.returncode != 0:
+    print(sh("docker logs openbao", ok=False).stderr[-1500:])
+check("fresh (uninitialised) server counts as healthy", health() == "healthy", sh("docker logs openbao", ok=False).stderr[-600:])
+s = vault_status(V)
+check("status before init: reachable, not initialised", s["reachable"] and not s["initialized"], s)
+try:
+    bao_request({**V, "openbao_ca_file": f"{W}/other.crt"}, "GET", "sys/health")
+    tls_ok = False
+except ValidationError:
+    tls_ok = True
+check("TLS is verified: a server cert from another CA is refused", tls_ok)
+
+# ---------------------------------------------------------------- init + configure
+first = init_openbao(V)
+check("init returns one recovery key and a root token", first and len(first["recovery_keys"]) == 1 and first["root_token"],
+      first)
+check("init is not repeated", init_openbao(V) is None)
+check("static seal: unsealed without anyone entering a key", not vault_status(V)["sealed"] and health() == "healthy")
+check("once unsealed the key is wiped from RAM; OpenBao keeps working", wipe_runtime_keys(V) == 1
+      and not os.listdir(f"{W}/run") and not vault_status(V)["sealed"])
+changes = configure_openbao(V, first["root_token"])
+check("configuration applied", {"AppRole auth", "KV fabric/", "KV apps/"} <= set(changes), changes)
+for name in ("setup-approle.json", "agent-approle.json"):
+    st = os.stat(f"{W}/keys/{name}")
+    check(f"{name}: root-only 0400", st.st_uid == 0 and oct(st.st_mode & 0o777) == "0o400")
+setup_token = approle_login(V, "setup-approle.json")
+check("re-run as fabric-setup (not root) changes nothing", configure_openbao(V, setup_token) == [])
+check("root token revoked after bootstrap", revoke_token(V, first["root_token"]))
+check("revoked root token is refused",
+      bao_request(V, "GET", "sys/mounts", token=first["root_token"])[0] == 403)
+
+# ---------------------------------------------------------------- break glass + the policy for people
+try:
+    generate_root_token(V, "tester", ["bm90IGEgcmVjb3Zlcnkga2V5"], source="test")
+    bad_refused = False
+except ValidationError:
+    bad_refused = bao_request(V, "GET", "sys/generate-root/attempt", admin=True)[1].get("started") is False
+check("break glass: a wrong recovery key is refused and the attempt cancelled", bad_refused)
+check("generate-root stays off on the network listener (OpenBao's default)",
+      bao_request(V, "GET", "sys/generate-root/attempt")[0] == 405)
+glass = generate_root_token(V, "tester", first["recovery_keys"], source="test")
+check("break glass: the recovery keys give a working root token",
+      bao_request(V, "GET", "auth/token/lookup-self", token=glass)[1].get("data", {}).get("policies") == ["root"])
+bao_request(V, "POST", "fabric/data/glass-probe", token=glass, body={"data": {"v": "fabric-only"}})
+person = bao_request(V, "POST", "auth/token/create", token=glass,
+                     body={"policies": ["fabric-admin"], "ttl": "5m"})[1]["auth"]["client_token"]
+check("people (fabric-admin): their applications' secrets, read and write",
+      bao_request(V, "POST", "apps/data/team/db", token=person, body={"data": {"pw": "x"}})[0] == 200
+      and bao_request(V, "GET", "apps/data/team/db", token=person)[0] == 200)
+check("people: fabric's own secrets are listed, never read",
+      "glass-probe" in bao_request(V, "LIST", "fabric/metadata", token=person)[1].get("data", {}).get("keys", [])
+      and bao_request(V, "GET", "fabric/data/glass-probe", token=person)[0] == 403
+      and bao_request(V, "POST", "fabric/data/glass-probe", token=person, body={"data": {"v": "x"}})[0] == 403)
+check("people: configuration readable, not writable",
+      bao_request(V, "GET", "sys/policies/acl/fabric-admin", token=person)[0] == 200
+      and bao_request(V, "PUT", "sys/policies/acl/fabric-admin", token=person, body={"policy": ""})[0] == 403
+      and bao_request(V, "POST", "sys/auth/userpass", token=person, body={"type": "userpass"})[0] == 403)
+auditor = bao_request(V, "POST", "auth/token/create", token=glass,
+                      body={"policies": ["fabric-auditor"], "ttl": "5m"})[1]["auth"]["client_token"]
+check("auditor bundle: application secrets listed (metadata), never read or written",
+      "team/" in bao_request(V, "LIST", "apps/metadata", token=auditor)[1].get("data", {}).get("keys", [])
+      and bao_request(V, "GET", "apps/data/team/db", token=auditor)[0] == 403
+      and bao_request(V, "POST", "apps/data/team/db", token=auditor, body={"data": {"pw": "y"}})[0] == 403)
+bao_request(V, "DELETE", "fabric/metadata/glass-probe", token=glass)
+check("break glass: the root token is revoked after use", revoke_token(V, glass))
+
+agent = approle_login(V, "agent-approle.json")
+check("fabric-agent may read the engine list", bao_request(V, "GET", "sys/mounts", token=agent)[0] == 200)
+check("fabric-agent may not write app secrets",
+      bao_request(V, "POST", "apps/data/x", token=agent, body={"data": {"a": "b"}})[0] == 403)
+check("fabric-agent may not read fabric's secrets", bao_request(V, "GET", "fabric/data/x", token=agent)[0] == 403)
+check("fabric-agent may not write policies",
+      bao_request(V, "PUT", "sys/policies/acl/evil", token=agent, body={"policy": 'path "*" {capabilities=["sudo"]}'})[0] == 403)
+check("fabric-setup may write fabric's secrets",
+      bao_request(V, "POST", "fabric/data/probe", token=setup_token, body={"data": {"v": "1"}})[0] == 200)
+role = bao_request(V, "GET", "auth/approle/role/fabric-agent", token=setup_token)[1]["data"]
+check("AppRole tokens and secret IDs are bound to fabric_net", role["token_bound_cidrs"] == [SUBNET]
+      and role["secret_id_bound_cidrs"] == [SUBNET], role)
+s = vault_status(V)
+check("status: unsealed, static seal, raft, KV v2 fabric/ + apps/, approle, key ok",
+      s["initialized"] and not s["sealed"] and s["seal_type"] == "static" and s["storage"] == "raft"
+      and {"fabric/", "apps/"} <= {m["path"] for m in s["mounts"] if m["version"] == "2"} and "approle/" in s["auth"]
+      and s["key"]["ok"], s)
+# ---------------------------------------------------------------- fabric's secrets into OpenBao
+ORIGINAL = {"ca_password": "Ca-pw-1", "rndc_secret": "cm5kYy1zZWNyZXQ=", "ldap_device_admin_password": "Da1",
+            "tsig_secrets": {"npm": "bnBtLXNlY3JldA=="}}
+with open(SECRETS, "w") as f:
+    yaml.safe_dump(ORIGINAL, f)
+os.chmod(SECRETS, 0o600)
+check("before the import: secrets come from the 0600 file", load_secrets(SECRETS, V) == ORIGINAL
+      and not secrets_in_openbao(SECRETS))
+check("import: written, read back, identical", import_secrets(V, SECRETS, setup_token) == "imported")
+check("import: the plaintext file is gone and the marker says OpenBao holds them",
+      not os.path.exists(SECRETS) and secrets_in_openbao(SECRETS))
+check("after the import: the same secrets come from OpenBao", load_secrets(SECRETS, V) == ORIGINAL)
+v1 = vault_status(V)["secrets"]["version"]
+save_secrets({"tsig_secrets": {"nas": "bmFzLXNlY3JldA=="}}, SECRETS, V)
+after = load_secrets(SECRETS, V)
+check("save: a TSIG key added in OpenBao, others untouched, new version",
+      after["tsig_secrets"] == {"npm": "bnBtLXNlY3JldA==", "nas": "bmFzLXNlY3JldA=="} and after["ca_password"] == "Ca-pw-1"
+      and vault_status(V)["secrets"]["version"] == v1 + 1)
+save_secrets({"tsig_secrets": {"npm": None}}, SECRETS, V)
+check("save: a TSIG key removed", "npm" not in load_secrets(SECRETS, V)["tsig_secrets"])
+ver = vault_status(V)["secrets"]["version"]
+save_secrets({"ca_password": "Ca-pw-1"}, SECRETS, V)
+check("save without a change writes no new version", vault_status(V)["secrets"]["version"] == ver)
+try:
+    write_vault_secrets(V, {"x": "y"}, ver - 1, setup_token)
+    cas = False
+except ValidationError as exc:
+    cas = "check-and-set" in str(exc) or "cas" in str(exc).lower()
+check("a write based on a stale version is refused (check-and-set)", cas)
+check("no plaintext file was recreated by any of this", not os.path.exists(SECRETS))
+check("fabric-agent sees the version, never the values",
+      bao_request(V, "GET", "fabric/data/secrets", token=approle_login(V, "agent-approle.json"))[0] == 403
+      and vault_status(V)["secrets"]["version"] == ver)
+open(SECRETS, "w").close()
+try:
+    import_secrets(V, SECRETS, setup_token)
+    empty_refused = False
+except ValidationError as exc:
+    empty_refused = "empty" in str(exc)
+check("an empty secrets file is never imported over the real ones", empty_refused)
+os.remove(SECRETS)
+check("...and OpenBao still holds them", load_secrets(SECRETS, V)["ca_password"] == "Ca-pw-1")
+backup = export_secrets(SECRETS, f"{W}/backup/fabric-secrets.yml", V)
+check("export for a reinstall: root-only copy", oct(os.stat(backup).st_mode & 0o777) == "0o600"
+      and yaml.safe_load(open(backup))["ca_password"] == "Ca-pw-1")
+shutil.copy2(backup, SECRETS)
+check("a restored file is used while present", load_secrets(SECRETS, V)["ca_password"] == "Ca-pw-1")
+check("...and re-imported: equal to OpenBao, shredded", import_secrets(V, SECRETS, setup_token) == "unchanged"
+      and not os.path.exists(SECRETS))
+
+audit = open(f"{W}/openbao/logs/audit.log").read()
+check("audit log records requests with secrets HMAC'd", '"path":"fabric/data/probe"' in audit and '"v":"1"' not in audit)
+
+# ---------------------------------------------------------------- restarts, unlock methods, rotation
+check("after a restart it unseals itself (fabric-unlock, then wiped)", start() and not vault_status(V)["sealed"]
+      and not os.listdir(f"{W}/run"))
+check("slot test: the key-file method unwraps the vault key", test_slot(V, "tester", "local", source="test"))
+sl = list_slots(V)
+check("slot list: type, presence, key version, what it was tested against",
+      [(x["type"], x["present"], x["key_id"]) for x in sl] == [("local", True, "fabric-1")] and sl[0]["tested"], sl)
+try:
+    remove_slot(V, "tester", "local", source="test")
+    last = False
+except ValidationError as exc:
+    last = "last" in str(exc)
+check("the last unlock method cannot be removed", last)
+
+
+def restart_unsealed():
+    compose("restart")
+    if health() != "healthy" or vault_status(V).get("sealed") is not False:
+        raise ValidationError("not unsealed after restart")
+
+
+res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+store = read_slot_store(V)
+check("rotation: new key fabric-2 in every present method, the old copy shredded",
+      res["key_id"] == "fabric-2" and res["kept"] == ["local"] and store["key_id"] == "fabric-2"
+      and not store.get("previous_key_id") and os.path.exists(f"{W}/keys/local-fabric-2.key")
+      and not os.path.exists(f"{W}/keys/local-fabric-1.key"), res)
+check("rotation: seal.hcl has only the new key; nothing left in RAM",
+      "previous_key" not in open(f"{W}/openbao/config/seal.hcl").read() and not os.listdir(f"{W}/run"))
+check("rotation: OpenBao opens with the new key alone, data intact", start() and
+      bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
+      .get("data", {}).get("data") == {"v": "1"})
+key_bytes = open(f"{W}/keys/local-fabric-2.key", "rb").read()
+check("the new key is not the old one", key_bytes != legacy)
+
+raw = json.load(open(f"{W}/keys/slots.json"))
+raw["slots"][0]["label"] = "changed while locked"
+open(f"{W}/keys/slots.json", "w").write(json.dumps(raw))
+check("a store changed while locked is detected (and still unlocks: the key itself is verified)",
+      unlock_vault(V)["tamper"] and "VAULT_SLOTS_TAMPERED" in open(f"{W}/fabric/archive/audit.log").read())
+wipe_runtime_keys(V)
+raw["slots"][0]["label"] = "Key file on this host"
+open(f"{W}/keys/slots.json", "w").write(json.dumps(raw))
+check("...and the untouched store verifies again", unlock_vault(V)["tamper"] is False)
+wipe_runtime_keys(V)
+
+os.rename(f"{W}/keys/local-fabric-2.key", f"{W}/keys/away.key")
+check("no unlock method present: fabric-unlock refuses (systemd then does not start OpenBao)", unlock_vault(V) is None)
+compose("stop")
+try:
+    locked = load_secrets(SECRETS, V)
+    locked_ok = False
+except ValidationError:
+    locked = None
+    locked_ok = True
+check("OpenBao locked: reading fabric's secrets fails loudly (never an empty set)", locked_ok, locked)
+up = compose("start")
+time.sleep(8)
+check("started anyway without its key (bypassing fabric-unlock): OpenBao refuses to run",
+      sh("docker inspect -f '{{.State.Running}}' openbao", ok=False).stdout.strip() != "true"
+      or health(30) != "healthy")
+os.rename(f"{W}/keys/slots.json", f"{W}/keys/slots.away")
+try:
+    ensure_vault_key(V)
+    refused = False
+except ValidationError as exc:
+    refused = "restore" in str(exc)
+check("no unlock methods next to existing data: a new key is never generated", refused
+      and not os.path.exists(f"{W}/keys/slots.json"))
+os.rename(f"{W}/keys/slots.away", f"{W}/keys/slots.json")
+os.rename(f"{W}/keys/away.key", f"{W}/keys/local-fabric-2.key")
+check("method back -> unseals again, data intact", start() and
+      bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
+      .get("data", {}).get("data") == {"v": "1"})
+check("the key never changed", open(f"{W}/keys/local-fabric-2.key", "rb").read() == key_bytes)
+
+# ---------------------------------------------------------------- USB stick unlock method (loop device)
+sh(f"truncate -s 64M {W}/stick.img")
+loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
+sh(f"truncate -s 64M {W}/other.img")
+other = sh(f"losetup --find --show {W}/other.img").stdout.strip()
+try:
+    add_usb_slot(V, "tester", loop, "safe stick", source="test")
+    usb_refused = False
+except ValidationError as exc:
+    usb_refused = "not a USB disk" in str(exc)
+check("add USB: anything that is not a USB disk is refused", usb_refused)
+os.makedirs(f"{W}/mnt", exist_ok=True)
+sh(f"mkfs.ext4 -q -F {other}")
+sh(f"mount {other} {W}/mnt")
+try:
+    add_usb_slot(V, "tester", other, "", source="test", require_usb=False)
+    busy = False
+except ValidationError as exc:
+    busy = "in use" in str(exc)
+sh(f"umount {W}/mnt")
+check("add USB: a mounted disk is never erased", busy)
+usb_id = add_usb_slot(V, "tester", loop, "safe stick", source="test", require_usb=False)
+store = read_slot_store(V)
+stick = next(sl for sl in store["slots"] if sl["id"] == usb_id)
+check("add USB: stick formatted with fabric's UUID, key written and verified, method saved",
+      stick["type"] == "usb" and stick["device"]["fs_uuid"] in sh(f"blkid -o value -s UUID {loop}").stdout
+      and stick["wraps"].get(store["key_id"]))
+check("add USB: stick not left mounted", sh(f"findmnt -n {loop}", ok=False).returncode != 0)
+check("add USB: kill-switch rule written for this stick's UUID only",
+      stick["device"]["fs_uuid"] in open(f"{W}/90-fabric-unlock.rules").read()
+      and open(f"{W}/90-fabric-unlock.rules").read().count("ACTION==") == 1)
+check("slot test through the stick", test_slot(V, "tester", usb_id, source="test"))
+remove_slot(V, "tester", "local", source="test")
+check("key file removed (the stick vouched): shredded, the stick is the only way in",
+      not any(f.startswith("local-") for f in os.listdir(f"{W}/keys"))
+      and [sl["type"] for sl in read_slot_store(V)["slots"]] == ["usb"])
+check("OpenBao restarts from the stick alone", start() and not vault_status(V)["sealed"])
+calls = []
+
+
+def fake_systemctl(*args, running=True):
+    calls.append(args)
+
+    class R:
+        returncode = 0 if (args[0] != "is-active" or running) else 3
+    return R()
+
+
+sh(f"losetup -d {loop}")
+check("stick pulled: kill switch stops OpenBao", vault_device_event(V, lambda *a: fake_systemctl(*a, running=True))
+      == "stopped" and ("stop", "openbao") in calls)
+check("with the stick gone fabric-unlock refuses", unlock_vault(V) is None)
+loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
+check("stick back: OpenBao is started again", vault_device_event(V, lambda *a: fake_systemctl(*a, running=False))
+      == "started" and ("start", "openbao") in calls)
+check("...and unseals from it, data intact", start() and
+      bao_request(V, "GET", "fabric/data/probe", token=approle_login(V, "setup-approle.json"))[1]
+      .get("data", {}).get("data") == {"v": "1"})
+res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+check("rotation with the stick: new key on the stick, old one shredded there",
+      res["kept"] == [usb_id] and res["key_id"] == "fabric-3" and test_slot(V, "tester", usb_id, source="test"))
+sh(f"mount -o ro {loop} {W}/mnt")
+on_stick = sorted(os.listdir(f"{W}/mnt/fabric-vault"))
+key_mode = oct(os.stat(f"{W}/mnt/fabric-vault/fabric-3.key").st_mode & 0o777)
+sh(f"umount {W}/mnt")
+check("on the stick: only the current key, root-only", on_stick == ["fabric-3.key"] and key_mode == "0o400", on_stick)
+try:
+    remove_slot(V, "tester", usb_id, source="test")
+    last_usb = False
+except ValidationError as exc:
+    last_usb = "last" in str(exc)
+check("the stick, now the only method, cannot be removed", last_usb)
+compose("stop")
+sh(f"losetup -d {loop}")
+sh(f"losetup -d {other}")
+
+# ---------------------------------------------------------------- security key (PKCS#11; SoftHSM2 stands in)
+loop = sh(f"losetup --find --show {W}/stick.img").stdout.strip()
+start("up")
+HSM = "/usr/lib/softhsm/libsofthsm2.so"
+have_hsm = os.path.exists(HSM) and shutil.which("softhsm2-util")
+try:
+    import PyKCS11 as P
+except ImportError:
+    have_hsm = False
+check("test prerequisites: softhsm2 and python3-pykcs11 installed", have_hsm)
+
+
+def refused(fn, text):
+    try:
+        fn()
+        return False
+    except ValidationError as exc:
+        return text in str(exc)
+
+
+def token_flags(serial):
+    lib = P.PyKCS11Lib()
+    lib.load(HSM)
+    return next(lib.getTokenInfo(sl).flags for sl in lib.getSlotList(tokenPresent=True)
+                if lib.getTokenInfo(sl).serialNumber.strip() == serial)
+
+
+if have_hsm:
+    os.makedirs(f"{W}/softhsm/tokens", exist_ok=True)
+    open(f"{W}/softhsm/softhsm2.conf", "w").write(f"directories.tokendir = {W}/softhsm/tokens\nobjectstore.backend = file\n")
+    os.environ["SOFTHSM2_CONF"] = f"{W}/softhsm/softhsm2.conf"
+    # softhsm2-util only takes PINs as arguments: acceptable for a throwaway software token in a test
+    for label in ("fabric-a", "fabric-b"):
+        sh(["softhsm2-util", "--init-token", "--free", "--label", label, "--so-pin", "87654321", "--pin", "123456"])
+    V["openbao_pkcs11_modules"] = [HSM]
+    toks = {t["label"]: t for t in list_pkcs11_tokens(V)}
+    check("tokens listed without a login", set(toks) == {"fabric-a", "fabric-b"}
+          and all(t["pin_state"] == "ok" for t in toks.values()), toks)
+    A, B = toks["fabric-a"]["serial"], toks["fabric-b"]["serial"]
+    check("a library not on the allowed list is refused (never loaded)",
+          refused(lambda: add_security_key_slot(V, "tester", "/tmp/x.so", A, "123456", source="test"), "allowed list"))
+    check("wrong PIN refused, nothing saved",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, A, "000000", source="test"), "wrong PIN")
+          and not any(sl["type"] == "pkcs11" for sl in read_slot_store(V)["slots"])
+          and not any(f.startswith("pin-") for f in os.listdir(f"{W}/keys")))
+    tok = add_security_key_slot(V, "tester", HSM, A, "123456", label="token a", source="test")
+    slot = next(sl for sl in read_slot_store(V)["slots"] if sl["id"] == tok)
+    lib = P.PyKCS11Lib()
+    lib.load(HSM)
+    sess = lib.openSession(next(sl for sl in lib.getSlotList(tokenPresent=True)
+                                if lib.getTokenInfo(sl).serialNumber.strip() == A))
+    sess.login("123456")
+    priv = sess.findObjects([(P.CKA_CLASS, P.CKO_PRIVATE_KEY), (P.CKA_ID, tuple(bytes.fromhex(slot["device"]["key_id"])))])
+    attrs = sess.getAttributeValue(priv[0], [P.CKA_SENSITIVE, P.CKA_EXTRACTABLE]) if priv else None
+    sess.logout()
+    store_text = open(f"{W}/keys/slots.json").read()
+    check("added: key pair made on the token (sensitive, not extractable); only ciphertext in the store",
+          attrs == [True, False] and slot["wraps"][read_slot_store(V)["key_id"]]["alg"] == "RSA-OAEP-SHA1", attrs)
+    pin_file = f"{W}/keys/pin-{tok}"
+    check("PIN kept root 0400 on this host, never in the store",
+          oct(os.stat(pin_file).st_mode & 0o777) == "0o400" and os.stat(pin_file).st_uid == 0 and "123456" not in store_text)
+    check("slot test through the token", test_slot(V, "tester", tok, source="test"))
+    check("the same token twice is refused",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, A, "123456", source="test"), "already"))
+
+    # PIN guard: a stale stored PIN costs one try, unattended starts do not retry
+    pkcs11.save_pin(V, slot, "000000")
+    kid = read_slot_store(V)["key_id"]
+    k1 = obtain_key(V, read_slot_store(V), kid, only=tok)[0]
+    low = bool(token_flags(A) & P.CKF_USER_PIN_COUNT_LOW)
+    pkcs11.save_pin(V, slot, "123456")
+    errs = []
+    k2 = obtain_key(V, read_slot_store(V), kid, only=tok, errors=errs)[0]
+    check("unattended: a wrong stored PIN costs one try, then the token is not tried again",
+          k1 is None and low and k2 is None and "not retried" in " ".join(errs), errs)
+    check("a person's `vault test` logs in once and clears it",
+          test_slot(V, "tester", tok, source="test") and not token_flags(A) & P.CKF_USER_PIN_COUNT_LOW)
+
+    # an existing key pair (the vendor-tool path, e.g. a YubiKey PIV slot)
+    sess = lib.openSession(next(sl for sl in lib.getSlotList(tokenPresent=True)
+                                if lib.getTokenInfo(sl).serialNumber.strip() == B), P.CKF_SERIAL_SESSION | P.CKF_RW_SESSION)
+    sess.login("123456")
+    for ident, extractable in (((0x0a,), True), ((0x03,), False)):
+        common = [(P.CKA_TOKEN, True), (P.CKA_ID, ident)]
+        sess.generateKeyPair([(P.CKA_CLASS, P.CKO_PUBLIC_KEY), (P.CKA_ENCRYPT, True), (P.CKA_MODULUS_BITS, 2048),
+                              (P.CKA_PUBLIC_EXPONENT, (1, 0, 1))] + common,
+                             [(P.CKA_CLASS, P.CKO_PRIVATE_KEY), (P.CKA_PRIVATE, True), (P.CKA_SENSITIVE, not extractable),
+                              (P.CKA_EXTRACTABLE, extractable), (P.CKA_DECRYPT, True)] + common,
+                             mecha=P.MechanismRSAGENERATEKEYPAIR)
+    sess.logout()
+    check("an existing key that can be exported is refused",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, B, "123456", "0a", source="test"), "exported"))
+    check("a key id that is not on the token is refused",
+          refused(lambda: add_security_key_slot(V, "tester", HSM, B, "123456", "7f", source="test"), "no key pair"))
+    tok_b = add_security_key_slot(V, "tester", HSM, B, "123456", "03", label="token b", source="test")
+    check("an existing sensitive key (id 03, like a YubiKey's 9d slot) is accepted and works",
+          test_slot(V, "tester", tok_b, source="test"))
+    remove_slot(V, "tester", tok_b, source="test")
+    check("removing a security key deletes its stored PIN", not os.path.exists(f"{W}/keys/pin-{tok_b}"))
+
+    # the token alone
+    remove_slot(V, "tester", usb_id, source="test")
+    check("OpenBao restarts from the security key alone", start() and not vault_status(V)["sealed"])
+    res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+    check("rotation: the token wraps the new key", res["kept"] == [tok] and test_slot(V, "tester", tok, source="test"))
+    check("the token, now the only method, cannot be removed",
+          refused(lambda: remove_slot(V, "tester", tok, source="test"), "last"))
+
+# ---------------------------------------------------------------- HSM / key manager (KMIP; PyKMIP server stands in)
+try:
+    from kmip import enums as kenums
+    have_kmip = bool(shutil.which("pykmip-server"))
+except ImportError:
+    have_kmip = False
+check("test prerequisites: python3-pykmip (client and pykmip-server) installed", have_kmip)
+if have_hsm and have_kmip:
+    KP = 15696
+    for name, san in (("kmip-server", "DNS:kmip.lan.test"), ("kmip-client", "DNS:fabric-test")):
+        sh(f"openssl req -newkey rsa:2048 -nodes -keyout {name}.key -out {name}.csr -subj '/CN={name}'")
+        open(f"{name}.ext", "w").write(f"subjectAltName={san}\nextendedKeyUsage=serverAuth,clientAuth\n")
+        sh(f"openssl x509 -req -in {name}.csr -CA root.crt -CAkey root.key -CAcreateserial -out {name}.crt "
+           f"-days 2 -extfile {name}.ext")
+    # one PEM for both settings: Debian's PyKMIP server swaps certfile and keyfile
+    open("kmip-server.pem", "w").write(open("kmip-server.crt").read() + open("kmip-server.key").read())
+    open("kmip.conf", "w").write(f"[server]\nhostname=127.0.0.1\nport={KP}\ncertificate_path={W}/kmip-server.pem\n"
+                                 f"key_path={W}/kmip-server.pem\nca_path={W}/root.crt\nauth_suite=TLS1.2\n"
+                                 f"enable_tls_client_auth=True\ndatabase_path={W}/kmip.db\nlogging_level=INFO\n")
+    kmip_srv = subprocess.Popen(["pykmip-server", "-f", f"{W}/kmip.conf", "-l", f"{W}/kmip.log"],
+                                stdout=open(f"{W}/kmip.out", "w"), stderr=subprocess.STDOUT)
+    for _ in range(60):
+        try:
+            socket.create_connection(("127.0.0.1", KP), 1).close()
+            break
+        except OSError:
+            time.sleep(0.5)
+    kargs = ("127.0.0.1", KP, "kmip.lan.test", f"{W}/root.crt", f"{W}/kmip-client.crt", f"{W}/kmip-client.key")
+    with kmip_session(*kargs) as kc:
+        kuid = kc.create(kenums.CryptographicAlgorithm.AES, 256)
+        kc.activate(kuid)
+    pem = {n: open(f"{W}/kmip-client.{n}").read() for n in ("crt", "key")}
+    check("KMIP: a device whose certificate is not from the given CA is refused (TLS verified)",
+          refused(lambda: add_kmip_slot(V, "tester", f"127.0.0.1:{KP}", kuid, open(f"{W}/other.crt").read(),
+                                        pem["crt"], pem["key"], "kmip.lan.test", source="test"), "TLS handshake"))
+    check("KMIP: a wrong key id is refused, nothing saved",
+          refused(lambda: add_kmip_slot(V, "tester", f"127.0.0.1:{KP}", "9999", open(f"{W}/root.crt").read(),
+                                        pem["crt"], pem["key"], "kmip.lan.test", source="test"), "refused")
+          and not any(sl["type"] == "kmip" for sl in read_slot_store(V)["slots"]))
+    hsm = add_kmip_slot(V, "tester", f"127.0.0.1:{KP}", kuid, open(f"{W}/root.crt").read(), pem["crt"], pem["key"],
+                        "kmip.lan.test", "test hsm", source="test")
+    kdir = f"{W}/keys/kmip-{hsm}"
+    check("KMIP: added after a wrap + unwrap through the device; its certificates and key root 0400",
+          all(oct(os.stat(f"{kdir}/{n}").st_mode & 0o777) == "0o400" for n in ("ca.crt", "client.crt", "client.key"))
+          and test_slot(V, "tester", hsm, source="test"))
+    remove_slot(V, "tester", tok, source="test")
+    check("OpenBao restarts from the HSM alone", start() and not vault_status(V)["sealed"])
+    res = rotate_vault_key(V, "tester", restart_unsealed, source="test")
+    check("rotation: the HSM wraps the new key", res["kept"] == [hsm] and test_slot(V, "tester", hsm, source="test"))
+    with kmip_session(*kargs) as kc:
+        kc.revoke(kenums.RevocationReasonCode.CESSATION_OF_OPERATION, kuid)
+    check("KMIP kill switch: key revoked on the device -> the method no longer unwraps, fabric-unlock refuses",
+          refused(lambda: test_slot(V, "tester", hsm, source="test"), "could not unwrap") and unlock_vault(V) is None)
+    kmip_srv.terminate()
+
+# ---------------------------------------------------------------- hardening
+insp = json.loads(sh("docker inspect openbao").stdout)[0]
+hc = insp["HostConfig"]
+check("runs as 913:913, not root", insp["Config"]["User"] == "913:913")
+check("no capabilities, no-new-privileges, read-only root, memory limit",
+      hc["CapDrop"] == ["ALL"] and not hc.get("CapAdd") and "no-new-privileges:true" in hc["SecurityOpt"]
+      and hc["ReadonlyRootfs"] and hc["Memory"] == 256 * 1024 * 1024, hc)
+check("effective capabilities are empty",
+      "CapEff:\t0000000000000000" in sh("docker exec openbao cat /proc/1/status", ok=False).stdout)
+check("key folder (RAM) mounted read-only", any(m["Destination"] == "/openbao/seal" and not m["RW"] for m in insp["Mounts"]))
+check("no Docker socket", not any("docker.sock" in m["Source"] for m in insp["Mounts"]))
+
+compose("down")
+sh(f"losetup -d {loop}", ok=False)
+sh(f"docker network rm {NET}", ok=False)
+print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
+sys.exit(1 if FAILED else 0)

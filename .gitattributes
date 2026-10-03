@@ -1,0 +1,10 @@
+# Always LF: these files run on Linux (bash, Dockerfiles, Python, YAML,
+# LDIF, systemd units). A CRLF checkout on Windows copied to the target
+# would break them.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.tar binary
+*.gz binary

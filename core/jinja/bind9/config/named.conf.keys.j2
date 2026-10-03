@@ -1,6 +1,0 @@
-{% for key in tsig_keys %}
-key "{{ key.name }}" {
-    algorithm {{ key.algorithm }};
-    secret "{{ tsig_secrets[key.name] }}";
-};
-{% endfor %}

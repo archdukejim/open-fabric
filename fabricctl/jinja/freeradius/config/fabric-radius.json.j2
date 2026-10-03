@@ -1,0 +1,9 @@
+{
+  "uri": "ldaps://{{ hostname_ldap }}:3636",
+  "base": "{{ ldap_base_dn }}",
+  "local": "{{ ldap_local_dn }}",
+  "bind_dn": "cn=radius_reader,ou=admins,{{ ldap_local_dn }}",
+  "password_file": "/etc/freeradius/fabric/ldap-password",
+  "ca_file": "/etc/freeradius/certs/ca.pem",
+  "people": {{ radius_people | default([]) | to_json }}
+}

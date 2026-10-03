@@ -1,0 +1,57 @@
+services:
+  webui:
+    image: {{ image_webui }}
+    build:
+      context: {{ deploy_base_dir }}/webui/build
+      args:
+        BASE_IMAGE: "{{ image_debian }}"
+        WEBUI_UID: "{{ service_users.webui.uid }}"
+        WEBUI_GID: "{{ service_users.webui.gid }}"
+    container_name: fabric-web
+    # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
+    # and the optional log forwarder reads everything from one place
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
+    user: "{{ service_users.webui.uid }}:{{ service_users.webui.gid }}"
+    # Member of nginx's group so it can hand nginx its socket.
+    group_add:
+      - "{{ service_users.nginx.gid }}"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:noexec,nosuid,size=16m
+    volumes:
+      # Config incl. the OIDC client secret (0400, owned by the webui uid)
+      - {{ deploy_base_dir }}/webui/config:/config:ro
+      # Public CA certs only (root + intermediate) — never stepca/data/secrets
+      - {{ deploy_base_dir }}/stepca/data/certs:/certs:ro
+      # nginx <-> webui: this container creates web.sock here
+      - {{ deploy_base_dir }}/webui/run:/run/webui
+      # webui -> fabric-agent (host): the only way to act on the system
+      - {{ deploy_base_dir }}/webui/agent:/agent:ro
+    networks:
+      # Only to reach Keycloak; no ports are published.
+      fabric_net:
+        ipv4_address: "{{ ip_webui }}"
+{% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+{% endif %}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s = socket.socket(socket.AF_UNIX); s.connect('/run/webui/web.sock')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+  fabric_net:
+    name: fabric_net
+    external: true

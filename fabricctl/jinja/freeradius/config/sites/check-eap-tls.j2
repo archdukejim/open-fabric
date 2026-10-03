@@ -1,0 +1,8 @@
+# Runs after the client certificate chained to the fabric CA: fabric_policy
+# decides by the device it is linked to. Its reply (the VLAN) is copied into
+# the final Access-Accept.
+server fabric-check-eap-tls {
+	authorize {
+		fabric_policy
+	}
+}

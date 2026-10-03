@@ -1,0 +1,58 @@
+# EAP (design §6): EAP-TLS for devices — every client certificate must
+# chain to the fabric CA; which device it belongs to, and whether it may
+# join, is decided by fabric_policy in fabric-check-eap-tls. EAP-TTLS/PAP
+# for people — user name and password inside a TLS tunnel to this server's
+# certificate, checked against 389-DS in fabric-inner-tunnel. No PEAP /
+# MSCHAPv2: it needs NT hashes, which the directory does not keep.
+eap {
+	default_eap_type = tls
+	timer_expire = 60
+	ignore_unknown_eap_types = no
+	max_sessions = ${max_requests}
+
+	tls-config tls-fabric {
+		certificate_file = ${certdir}/server.pem
+		private_key_file = ${certdir}/server.key
+		ca_file = ${certdir}/ca.pem
+		cipher_list = "DEFAULT"
+		cipher_server_preference = yes
+		tls_min_version = "1.2"
+		tls_max_version = "1.2"
+		ecdh_curve = ""
+		fragment_size = 1024
+		include_length = yes
+		check_crl = no
+		# No session resumption: every connection is checked against the
+		# directory, so a disabled device or an unlinked certificate is out
+		# at its next authentication.
+		cache {
+			enable = no
+		}
+		# The certificate exists as a file only while this runs: record its
+		# SHA-256 fingerprint (what devices are linked by) under its serial.
+		verify {
+			tmpdir = ${run_dir}/verify
+			client = "/usr/bin/python3 /etc/freeradius/python/record_fingerprint.py %{TLS-Client-Cert-Filename}"
+		}
+		ocsp {
+			enable = no
+		}
+	}
+
+	tls {
+		tls = tls-fabric
+		virtual_server = fabric-check-eap-tls
+	}
+
+{% if radius_people | default([]) %}
+	ttls {
+		tls = tls-fabric
+		# the inner reply (the VLAN) goes into the outer Access-Accept
+		use_tunneled_reply = yes
+		# the calling MAC and the switch, for the decision log
+		copy_request_to_tunnel = yes
+		require_client_cert = no
+		virtual_server = fabric-inner-tunnel
+	}
+{% endif %}
+}

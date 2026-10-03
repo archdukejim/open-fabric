@@ -1,0 +1,50 @@
+services:
+  fluentbit:
+    # Log forwarding (design D20): the host journal (every fabric container
+    # logs there, and fabric's audit log too) and OpenBao's audit log, to
+    # syslog and/or Elasticsearch/OpenSearch. Pinned by digest.
+    image: "{{ image_fluentbit }}"
+    container_name: fluentbit
+    user: "{{ service_users.fluentbit.uid }}:{{ service_users.fluentbit.gid }}"
+    # read the journal (systemd-journal group) and OpenBao's audit log (openbao group)
+    group_add:
+      - "{{ journal_gid | default(190) }}"
+      - "{{ service_users.openbao.gid }}"
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/config/fluent-bit.yaml"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file:
+      - {{ deploy_base_dir }}/fluentbit/config/secrets.env
+    volumes:
+      - {{ deploy_base_dir }}/fluentbit/config:/config:ro
+      - {{ deploy_base_dir }}/fluentbit/buffer:/buffer
+{% if fluentbit_journal | default(true) %}
+      - /var/log/journal:/var/log/journal:ro
+      - /run/log/journal:/run/log/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+{% endif %}
+      - {{ deploy_base_dir }}/openbao/logs:/openbao-logs:ro
+{% if (log_forwarding | default({})).hosts | default({}) %}
+    # destinations not in DNS (log_forwarding.hosts: {name: address})
+    extra_hosts:
+{% for name, addr in log_forwarding.hosts.items() %}
+      - "{{ name }}:{{ addr }}"
+{% endfor %}
+{% endif %}
+    networks:
+      fabric_net:
+        ipv4_address: "{{ ip_fluentbit }}"
+    mem_limit: {{ fluentbit_mem_limit }}
+    healthcheck:
+      test: ["CMD", "/fluent-bit/bin/fluent-bit", "--version"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  fabric_net:
+    name: fabric_net
+    external: true

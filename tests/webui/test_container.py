@@ -1,0 +1,604 @@
+#!/usr/bin/env python3
+"""End-to-end test of the web UI container against a mock Keycloak and the
+real fabric-agent (Linux, root):
+    sudo python3 tests/webui/test_container.py
+Builds a throwaway PKI with openssl, starts a TLS mock Keycloak that signs
+real RS256 ID tokens, starts fabric-agent from the installed tree and the
+web UI image on a unix socket, and drives it the way nginx would (forwarded
+client-certificate headers)."""
+import base64
+import hashlib
+import http.client
+import json
+import os
+import shutil
+import socket
+import ssl
+import subprocess
+import sys
+import threading
+import time
+import urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
+from fabriclib.rbac.permissions import BUNDLES  # noqa: E402
+
+
+def bundle_roles(bundle, name=None):
+    """The roles claim Keycloak issues for a bundle: the composite and its permissions."""
+    return [name or bundle] + [f"fabric:{p}" for p in BUNDLES[bundle]]
+
+
+ADMIN_ROLES = bundle_roles("admin", "fabric-admin")
+AUDITOR_ROLES = bundle_roles("fabric-auditor")
+W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/webui"
+shutil.rmtree(W, ignore_errors=True)
+os.makedirs(W)
+
+
+def sh(cmd, **kw):
+    return subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True, cwd=W, **kw).stdout
+
+
+# ---------------------------------------------------------------- PKI
+sh("openssl req -x509 -newkey rsa:2048 -nodes -keyout root.key -out root.crt -days 2 -subj '/O=Test/CN=Test Root CA' "
+   "-addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign")
+
+
+def ca_cert(name, cn, issuer):
+    sh(f"openssl req -newkey rsa:2048 -nodes -keyout {name}.key -out {name}.csr -subj '/C=US/O=Test Org/CN={cn}'")
+    open(f"{W}/{name}.ext", "w").write("basicConstraints=critical,CA:TRUE,pathlen:1\nkeyUsage=critical,keyCertSign,cRLSign\n")
+    sh(f"openssl x509 -req -in {name}.csr -CA {issuer}.crt -CAkey {issuer}.key -CAcreateserial -out {name}.crt -days 2 -extfile {name}.ext")
+
+
+def leaf(name, cn, issuer, san=None):
+    sh(f"openssl req -newkey rsa:2048 -nodes -keyout {name}.key -out {name}.csr -subj '/C=US/O=Test Org/OU=IT/CN={cn}'")
+    ext = "basicConstraints=CA:FALSE\nextendedKeyUsage=serverAuth,clientAuth\n" + (f"subjectAltName=DNS:{san}\n" if san else "")
+    open(f"{W}/{name}.ext", "w").write(ext)
+    sh(f"openssl x509 -req -in {name}.csr -CA {issuer}.crt -CAkey {issuer}.key -CAcreateserial -out {name}.crt -days 2 -extfile {name}.ext")
+
+
+ca_cert("int", "Test Intermediate CA", "root")
+ca_cert("sub", "Rogue Sub CA", "int")
+leaf("sso", "sso.test", "int", san="sso.test")
+open(f"{W}/sso-chain.crt", "w").write(open(f"{W}/sso.crt").read() + open(f"{W}/int.crt").read())
+
+
+def dn(path, which):
+    return sh(f"openssl x509 -in {path} -noout -{which} -nameopt RFC2253").split("=", 1)[1].strip()
+
+
+INT_DN = dn(f"{W}/int.crt", "subject")
+SUB_DN = dn(f"{W}/sub.crt", "subject")
+
+# ------------------------------------------------------- mock Keycloak
+sh("openssl genrsa -out sign.key 2048")
+modulus = int(sh("openssl rsa -in sign.key -noout -modulus").split("=")[1].strip(), 16)
+
+
+def b64u(b):
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+JWKS = {"keys": [{"kid": "k1", "kty": "RSA", "alg": "RS256", "use": "sig",
+                  "n": b64u(modulus.to_bytes(256, "big")), "e": b64u((65537).to_bytes(3, "big"))}]}
+ISSUER = "https://sso.test/realms/test"
+CODES = {}          # code -> dict(nonce, challenge, user, roles, tamper)
+MOCK = {"user": "alice", "roles": ["fabric-admin"], "tamper": None}
+REFRESH = {}        # refresh token -> {"user", "roles", "short"}: what a refresh grant returns (roles can be revoked)
+
+
+def sign_jwt(claims, kid="k1"):
+    header = b64u(json.dumps({"alg": "RS256", "kid": kid, "typ": "JWT"}).encode())
+    payload = b64u(json.dumps(claims).encode())
+    open(f"{W}/tosign", "wb").write(f"{header}.{payload}".encode())
+    sig = subprocess.run(["openssl", "dgst", "-sha256", "-sign", f"{W}/sign.key", f"{W}/tosign"],
+                         capture_output=True, check=True).stdout
+    return f"{header}.{payload}.{b64u(sig)}"
+
+
+class KC(BaseHTTPRequestHandler):
+    def log_message(self, *a):
+        pass
+
+    def reply(self, code, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self):
+        if self.path == "/realms/test/protocol/openid-connect/certs":
+            return self.reply(200, JWKS)
+        self.reply(404, {})
+
+    def do_POST(self):
+        form = dict(urllib.parse.parse_qsl(self.rfile.read(int(self.headers["Content-Length"])).decode()))
+        if self.path != "/realms/test/protocol/openid-connect/token":
+            return self.reply(404, {})
+        if form.get("grant_type") == "refresh_token":
+            r = REFRESH.get(form.get("refresh_token"))
+            if not r or form.get("client_secret") != "s3cret" or r["user"] is None:
+                return self.reply(400, {"error": "invalid_grant"})
+            now = int(time.time())
+            return self.reply(200, {"id_token": sign_jwt({
+                "iss": ISSUER, "aud": "fabric-webui", "azp": "fabric-webui", "sub": "u1", "iat": now,
+                "exp": now + (20 if r["short"] else 300), "preferred_username": r["user"], "roles": r["roles"]}),
+                "refresh_token": form["refresh_token"]})
+        entry = CODES.pop(form.get("code"), None)
+        if not entry or form.get("client_secret") != "s3cret" or form.get("client_id") != "fabric-webui":
+            return self.reply(400, {"error": "invalid_grant"})
+        if b64u(hashlib.sha256(form["code_verifier"].encode()).digest()) != entry["challenge"]:
+            return self.reply(400, {"error": "invalid_grant", "error_description": "PKCE"})
+        now = int(time.time())
+        claims = {"iss": ISSUER, "aud": "fabric-webui", "azp": "fabric-webui", "sub": "u1", "iat": now, "exp": now + 300,
+                  "nonce": entry["nonce"], "preferred_username": entry["user"], "roles": entry["roles"]}
+        t = entry["tamper"]
+        if t == "nonce":
+            claims["nonce"] = "wrong"
+        if t == "aud":
+            claims["aud"] = "other-client"
+        if t == "stale":                 # signed in long ago (step-up for vault changes)
+            claims["auth_time"] = now - 3600
+        if t == "expired":
+            claims["exp"] = now - 600
+        if t == "short":                 # expires soon: the next request renews it
+            claims["exp"] = now + 20
+        token = sign_jwt(claims)
+        if t == "sig":
+            h, p, s = token.split(".")
+            p = b64u(json.dumps({**claims, "roles": ["fabric-admin", "x"]}).encode())
+            token = f"{h}.{p}.{s}"
+        rt = f"rt-{os.urandom(6).hex()}"
+        REFRESH[rt] = {"user": entry["user"], "roles": entry["roles"], "short": t == "short"}
+        self.reply(200, {"id_token": token, "access_token": "unused", "token_type": "Bearer", "refresh_token": rt})
+
+
+kc = ThreadingHTTPServer(("0.0.0.0", 18443), KC)
+ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+ctx.load_cert_chain(f"{W}/sso-chain.crt", f"{W}/sso.key")
+kc.socket = ctx.wrap_socket(kc.socket, server_side=True)
+threading.Thread(target=kc.serve_forever, daemon=True).start()
+
+# ------------------------------------------- fabric-agent (host, root)
+subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+os.makedirs(f"{W}/fabric/config")
+open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
+open(f"{W}/fabric/config/vars.yaml", "w").write(
+    f"deploy_base_dir: {W}\nhost_ip: 192.168.7.53\nhostname_certs: certs.lan.test\n"
+    f"hostname_openbao: vault.lan.test\nip_openbao: 10.254.8.99\nopenbao_key_dir: {W}/nokeys\nhostname: pi-core\n"
+    "service_users: {openbao: {uid: 913, gid: 913}}\n"
+    "domain: lan.test\ndns:\n  dynamic_zone_var:\n    zone_authority: true\n    A:\n    - {name: pi-core, ip: 192.168.7.53}\n"
+    "    CNAME:\n    - {name: calibre, canonical: nas25-apps}\n")
+UID = 912
+DEBIAN = subprocess.run([sys.executable, f"{REPO}/tests/image_ref.py", "debian"], capture_output=True, text=True,
+                        check=True).stdout.strip()
+for d, owner, group, mode in [("agent", 0, UID, 0o750), ("run", UID, 0, 0o750), ("config", 0, UID, 0o750),
+                              ("certs", 0, 0, 0o755)]:
+    os.makedirs(f"{W}/{d}", exist_ok=True)
+    os.chown(f"{W}/{d}", owner, group)
+    os.chmod(f"{W}/{d}", mode)
+shutil.copy(f"{W}/root.crt", f"{W}/certs/root_ca.crt")
+shutil.copy(f"{W}/int.crt", f"{W}/certs/intermediate_ca.crt")
+shutil.copytree(f"{W}/certs", f"{W}/stepca/data/certs")      # what the agent's PKI pages read
+agent = subprocess.Popen([sys.executable, f"{W}/fabric/lib/agent/server.py", "--socket", f"{W}/agent/agent.sock",
+                          "--socket-gid", str(UID), "--allow-uid", str(UID)],
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+
+# ------------------------------------------- webui container (uid 912)
+sh("docker rm -f cwebui >/dev/null 2>&1; docker network rm cwnet >/dev/null 2>&1; true")
+sh("docker network create --subnet 10.254.8.0/24 --gateway 10.254.8.1 cwnet >/dev/null")
+cfg = {"socket": "/run/webui/web.sock", "socket_gid": 0, "agent_socket": "/agent/agent.sock",
+       "public_url": "https://mgr.test", "ca_file": "/certs/root_ca.crt", "intermediate_ca": "/certs/intermediate_ca.crt",
+       "admin_role": "fabric-admin", "session_idle": 900, "session_max": 28800,
+       "keycloak": {"ip": "10.254.8.1", "port": 18443, "hostname": "sso.test", "realm": "test",
+                    "client_id": "fabric-webui", "client_secret": "s3cret"}}
+json.dump(cfg, open(f"{W}/config/webui.json", "w"))
+os.makedirs(f"{W}/webui/config")                 # where fabric-agent reads the Keycloak settings it verifies against
+json.dump(cfg, open(f"{W}/webui/config/webui.json", "w"))
+os.chown(f"{W}/config/webui.json", UID, UID)
+os.chmod(f"{W}/config/webui.json", 0o400)
+os.makedirs(f"{W}/build")
+sh(f"cp -a {W}/fabric/jinja/webui/build/. {W}/build/ && cp -a {W}/fabric/lib/webui {W}/build/app")
+sh(f"docker build -q --build-arg BASE_IMAGE={DEBIAN} --build-arg WEBUI_UID={UID} --build-arg WEBUI_GID={UID} -t fabric/webui:test {W}/build >/dev/null")
+sh(f"docker run -d --name cwebui --network cwnet --ip 10.254.8.80 --user {UID}:{UID} --group-add 0 "
+   f"--read-only --security-opt no-new-privileges:true --cap-drop ALL --tmpfs /tmp:noexec,nosuid,size=16m "
+   f"-v {W}/config:/config:ro -v {W}/certs:/certs:ro -v {W}/run:/run/webui -v {W}/agent:/agent:ro "
+   f"fabric/webui:test >/dev/null")
+for _ in range(100):
+    if os.path.exists(f"{W}/run/web.sock"):
+        break
+    time.sleep(0.2)
+os.symlink(f"{W}/run/web.sock", f"{W}/web.sock")
+
+
+class UConn(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX)
+        self.sock.connect(f"{W}/web.sock")
+
+
+ALICE = {"X-SSL-Client-Verify": "SUCCESS", "X-SSL-Client-S-DN": "CN=alice,OU=IT,O=Test Org,C=US",
+         "X-SSL-Client-I-DN": INT_DN, "X-SSL-Client-Fingerprint": "aa" * 20}
+
+
+def req(method, path, headers=None, body=None, cookie=None):
+    h = dict(headers or {})
+    if cookie:
+        h["Cookie"] = cookie
+    if body is not None:
+        body = urllib.parse.urlencode(body)
+        h["Content-Type"] = "application/x-www-form-urlencoded"
+    c = UConn("x")
+    c.request(method, path, body=body, headers=h)
+    r = c.getresponse()
+    data = r.read().decode()
+    return r.status, dict(r.getheaders()), r.getheader("Set-Cookie") or "", data
+
+
+def req_upload(path, headers, fields, files, cookie):
+    """multipart/form-data POST, as a browser sends a form with a file input."""
+    boundary = "----fabrictest" + os.urandom(8).hex()
+    out = b""
+    for k, v in fields.items():
+        out += f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+    for k, (fname, data) in files.items():
+        out += (f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"; filename="{fname}"\r\n'
+                f"Content-Type: application/octet-stream\r\n\r\n").encode() + data + b"\r\n"
+    out += f"--{boundary}--\r\n".encode()
+    c = UConn("x")
+    c.request("POST", path, body=out, headers={**headers, "Cookie": cookie,
+                                               "Content-Type": f"multipart/form-data; boundary={boundary}"})
+    r = c.getresponse()
+    return r.status, dict(r.getheaders()), r.read().decode()
+
+
+def cookie_csrf(session_cookie):
+    """The session's CSRF token, from the sign-out form every page has."""
+    body = req("GET", "/", ALICE, cookie=session_cookie)[3]
+    return body.split('name="csrf" value="')[1].split('"')[0]
+
+
+def cookie_val(set_cookie, name):
+    for part in set_cookie.split(", "):
+        if part.startswith(name + "="):
+            return part.split(";")[0]
+    return ""
+
+
+results = []
+
+
+def check(name, cond, detail=""):
+    results.append((name, bool(cond)))
+    print(("PASS " if cond else "FAIL ") + name + ("" if cond else f"  -> {detail}"))
+
+
+def login(cert=ALICE, user="alice", roles=tuple(ADMIN_ROLES), tamper=None, callback_cert=None, next_path=None):
+    st, hd, sc, _ = req("GET", "/login" + (f"?next={urllib.parse.quote(next_path)}" if next_path else ""), cert)
+    loc = urllib.parse.urlparse(hd.get("Location", ""))
+    q = dict(urllib.parse.parse_qsl(loc.query))
+    code = os.urandom(8).hex()
+    CODES[code] = {"nonce": q.get("nonce"), "challenge": q.get("code_challenge"), "user": user,
+                   "roles": list(roles), "tamper": tamper}
+    lc = cookie_val(sc, "__Host-webui-login")
+    return req("GET", f"/oidc/callback?code={code}&state={q.get('state')}", callback_cert or cert, cookie=lc), q, hd
+
+
+# ---------------------------------------------------------------- tests
+st, *_ = req("GET", "/")
+check("no client cert -> 403", st == 403, st)
+st, *_ = req("GET", "/", {**ALICE, "X-SSL-Client-Verify": "FAILED:unable to verify"})
+check("unverified cert -> 403", st == 403, st)
+st, *_ = req("GET", "/", {**ALICE, "X-SSL-Client-I-DN": SUB_DN})
+check("cert from subordinate CA -> 403", st == 403, st)
+st, hd, *_ = req("GET", "/", ALICE)
+check("valid cert, no session -> redirect to /login", st == 303 and hd.get("Location") == "/login", (st, hd))
+
+st, hd, sc, _ = req("GET", "/login", ALICE)
+q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(hd["Location"]).query))
+check("login redirects to Keycloak auth endpoint",
+      hd["Location"].startswith(ISSUER + "/protocol/openid-connect/auth?"), hd["Location"])
+check("login uses PKCE S256 + state + nonce + exact redirect_uri",
+      q.get("code_challenge_method") == "S256" and q.get("state") and q.get("nonce")
+      and q.get("redirect_uri") == "https://mgr.test/oidc/callback", q)
+check("login cookie is __Host-, Secure, HttpOnly", "__Host-webui-login=" in sc and "Secure" in sc and "HttpOnly" in sc, sc)
+
+(st, hd, sc, body), _, _ = login(user="bob")
+check("Keycloak user != cert CN -> 403", st == 403, st)
+(st, hd, sc, body), _, _ = login(roles=("offline_access", "fabric-admin"))
+check("user without any fabric permission -> 403 (a bundle name alone grants nothing)",
+      st == 403 and "no fabric role" in body, (st, body[:200]))
+for t in ("nonce", "aud", "expired", "sig"):
+    (st, *_), _, _ = login(tamper=t)
+    check(f"ID token with bad {t} -> 401", st == 401, st)
+BOB_CERT = {**ALICE, "X-SSL-Client-Fingerprint": "bb" * 20}
+(st, *_), _, _ = login(callback_cert=BOB_CERT)
+check("callback presented with a different cert -> 400", st == 400, st)
+st, *_ = req("GET", "/oidc/callback?code=x&state=forged", ALICE)
+check("forged state -> 400", st == 400, st)
+
+(st, hd, sc, body), _, _ = login()
+session = cookie_val(sc, "__Host-webui")
+check("valid login -> session cookie (Strict)", st == 200 and session and "SameSite=Strict" in sc, (st, sc))
+check("security headers present", "default-src 'none'" in hd.get("Content-Security-Policy", "")
+      and hd.get("X-Frame-Options") == "DENY" and hd.get("Cache-Control") == "no-store", hd)
+
+st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
+check("overview tab renders service health", st == 200 and "Overview" in body and "services healthy" in body, st)
+check("overview: the host changes through the agent (this test install was never asked: says so)",
+      "Host changes" in body and "Not asked yet" in body, body[-600:])
+st, hd, sc, body = req("GET", "/kea", ALICE, cookie=session)
+check("Kea tab: DHCP off on this host, how to turn it on", st == 200 and "DHCP is off" in body and "install_kea" in body,
+      (st, body[:300]))
+st, hd, sc, body = req("GET", "/freeradius", ALICE, cookie=session)
+check("FreeRADIUS tab: 802.1X off on this host, how to turn it on",
+      st == 200 and "802.1X is off" in body and "install_freeradius" in body and 'class="tab active"' in body,
+      (st, body[:300]))
+st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
+check("footer shows real version", "fabricctl 9.9.9" in body, body[-300:])
+st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
+check("BIND9 tab shows the zone's records and CNAME targets", st == 200 and "nas25-apps" in body and "192.168.7.53" in body, body[:500])
+csrf = body.split('name="csrf" value="')[1].split('"')[0]
+check("A record shows its automatic PTR", "53.7.168.192.in-addr.arpa" in body, body[:300])
+st, hd, sc, body = req("GET", "/bind9?view=reverse", ALICE, cookie=session)
+check("reverse zones section lists generated PTRs", st == 200 and "7.168.192.in-addr.arpa" in body
+      and "pi-core.lan.test." in body, body[:300])
+
+st, hd, sc, body = req("GET", "/", BOB_CERT, cookie=session)
+check("session cookie replayed with another cert -> redirect to login", st == 303, st)
+st, hd, sc, body = req("GET", "/", ALICE, cookie=session)
+check("...and that session is now destroyed", st == 303, st)
+
+(st, hd, sc, body), _, _ = login()
+session = cookie_val(sc, "__Host-webui")
+st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
+csrf = body.split('name="csrf" value="')[1].split('"')[0]
+POSTH = {**ALICE, "Origin": "https://mgr.test"}
+add = {"csrf": csrf, "type": "CNAME", "name": "shelfmark", "target": "nas25-apps"}
+st, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", ALICE, dict(add), cookie=session)
+check("POST without Origin -> 403", st == 403, st)
+st, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH, {**add, "csrf": "nope"}, cookie=session)
+check("POST with bad CSRF -> 403", st == 403, st)
+st, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", {**POSTH, "Origin": "https://evil.test"}, dict(add), cookie=session)
+check("POST from foreign origin -> 403", st == 403, st)
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH, dict(add), cookie=session)
+vars_text = open(f"{W}/fabric/config/vars.yaml").read()
+check("add CNAME -> saved to vars.yaml", st == 303 and "shelfmark" in vars_text and "msg=" in hd["Location"], (st, hd))
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
+                 {"csrf": csrf, "type": "A", "name": "bad name;rm", "ip": "1.2.3.4"}, cookie=session)
+check("invalid record name rejected", st == 303 and "err=" in hd["Location"], hd)
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
+                 {"csrf": csrf, "type": "TXT", "name": "x", "text": 'a"\n$INCLUDE /etc/shadow'}, cookie=session)
+check("zone-file injection via TXT rejected", st == 303 and "err=" in hd["Location"], hd)
+st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
+idx = [l for l in body.split("<tr>") if "shelfmark" in l][0].split('name="index" value="')[1].split('"')[0]
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
+                 {"csrf": csrf, "type": "CNAME", "index": idx, "name": "wrong-name"}, cookie=session)
+check("stale delete (name mismatch) refused", "err=" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
+                 {"csrf": csrf, "type": "CNAME", "index": idx, "name": "shelfmark"}, cookie=session)
+check("delete CNAME -> removed from vars.yaml", "shelfmark" not in open(f"{W}/fabric/config/vars.yaml").read(), hd)
+st, hd, sc, body = req("GET", "/audit", ALICE, cookie=session)
+check("audit log records web actions with user", "User: alice (web) | Action: DNS_ADD" in body
+      and "LOGIN_DENIED" in body, body[:400])
+
+# ---- Step-CA tab: manual PKI through the agent
+st, hd, sc, body = req("GET", "/stepca", ALICE, cookie=session)
+check("Step-CA tab shows the CA certificates", st == 200 and "Test Root CA" in body and "Test Intermediate CA" in body
+      and "http://certs.lan.test/" in body, body[:400])
+views_ok = all(req("GET", f"/stepca?view={v}", ALICE, cookie=session)[0] == 200
+               for v in ("sign", "issue", "inspect", "convert", "issued"))
+check("every Step-CA menu page renders", views_ok)
+sso_pem, sso_key = open(f"{W}/sso.crt").read(), open(f"{W}/sso.key").read()
+sso_der = subprocess.run(["openssl", "x509", "-in", f"{W}/sso.crt", "-outform", "DER"], capture_output=True).stdout
+st, hd, body = req_upload("/stepca/inspect", POSTH, {"csrf": csrf}, {"file": ("sso.cer", sso_der)}, session)
+check("inspect a DER upload -> decoded, marked as issued by this fabric",
+      st == 200 and "sso.test" in body and "issued by this fabric" in body, (st, body[:300]))
+st, hd, body = req_upload("/stepca/inspect", POSTH, {"csrf": csrf, "data": sso_key}, {}, session)
+check("inspect refuses a pasted private key (400, not echoed)",
+      st == 400 and "private key" in body and "BEGIN" not in body.split("<textarea")[0], st)
+st, hd, body = req_upload("/stepca/inspect", POSTH, {"csrf": "nope"}, {"file": ("x.crt", sso_pem.encode())}, session)
+check("upload with bad CSRF -> 403", st == 403, st)
+subprocess.run(["openssl", "req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{W}/dev.key", "-out",
+                f"{W}/dev.csr", "-subj", "/CN=dev.lan.test", "-addext", "subjectAltName=DNS:dev.lan.test,IP:192.168.7.9"],
+               check=True, capture_output=True)
+st, hd, body = req_upload("/stepca/sign/review", POSTH, {"csrf": csrf}, {"csr_file": ("dev.csr", open(f"{W}/dev.csr", "rb").read())}, session)
+check("CSR upload -> review with names and a Sign button",
+      st == 200 and "dev.lan.test, 192.168.7.9" in body and "Sign certificate" in body, body[:400])
+st, hd, body = req_upload("/stepca/convert", POSTH, {"csrf": csrf, "key": sso_key}, {"cert_file": ("sso.crt", sso_pem.encode())}, session)
+check("convert cert + key -> downloads incl. .p12 and a one-time password",
+      st == 200 and 'download="sso.test.p12"' in body and 'download="sso.test.cer"' in body and "shown once" in body,
+      body[:400])
+st, hd, sc, body = req("POST", "/stepca/issue", POSTH, {"csrf": csrf, "cn": "bad name!", "key_type": "RSA-2048",
+                                                        "days": "30"}, cookie=session)
+check("invalid request -> form again with the reason (400)", st == 400 and "not a host name" in body, (st, body[:300]))
+
+# ---- 389-DS tab without a directory container: the page says so, nothing breaks
+st, hd, sc, body = req("GET", "/dirsrv", ALICE, cookie=session)
+check("389-DS tab reports an unreachable directory instead of failing", st == 200 and "could not be read" in body, (st, body[:300]))
+st, hd, sc, body = req("GET", "/stepca?view=issue", ALICE, cookie=session)
+check("Step-CA still works without the directory (no device list)", st == 200 and 'select name="device"' not in body, st)
+
+st, hd, sc, body = req("GET", "/openbao", ALICE, cookie=session)
+check("OpenBao tab reports an unreachable vault instead of failing", st == 200 and "Unreachable" in body, (st, body[:300]))
+st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=session)
+check("unlock methods page renders from the host, every method type addable",
+      st == 200 and "Add an unlock method" in body and "arrives next" not in body, (st, body[:300]))
+st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "x"}, cookie=session)
+check("vault change: the host name must be typed", st == 303 and "Type+this+host" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": csrf, "confirm": "pi-core"}, cookie=session)
+check("vault change: confirmed and fresh -> reaches the agent (which refuses: this test host has no vault key)",
+      st == 303 and "no+vault+key" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/slots/add-hsm", POSTH, {"csrf": csrf, "confirm": "pi-core"}, cookie=session)
+check("add HSM: the agent refuses an empty endpoint (validated before anything is touched)",
+      "endpoint" in hd.get("Location", "") and "err=" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/slots/add-usb", POSTH, {"csrf": csrf, "confirm": "pi-core", "disk": "/dev/nope"},
+                 cookie=session)
+check("add USB: the agent refuses a disk that does not exist", "not+a+disk" in hd.get("Location", ""), hd)
+st, hd, *_ = req("POST", "/openbao/slots/add-security-key", POSTH,
+                 {"csrf": csrf, "confirm": "pi-core", "token": "/tmp/evil.so|1234", "pin": "123456", "key": "new"},
+                 cookie=session)
+check("add security key: a library not on the allowed list is never loaded", "allowed+list" in hd.get("Location", ""), hd)
+(st, hd, sc, body), _, _ = login(tamper="stale")
+stale = cookie_val(sc, "__Host-webui")
+st, hd, sc, body = req("GET", "/openbao?view=unlock", ALICE, cookie=stale)
+stale_csrf = body.split('name="csrf" value="')[1].split('"')[0]
+st, hd, *_ = req("POST", "/openbao/rotate", POSTH, {"csrf": stale_csrf, "confirm": "pi-core"}, cookie=stale)
+check("vault change with a sign-in older than 5 minutes -> sign in again first (step-up)",
+      st == 303 and hd.get("Location", "").startswith("/login?next=%2Fopenbao"), hd)
+(st, hd, sc, body), _, _ = login(next_path="/openbao?view=unlock")
+check("after signing in, back to where the change was made", st == 200 and "url=/openbao?view=unlock" in body, body[:300])
+(st, hd, sc, body), _, _ = login(next_path="//evil.test/x")
+check("next= cannot leave this site (no open redirect)", st == 200 and 'url=/"' in body and "evil" not in body, body[:300])
+
+# ---- BIND9 tab: TSIG keys for a zone
+st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)
+check("TSIG view renders the create form", st == 200 and "New TSIG key for a zone" in body, st)
+st, hd, sc, body = req("POST", "/bind9/tsig/create", POSTH, {"csrf": csrf, "name": "npm-certbot", "zone": "lan.test",
+                                                              "scope": "acme-hosts", "hosts": "npm, nas"}, cookie=session)
+secret = body.split('<code class="secret">')[1].split("<")[0] if '<code class="secret">' in body else ""
+check("create TSIG key -> secret and rfc2136.ini shown once", st == 200 and secret
+      and "dns_rfc2136_name = npm-certbot" in body, body[:300])
+vt = open(f"{W}/fabric/config/vars.yaml").read()
+check("...key saved, secret kept out of vars.yaml", "npm-certbot" in vt and secret not in vt
+      and secret in open(f"{W}/fabric/config/fabric-secrets.yml").read())
+st, hd, sc, body = req("GET", "/bind9?view=tsig", ALICE, cookie=session)
+check("TSIG list shows the key's rights, never its secret",
+      "_acme-challenge.npm.lan.test" in body and secret not in body, body[:300])
+st, hd, sc, body = req("POST", "/bind9/tsig/create", POSTH, {"csrf": csrf, "name": "x", "zone": "evil.test",
+                                                              "scope": "acme-zone"}, cookie=session)
+check("TSIG key for a zone fabric does not serve -> refused", st == 400 and "forward zones" in body, st)
+st, hd, sc, body = req("POST", "/bind9/tsig/npm-certbot/rotate", POSTH, {"csrf": csrf}, cookie=session)
+new = body.split('<code class="secret">')[1].split("<")[0] if '<code class="secret">' in body else ""
+check("rotate -> a new secret", st == 200 and new and new != secret, st)
+st, hd, *_ = req("POST", "/bind9/tsig/npm-certbot/delete", POSTH, {"csrf": csrf}, cookie=session)
+check("delete TSIG key -> removed", st == 303 and "npm-certbot" not in open(f"{W}/fabric/config/vars.yaml").read(), st)
+st, hd, sc, body = req("GET", "/audit", ALICE, cookie=session)
+check("audit log records TSIG and PKI actions", "TSIG_ADD" in body and "TSIG_SECRET" in body
+      and "PKI_CONVERT" in body, body[:300])
+
+st, hd, sc, body = req("POST", "/logout", POSTH, {"csrf": csrf}, cookie=session)
+check("logout -> Keycloak end-session with id_token_hint",
+      st == 303 and "/protocol/openid-connect/logout?id_token_hint=" in hd.get("Location", ""), hd)
+st, *_ = req("GET", "/", ALICE, cookie=session)
+check("session invalid after logout", st == 303, st)
+
+print("--- role bundles in the pages (RBAC)")
+(st, hd, sc, body), _, _ = login(roles=tuple(AUDITOR_ROLES))
+aud = cookie_val(sc, "__Host-webui")
+check("an auditor signs in", st == 200 and aud, st)
+st, _, _, body = req("GET", "/bind9", ALICE, cookie=aud)
+check("auditor: DNS records shown, no add/delete forms, no Apply", st == 200 and "nas25-apps" in body
+      and "/bind9/zone/dynamic_zone_var/add" not in body and 'action="/apply"' not in body, body[:300])
+st, _, _, body = req("GET", "/stepca", ALICE, cookie=aud)
+check("auditor: Step-CA without Sign / New key / Convert", st == 200 and "Sign a CSR" not in body
+      and "New key + certificate" not in body and "Certificate authority" in body, body[:300])
+st, _, _, body = req("GET", "/openbao?view=unlock", ALICE, cookie=aud)
+check("auditor: unlock methods listed, no rotate / add / remove", st == 200 and 'action="/openbao/rotate"' not in body
+      and "/openbao/slots/add-usb" not in body, body[:300])
+st, hd, _, body = req("GET", "/", ALICE, cookie=aud)
+check("auditor: every tab shown (all read permissions)", all(t in body for t in ("/bind9", "/stepca", "/dirsrv", "/openbao")))
+st, _, _, body = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
+                     {"csrf": cookie_csrf(aud), "type": "A", "name": "sneaky", "ip": "192.168.7.9"}, cookie=aud)
+check("auditor: a crafted POST is refused by fabric-agent (403, permission named)",
+      st == 403 and "dns:write" in body and "sneaky" not in open(f"{W}/fabric/config/vars.yaml").read(), (st, body[:200]))
+netops = bundle_roles("fabric-network-operator")
+(st, hd, sc, body), _, _ = login(roles=tuple(netops))
+net = cookie_val(sc, "__Host-webui")
+st, _, _, body = req("GET", "/", ALICE, cookie=net)
+check("network operator: no Directory or 802.1X tab (no device management)",
+      "/dirsrv" not in body and "/freeradius" not in body and "/bind9" in body, body[:300])
+
+(st, hd, sc, body), _, _ = login(tamper="short")
+short = cookie_val(sc, "__Host-webui")
+st, *_ = req("GET", "/", ALICE, cookie=short)
+check("a token about to expire is renewed (refresh grant), the session goes on", st == 200, st)
+for r in REFRESH.values():
+    r["roles"] = []                    # an administrator removed the user from every fabric group
+st, hd, *_ = req("GET", "/", ALICE, cookie=short)
+check("roles removed in Keycloak: at the next renewal the session ends", st == 303 and hd.get("Location") == "/login",
+      (st, hd.get("Location")))
+
+print("--- isolation")
+def dexec(cmd):
+    return subprocess.run(["docker", "exec", "cwebui", "sh", "-c", cmd], capture_output=True, text=True)
+check("container runs as uid 912", dexec("id -u").stdout.strip() == "912", dexec("id -u").stdout)
+check("container has no capabilities", "CapEff:\t0000000000000000" in dexec("cat /proc/1/status").stdout)
+check("container root filesystem is read-only", dexec("touch /app/x").returncode != 0)
+check("container cannot write the agent mount", dexec("touch /agent/x").returncode != 0)
+check("no Docker socket in the container", dexec("test -e /var/run/docker.sock").returncode != 0)
+check("container cannot read host fabric config", dexec("test -e /fabric").returncode != 0)
+probe = ("import socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); "
+         "s.sendall(b'GET /v1/zones HTTP/1.0\\r\\n\\r\\n'); print(s.recv(200).split(b'\\r\\n')[0].decode())")
+r = subprocess.run(["setpriv", "--reuid=65534", "--regid=65534", "--clear-groups", sys.executable, "-c", probe,
+                    f"{W}/agent/agent.sock"], capture_output=True, text=True)
+check("other users cannot reach the agent socket", "Permission denied" in r.stderr, r.stdout + r.stderr[-200:])
+r = subprocess.run(["setpriv", "--reuid=913", f"--regid={UID}", "--clear-groups", sys.executable, "-c", probe,
+                    f"{W}/agent/agent.sock"], capture_output=True, text=True)
+check("agent rejects a wrong uid even with the right group (SO_PEERCRED)", "403" in r.stdout, r.stdout + r.stderr[-200:])
+r = subprocess.run(["docker", "exec", "cwebui", "python3", "-c", probe, "/agent/agent.sock"],
+                   capture_output=True, text=True)
+check("from the web UI container, a call without a sign-in token is refused (401)", "401" in r.stdout,
+      r.stdout + r.stderr[-200:])
+
+print("--- fabric-agent: permissions from the signed token (RBAC)")
+CALL = ("import json,socket,sys; s=socket.socket(socket.AF_UNIX); s.connect(sys.argv[1]); b=sys.argv[4].encode(); "
+        "s.sendall(f'{sys.argv[2]} {sys.argv[3]} HTTP/1.0\\r\\nAuthorization: Bearer {sys.argv[5]}\\r\\n"
+        "Content-Type: application/json\\r\\nContent-Length: {len(b)}\\r\\n\\r\\n'.encode()+b); "
+        "r=b''\nwhile True:\n c=s.recv(65536)\n if not c: break\n r+=c\n"
+        "print(r.split(b'\\r\\n')[0].decode()); print(r.split(b'\\r\\n\\r\\n',1)[1].decode()[:300])")
+
+
+def agent_call(method, path, user, roles, body=None, exp=300):
+    now = int(time.time())
+    token = sign_jwt({"iss": ISSUER, "aud": "fabric-webui", "azp": "fabric-webui", "sub": "u1", "iat": now,
+                      "exp": now + exp, "preferred_username": user, "roles": list(roles)})
+    r = subprocess.run(["setpriv", f"--reuid={UID}", f"--regid={UID}", "--clear-groups", sys.executable, "-c", CALL,
+                        f"{W}/agent/agent.sock", method, path, json.dumps(body or {}), token],
+                       capture_output=True, text=True)
+    return r.stdout + r.stderr[-300:]
+
+
+out = agent_call("GET", "/v1/zones", "alice", AUDITOR_ROLES)
+check("auditor token: may read zones", " 200 " in out, out)
+out = agent_call("POST", "/v1/zones/dynamic_zone_var/records", "carol", AUDITOR_ROLES,
+                 {"actor": "carol", "type": "A", "name": "nope", "ip": "192.168.7.9"})
+check("auditor token: may not add a record (403, the permission named)", " 403 " in out and "dns:write" in out, out)
+out = agent_call("POST", "/v1/people", "carol", AUDITOR_ROLES, {"uid": "mallory", "first": "M", "last": "M",
+                                                                "email": "m@x.test"})
+check("auditor token: may not create people (403, people:create)", " 403 " in out and "people:create" in out, out)
+out = agent_call("POST", "/v1/people/alice/reset", "carol", AUDITOR_ROLES)
+check("auditor token: may not reset a sign-in (403, people:reset)", " 403 " in out and "people:reset" in out, out)
+out = agent_call("POST", "/v1/radius/clients", "carol", AUDITOR_ROLES, {"name": "evil", "address": "192.168.7.66"})
+check("auditor token: may not add a RADIUS client (403, radius:admin)", " 403 " in out and "radius:admin" in out, out)
+out = agent_call("POST", "/v1/radius/clients", "carol", bundle_roles("fabric-network-operator"),
+                 {"name": "evil", "address": "192.168.7.66"})
+out2 = agent_call("POST", "/v1/radius/people", "carol", AUDITOR_ROLES, {"group": "admins"})
+check("auditor token: may not map a group for network logins (403, radius:admin)",
+      " 403 " in out2 and "radius:admin" in out2, out2)
+check("network operator token: may not add a RADIUS client either (802.1X is equipment operators')",
+      " 403 " in out and "radius:admin" in out, out)
+out = agent_call("GET", "/v1/nope", "alice", ADMIN_ROLES)
+check("a route that is not in the permission table is refused even for the admin", " 403 " in out, out)
+out = agent_call("GET", "/v1/zones", "alice", ADMIN_ROLES, exp=-600)
+check("an expired token is refused (401)", " 401 " in out, out)
+out = agent_call("POST", "/v1/zones/dynamic_zone_var/records", "alice", ADMIN_ROLES,
+                 {"actor": "mallory", "type": "A", "name": "rbac-probe", "ip": "192.168.7.9"})
+audit_tail = open(f"{W}/fabric/archive/audit.log").read().splitlines()[-1] if os.path.exists(
+    f"{W}/fabric/archive/audit.log") else ""
+check("the audit log names the token's user, not the actor the request claims",
+      " 200 " in out and "alice" in audit_tail and "mallory" not in audit_tail, (out, audit_tail))
+subprocess.run("docker rm -f cwebui >/dev/null; docker network rm cwnet >/dev/null; docker rmi fabric/webui:test >/dev/null",
+               shell=True)
+agent.terminate()
+kc.shutdown()
+failed = [n for n, ok in results if not ok]
+print(f"\n{len(results) - len(failed)}/{len(results)} passed")
+if failed:
+    print(agent.stdout.read()[-3000:]); print(subprocess.run(['docker','logs','cwebui'],capture_output=True,text=True).stdout[-2000:])
+sys.exit(1 if failed else 0)

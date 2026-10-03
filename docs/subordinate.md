@@ -1,9 +1,9 @@
 # Subordinate CA Infrastructure (Nested Layouts)
 
-The `core-template` infrastructure natively supports multi-tier, nested PKI deployments. This allows you to build a comprehensive hierarchy where a "First Level Intermediate CA" can issue both local application certificates AND sign further Subordinate ICAs for segmented environments (Second Level Intermediate CAs, Third Level, etc.).
+The `fabric` infrastructure natively supports multi-tier, nested PKI deployments. This allows you to build a comprehensive hierarchy where a "First Level Intermediate CA" can issue both local application certificates AND sign further Subordinate ICAs for segmented environments (Second Level Intermediate CAs, Third Level, etc.).
 
 ### Are Subordinate CAs minted from the Root or the ICA?
-When you use `core-template`'s `core-mgr` to mint a subordinate CA, it is **minted and signed by the Intermediate CA**, not the Root CA. The `step-ca` daemon running on your host operates exclusively using the Intermediate CA's private key. The Root CA remains isolated and is not used for day-to-day operations.
+When you use `fabric`'s `fabricctl` to mint a subordinate CA, it is **minted and signed by the Intermediate CA**, not the Root CA. The `step-ca` daemon running on your host operates exclusively using the Intermediate CA's private key. The Root CA remains isolated and is not used for day-to-day operations.
 
 ```mermaid
 flowchart TD
@@ -41,7 +41,7 @@ A highly secure, best-practice deployment looks like this:
 
 ## Example Scenario (Deep Nesting)
 
-You can chain ICAs infinitely. Here is an example of a 4-level deep architecture, fully supported by this trust model.
+The trust model allows chains of any depth. Here is an example of a 4-level deep architecture (for setting up a deeper level with fabric, see the note in [Step 4](#step-4-configure-the-subordinate-deployment)).
 
 ```mermaid
 graph TD
@@ -62,35 +62,40 @@ As long as the client devices have the **Root CA** installed, they will implicit
 
 ## Step 1: Mint the Subordinate CA on the First Level Host
 
-Log in to the host machine running your First Level infrastructure. Use the built-in management script to mint a new intermediate CA certificate.
+Log in to the host machine running your First Level infrastructure and mint a new intermediate CA certificate. The **path length** is given on the command line: how many further levels of ICAs the new CA may issue. For a Second Level ICA that needs to issue Third Level ICAs, give `1` or more; for one that only issues leaf certificates, `0` (the default when no number follows).
 
 ```bash
-sudo core-mgr --mint-certs --intermediate-ca
+sudo mkdir -p /root/sub-certs
+sudo fabricctl --mint-certs --intermediate-ca 1
 ```
 
 **Interactive Prompts:**
-1. **Common Name**: Provide a descriptive name, e.g., `Region A Second Level ICA`.
-2. **Path Length**: You will be asked for a `pathLen`. This specifies how many further levels of ICAs this new CA is allowed to issue. For a Second Level ICA that needs to issue Third Level ICAs, specify `1` or greater. If it should only issue leaf certificates, use `0`.
-3. **Output directory**: Enter a convenient output directory (e.g., `/tmp/sub-certs`).
+1. **Common Name**: letters, digits, `.`, `_`, `@`, `*` and `-` only (no spaces), e.g. `region-a.ica.internal`.
+2. **Validity in days** (default 365).
+3. **Output directory**: an existing folder, e.g. `/root/sub-certs` (default: the home of the account that ran `sudo`).
+4. **Key type** and **key size** (defaults RSA 4096; `--kty` / `--size` change the defaults).
 
-This will generate two files in the output directory:
-- `Region_A_Second_Level_ICA.crt` (The intermediate CA certificate)
-- `Region_A_Second_Level_ICA.key` (The private key for the intermediate CA)
+After a review and `y`, the entry is added to `extra_certs` in `vars.yaml` and two files are written to the output directory, named after the Common Name with `.`, `/` and spaces turned into `-`:
+- `region-a-ica-internal.crt` (the intermediate CA certificate, followed by the First Level chain)
+- `region-a-ica-internal.key` (its private key, unencrypted, `0600`)
+
+Setup's `certs` step and `fabricctl certs` keep every `extra_certs` entry issued: if these files are moved away, or the certificate is within 30 days of expiry, a new certificate **with a new key** is minted into the same folder (and setup fails if the folder no longer exists). Once you have copied the files to the subordinate host, remove the entry from `extra_certs` in `/opt/fabric/config/vars.yaml` by hand (the interactive menu treats `extra_certs` as immutable).
 
 ## Hardware Keys: Signing a CSR
 
-If you are using a **Hardware Security Module (HSM)** or a **YubiKey** to store the private key for your Second Level Intermediate CA, you will generate a Certificate Signing Request (CSR) locally on the hardware instead of letting `core-mgr` generate the key for you.
+If you are using a **Hardware Security Module (HSM)** or a **YubiKey** to store the private key for your Second Level Intermediate CA, you will generate a Certificate Signing Request (CSR) locally on the hardware instead of letting `fabricctl` generate the key for you.
 
 Once you have your CSR file (e.g., `hardware-key.csr`), you can use the First Level infrastructure's `step-ca` backend to sign it.
 
 1. Transfer your `hardware-key.csr` to the First Level host.
-2. Copy it into the step-ca volume:
+2. Copy it into the step-ca volume (`/opt/stepca/data` is `/home/step` inside the container; `artifacts/` is its scratch folder, created by fabric when it first mints a certificate):
    ```bash
    sudo cp hardware-key.csr /opt/stepca/data/artifacts/
+   sudo chmod 0644 /opt/stepca/data/artifacts/hardware-key.csr
    ```
 3. Use the `step certificate sign` command directly inside the container to sign the CSR using the First Level ICA's private key:
    ```bash
-   sudo docker exec -it step-ca step certificate sign \
+   sudo docker exec step-ca step certificate sign \
        /home/step/artifacts/hardware-key.csr \
        /home/step/certs/intermediate_ca.crt \
        /home/step/secrets/intermediate_ca_key \
@@ -103,22 +108,25 @@ Once you have your CSR file (e.g., `hardware-key.csr`), you can use the First Le
 
 ## Step 2: Retrieve the Root CA
 
-You will also need the Root CA certificate. You can download it directly from the First Level PKI web endpoint:
+You will also need the Root CA certificate. On the First Level host it is `/opt/stepca/data/certs/root_ca.crt`; it is also published on the First Level CA page (`certs.<domain>`, here `top.internal`), plain HTTP too:
 
 ```bash
-curl -k -o root_ca.crt https://certificates.top.internal/root_ca.crt
+curl -o root_ca.crt http://certs.top.internal/root-ca.crt
+openssl x509 -in root_ca.crt -noout -fingerprint -sha256
 ```
+
+Downloaded over the network, compare the fingerprint with the one shown on the First Level host's CA page or `openssl x509 -in /opt/stepca/data/certs/root_ca.crt -noout -fingerprint -sha256` there before you trust it.
 
 ## Step 3: Transfer Files to the Subordinate Host
 
 Transfer the required files to the new host machine that will run the Second Level infrastructure:
 1. `root_ca.crt` (Root CA)
-2. `second_level_ica.crt` (Second Level Intermediate CA)
-3. `second_level_ica.key` (Second Level Private Key — **Skip this if using a hardware key**, you will configure HSM access directly in step-ca later)
+2. the Second Level Intermediate CA certificate (`region-a-ica-internal.crt` from Step 1, or `second_level_ica.crt` from a signed CSR)
+3. its private key (`region-a-ica-internal.key` — none with a hardware key). Copy it over a secure channel and delete it from the First Level host afterwards.
 
 ## Step 4: Configure the Subordinate Deployment
 
-On the subordinate host, configure `custom-vars.yaml` to use the Bring-Your-Own-Certs (BYOC) mechanism. This instructs the installer to use the provided certificates instead of generating its own offline root.
+On the subordinate host, write a vars file that uses the Bring-Your-Own-Certs (BYOC) mechanism and give it to setup (`sudo fabricctl setup --file custom-vars.yaml`). This instructs the installer to use the provided certificates instead of generating its own root.
 
 ```yaml
 # custom-vars.yaml
@@ -128,8 +136,10 @@ domain: sub1.internal
 # Enable BYOC and specify the paths to the transferred files
 byoc: true
 ca_crt_path: /path/to/transferred/root_ca.crt
-ica_crt_path: /path/to/transferred/second_level_ica.crt
-ica_key_path: /path/to/transferred/second_level_ica.key
+ica_crt_path: /path/to/transferred/region-a-ica-internal.crt
+ica_key_path: /path/to/transferred/region-a-ica-internal.key   # default: ica_crt_path with .key
 ```
 
-*(If using a hardware key, deploy without `ica_key_path` and manually configure the `ca.json` KMS block to point to your PKCS#11 module post-deployment).*
+BYOC is read only on the first setup (while Step-CA has no `ca.json`); changing `byoc` or the paths later has no effect. The `pki` step refuses when a file is missing, copies them into `/opt/stepca/data` (the intermediate key unencrypted or encrypted with fabric's `ca_password`; the unused root key `step ca init` made is removed), and checks the intermediate with `openssl verify` against `ca_crt_path`. *Not tested by the fabric project:* that check is given only the root, so an intermediate signed by another intermediate (a Second Level ICA and deeper) may be refused there.
+
+*(A hardware key is not supported by setup: the `pki` step requires a key file at `ica_key_path`. Moving Step-CA to a PKCS#11 key means editing its `ca.json` KMS settings by hand after deployment.)*

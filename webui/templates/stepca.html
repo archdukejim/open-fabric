@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% macro device_select() %}{% if devices %}<label>For device (optional — links the certificate to it)<select name="device"><option value="">—</option>{% for d in devices %}<option{{ ' selected' if d.name == device }}>{{ d.name }}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
+{% block body %}
+<h1>Step-CA · PKI</h1>
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+<nav class="subtabs">
+{% for v, label in menu %}<a href="/stepca?view={{ v }}" class="subtab{{ ' active' if v == view }}">{{ label }}</a>{% endfor %}
+</nav>
+{% if view == 'ca' %}
+{% if ca %}
+{% for label, c in (('Root CA', ca.root), ('Intermediate CA', ca.intermediate)) %}
+<section class="card"><h2>{{ label }}</h2>
+<dl class="kv"><dt>Subject</dt><dd>{{ c.subject }}</dd><dt>Valid until</dt><dd>{{ c.not_after }}</dd>
+<dt>Key</dt><dd>{{ c.key }}</dd><dt>SHA-256</dt><dd><code class="fp">{{ c.sha256 }}</code></dd></dl></section>
+{% endfor %}
+<section class="card"><h2>Trust this CA on a device</h2>
+<p>Every format (Windows .cer, Linux .crt, PEM text, DER, .p7b chain) is published over plain HTTP at <a href="{{ ca.certs_url }}">{{ ca.certs_url }}</a>.</p>
+<p class="muted">Manually issued certificates: at most {{ ca.max_days }} days (<code>pki_manual_max_days</code>).</p></section>
+{% else %}<section class="card"><p class="flash bad">The CA certificates could not be read.</p></section>{% endif %}
+
+{% elif view == 'sign' %}
+{% if review %}
+<section class="card"><h2>Review the request</h2>
+<dl class="kv"><dt>Subject</dt><dd>{{ review.subject or '—' }}</dd>
+<dt>Names</dt><dd>{{ review.sans | join(', ') or review.cn }}</dd><dt>Key</dt><dd>{{ review.key }}</dd></dl>
+{% if review.ca_requested %}<p class="flash warn">The request asks to be a CA. That is ignored: fabric only issues leaf certificates here.</p>{% endif %}
+{% if review.problems %}
+<p class="flash bad">This request cannot be signed:</p><ul>{% for p in review.problems %}<li>{{ p }}</li>{% endfor %}</ul>
+{% else %}
+{% if can('pki:sign') %}<form method="post" action="/stepca/sign" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="csr" value="{{ review.pem }}">
+{{ device_select() }}
+<label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
+<div><button>Sign certificate</button></div>
+</form>{% endif %}
+<p class="muted">Issued as a leaf certificate for server and client authentication, from the fabric intermediate CA.</p>
+{% endif %}
+<details><summary>Decoded request</summary><pre>{{ review.text }}</pre></details>
+</section>
+{% endif %}
+<section class="card"><h2>Sign a certificate signing request</h2>
+<p class="muted">For devices that make their own key (switches, printers, appliances, Windows <code>certreq</code>, <code>openssl req</code>). The private key never leaves the device.</p>
+{% if can('pki:sign') %}<form method="post" action="/stepca/sign/review" enctype="multipart/form-data" class="stack">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="device" value="{{ device }}">
+<label>Upload a CSR (.csr, .req, .pem or DER)<input type="file" name="csr_file" accept=".csr,.req,.pem,.der,.txt"></label>
+<label>…or paste it<textarea name="csr" rows="8" placeholder="-----BEGIN CERTIFICATE REQUEST-----"></textarea></label>
+<div><button>Review</button></div>
+</form>{% endif %}</section>
+
+{% elif view == 'issue' %}
+<section class="card"><h2>New private key and certificate</h2>
+<p class="muted">For devices that cannot make a CSR. The key is generated here, shown once for download (PEM and a password-protected .p12) and not kept.</p>
+{% if can('pki:issue') %}<form method="post" action="/stepca/issue" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Name (CN)<input name="cn" required placeholder="printer.home.arpa" value="{{ (device ~ ('.' ~ ca.domain if ca and ca.domain else '')) if device else '' }}"></label>
+{{ device_select() }}
+<label class="wide">Other names (DNS, IP, e-mail; comma or space separated)<input name="sans" placeholder="printer, 192.168.1.40"></label>
+<label>Key type<select name="key_type">{% for k in key_types %}<option{{ ' selected' if k == 'RSA-2048' }}>{{ k }}</option>{% endfor %}</select></label>
+<label>Valid for (days)<input name="days" inputmode="numeric" value="{{ [365, ca.max_days if ca else 365] | min }}" required></label>
+<div><button>Generate</button></div>
+</form>{% endif %}
+<p class="muted">RSA-2048 is the most widely accepted by older devices; EC keys are smaller and faster where supported.</p></section>
+
+{% elif view == 'inspect' %}
+{% if inspected %}
+{% for item in inspected['items'] %}
+<section class="card"><h2>{{ 'Certificate' if inspected.kind == 'cert' else 'Certificate signing request' }}{% if inspected['items'] | length > 1 %} {{ loop.index }}{% endif %}</h2>
+{% if item.trusted is not none %}<p><span class="pill {{ 'ok' if item.trusted else 'warn' }}">{{ 'issued by this fabric' if item.trusted else 'not issued by this fabric (or incomplete chain)' }}</span></p>{% endif %}
+<dl class="kv"><dt>Subject</dt><dd>{{ item.info.subject or '—' }}</dd>
+{% if item.info.issuer %}<dt>Issuer</dt><dd>{{ item.info.issuer }}</dd>{% endif %}
+<dt>Names</dt><dd>{{ item.info.sans | join(', ') or '—' }}</dd><dt>Key</dt><dd>{{ item.info.key }}</dd>
+{% if item.info.not_after %}<dt>Valid</dt><dd>{{ item.info.not_before }} → {{ item.info.not_after }}</dd>
+<dt>Usage</dt><dd>{{ item.info.usage or '—' }}{{ ' · CA' if item.info.is_ca }}</dd>
+<dt>Serial</dt><dd><code class="fp">{{ item.info.serial }}</code></dd><dt>SHA-256</dt><dd><code class="fp">{{ item.info.sha256 }}</code></dd>{% endif %}
+</dl>
+{% if item.info.problems %}<p class="flash bad">Would be refused for signing: {{ item.info.problems | join('; ') }}</p>{% endif %}
+<details><summary>Full decode</summary><pre>{{ item.text }}</pre></details></section>
+{% endfor %}
+{% endif %}
+<section class="card"><h2>Inspect a certificate or CSR</h2>
+<p class="muted">Decodes PEM, DER or base64: subject, names, validity, usages, fingerprints, and whether this fabric issued it. Private keys are refused unread.</p>
+{% if can('pki:read') %}<form method="post" action="/stepca/inspect" enctype="multipart/form-data" class="stack">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Upload (.crt, .cer, .pem, .der, .csr)<input type="file" name="file"></label>
+<label>…or paste<textarea name="data" rows="8" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
+<div><button>Inspect</button></div>
+</form>{% endif %}</section>
+
+{% elif view == 'convert' %}
+<section class="card"><h2>Convert a certificate</h2>
+<p class="muted">Get a certificate as PEM (.crt), DER (.cer), full chain (.pem / .p7b) — and, with its private key, a password-protected .p12 for Windows, macOS and phones. The key is not kept.</p>
+{% if can('pki:issue') %}<form method="post" action="/stepca/convert" enctype="multipart/form-data" class="stack">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Certificate (upload)<input type="file" name="cert_file"></label>
+<label>…or paste<textarea name="cert" rows="6" placeholder="-----BEGIN CERTIFICATE-----"></textarea></label>
+<label>Private key for a .p12 (optional, unencrypted PEM; upload)<input type="file" name="key_file"></label>
+<label>…or paste<textarea name="key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" autocomplete="off"></textarea></label>
+<div><button>Convert</button></div>
+</form>{% endif %}</section>
+
+{% elif view == 'issued' %}
+<section class="card"><h2>Issued by hand</h2>
+<p class="muted">Certificates signed from a CSR or generated here (newest first). Service certificates are managed by setup and not listed.</p>
+{% if issued %}
+<table><thead><tr><th>Subject</th><th>Names</th><th>How</th><th>Expires</th><th>By</th></tr></thead><tbody>
+{% for c in issued %}
+<tr><td>{{ c.subject }}</td><td>{{ (c.sans or []) | join(', ') }}</td><td>{{ 'CSR' if c.kind == 'csr' else 'key + cert' }}</td>
+<td><span class="pill {{ 'ok' if c.status == 'valid' else ('warn' if c.status == 'expires soon' else 'bad') }}">{{ c.status }}</span> <span class="muted">{{ c.not_after }}</span></td>
+<td>{{ c.actor }} <span class="muted">{{ c.when }}</span></td></tr>
+{% endfor %}</tbody></table>
+{% else %}<p class="blank">Nothing issued by hand yet.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

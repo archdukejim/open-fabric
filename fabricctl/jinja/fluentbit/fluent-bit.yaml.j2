@@ -1,0 +1,88 @@
+# Fluent Bit — rendered by fabricctl (fabric/jinja/fluentbit/fluent-bit.yaml.j2), design D20.
+# Every destination is verified TLS; credentials come from secrets.env (from OpenBao).
+{% set lf = log_forwarding | default({}) %}
+{% set sl = lf.syslog | default({}) %}
+{% set es = lf.elastic | default({}) %}
+service:
+  flush: 2
+  log_level: info
+  http_server: on
+  http_listen: 0.0.0.0
+  http_port: 2020
+  # disk buffer: nothing is lost while a destination is down
+  storage.path: /buffer
+  storage.sync: normal
+  storage.backlog.mem_limit: 8M
+  # retries: soon after a destination is back, then at most every minute
+  scheduler.base: 2
+  scheduler.cap: 60
+
+pipeline:
+  inputs:
+{% if fluentbit_journal | default(true) %}
+    - name: systemd
+      tag: journal
+      db: /buffer/journal.db
+      read_from_tail: on
+      strip_underscores: on
+      storage.type: filesystem
+{% endif %}
+    - name: tail
+      tag: openbao.audit
+      path: /openbao-logs/audit-forward.log
+      db: /buffer/openbao-audit.db
+      read_from_head: off
+      storage.type: filesystem
+{% for extra in fluentbit_extra_files | default([]) %}
+    - name: tail
+      tag: file.{{ loop.index }}
+      path: {{ extra }}
+      db: /buffer/file-{{ loop.index }}.db
+      read_from_head: on
+      storage.type: filesystem
+{% endfor %}
+
+  filters:
+    - name: record_modifier
+      match: "*"
+      record: fabric_host {{ hostname }}
+
+  outputs:
+{% if sl.host | default('') %}
+    - name: syslog
+      match: "*"
+      host: {{ sl.host }}
+      port: {{ sl.port | default(6514) }}
+      mode: {{ 'tls' if sl.tls | default(true) else 'tcp' }}
+      tls: {{ 'on' if sl.tls | default(true) else 'off' }}
+      tls.verify: on
+      tls.ca_file: /config/syslog-ca.crt
+      syslog_format: rfc5424
+      syslog_hostname_key: fabric_host
+      syslog_appname_preset: fabric
+      syslog_message_key: {{ sl.message_key | default('log') }}
+      storage.total_limit_size: {{ lf.buffer_limit | default('256M') }}
+      retry_limit: no_limits
+{% endif %}
+{% if es.url | default('') %}
+{% set u = es.url.split('://')[-1].split('/')[0] %}
+    - name: es
+      match: "*"
+      host: {{ u.split(':')[0] }}
+      port: {{ u.split(':')[1] if ':' in u else 443 }}
+      tls: on
+      tls.verify: on
+      tls.ca_file: /config/elastic-ca.crt
+      index: {{ es.index | default('fabric') }}
+      suppress_type_name: on
+{% if es.user | default('') %}
+      http_user: {{ es.user }}
+      http_passwd: ${LOG_ELASTIC_PASSWORD}
+{% endif %}
+      storage.total_limit_size: {{ lf.buffer_limit | default('256M') }}
+      retry_limit: no_limits
+{% endif %}
+{% if not (sl.host | default('')) and not (es.url | default('')) %}
+    - name: "null"
+      match: "*"
+{% endif %}

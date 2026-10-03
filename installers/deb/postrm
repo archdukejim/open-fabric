@@ -1,0 +1,39 @@
+#!/bin/sh
+# fabricctl postrm.
+#   apt remove: only the package goes; the running fabric install (services,
+#               CA, vault, directory, data) is left exactly as it is.
+#   apt purge:  fabric is uninstalled completely, after an export of all its
+#               data (config, secrets, CA, directory, vault with its key) to
+#               /var/backups/fabric/ (root only): apt cannot ask where. To choose
+#               the folder, or skip it, run `sudo fabricctl uninstall` first.
+set -e
+BASE=/opt
+CLI="$BASE/fabric/lib/fabriclib/cli.py"
+case "$1" in
+    remove)
+        if [ -f "$BASE/fabric/config/vars.yaml" ]; then
+            echo "fabricctl: package removed; fabric keeps running from $BASE/fabric (nothing deleted)."
+            echo "           Remove fabric completely: sudo apt purge fabricctl   (or: sudo fabricctl uninstall)"
+        fi
+        ;;
+    purge)
+        if [ -f "$CLI" ] && [ -f "$BASE/fabric/config/vars.yaml" ]; then
+            DEST="/var/backups/fabric/fabric-export-$(date +%Y%m%d-%H%M%S)"
+            echo "fabricctl: purging — exporting fabric's data to $DEST, then uninstalling fabric"
+            if ! python3 "$CLI" uninstall --yes --export "$DEST"; then
+                echo "fabricctl: uninstall did not finish; finish it with: sudo python3 $CLI uninstall --yes --no-export" >&2
+            fi
+        fi
+        ;;
+esac
+# Bytecode caches written next to the packaged code (by releases before the
+# wrapper stopped that) are not dpkg's files: remove them so the folder goes.
+case "$1" in
+    remove|purge)
+        if [ -d /usr/lib/fabricctl ]; then
+            find /usr/lib/fabricctl -name __pycache__ -type d -prune -exec rm -rf {} + 2>/dev/null || true
+            find /usr/lib/fabricctl -depth -type d -empty -delete 2>/dev/null || true
+        fi
+        ;;
+esac
+exit 0

@@ -1,0 +1,21 @@
+{% if install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
+// Kea DHCP-DDNS: may only change A/AAAA/DHCID in the DHCP subzone (design D16)
+key "kea-ddns" {
+    algorithm hmac-sha256;
+    secret "{{ kea_ddns_secret }}";
+};
+{% endif %}
+{% set fl = federation_links | default({'children': [], 'upstream': none}) %}
+{% for link in fl.children + ([fl.upstream] if fl.upstream else []) %}
+// Federation link to site {{ link.site }}: signs zone transfers both ways (design federation.md M4)
+key "{{ link.key }}" {
+    algorithm {{ link.algorithm }};
+    secret "{{ link.secret }}";
+};
+{% endfor %}
+{% for key in tsig_keys %}
+key "{{ key.name }}" {
+    algorithm {{ key.algorithm }};
+    secret "{{ tsig_secrets[key.name] }}";
+};
+{% endfor %}

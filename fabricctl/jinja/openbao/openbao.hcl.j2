@@ -1,0 +1,58 @@
+# OpenBao — rendered by fabricctl (fabric/jinja/openbao/openbao.hcl.j2).
+ui            = true
+cluster_name  = "fabric"
+api_addr      = "https://{{ hostname_openbao }}"
+cluster_addr  = "https://{{ ip_openbao }}:8201"
+# Integrated Raft storage: no mlock needed (and none possible without IPC_LOCK).
+disable_mlock = true
+log_level     = "info"
+
+storage "raft" {
+  path    = "/openbao/data"
+  node_id = "fabric-1"
+}
+
+listener "tcp" {
+  address         = "0.0.0.0:8200"
+  cluster_address = "0.0.0.0:8201"
+  tls_cert_file   = "/openbao/certs/fullchain.pem"
+  tls_key_file    = "/openbao/certs/privkey.pem"
+  tls_min_version = "tls12"
+}
+
+# Break glass (`fabricctl vault break-glass`): generate-root from the recovery
+# keys. OpenBao 2.5.3+ turns those unauthenticated endpoints off, rightly, on
+# the network listener; they are only on this socket, whose folder is on the
+# host under {{ openbao_admin_dir | default('/run/fabric/openbao-admin') }} (root and the openbao user only).
+listener "unix" {
+  address     = "/openbao/admin/bao.sock"
+  socket_mode = "0600"
+  disable_unauthed_generate_root_endpoints = false
+}
+
+# Every request is logged, secrets HMAC'd (OpenBao 2.x: audit devices are
+# declared here, not enabled through the API).
+# NEVER change a declared audit device: OpenBao refuses to become active when
+# a device's options differ from the audit table ("modifications to audit
+# devices are not allowed"), so an upgrade would lock the vault. Add a new
+# device instead (tests/render.py pins this block).
+audit "file" "file" {
+  description = "fabric: every request"
+  options {
+    file_path = "/openbao/logs/audit.log"
+  }
+}
+
+# The same audit trail, group-readable (openbao group) for the optional log
+# forwarder (Fluent Bit), which joins that group.
+audit "file" "forward" {
+  description = "fabric: every request, for log forwarding"
+  options {
+    file_path = "/openbao/logs/audit-forward.log"
+    mode      = "0640"
+  }
+}
+
+# The seal is in seal.hcl next to this file, written by fabricctl from the
+# unlock methods (key slots): the static seal reads the vault key that
+# fabric-unlock places in RAM just before start.

@@ -1,0 +1,5 @@
+# tests/consent
+
+| File | What |
+|---|---|
+| `run.py` | Asking before fabric changes the host (host-consent.md), no containers: unattended runs stop without `--approve` and approve nothing; `--approve all`; a re-run asks only about new changes; a declined recommended group is skipped with a warning and shown as a relaxation, a declined required one stops; the interactive question has no default; the `fabric-*` accounts in 600–649, an id taken by another account refused, the move from the previous `bind` (53) account; an older install's settings upgraded; the firewall question rule by rule; undoing: a host file kept once before fabric's first change and put back (a file fabric added removed, a symlink's target back, fabric's own file never taken for the original), daemon.json without a kept copy losing only fabric's values, `setup --undo` refusing what fabric needs, the resolver while BIND needs port 53, a never-asked install and an unattended run without `--yes`; uninstall's list of every kind of host change |

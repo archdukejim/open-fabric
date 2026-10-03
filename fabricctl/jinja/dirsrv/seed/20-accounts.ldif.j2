@@ -1,0 +1,28 @@
+# Role and service accounts, in this install's local suffix (ou=admins,o=<site>): each
+# install has its own, with its own passwords. Passwords come from fabric's secrets
+# (OpenBao) and are re-applied on every deploy, so rotating a secret there rotates it here.
+{% set accounts = [
+  ('super_admin', 'Directory super administrator', ldap_super_admin_password),
+  ('group_admin', 'Group administrator', ldap_group_admin_password),
+  ('user_creator_admin', 'User creation service', ldap_user_creator_password),
+  ('user_modifier_admin', 'User modification service', ldap_user_modifier_password),
+  ('keycloak_admin', 'Keycloak federation service', ldap_keycloak_password),
+  ('device_admin', 'Device and device-role management (fabric-agent)', ldap_device_admin_password),
+  ('radius_reader', 'FreeRADIUS: reads devices and device roles (802.1X)', ldap_radius_password),
+] %}
+{% for name, desc, pw in accounts %}
+
+dn: cn={{ name }},ou=admins,{{ ldap_local_dn }}
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: {{ name }}
+sn: {{ desc }}
+userPassword: {{ pw }}
+
+dn: cn={{ name }},ou=admins,{{ ldap_local_dn }}
+changetype: modify
+replace: userPassword
+userPassword: {{ pw }}
+{% endfor %}

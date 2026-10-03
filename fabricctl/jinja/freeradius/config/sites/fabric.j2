@@ -1,0 +1,39 @@
+# The RADIUS server switches and access points talk to.
+server fabric {
+	listen {
+		type = auth
+		ipaddr = *
+		port = 1812
+	}
+	listen {
+		type = acct
+		ipaddr = *
+		port = 1813
+	}
+
+	authorize {
+		# EAP (802.1X): the eap module drives the exchange; the device check
+		# runs in fabric-check-eap-tls once the certificate is verified.
+		eap {
+			ok = return
+		}
+		# Anything else is MAB (MAC authentication bypass): fabric_policy
+		# accepts only a device whose roles grant network:mab.
+		fabric_policy
+	}
+
+	authenticate {
+		eap
+	}
+
+	# Accounting is acknowledged and not stored.
+	accounting {
+		ok
+	}
+
+	post-auth {
+		Post-Auth-Type REJECT {
+			eap
+		}
+	}
+}

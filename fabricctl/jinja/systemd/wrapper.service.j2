@@ -1,0 +1,56 @@
+[Unit]
+Description=Docker Compose service for {{ item.service }}
+PartOf=fabric.target
+# fabric.target is reached once this service is up (and healthy): `fabricctl start` waits for it.
+Before=fabric.target
+# time-sync.target: certificates, TOTP and TSIG need the right clock (ntp.md); chrony-wait gives up after 90 s
+After=docker.service network-online.target time-sync.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
+
+Requires=docker.service network-online.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
+
+
+[Service]
+Type=simple
+WorkingDirectory={{ deploy_base_dir }}/{{ item.folder }}
+{% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
+{% if item.service == 'postgres' %}
+ExecStartPre=/bin/sleep 0
+{% elif item.service == 'keycloak' %}
+ExecStartPre=/bin/sleep 15
+{% else %}
+ExecStartPre=/bin/sleep 30
+{% endif %}
+{% endif %}
+{% if item.condition is defined %}
+# Start only if this succeeds (exit 1..254 = skipped, not failed).
+ExecCondition={{ item.condition }}
+{% endif %}
+ExecStartPre=-/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml rm -fsv
+ExecStart=/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml up --abort-on-container-exit
+ExecStop=/usr/bin/docker compose -f {{ deploy_base_dir }}/{{ item.folder }}/docker-compose.yml stop
+Restart=always
+# `compose up` exits 130 when stopped (fabricctl stop, the unlock kill switch): a clean stop, not a failure.
+SuccessExitStatus=130
+TimeoutStartSec=600
+TimeoutStopSec=30
+{% if item.healthcheck | default(true) %}
+# Wait for the container to be healthy. Missing or "created" means compose is still pulling or creating it (a
+# first start pulls the image): keep waiting. Only a container that ran and stopped is a failure; one that dies at
+# once also ends `compose up` (--abort-on-container-exit), which fails the unit by itself.
+ExecStartPost=/bin/bash -c 'for i in {1..120}; do \
+    state=$(docker inspect -f "{{"{{.State.Status}}"}}" {{ item.compose }} 2>/dev/null || echo "missing"); \
+    if [ "$state" = "exited" ] || [ "$state" = "dead" ]; then echo "Container {{ item.compose }} stopped."; exit 1; fi; \
+    if [ "$state" = "running" ]; then \
+        status=$(docker inspect -f "{{"{{.State.Health.Status}}"}}" {{ item.compose }} 2>/dev/null || echo "none"); \
+        if [ "$status" = "healthy" ]; then exit 0; elif [ "$status" = "unhealthy" ]; then exit 1; fi; \
+    fi; \
+    sleep 5; \
+done; echo "Container {{ item.compose }} not healthy after 10 minutes."; exit 1'
+{% endif %}
+
+{% for cmd in item.post | default([]) %}
+ExecStartPost={{ cmd }}
+{% endfor %}
+
+[Install]
+WantedBy=multi-user.target fabric.target

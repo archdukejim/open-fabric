@@ -1,0 +1,68 @@
+// Kea DHCPv4 — rendered by fabricctl (fabric/jinja/kea/kea-dhcp4.conf.j2) from `dhcp:` in vars.yaml.
+{% set d = dhcp | default({}) %}
+{% set ddns_zone = (d.ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
+{
+"Dhcp4": {
+    "interfaces-config": {
+        "interfaces": {{ d.interfaces | default([]) | to_json }},
+        "dhcp-socket-type": "raw"
+    },
+    "control-socket": { "socket-type": "unix", "socket-name": "/var/run/kea/kea4-ctrl-socket" },
+    "lease-database": { "type": "memfile", "persist": true, "name": "/var/lib/kea/kea-leases4.csv", "lfc-interval": 3600 },
+    "hooks-libraries": [
+        { "library": "libdhcp_lease_cmds.so" },
+        { "library": "libdhcp_stat_cmds.so" }
+    ],
+    "valid-lifetime": {{ d.lease_time | default(86400) }},
+    "renew-timer": {{ ((d.lease_time | default(86400)) / 2) | int }},
+    "rebind-timer": {{ ((d.lease_time | default(86400)) * 7 / 8) | int }},
+{% if d.ddns | default(true) %}
+    // hostnames of leases go to their own dynamic zone, never a zone fabric renders (design D16)
+    "dhcp-ddns": { "enable-updates": true, "server-ip": "{{ ip_kea_ddns }}", "server-port": 53001 },
+    "ddns-send-updates": true,
+    "ddns-qualifying-suffix": "{{ ddns_zone }}.",
+    "ddns-override-client-update": true,
+    "ddns-replace-client-name": "when-not-present",
+    "ddns-generated-prefix": "dhcp",
+    "ddns-conflict-resolution-mode": "check-with-dhcid",
+    "hostname-char-set": "[^A-Za-z0-9.-]",
+    "hostname-char-replacement": "-",
+{% endif %}
+{# fabric's own options (DNS, time, domain, search list); the admin's dhcp.options replace them by name and add
+   any others (dhcp-management.md) #}
+{% set fabric_options = [{"name": "domain-name-servers", "data": (d.dns | default([host_ip])) | join(', ')}] %}
+{% if (d.ntp is defined or ntp_serve | default(true)) and (d.ntp | default([host_ip])) %}
+{% set _ = fabric_options.append({"name": "ntp-servers", "data": (d.ntp | default([host_ip])) | join(', ')}) %}
+{% endif %}
+{% set _ = fabric_options.append({"name": "domain-name", "data": d.domain | default(domain)}) %}
+{% set _ = fabric_options.append({"name": "domain-search", "data": (([ddns_zone] if d.ddns | default(true) else []) + [domain]) | join(', ')}) %}
+    "option-data": {{ kea_option_data(fabric_options, d.options) | to_json }},
+{% if d.option_defs | default([]) %}
+    "option-def": {{ kea_option_defs(d.option_defs) | to_json }},
+{% endif %}
+{% if d.client_classes | default([]) %}
+    "client-classes": {{ kea_client_classes(d.client_classes) | to_json }},
+{% endif %}
+    "subnet4": [
+{% for s in d.subnets | default([]) %}
+        {
+            "id": {{ s.id | default(loop.index) }},
+            "subnet": "{{ s.subnet }}",
+{% set uc = {} %}
+{% for k in ['name', 'vlan', 'notes'] if s[k] is defined %}{% set _ = uc.update({k: s[k]}) %}{% endfor %}
+{% if uc %}
+            "user-context": {{ uc | to_json }},
+{% endif %}
+            "pools": [ {% for p in s.pools | default([]) %}{ "pool": "{{ p }}" }{{ ', ' if not loop.last }}{% endfor %} ],
+            "option-data": {{ kea_option_data([{"name": "routers", "data": s.routers}] if s.routers is defined and s.routers else [], s.options) | to_json }},
+            "reservations": [
+{% for r in s.reservations | default([]) %}
+                { "hw-address": "{{ r.mac | lower }}", "ip-address": "{{ r.ip }}"{% if r.hostname is defined and r.hostname %}, "hostname": "{{ r.hostname }}"{% endif %}{% if r.options is defined and r.options %}, "option-data": {{ kea_option_data([], r.options) | to_json }}{% endif %} }{{ ',' if not loop.last }}
+{% endfor %}
+            ]
+        }{{ ',' if not loop.last }}
+{% endfor %}
+    ],
+    "loggers": [ { "name": "kea-dhcp4", "output-options": [ { "output": "stdout" } ], "severity": "INFO" } ]
+}
+}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% macro opt_name(o) %}{{ o.name if o.name is defined else 'code ' ~ o.code }}{% endmacro %}
+{% macro csrf() %}<input type="hidden" name="csrf" value="{{ ctx.csrf }}">{% endmacro %}
+{% macro unset(o, scope, target) %}{% if can('dhcp:write') %}<form method="post" action="/kea/options/delete" class="inline">{{ csrf() }}<input type="hidden" name="option" value="{{ o.name if o.name is defined else o.code }}"><input type="hidden" name="scope" value="{{ scope }}"><input type="hidden" name="target" value="{{ target }}"><button class="ghost">Remove</button></form>{% endif %}{% endmacro %}
+{% block body %}
+<h1>Kea · DHCP <span class="opt">optional</span></h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+{% if not d.enabled %}
+<section class="card"><h2>DHCP is off</h2>
+<p class="muted">Kea 3.0 LTS hands out addresses on your LAN and registers clients' hostnames in their own DNS zone (<code>dhcp.&lt;domain&gt;</code>). Turn it on in <code>vars.yaml</code> and re-run setup:</p>
+<pre>install_kea: true
+dhcp:
+  interfaces: [eth0]
+  subnets:
+    - subnet: 192.168.4.0/22
+      name: main
+      pools: ["192.168.5.100 - 192.168.5.200"]
+      routers: 192.168.4.1</pre></section>
+{% else %}
+<section class="card"><h2>Subnets</h2>
+<p class="muted">Serving on {{ d.interfaces | join(', ') }} · lease {{ d.lease_time }} s{% if d.ddns_zone %} · hostnames registered in <code>{{ d.ddns_zone }}</code>{% endif %}. A VLAN here is a record of what the network is for: fabric does not configure switches.</p>
+<table><thead><tr><th>Subnet</th><th>Name</th><th>VLAN</th><th>Pools</th><th>Router</th><th>Notes</th><th>Reservations</th></tr></thead><tbody>
+{% for s in d.subnets %}<tr><td>{{ s.subnet }}</td><td>{{ s.name or '—' }}</td><td>{{ s.vlan or '—' }}</td><td>{{ (s.pools or []) | join(', ') or '—' }}</td><td>{{ s.routers or '—' }}</td><td>{{ s.notes or '' }}</td><td class="num">{{ (s.reservations or []) | length }}</td></tr>
+{% if can('dhcp:write') %}<tr><td colspan="7"><details><summary>Edit {{ s.name or s.subnet }}</summary>
+<form method="post" action="/kea/subnets/update" class="grid">{{ csrf() }}<input type="hidden" name="subnet" value="{{ s.subnet }}">
+<label>Name<input name="name" value="{{ s.name or '' }}" placeholder="iot"></label>
+<label>VLAN (1–4094, empty: none)<input name="vlan" value="{{ s.vlan or '' }}"></label>
+<label>Router<input name="router" value="{{ s.routers or '' }}"></label>
+<label>Notes<input name="notes" value="{{ s.notes or '' }}" maxlength="500"></label>
+<label>May overlap another site because… (federation; empty: never)<input name="allow_overlap" value="{{ s.allow_overlap or '' }}" maxlength="200"></label>
+<label>Add pools (one per line)<textarea name="add_pools" rows="2" placeholder="192.168.20.100 - 192.168.20.200"></textarea></label>
+<label>Remove pools (one per line)<textarea name="remove_pools" rows="2"></textarea></label>
+<div><button>Save</button></div></form>
+<form method="post" action="/kea/subnets/delete" class="grid">{{ csrf() }}<input type="hidden" name="subnet" value="{{ s.subnet }}">
+<label><input type="checkbox" name="force"> even with active leases (clients lose their address at renewal)</label>
+<div><button class="ghost">Remove subnet</button></div></form>
+</details></td></tr>{% endif %}
+{% endfor %}
+</tbody></table>
+{% if can('dhcp:write') %}<details><summary>Add a subnet</summary>
+<form method="post" action="/kea/subnets" class="grid">{{ csrf() }}
+<label>Network<input name="network" required placeholder="192.168.20.0/24"></label>
+<label>Name (one word, unique)<input name="name" required placeholder="iot"></label>
+<label>VLAN (optional)<input name="vlan" placeholder="20"></label>
+<label>Router<input name="router" placeholder="192.168.20.1"></label>
+<label>Pools (one per line)<textarea name="pools" rows="2" placeholder="192.168.20.100 - 192.168.20.200"></textarea></label>
+<label>Notes<input name="notes" maxlength="500" placeholder="IoT: internet only, trunked on switch1 port 24"></label>
+<label>May overlap another site because… (federation; usually empty)<input name="allow_overlap" maxlength="200"></label>
+<div><button>Add subnet</button></div></form>
+<p class="muted small">Saved, checked by Kea and applied at once; a subnet keeps its id, so other subnets' leases are not affected.</p></details>{% endif %}
+</section>
+
+<section class="card"><h2>Options</h2>
+<p class="muted">Any DHCP option — network boot (PXE), switch provisioning (ZTP), time, vendor options — for every subnet, one subnet, a client class or one reservation; the most specific wins. Kea checks every option before it is applied.</p>
+{% if d.overrides %}<p class="flash warn">Replacing fabric's own: {{ d.overrides | join(', ') }}</p>{% endif %}
+<table><thead><tr><th>Where</th><th>Option</th><th>Value</th><th></th></tr></thead><tbody>
+{% for o in d.options %}<tr><td>every subnet</td><td><code>{{ opt_name(o) }}</code></td><td>{{ o.data }}</td><td class="num">{{ unset(o, 'all', '') }}</td></tr>{% endfor %}
+{% for s in d.subnets %}{% for o in s.options or [] %}<tr><td>subnet {{ s.name or s.subnet }}</td><td><code>{{ opt_name(o) }}</code></td><td>{{ o.data }}</td><td class="num">{{ unset(o, 'subnet', s.subnet) }}</td></tr>{% endfor %}
+{% for r in s.reservations or [] %}{% for o in r.options or [] %}<tr><td>reservation {{ r.mac }}</td><td><code>{{ opt_name(o) }}</code></td><td>{{ o.data }}</td><td class="num">{{ unset(o, 'mac', r.mac) }}</td></tr>{% endfor %}{% endfor %}{% endfor %}
+{% for c in d.client_classes %}{% for o in c.options or [] %}<tr><td>class {{ c.name }}</td><td><code>{{ opt_name(o) }}</code></td><td>{{ o.data }}</td><td class="num">{{ unset(o, 'class', c.name) }}</td></tr>{% endfor %}{% endfor %}
+</tbody></table>
+{% if can('dhcp:write') %}<form method="post" action="/kea/options" class="grid">{{ csrf() }}
+<label>Where<select name="scope"><option value="all">every subnet</option><option value="subnet">a subnet</option><option value="class">a client class</option><option value="mac">a reservation</option></select></label>
+<label>Which (subnet name or network, class name, or MAC)<input name="target" placeholder="iot"></label>
+<label>Option (Kea name or code 1–254)<input name="option" required placeholder="tftp-server-name"></label>
+<label>Value<input name="data" placeholder="192.168.4.30"></label>
+<label><input type="checkbox" name="always_send"> send even when the client does not ask</label>
+<div><button>Set option</button></div></form>{% endif %}
+</section>
+
+<section class="card"><h2>Client classes</h2>
+<p class="muted">Clients matched by a Kea expression get their own options and network-boot settings, e.g. UEFI PXE: <code>option[93].hex == 0x0007</code>.</p>
+{% if d.client_classes %}<table><thead><tr><th>Class</th><th>Test</th><th>Next server</th><th>Boot file</th><th></th></tr></thead><tbody>
+{% for c in d.client_classes %}<tr><td>{{ c.name }}</td><td><code>{{ c.test }}</code></td><td>{{ c.next_server or '—' }}</td><td>{{ c.boot_file_name or '—' }}</td>
+<td class="num">{% if can('dhcp:write') %}<form method="post" action="/kea/classes/{{ c.name | urlencode }}/delete">{{ csrf() }}<button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table>{% else %}<p class="blank">No client classes.</p>{% endif %}
+{% if can('dhcp:write') %}<details><summary>Add a client class</summary>
+<form method="post" action="/kea/classes" class="grid">{{ csrf() }}
+<label>Name<input name="name" required placeholder="pxe-uefi"></label>
+<label>Test (Kea expression)<input name="test" required placeholder="option[93].hex == 0x0007"></label>
+<label>Next server (boot server's address, optional)<input name="next_server" placeholder="192.168.4.30"></label>
+<label>Boot file (optional)<input name="boot_file" placeholder="ipxe.efi"></label>
+<div><button>Add class</button></div></form>
+<p class="muted small">Then give it options above (Where: a client class).</p></details>{% endif %}
+</section>
+
+<section class="card"><h2>Reservations</h2>
+<table><thead><tr><th>MAC</th><th>Address</th><th>Hostname</th><th></th></tr></thead><tbody>
+{% for s in d.subnets %}{% for r in s.reservations or [] %}<tr><td><code>{{ r.mac }}</code></td><td>{{ r.ip }}</td><td>{{ r.hostname or '—' }}</td>
+<td class="num">{% if can('dhcp:write') %}<form method="post" action="/kea/reservations/{{ r.mac | urlencode }}/delete">{{ csrf() }}<button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}{% endfor %}
+</tbody></table>
+{% if can('dhcp:write') %}<form method="post" action="/kea/reservations" class="grid">{{ csrf() }}
+<label>MAC<input name="mac" required placeholder="aa:bb:cc:dd:ee:ff"></label>
+<label>Address (inside a subnet, outside its pools)<input name="ip" required placeholder="192.168.4.20"></label>
+<label>Hostname (optional)<input name="hostname" placeholder="printer"></label>
+<div><button>Reserve</button></div>
+</form>
+<p class="muted small">Saved and applied at once; the client gets the address at its next renewal.</p>{% endif %}
+</section>
+<section class="card"><h2>Leases <span class="muted">{{ d.leases | length }}</span></h2>
+{% if d.leases_error %}<p class="flash warn">{{ d.leases_error }}</p>{% endif %}
+{% if d.leases %}<table><thead><tr><th>Address</th><th>MAC</th><th>Hostname</th><th>Expires</th><th>State</th></tr></thead><tbody>
+{% for l in d.leases %}<tr><td>{{ l.ip }}</td><td><code>{{ l.mac }}</code></td><td>{{ l.hostname or '—' }}</td><td>{{ l.expires }}</td><td>{{ l.state }}</td></tr>{% endfor %}
+</tbody></table>{% elif not d.leases_error %}<p class="blank">No leases yet.</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

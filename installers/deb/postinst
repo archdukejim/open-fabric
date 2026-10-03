@@ -1,0 +1,13 @@
+#!/bin/sh
+# fabricctl postinst: never starts services or touches the network — installing
+# the package is always safe; `fabricctl setup` does the real work.
+set -e
+if [ "$1" = "configure" ]; then
+    if [ -f /opt/fabric/config/vars.yaml ]; then
+        echo "fabricctl: package updated. Apply it to the running install with: sudo fabricctl setup"
+    else
+        echo "fabricctl: installed. Next: sudo fabricctl setup   (unattended: --file vars.yaml --non-interactive --yes)"
+        echo "           example settings: /usr/share/doc/fabricctl/examples/vars.yaml"
+    fi
+fi
+exit 0
