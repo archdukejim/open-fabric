@@ -2,10 +2,14 @@ import ipaddress
 import re
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.dhcp.normalize_client_classes import normalize_client_classes
+from fabriclib.dhcp.normalize_option_defs import normalize_option_defs
+from fabriclib.dhcp.normalize_options import normalize_options
 
 IFACE_RE = re.compile(r"^[A-Za-z0-9._-]{1,15}$")
 LABEL_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
+NOTES_MAX = 500
 
 
 def _pool(text, net):
@@ -36,18 +40,52 @@ def _is_v4(text):
         return False
 
 
+def _subnet_ids(subnets):
+    """Purpose: a stable Kea subnet id for every subnet: leases are tied to it, so it must not follow the list's
+             order (removing a subnet would move another's leases).
+    Inputs:  subnets — the dhcp.subnets entries (dicts), some with "id".
+    Returns: list of ints, one per subnet: its own id; a subnet without one gets its position (1, 2, …) — what
+             fabric rendered before ids were stored — unless taken, else the next free number.
+    Fails:   ValidationError for an id that is not 1-4294967294 or used twice.
+    Feeds:   normalize_dhcp."""
+    taken = set()
+    for s in subnets:
+        if "id" in s:
+            i = s["id"]
+            if isinstance(i, bool) or not isinstance(i, int) or not 1 <= i <= 4294967294:
+                raise ValidationError(f"dhcp subnet {s.get('subnet')}: id is a number from 1 to 4294967294")
+            if i in taken:
+                raise ValidationError(f"dhcp subnet id {i} is used twice")
+            taken.add(i)
+    ids = []
+    for pos, s in enumerate(subnets, 1):
+        if "id" in s:
+            ids.append(s["id"])
+            continue
+        i = pos if pos not in taken else max(taken | set(ids) | {0}) + 1
+        taken.add(i)
+        ids.append(i)
+    return ids
+
+
 def normalize_dhcp(v):
     """Purpose: Check `dhcp:` (and that nothing static collides with it) before anything is rendered.
     Inputs:  v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4
-             network, host bits zero), pools, routers, reservations [{mac, ip, hostname}]}], ddns_subdomain (one label,
-             default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default
-             86400)}; dns (its A records).
-    Returns: a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` with subnets normalized (subnet as str,
-             reservations with lower-case colon MACs and a hostname only when set).
+             network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a
+             record, fabric configures no switch), notes (at most 500 characters), pools, routers, options,
+             reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes
+             (design dhcp-management.md §2), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default
+             this host), lease_time (int 300-2592000, default 86400)}; dns (its A records).
+    Returns: a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` normalized: every subnet with its id
+             (_subnet_ids: existing installs keep the ids their position gave them), subnet as str, name/vlan/
+             notes/options only when set, reservations with lower-case colon MACs and a hostname / options only
+             when set; options, option_defs and client_classes normalized (left out when empty).
     Fails:   ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4
-             subnet, a bad pool, a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
+             subnet, a bad or repeated id, name or vlan, notes too long, a bad pool or two pools overlapping
+             (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
              pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain
-             ValueError (not a ValidationError) if routers is not an IP address.
+             ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options,
+             normalize_option_defs and normalize_client_classes.
     Feeds:   deploy/check_settings (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py.
     Notes:   a static A record inside a pool is refused because Kea would hand that address out.
     """
@@ -65,15 +103,41 @@ def normalize_dhcp(v):
     lease = d.get("lease_time", 86400)
     if not isinstance(lease, int) or not 300 <= lease <= 2592000:
         raise ValidationError("dhcp.lease_time: seconds, 300 to 2592000")
-    subnets, pools_all, seen_ips, seen_macs = [], [], set(), set()
-    for s in d.get("subnets") or []:
+    raw = d.get("subnets") or []
+    if not isinstance(raw, list) or not all(isinstance(s, dict) for s in raw):
+        raise ValidationError("dhcp.subnets: a list of subnets")
+    subnets, pools_all, seen_ips, seen_macs, names, vlans = [], [], set(), set(), set(), set()
+    for s, sid in zip(raw, _subnet_ids(raw)):
         try:
             net = ipaddress.ip_network(str(s.get("subnet")), strict=True)
         except ValueError:
             raise ValidationError(f"dhcp subnet {s.get('subnet')!r}: a network like 192.168.4.0/22")
         if net.version != 4:
             raise ValidationError(f"{net}: DHCPv4 subnets only")
+        meta = {"id": sid}
+        if s.get("name"):
+            name = str(s["name"]).strip().lower()
+            if not LABEL_RE.match(name) or name in names:
+                raise ValidationError(f"{net}: name {s['name']!r} is one DNS label, unique on this site")
+            names.add(name)
+            meta["name"] = name
+        if s.get("vlan") is not None:
+            vlan = s["vlan"]
+            if isinstance(vlan, bool) or not isinstance(vlan, int) or not 1 <= vlan <= 4094 or vlan in vlans:
+                raise ValidationError(f"{net}: vlan {vlan!r} is a number from 1 to 4094, unique on this site")
+            vlans.add(vlan)
+            meta["vlan"] = vlan
+        if s.get("notes"):
+            notes = str(s["notes"])
+            if len(notes) > NOTES_MAX:
+                raise ValidationError(f"{net}: notes are at most {NOTES_MAX} characters")
+            meta["notes"] = notes
         pools = [_pool(p, net) for p in s.get("pools") or []]
+        for lo, hi in pools:
+            other = next((f"{a} - {b}" for a, b in pools_all if lo <= b and a <= hi), None)
+            if other:
+                raise ValidationError(f"pool {lo} - {hi} overlaps pool {other}")
+            pools_all.append((lo, hi))
         if s.get("routers") and ipaddress.ip_address(str(s["routers"])) not in net:
             raise ValidationError(f"{net}: router {s['routers']} is outside the subnet")
         reservations = []
@@ -94,9 +158,13 @@ def normalize_dhcp(v):
             host = r.get("hostname") or ""
             if host and not LABEL_RE.match(host):
                 raise ValidationError(f"reservation hostname {host!r}: one DNS label")
-            reservations.append({"mac": mac, "ip": str(ip), **({"hostname": host} if host else {})})
-        pools_all += pools
-        subnets.append({**s, "subnet": str(net), "reservations": reservations})
+            ropts = normalize_options(r.get("options"), f"reservation {mac}")
+            reservations.append({"mac": mac, "ip": str(ip), **({"hostname": host} if host else {}),
+                                 **({"options": ropts} if ropts else {})})
+        sopts = normalize_options(s.get("options"), f"subnet {meta.get('name', net)}")
+        subnets.append({**{k: x for k, x in s.items() if k not in ("name", "vlan", "notes", "options")},
+                        **meta, "subnet": str(net), "reservations": reservations,
+                        **({"options": sopts} if sopts else {})})
     if not subnets:
         raise ValidationError("dhcp.subnets: at least one subnet with a pool")
     for zone in (v.get("dns") or {}).values():
@@ -108,4 +176,12 @@ def normalize_dhcp(v):
             if any(lo <= ip <= hi for lo, hi in pools_all):
                 raise ValidationError(f"DNS record {rec.get('name')} = {ip} is inside a DHCP pool: make it a "
                                       "DHCP reservation, or move the pool")
-    return {**d, "subnets": subnets}
+    out = {**d, "subnets": subnets}
+    for key, fn in (("options", lambda x: normalize_options(x, "dhcp.options")),
+                    ("option_defs", normalize_option_defs), ("client_classes", normalize_client_classes)):
+        value = fn(d.get(key))
+        if value:
+            out[key] = value
+        else:
+            out.pop(key, None)
+    return out

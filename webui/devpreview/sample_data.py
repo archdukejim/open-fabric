@@ -15,12 +15,16 @@ SAMPLE_RADIUS = {"enabled": True, "server_name": "radius.home.arpa", "host_ip": 
                           "vlan": "-", "mac": "02:aa:bb:cc:dd:01", "nas": "switch1", "reason": "device disabled"}],
                  "log_error": ""}
 SAMPLE_DHCP = {"enabled": True, "interfaces": ["eth0"], "lease_time": 86400, "ddns_zone": "dhcp.home.arpa",
-               "subnets": [{"subnet": "192.168.1.0/24", "pools": ["192.168.1.100 - 192.168.1.199"],
-                            "routers": "192.168.1.1",
+               "subnets": [{"subnet": "192.168.1.0/24", "id": 1, "name": "main", "vlan": 1,
+                            "notes": "the house LAN", "pools": ["192.168.1.100 - 192.168.1.199"],
+                            "routers": "192.168.1.1", "options": [{"name": "ntp-servers", "data": "192.168.1.2"}],
                             "reservations": [{"mac": "aa:bb:cc:00:11:22", "ip": "192.168.1.20", "hostname": "printer"}]}],
                "leases": [{"ip": "192.168.1.101", "mac": "02:11:22:33:44:55", "hostname": "laptop1.dhcp.home.arpa",
                            "expires": "2026-09-30T08:00", "state": "active", "subnet_id": 1}],
-               "leases_error": ""}
+               "leases_error": "", "options": [{"name": "time-offset", "data": "-18000"}], "overrides": [],
+               "option_defs": [], "client_classes": [{"name": "pxe-uefi", "test": "option[93].hex == 0x0007",
+                                                      "next_server": "192.168.1.30", "boot_file_name": "ipxe.efi",
+                                                      "options": [{"name": "tftp-server-name", "data": "192.168.1.30"}]}]}
 SAMPLE = {
     "services": [("nginx", "active", "healthy"), ("bind9", "active", "healthy"), ("stepca", "active", "healthy"),
                  ("ldap", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),

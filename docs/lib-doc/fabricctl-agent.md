@@ -127,6 +127,41 @@
 | Feeds | do_GET, do_POST. |
 | Called by | `agent.handler.Handler.do_GET`, `agent.handler.Handler.do_POST` |
 
+## `fabricctl/lib/agent/post_dhcp.py`
+
+### `_vlan(data)`
+
+| | |
+|---|---|
+| Purpose | the vlan field: a number 1-4094 as text or number, "" to clear, absent to leave it. |
+| Inputs | data — the request body. |
+| Returns | KEEP (absent), None ("" or null) or int. |
+| Fails | ValidationError for anything else (-> 400). |
+| Feeds | post_dhcp. |
+| Called by | `agent.post_dhcp.post_dhcp` |
+
+### `_where(data)`
+
+| | |
+|---|---|
+| Purpose | where an option goes: subnet, class or mac from the body (none: every subnet). |
+| Inputs | data — the request body. |
+| Returns | {"subnet", "client_class", "mac"} (each str or None). |
+| Fails | ValidationError from read_text (-> 400). |
+| Feeds | post_dhcp. |
+| Called by | `agent.post_dhcp.post_dhcp` |
+
+### `post_dhcp(route, actor, data)`
+
+| | |
+|---|---|
+| Purpose | DHCP changes from the Kea tab, each saved and applied at once (design dhcp-management.md §4): POST /v1/dhcp/reservations[/<mac>/delete], /v1/dhcp/subnets, /v1/dhcp/subnets/update, /v1/dhcp/subnets/delete, /v1/dhcp/options, /v1/dhcp/options/delete, /v1/dhcp/classes, /v1/dhcp/classes/<name>/delete. |
+| Inputs | route — segments after /v1/; actor — the verified user; data — the body: mac, ip, hostname (reservations); network, name, vlan, router, pools, notes (add); subnet (name or network), name, vlan, router, notes, add_pools, remove_pools (update; a field left out stays, "" clears it); subnet, force (delete); option, data, subnet \| class \| mac, always_send (options); name, test, next_server, boot_file (classes). |
+| Returns | the saved item, with "applied" (bool) and the last 2000 characters of the apply's output. |
+| Fails | ValidationError from the readers and fabriclib (-> 400); RouteNotFound for another route. |
+| Feeds | agent/post_route.py. |
+| Called by | `agent.post_route.post_route` |
+
 ## `fabricctl/lib/agent/post_directory.py`
 
 ### `post_directory(route, actor, data)`
@@ -159,9 +194,9 @@
 
 | | |
 |---|---|
-| Purpose | DHCP reservations and 802.1X settings, each saved and applied at once: POST /v1/dhcp/reservations[/<mac>/delete], /v1/radius/clients[/<name>/rotate\|delete], /v1/radius/people[/<group>/delete]. |
-| Inputs | route — segments after /v1/; actor — the verified user; data — the body (mac, ip, hostname; name, address, message_authenticator, secret; group, vlan, priority). |
-| Returns | the saved item (reservation, mapping) or the client's secret (shown once), with "applied" (bool) and the last 2000 characters of the apply's output. |
+| Purpose | 802.1X settings, each saved and applied at once: POST /v1/radius/clients[/<name>/rotate\|delete], /v1/radius/people[/<group>/delete] (DHCP: post_dhcp). |
+| Inputs | route — segments after /v1/; actor — the verified user; data — the body (name, address, message_authenticator, secret; group, vlan, priority). |
+| Returns | the saved mapping or the client's secret (shown once), with "applied" (bool) and the last 2000 characters of the apply's output. |
 | Fails | ValidationError from the readers and fabriclib (-> 400); RouteNotFound for another route. |
 | Feeds | agent/post_route.py. |
 | Called by | `agent.post_route.post_route` |
@@ -230,7 +265,7 @@
 | Returns | list of str (at most 100); [] when absent or empty. |
 | Fails | ValidationError("<field> must be a list of text") for anything else (-> 400). |
 | Feeds | post_dns (TSIG hosts and types), post_pki (sans). |
-| Called by | `agent.post_dns.post_dns`, `agent.post_pki.post_pki` |
+| Called by | `agent.post_dhcp.post_dhcp`, `agent.post_dns.post_dns`, `agent.post_pki.post_pki` |
 
 ## `fabricctl/lib/agent/read_text.py`
 
@@ -243,7 +278,7 @@
 | Returns | str, the value; "" when absent. |
 | Fails | ValidationError("<field> must be text") when present but not a string (-> 400). |
 | Feeds | every post_* route module. |
-| Called by | `agent.post_directory.post_directory`, `agent.post_dns.post_dns`, `agent.post_network.post_network`, `agent.post_pki.post_pki`, `agent.post_route.post_route`, `agent.post_vault.post_vault` |
+| Called by | `agent.post_dhcp._where`, `agent.post_dhcp.post_dhcp`, `agent.post_directory.post_directory`, `agent.post_dns.post_dns`, `agent.post_network.post_network`, `agent.post_pki.post_pki`, `agent.post_route.post_route`, `agent.post_vault.post_vault` |
 
 ## `fabricctl/lib/agent/server.py`
 

@@ -2,6 +2,19 @@
 
 # webui
 
+## `webui/agentclient/add_client_class.py`
+
+### `add_client_class(name, test, next_server, boot_file)`
+
+| | |
+|---|---|
+| Purpose | Add a DHCP client class (Kea expression, optional network-boot fields). Agent route: POST /v1/dhcp/classes (dhcp:write), timeout 300 s. |
+| Inputs | name, test, next_server, boot_file — str as typed. No actor: the agent uses the token's user. |
+| Returns | {"class": saved dict, "applied", "output"}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
+| Called by | — (no static caller) |
+
 ## `webui/agentclient/add_radius_client.py`
 
 ### `add_radius_client(name, address, message_authenticator=True, secret='')`
@@ -39,6 +52,19 @@
 | Returns | {"reservation": saved dict with "mac" and "ip", "applied": bool, "output": last 2000 chars of apply}. |
 | Fails | the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401), PermissionDenied (403); ValidationError for bad values; a failed apply is applied=False (saved anyway). |
 | Feeds | webui/routes/post_action for /kea/reservations. |
+| Called by | — (no static caller) |
+
+## `webui/agentclient/add_subnet.py`
+
+### `add_subnet(network, name, vlan, router, pools, notes)`
+
+| | |
+|---|---|
+| Purpose | Add a DHCP subnet (name, VLAN record, router, pools, notes); the agent saves and applies it. Agent route: POST /v1/dhcp/subnets (dhcp:write), timeout 300 s. |
+| Inputs | network, name, vlan, router, notes — str as typed; pools — list of "first - last". No actor: the agent uses the token's user. |
+| Returns | {"subnet": saved dict, "applied": bool, "output": last 2000 chars of apply}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
 | Called by | — (no static caller) |
 
 ## `webui/agentclient/apply_changes.py`
@@ -137,7 +163,7 @@
 | Fails | AgentError — the socket is missing/refused/timed out (OSError), the reply is not JSON (ValueError), or any status other than 200/400/401/403 (e.g. 404 unknown route, 500 agent internal error); ValidationError — 400: fabriclib rejected the input; message is the agent's "error", safe to show; AuthError — 401: the agent did not accept the ID token (missing, expired, not valid); PermissionDenied — 403: the token lacks the permission the route needs (fabriclib/rbac/required_permission.py), the route is not in that table, or the peer uid is refused; TypeError from json.dumps if `body` is not JSON-serialisable (not wrapped). |
 | Feeds | every agent call in webui/agentclient/. |
 | Notes | webui/handler.Handler.handle_request maps these to: 400 page, redirect to /login, 403 page, 503 page. |
-| Called by | `webui.agentclient.add_radius_client.add_radius_client`, `webui.agentclient.add_record.add_record`, `webui.agentclient.add_reservation.add_reservation`, `webui.agentclient.apply_changes.apply_changes`, `webui.agentclient.audit.audit`, `webui.agentclient.ca_summary.ca_summary`, `webui.agentclient.convert_cert.convert_cert`, `webui.agentclient.create_person.create_person`, `webui.agentclient.create_tsig_key.create_tsig_key`, `webui.agentclient.delete_device.delete_device`, `webui.agentclient.delete_record.delete_record`, `webui.agentclient.delete_role.delete_role`, `webui.agentclient.delete_tsig_key.delete_tsig_key`, `webui.agentclient.describe_csr.describe_csr`, `webui.agentclient.device_overview.device_overview`, `webui.agentclient.dhcp_overview.dhcp_overview`, `webui.agentclient.inspect_pem.inspect_pem`, `webui.agentclient.issue_key_pair.issue_key_pair`, `webui.agentclient.link_device_cert.link_device_cert`, `webui.agentclient.list_issued.list_issued`, `webui.agentclient.list_people.list_people`, `webui.agentclient.list_tsig_keys.list_tsig_keys`, `webui.agentclient.list_zones.list_zones`, `webui.agentclient.map_radius_group.map_radius_group`, `webui.agentclient.radius_guides.radius_guides`, `webui.agentclient.radius_overview.radius_overview`, `webui.agentclient.read_audit.read_audit`, `webui.agentclient.remove_radius_client.remove_radius_client`, `webui.agentclient.remove_reservation.remove_reservation`, `webui.agentclient.reset_sign_in.reset_sign_in`, `webui.agentclient.reverse_zones.reverse_zones`, `webui.agentclient.rotate_radius_secret.rotate_radius_secret`, `webui.agentclient.rotate_tsig_key.rotate_tsig_key`, `webui.agentclient.save_device.save_device`, `webui.agentclient.save_role.save_role`, `webui.agentclient.service_status.service_status`, `webui.agentclient.sign_csr.sign_csr`, `webui.agentclient.unmap_radius_group.unmap_radius_group`, `webui.agentclient.vault_add_kmip.vault_add_kmip`, `webui.agentclient.vault_add_security_key.vault_add_security_key`, `webui.agentclient.vault_add_usb.vault_add_usb`, `webui.agentclient.vault_devices.vault_devices`, `webui.agentclient.vault_rotate.vault_rotate`, `webui.agentclient.vault_slot_action.vault_slot_action`, `webui.agentclient.vault_slots.vault_slots`, `webui.agentclient.vault_status.vault_status`, `webui.agentclient.version_info.version_info`, `webui.agentclient.zone_detail.zone_detail` |
+| Called by | `webui.agentclient.add_client_class.add_client_class`, `webui.agentclient.add_radius_client.add_radius_client`, `webui.agentclient.add_record.add_record`, `webui.agentclient.add_reservation.add_reservation`, `webui.agentclient.add_subnet.add_subnet`, `webui.agentclient.apply_changes.apply_changes`, `webui.agentclient.audit.audit`, `webui.agentclient.ca_summary.ca_summary`, `webui.agentclient.convert_cert.convert_cert`, `webui.agentclient.create_person.create_person`, `webui.agentclient.create_tsig_key.create_tsig_key`, `webui.agentclient.delete_device.delete_device`, `webui.agentclient.delete_record.delete_record`, `webui.agentclient.delete_role.delete_role`, `webui.agentclient.delete_tsig_key.delete_tsig_key`, `webui.agentclient.describe_csr.describe_csr`, `webui.agentclient.device_overview.device_overview`, `webui.agentclient.dhcp_overview.dhcp_overview`, `webui.agentclient.inspect_pem.inspect_pem`, `webui.agentclient.issue_key_pair.issue_key_pair`, `webui.agentclient.link_device_cert.link_device_cert`, `webui.agentclient.list_issued.list_issued`, `webui.agentclient.list_people.list_people`, `webui.agentclient.list_tsig_keys.list_tsig_keys`, `webui.agentclient.list_zones.list_zones`, `webui.agentclient.map_radius_group.map_radius_group`, `webui.agentclient.radius_guides.radius_guides`, `webui.agentclient.radius_overview.radius_overview`, `webui.agentclient.read_audit.read_audit`, `webui.agentclient.remove_client_class.remove_client_class`, `webui.agentclient.remove_radius_client.remove_radius_client`, `webui.agentclient.remove_reservation.remove_reservation`, `webui.agentclient.remove_subnet.remove_subnet`, `webui.agentclient.reset_sign_in.reset_sign_in`, `webui.agentclient.reverse_zones.reverse_zones`, `webui.agentclient.rotate_radius_secret.rotate_radius_secret`, `webui.agentclient.rotate_tsig_key.rotate_tsig_key`, `webui.agentclient.save_device.save_device`, `webui.agentclient.save_role.save_role`, `webui.agentclient.service_status.service_status`, `webui.agentclient.set_option.set_option`, `webui.agentclient.sign_csr.sign_csr`, `webui.agentclient.unmap_radius_group.unmap_radius_group`, `webui.agentclient.unset_option.unset_option`, `webui.agentclient.update_subnet.update_subnet`, `webui.agentclient.vault_add_kmip.vault_add_kmip`, `webui.agentclient.vault_add_security_key.vault_add_security_key`, `webui.agentclient.vault_add_usb.vault_add_usb`, `webui.agentclient.vault_devices.vault_devices`, `webui.agentclient.vault_rotate.vault_rotate`, `webui.agentclient.vault_slot_action.vault_slot_action`, `webui.agentclient.vault_slots.vault_slots`, `webui.agentclient.vault_status.vault_status`, `webui.agentclient.version_info.version_info`, `webui.agentclient.zone_detail.zone_detail` |
 
 ## `webui/agentclient/convert_cert.py`
 
@@ -384,7 +410,7 @@
 | Returns | the quoted str. |
 | Fails | never. |
 | Feeds | every function here that puts a zone, key, slot, device, role, MAC, group, client or uid in the path. |
-| Called by | `webui.agentclient.add_record.add_record`, `webui.agentclient.delete_device.delete_device`, `webui.agentclient.delete_record.delete_record`, `webui.agentclient.delete_role.delete_role`, `webui.agentclient.delete_tsig_key.delete_tsig_key`, `webui.agentclient.link_device_cert.link_device_cert`, `webui.agentclient.remove_radius_client.remove_radius_client`, `webui.agentclient.remove_reservation.remove_reservation`, `webui.agentclient.reset_sign_in.reset_sign_in`, `webui.agentclient.rotate_radius_secret.rotate_radius_secret`, `webui.agentclient.rotate_tsig_key.rotate_tsig_key`, `webui.agentclient.save_device.save_device`, `webui.agentclient.save_role.save_role`, `webui.agentclient.unmap_radius_group.unmap_radius_group`, `webui.agentclient.vault_slot_action.vault_slot_action`, `webui.agentclient.zone_detail.zone_detail` |
+| Called by | `webui.agentclient.add_record.add_record`, `webui.agentclient.delete_device.delete_device`, `webui.agentclient.delete_record.delete_record`, `webui.agentclient.delete_role.delete_role`, `webui.agentclient.delete_tsig_key.delete_tsig_key`, `webui.agentclient.link_device_cert.link_device_cert`, `webui.agentclient.remove_client_class.remove_client_class`, `webui.agentclient.remove_radius_client.remove_radius_client`, `webui.agentclient.remove_reservation.remove_reservation`, `webui.agentclient.reset_sign_in.reset_sign_in`, `webui.agentclient.rotate_radius_secret.rotate_radius_secret`, `webui.agentclient.rotate_tsig_key.rotate_tsig_key`, `webui.agentclient.save_device.save_device`, `webui.agentclient.save_role.save_role`, `webui.agentclient.unmap_radius_group.unmap_radius_group`, `webui.agentclient.vault_slot_action.vault_slot_action`, `webui.agentclient.zone_detail.zone_detail` |
 
 ## `webui/agentclient/radius_guides.py`
 
@@ -425,6 +451,19 @@
 | Feeds | webui/routes/get_page for "/audit". |
 | Called by | — (no static caller) |
 
+## `webui/agentclient/remove_client_class.py`
+
+### `remove_client_class(name)`
+
+| | |
+|---|---|
+| Purpose | Remove a DHCP client class and its options. Agent route: POST /v1/dhcp/classes/<name>/delete (dhcp:write), timeout 300 s. |
+| Inputs | name — the class. No actor: the agent uses the token's user. |
+| Returns | {"applied", "output"}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
+| Called by | — (no static caller) |
+
 ## `webui/agentclient/remove_radius_client.py`
 
 ### `remove_radius_client(name)`
@@ -449,6 +488,19 @@
 | Returns | {"applied": bool, "output": str last 2000 chars of apply}. |
 | Fails | the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401), PermissionDenied (403); ValidationError for an unknown MAC. |
 | Feeds | webui/routes/post_action for /kea/reservations/<mac>/delete. |
+| Called by | — (no static caller) |
+
+## `webui/agentclient/remove_subnet.py`
+
+### `remove_subnet(subnet, force)`
+
+| | |
+|---|---|
+| Purpose | Remove a DHCP subnet; refused with active leases unless force. Agent route: POST /v1/dhcp/subnets/delete (dhcp:write), timeout 300 s. |
+| Inputs | subnet — its name or network; force — bool. No actor: the agent uses the token's user. |
+| Returns | {"removed": network, "applied", "output"}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
 | Called by | — (no static caller) |
 
 ## `webui/agentclient/reset_sign_in.py`
@@ -542,6 +594,19 @@
 | Feeds | webui/routes/get_page for "/" (views.overview). |
 | Called by | — (no static caller) |
 
+## `webui/agentclient/set_option.py`
+
+### `set_option(option, data, where)`
+
+| | |
+|---|---|
+| Purpose | Set a DHCP option for every subnet, a subnet, a class or a reservation. Agent route: POST /v1/dhcp/options (dhcp:write), timeout 300 s. |
+| Inputs | option — name or code; data — its value; where — {"subnet"\|"class"\|"mac": value} or {} (every subnet), "always_send" optional. No actor: the agent uses the token's user. |
+| Returns | {"where": label, "option": saved dict, "applied", "output"}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
+| Called by | — (no static caller) |
+
 ## `webui/agentclient/sign_csr.py`
 
 ### `sign_csr(actor, csr, days, device='')`
@@ -566,6 +631,32 @@
 | Returns | {"applied": bool, "output": str}. |
 | Fails | the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401), PermissionDenied (403); ValidationError for a group that is not mapped. |
 | Feeds | webui/routes/post_action for /freeradius/people/<group>/delete. |
+| Called by | — (no static caller) |
+
+## `webui/agentclient/unset_option.py`
+
+### `unset_option(option, where)`
+
+| | |
+|---|---|
+| Purpose | Remove a DHCP option the admin set. Agent route: POST /v1/dhcp/options/delete (dhcp:write), timeout 300 s. |
+| Inputs | option — name or code; where — as set_option. No actor: the agent uses the token's user. |
+| Returns | {"where": label, "applied", "output"}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
+| Called by | — (no static caller) |
+
+## `webui/agentclient/update_subnet.py`
+
+### `update_subnet(subnet, fields)`
+
+| | |
+|---|---|
+| Purpose | Change a DHCP subnet's name, VLAN, router, notes or pools; the agent saves and applies it. Agent route: POST /v1/dhcp/subnets/update (dhcp:write), timeout 300 s. |
+| Inputs | subnet — its name or network; fields — dict of the fields to change (name, vlan, router, notes: "" clears; add_pools, remove_pools: lists). No actor: the agent uses the token's user. |
+| Returns | {"subnet": saved dict, "applied", "output"}. |
+| Fails | the call_agent exceptions: AgentError, ValidationError (400: what fabriclib refuses), AuthError (401), PermissionDenied (403); a failed apply is applied=False (saved anyway). |
+| Feeds | webui/routes/kea_post. |
 | Called by | — (no static caller) |
 
 ## `webui/agentclient/vault_add_kmip.py`
@@ -797,6 +888,30 @@
 | Feeds | dev_handler.DevHandler.do_POST (under the state lock). |
 | Called by | `webui.devpreview.dev_handler.DevHandler.do_POST` |
 
+## `webui/devpreview/dev_post_dhcp.py`
+
+### `_where(form)`
+
+| | |
+|---|---|
+| Purpose | where a dev-preview option goes: the sample's global list, or the first subnet / named class. |
+| Inputs | form — dict with scope and target. |
+| Returns | the list of options to change. |
+| Fails | never (falls back to the global list). |
+| Feeds | dev_post_dhcp. |
+| Called by | `webui.devpreview.dev_post_dhcp.dev_post_dhcp` |
+
+### `dev_post_dhcp(h, path, form)`
+
+| | |
+|---|---|
+| Purpose | the Kea tab's changes acted out on the sample data in memory (nothing applied): reservations, subnets, options, client classes. |
+| Inputs | h — the dev handler (send); path — /kea/…; form — dict. |
+| Returns | True when the path was handled (303 back to /kea with a message); None otherwise. |
+| Fails | never for form values (the dev preview does not validate; fabriclib does in production). |
+| Feeds | dev_post_action. |
+| Called by | — (no static caller) |
+
 ## `webui/devpreview/dev_post_directory.py`
 
 ### `dev_post_directory(h, path, form)`
@@ -829,8 +944,8 @@
 
 | | |
 |---|---|
-| Purpose | RADIUS groups and clients and Kea reservations, acted out on the sample data in memory. |
-| Inputs | h — the dev handler (send, ctx); path — /freeradius/people…, /freeradius/clients…, /kea/reservations…; form — dict. |
+| Purpose | RADIUS groups and clients, acted out on the sample data in memory (Kea: dev_post_dhcp). |
+| Inputs | h — the dev handler (send, ctx); path — /freeradius/people…, /freeradius/clients…; form — dict. |
 | Returns | True when the path was handled (a 303 with msg, or the shared-secret page); None otherwise. |
 | Fails | ValueError for a non-numeric vlan or priority (not caught: http.server closes the connection). |
 | Feeds | dev_post_action. |
@@ -1324,6 +1439,52 @@
 | Feeds | handler.Handler.handle_request. |
 | Called by | `webui.handler.Handler.handle_request` |
 
+## `webui/routes/kea_post.py`
+
+### `_pools(text)`
+
+| | |
+|---|---|
+| Purpose | pools typed one per line (or comma-separated) into a list. |
+| Inputs | text — str from a textarea. |
+| Returns | list of "first - last" strings, blanks dropped. |
+| Fails | never. |
+| Feeds | _kea. |
+| Called by | `webui.routes.kea_post._kea` |
+
+### `_where(form)`
+
+| | |
+|---|---|
+| Purpose | where an option form puts its option: "every subnet", a subnet, a class or a reservation. |
+| Inputs | form — dict with scope ("all", "subnet", "class", "mac") and target. |
+| Returns | {} or {"subnet"\|"class"\|"mac": target}. |
+| Fails | never (the agent refuses an unknown target). |
+| Feeds | _kea. |
+| Called by | `webui.routes.kea_post._kea` |
+
+### `_kea(parts, form)`
+
+| | |
+|---|---|
+| Purpose | one Kea tab change, saved and applied by fabric-agent: reservations, subnets, options, classes. |
+| Inputs | parts — segments after /kea/: ["reservations"], ["reservations", <mac>, "delete"], ["subnets"], ["subnets", "update"], ["subnets", "delete"], ["options"], ["options", "delete"], ["classes"], ["classes", <name>, "delete"]; form — dict. |
+| Returns | (agent result, message), or None for another path. |
+| Fails | agent errors propagate (saved_and_applied handles ValidationError). |
+| Feeds | kea_post. |
+| Called by | `webui.routes.kea_post.kea_post` |
+
+### `kea_post(h, parts, form)`
+
+| | |
+|---|---|
+| Purpose | route a signed-in, CSRF-checked POST under /kea/ (design dhcp-management.md §4). |
+| Inputs | h — the request handler; parts — URL-decoded segments after /kea/; form — dict. |
+| Returns | 303 back to /kea with the outcome (saved_and_applied); 404 for an unknown path. |
+| Fails | AgentError, PermissionDenied and AuthError propagate to handle_request. |
+| Feeds | post_action. |
+| Called by | `webui.routes.post_action.post_action` |
+
 ## `webui/routes/openbao_page.py`
 
 ### `openbao_page(h, ctx, query)`
@@ -1350,17 +1511,6 @@
 | Feeds | post_action. |
 | Called by | `webui.routes.post_action.post_action` |
 
-### `_kea(parts, form)`
-
-| | |
-|---|---|
-| Purpose | A Kea reservation: add one, or remove one by MAC (saved and applied by fabric-agent). |
-| Inputs | parts — segments after /kea/reservations: [] (form mac, ip, hostname) or [<mac>, 'delete']; form — dict. |
-| Returns | (agent result, message), or None for another path. |
-| Fails | agent errors propagate (saved_and_applied handles ValidationError). |
-| Feeds | post_action. |
-| Called by | `webui.routes.post_action.post_action` |
-
 ### `_radius_people(parts, form)`
 
 | | |
@@ -1377,7 +1527,7 @@
 | | |
 |---|---|
 | Purpose | Route a signed-in, CSRF-checked POST to its action. |
-| Inputs | h — the request handler (app, send, redirect, deny); sess — dict from find_session; path — str; form — dict from read_form. Routes: /logout; /bind9/zone/…; /apply; /stepca/…; /openbao/…; /dirsrv/…; /kea/reservations…; /freeradius/clients…; /freeradius/people…; /bind9/tsig/…. |
+| Inputs | h — the request handler (app, send, redirect, deny); sess — dict from find_session; path — str; form — dict from read_form. Routes: /logout; /bind9/zone/…; /apply; /stepca/…; /openbao/…; /dirsrv/…; /kea/… (reservations, subnets, options, classes); /freeradius/clients…; /freeradius/people…; /bind9/tsig/…. |
 | Returns | /logout: session dropped, LOGOUT audited, 303 to Keycloak's logout URL clearing the session cookie; /apply: 200 apply result; the rest as their route modules. |
 | Fails | 404 for an unknown path; agent errors propagate to handle_request (400, redirect to /login, 403, 503). |
 | Feeds | handler.Handler.handle_request. |
@@ -1406,8 +1556,8 @@
 | Inputs | h — the request handler (redirect, deny); tab — the page to go back to (/kea, /freeradius); change — a function returning (agent result with "applied" and "output", the message to show), or None for an unknown path. |
 | Returns | 303 to the tab with msg; with err when applying failed (the last 300 characters of its output) or the agent refused the input; 404 when change returned None. |
 | Fails | AgentError, PermissionDenied and AuthError propagate to handle_request. |
-| Feeds | post_action (Kea reservations, FreeRADIUS people). |
-| Called by | `webui.routes.post_action.post_action` |
+| Feeds | kea_post (the Kea tab), post_action (FreeRADIUS people). |
+| Called by | `webui.routes.kea_post.kea_post`, `webui.routes.post_action.post_action` |
 
 ## `webui/routes/stepca_page.py`
 

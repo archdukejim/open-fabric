@@ -5,6 +5,7 @@ from webui import views
 from webui.constants import SESSION_COOKIE
 from webui.httpio.cookie_header import cookie_header
 from webui.routes.dirsrv_post import dirsrv_post
+from webui.routes.kea_post import kea_post
 from webui.routes.radius_post import radius_post
 from webui.routes.saved_and_applied import saved_and_applied
 from webui.routes.stepca_post import stepca_post
@@ -21,20 +22,6 @@ def _segments(path, skip):
     Fails:   never.
     Feeds:   post_action."""
     return [urllib.parse.unquote(p) for p in path.split("/")[skip:]]
-
-
-def _kea(parts, form):
-    """Purpose: A Kea reservation: add one, or remove one by MAC (saved and applied by fabric-agent).
-    Inputs:  parts — segments after /kea/reservations: [] (form mac, ip, hostname) or [<mac>, 'delete']; form — dict.
-    Returns: (agent result, message), or None for another path.
-    Fails:   agent errors propagate (saved_and_applied handles ValidationError).
-    Feeds:   post_action."""
-    if not parts:
-        res = actions.add_reservation(form.get("mac", ""), form.get("ip", ""), form.get("hostname", ""))
-        return res, f"Reserved {res['reservation']['ip']} for {res['reservation']['mac']}."
-    if len(parts) == 2 and parts[1] == "delete":
-        return actions.remove_reservation(parts[0]), f"Reservation for {parts[0]} removed."
-    return None
 
 
 def _radius_people(parts, form):
@@ -56,7 +43,7 @@ def post_action(h, sess, path, form):
     """Purpose: Route a signed-in, CSRF-checked POST to its action.
     Inputs:  h — the request handler (app, send, redirect, deny); sess — dict from find_session; path — str; form —
              dict from read_form. Routes: /logout; /bind9/zone/…; /apply; /stepca/…; /openbao/…; /dirsrv/…;
-             /kea/reservations…; /freeradius/clients…; /freeradius/people…; /bind9/tsig/….
+             /kea/… (reservations, subnets, options, classes); /freeradius/clients…; /freeradius/people…; /bind9/tsig/….
     Returns: /logout: session dropped, LOGOUT audited, 303 to Keycloak's logout URL clearing the session cookie;
              /apply: 200 apply result; the rest as their route modules.
     Fails:   404 for an unknown path; agent errors propagate to handle_request (400, redirect to /login, 403, 503).
@@ -80,8 +67,8 @@ def post_action(h, sess, path, form):
         return vault_post(h, sess, _segments(path, 2), form)
     if path.startswith("/dirsrv/"):
         return dirsrv_post(h, sess, _segments(path, 2), form)
-    if path.startswith("/kea/reservations"):
-        return saved_and_applied(h, "/kea", lambda: _kea(_segments(path, 3), form))
+    if path.startswith("/kea/"):
+        return kea_post(h, _segments(path, 2), form)
     if path.startswith("/freeradius/clients"):
         return radius_post(h, sess, _segments(path, 3), form)
     if path.startswith("/freeradius/people"):

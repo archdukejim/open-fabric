@@ -42,6 +42,10 @@ request. Root peers (the host itself) are not asked for a token.
   POST /v1/roles {actor, name, fields} | /v1/roles/<name> {actor, fields} | /v1/roles/<name>/delete
   POST /v1/people {uid, first, last, email} | /v1/people/<uid>/reset   (one-time password returned)
   GET  /v1/dhcp | POST /v1/dhcp/reservations {mac, ip, hostname} | /v1/dhcp/reservations/<mac>/delete
+       POST /v1/dhcp/subnets {network, name, vlan, router, pools, notes} | /v1/dhcp/subnets/update {subnet, ...}
+            | /v1/dhcp/subnets/delete {subnet, force} | /v1/dhcp/options {option, data, subnet|class|mac,
+            always_send} | /v1/dhcp/options/delete | /v1/dhcp/classes {name, test, next_server, boot_file}
+            | /v1/dhcp/classes/<name>/delete
   GET  /v1/radius | /v1/radius/guides (setup guides, Windows scripts) | POST /v1/radius/clients {name, address, message_authenticator, secret?}
        | /v1/radius/clients/<name>/rotate {secret?} | /v1/radius/clients/<name>/delete   (secret returned once)
        | /v1/radius/people {group, vlan, priority} | /v1/radius/people/<group>/delete

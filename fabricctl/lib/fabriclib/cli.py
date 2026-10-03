@@ -9,8 +9,8 @@
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
-  fabricctl dhcp status|leases|reserve|unreserve
-                                 DHCP (optional Kea): subnets, leases, reservations
+  fabricctl dhcp status|leases|reserve|unreserve|add-subnet|set-subnet|remove-subnet|option|class
+                                 DHCP (optional Kea): subnets, leases, reservations, options, client classes
   fabricctl radius status|log|add-client|rotate-secret|remove-client
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
   fabricctl federation status|enable|disable|invite|invitations|revoke

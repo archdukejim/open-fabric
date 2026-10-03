@@ -7,6 +7,13 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `add_radius_client.py` | Add a RADIUS client (switch or access point); saved and applied at once. Agent route: POST /v1/radius/clients (radius:admin), timeout 300 s. |
 | `add_record.py` | Add one DNS record to a zone in vars.yaml (published by the next apply). Agent route: POST /v1/zones/<key>/records (dns:write). |
 | `add_reservation.py` | Reserve an IP for a MAC; the agent saves it and applies at once (Kea reloads with it). Agent route: POST /v1/dhcp/reservations (dhcp:write), timeout 300 s. |
+| `add_subnet.py` | Add a DHCP subnet (name, VLAN record, router, pools, notes); saved and applied |
+| `update_subnet.py` | Change a DHCP subnet's name, VLAN, router, notes or pools |
+| `remove_subnet.py` | Remove a DHCP subnet (refused with active leases unless forced) |
+| `set_option.py` | Set a DHCP option for every subnet, a subnet, a client class or a reservation |
+| `unset_option.py` | Remove a DHCP option the admin set |
+| `add_client_class.py` | Add a DHCP client class (Kea expression, network-boot fields) |
+| `remove_client_class.py` | Remove a DHCP client class |
 | `apply_changes.py` | Render and apply the configuration (as `fabricctl --apply`) on the host. Agent route: POST /v1/apply (dns:write), timeout 960 s. |
 | `audit.py` | Write a login event to the audit log, best effort so an agent outage never blocks a denial. Agent route: POST /v1/events (session). |
 | `ca_summary.py` | The CA certificates, where devices fetch them, and the signing limits, for the Step-CA page. Agent route: GET /v1/pki/ca (pki:read). |

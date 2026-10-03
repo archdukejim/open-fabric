@@ -11,6 +11,9 @@ import yaml
 
 from fabriclib.common.read_images_lock import read_images_lock
 from fabriclib.common.read_packages_lock import read_packages_lock
+from fabriclib.dhcp.kea_client_classes import kea_client_classes
+from fabriclib.dhcp.kea_option_data import kea_option_data
+from fabriclib.dhcp.kea_option_defs import kea_option_defs
 
 
 class _RelativeEnvironment(jinja2.Environment):
@@ -90,7 +93,8 @@ def jinja_env(template_dir):
     """Purpose: build the Jinja2 environment every fabric template is rendered with: fabric's Ansible-style
              filters, the `match` test, relative extends, trim_blocks/lstrip_blocks, trailing newlines kept.
     Inputs:  template_dir — str, the jinja folder (fabricctl/jinja); its parent must hold images.lock.yaml.
-    Returns: jinja2.Environment with globals images_lock ({name: ref}), packages_lock and lookup.
+    Returns: jinja2.Environment with globals images_lock ({name: ref}), packages_lock, lookup and the Kea helpers
+             (kea_option_data, kea_option_defs, kea_client_classes).
     Fails:   yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is
              unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest.
              A missing lock file gives empty globals, not an error.
@@ -112,6 +116,9 @@ def jinja_env(template_dir):
     })
     env.tests["match"] = lambda value, pattern: bool(re.search(pattern, str(value)))
     env.globals["lookup"] = _lookup
+    # Kea (dhcp-management.md): fabric's option format to Kea's JSON, one helper per Kea list
+    env.globals.update(kea_option_data=kea_option_data, kea_option_defs=kea_option_defs,
+                       kea_client_classes=kea_client_classes)
     # image_* defaults: the validated, digest-pinned refs (fabric/images.lock.yaml)
     env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(os.path.dirname(template_dir)).items()}
     env.globals["packages_lock"] = read_packages_lock(os.path.dirname(template_dir))

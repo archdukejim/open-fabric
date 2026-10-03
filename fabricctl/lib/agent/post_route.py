@@ -1,4 +1,5 @@
 from agent.post_directory import post_directory
+from agent.post_dhcp import post_dhcp
 from agent.post_dns import post_dns
 from agent.post_network import post_network
 from agent.post_pki import post_pki
@@ -28,7 +29,9 @@ def post_route(route, actor, data, perms):
     area = route[:1]
     if area in (["zones"], ["tsig"]):
         return post_dns(route, actor, data)
-    if area in (["dhcp"], ["radius"]):
+    if area == ["dhcp"]:
+        return post_dhcp(route, actor, data)
+    if area == ["radius"]:
         return post_network(route, actor, data)
     if area == ["pki"] and len(route) == 2:
         return post_pki(route[1], actor, data)

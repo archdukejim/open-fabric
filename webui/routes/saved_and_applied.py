@@ -11,7 +11,7 @@ def saved_and_applied(h, tab, change):
     Returns: 303 to the tab with msg; with err when applying failed (the last 300 characters of its output) or the agent
              refused the input; 404 when change returned None.
     Fails:   AgentError, PermissionDenied and AuthError propagate to handle_request.
-    Feeds:   post_action (Kea reservations, FreeRADIUS people)."""
+    Feeds:   kea_post (the Kea tab), post_action (FreeRADIUS people)."""
     try:
         done = change()
         if done is None:

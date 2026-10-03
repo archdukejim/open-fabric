@@ -1,6 +1,6 @@
 # Design: DHCP management — subnets, pools, options, client classes, address plan
 
-Status: **planned** (owner request 2026-10-01). Milestone M8 of
+Status: **being built** (owner request 2026-10-01): settings, Kea's own check, commands and the Kea tab done; the address plan across sites (§5) next. Milestone M8 of
 [federation.md](federation.md) §8a, built before M5; the address plan rides
 on M5's site-to-upstream sync and is shown in M6's Federation tab.
 

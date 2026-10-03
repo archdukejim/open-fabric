@@ -2,6 +2,19 @@
 
 # fabriclib-dhcp
 
+## `fabricctl/lib/fabriclib/dhcp/add_client_class.py`
+
+### `add_client_class(actor, name, test, next_server=None, boot_file_name=None, server_hostname=None, source='cli')`
+
+| | |
+|---|---|
+| Purpose | add a DHCP client class: clients matching a Kea expression (e.g. UEFI PXE, a switch vendor for ZTP) get their own options and network-boot fields (design dhcp-management.md §2). Options are added with `set_option(client_class=…)`. Applied by the next apply; Kea checks the expression then. |
+| Inputs | actor — who asks (audit); name — class name; test — Kea expression ("option[93].hex == 0x0007"); next_server — IPv4 address of the boot server or None; boot_file_name, server_hostname — or None; source — "cli" or "web". |
+| Returns | the saved class (normalized). |
+| Fails | ValidationError: a class of that name exists; errors of normalize_client_classes; OSError / yaml.YAMLError from edit_dhcp. |
+| Feeds | run_dhcp_command (class add), agent route POST /v1/dhcp/classes. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
 ## `fabricctl/lib/fabriclib/dhcp/add_reservation.py`
 
 ### `add_reservation(actor, mac, ip, hostname='', source='cli')`
@@ -14,7 +27,73 @@
 | Fails | ValidationError "… is not an IPv4 address" (unparseable), "… is in none of the DHCP subnets", or one from normalize_dhcp (bad MAC, inside a pool, duplicate MAC or address, bad hostname, a static A record in a pool); plain ValueError from normalize_dhcp if a stored router is not an address; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
 | Feeds | agent route POST /v1/dhcp/reservations (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command (reserve). |
 | Notes | the whole `dhcp:` block is validated again (as if install_kea were on) before anything is saved. |
-| Called by | `agent.post_network.post_network`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+## `fabricctl/lib/fabriclib/dhcp/add_subnet.py`
+
+### `add_subnet(actor, subnet, name, vlan=None, router=None, pools=(), notes='', source='cli')`
+
+| | |
+|---|---|
+| Purpose | add a DHCP subnet with its name, VLAN record, router, pools and notes (design dhcp-management.md §4). Applied by the next apply. |
+| Inputs | actor — who asks (audit); subnet — network ("192.168.20.0/24"); name — one DNS label, unique; vlan — 1-4094 or None (a record: fabric configures no switch); router — address in the subnet or None; pools — "first - last" strings; notes — free text (at most 500 characters); source — "cli" or "web". |
+| Returns | the saved subnet (normalized, with its new id: one above the highest in use, never reused while the others keep theirs). |
+| Fails | ValidationError from normalize_dhcp (bad network, name or vlan taken, pool outside the subnet or overlapping another, …); OSError / yaml.YAMLError from edit_dhcp. |
+| Feeds | run_dhcp_command (add-subnet), agent route POST /v1/dhcp/subnets. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+## `fabricctl/lib/fabriclib/dhcp/check_kea_config.py`
+
+### `check_kea_config(image, name, text)`
+
+| | |
+|---|---|
+| Purpose | have Kea itself check a configuration before fabric installs it (`kea-dhcp4 -t`, design dhcp-management.md §3): a file Kea would refuse is never put in place. |
+| Inputs | image — fabric's Kea image (vars image_kea); name — "kea-dhcp4.conf" or "kea-dhcp-ddns.conf"; text — the rendered configuration. |
+| Returns | True when Kea accepted it; None when it could not be checked (no Docker, or the image is not built yet — a first install: the service start then reports any error). |
+| Fails | ValidationError with Kea's own message when it refuses the file; subprocess.TimeoutExpired (60 s). |
+| Feeds | dhcp/deploy_kea. |
+| Notes | runs in a throwaway container on the host network (Kea checks the served interfaces exist; `-t` opens no socket), with no capabilities and a read-only root; the file is mounted read-only. |
+| Called by | `fabriclib.dhcp.common.edit_dhcp.edit_dhcp`, `fabriclib.dhcp.deploy_kea.deploy_kea` |
+
+## `fabricctl/lib/fabriclib/dhcp/common/edit_dhcp.py`
+
+### `edit_dhcp(actor, event, change, source='cli')`
+
+| | |
+|---|---|
+| Purpose | one change to `dhcp:` in vars.yaml, the way every DHCP command makes it: under the vars lock, on the normalized settings (so every subnet keeps a stored id), the whole block checked again — by fabric and, when DHCP is on, by Kea itself on the configuration it would get — before it is saved, then audited. Applied by the next apply. |
+| Inputs | actor — who asks (audit); event — the audit event (e.g. "DHCP_SUBNET_ADD"); change — function(dhcp) that changes the dict in place and returns (result, audit detail str); source — "cli" or "web". |
+| Returns | (result of change, the saved dhcp block). |
+| Fails | ValidationError from change, normalize_dhcp or Kea's check (check_kea_config: an option Kea does not know, data that does not fit, a class expression it cannot parse) — nothing is saved then, so a refused change never breaks the next apply; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
+| Feeds | dhcp/add_subnet, update_subnet, remove_subnet, set_option, unset_option, add_client_class, remove_client_class. |
+| Called by | `fabriclib.dhcp.add_client_class.add_client_class`, `fabriclib.dhcp.add_subnet.add_subnet`, `fabriclib.dhcp.remove_client_class.remove_client_class`, `fabriclib.dhcp.remove_subnet.remove_subnet`, `fabriclib.dhcp.set_option.set_option`, `fabriclib.dhcp.unset_option.unset_option`, `fabriclib.dhcp.update_subnet.update_subnet` |
+
+## `fabricctl/lib/fabriclib/dhcp/common/find_subnet.py`
+
+### `find_subnet(dhcp, which)`
+
+| | |
+|---|---|
+| Purpose | the subnet a command names, by its name or its network. |
+| Inputs | dhcp — the normalized dhcp block; which — a subnet name ("iot") or network ("192.168.20.0/24"). |
+| Returns | the subnet dict (the object inside dhcp, so changes to it are saved). |
+| Fails | ValidationError "no DHCP subnet …". |
+| Feeds | dhcp/update_subnet, remove_subnet, set_option, unset_option. |
+| Called by | `fabriclib.dhcp.common.option_target.option_target`, `fabriclib.dhcp.remove_subnet.remove_subnet`, `fabriclib.dhcp.update_subnet.update_subnet` |
+
+## `fabricctl/lib/fabriclib/dhcp/common/option_target.py`
+
+### `option_target(dhcp, subnet=None, client_class=None, mac=None)`
+
+| | |
+|---|---|
+| Purpose | the place an option command works on: every subnet (global), one subnet, one client class, or one reservation (design dhcp-management.md §2: Kea's levels, most specific wins). |
+| Inputs | dhcp — the normalized dhcp block; subnet — a subnet's name or network; client_class — a class name; mac — a reservation's MAC. At most one of the three. |
+| Returns | (the dict whose "options" list to change, a label for messages and the audit). |
+| Fails | ValidationError: more than one place given; no such subnet, class or reservation. |
+| Feeds | dhcp/set_option, dhcp/unset_option. |
+| Called by | `fabriclib.dhcp.set_option.set_option`, `fabriclib.dhcp.unset_option.unset_option` |
 
 ## `fabricctl/lib/fabriclib/dhcp/deploy_kea.py`
 
@@ -25,7 +104,7 @@
 | Purpose | Write Kea's files under <deploy_base>/kea during apply: kea-dhcp4.conf and kea-dhcp-ddns.conf, the lease folder, the control-socket folder, and the DHCP subzone's file (created once). |
 | Inputs | v — the rendered vars: deploy_base_dir, service_users.kea.gid and the normalized `dhcp`. secrets — fabric's secrets dict (kea_ddns_secret). jinja_env — Jinja environment holding kea/*.j2. bind_uid, bind_gid — int owner of the subzone file. |
 | Returns | True if either Kea config file changed (Kea must be restarted), else False. |
-| Fails | KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors from ensure_ddns_zone. |
+| Fails | ValidationError when Kea refuses a changed file (check_kea_config: `kea-dhcp4 -t` in fabric's Kea image; nothing is written then); KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors from ensure_ddns_zone. |
 | Feeds | deploy/deploy_optional_parts (apply); tests/kea/run.py. |
 | Notes | config/ is root:kea 0750 and the files root:kea 0640 (the DDNS one holds the TSIG secret); leases/ and run/ are root 0750. The subzone file is made only when dhcp.ddns is not false. |
 | Called by | `fabriclib.deploy.deploy_optional_parts.deploy_optional_parts` |
@@ -38,7 +117,7 @@
 |---|---|
 | Purpose | What the Kea tab and `fabricctl dhcp` show: whether DHCP is on, its interfaces, subnets (pools, router, reservations), lease time, the DHCP subzone and the live leases. Read-only. |
 | Inputs | v — the vars dict (install_kea, dhcp, domain). Asks Kea's control socket when DHCP is on. |
-| Returns | {"enabled", "interfaces", "subnets", "lease_time", "ddns_zone" ("" when DDNS is off), "leases" (see list_leases), "leases_error" (why leases could not be read, else "")}. |
+| Returns | {"enabled", "interfaces", "subnets" (with id, name, vlan, notes, options as stored), "lease_time", "ddns_zone" ("" when DDNS is off), "options" (the admin's, every subnet), "overrides" (names of the options fabric sets itself that the admin replaced: domain-name-servers, ntp-servers, domain-name, domain-search, routers — shown so a replaced default is never a surprise), "option_defs", "client_classes", "leases" (see list_leases), "leases_error" (why leases could not be read, else "")}. |
 | Fails | never for Kea problems — a ValidationError from list_leases goes into leases_error; other errors propagate. |
 | Feeds | agent route GET /v1/dhcp (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command (status, leases). |
 | Called by | `agent.get_route.<module>`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
@@ -57,6 +136,19 @@
 | Notes | fabric never rewrites this file, so hosts registered by DDNS survive every apply (design D16). |
 | Called by | `fabriclib.dhcp.deploy_kea.deploy_kea` |
 
+## `fabricctl/lib/fabriclib/dhcp/kea_client_classes.py`
+
+### `kea_client_classes(classes)`
+
+| | |
+|---|---|
+| Purpose | Kea's client-classes list from dhcp.client_classes (as normalize_client_classes returns them). |
+| Inputs | classes — list of {name, test, options, next_server, server_hostname, boot_file_name}, or None. |
+| Returns | list of Kea client-class dicts: name, test, option-data, and next-server / server-hostname / boot-file-name when set (network boot). |
+| Fails | never. |
+| Feeds | jinja_env global kea_client_classes (kea/kea-dhcp4.conf.j2). |
+| Called by | — (no static caller) |
+
 ## `fabricctl/lib/fabriclib/dhcp/kea_command.py`
 
 ### `kea_command(v, command, arguments=None, timeout=10)`
@@ -70,6 +162,43 @@
 | Feeds | list_leases. |
 | Called by | `fabriclib.dhcp.list_leases.list_leases` |
 
+## `fabricctl/lib/fabriclib/dhcp/kea_option_data.py`
+
+### `_key(o)`
+
+| | |
+|---|---|
+| Purpose | what makes two options the same option. |
+| Inputs | o — an option (fabric's or Kea's form). |
+| Returns | (name or code, space). |
+| Fails | never. |
+| Feeds | kea_option_data. |
+| Called by | `fabriclib.dhcp.kea_option_data.kea_option_data` |
+
+### `kea_option_data(defaults, options)`
+
+| | |
+|---|---|
+| Purpose | Kea's option-data list for one level (global, class, subnet, reservation): the options fabric sets itself there, with the admin's options of the same name replacing them, then the admin's others. |
+| Inputs | defaults — fabric's own options at that level ([{name, data}], e.g. domain-name-servers, routers); options — the admin's options as normalize_options returns them (None: none). |
+| Returns | list of Kea option-data dicts (name or code, data, space when not dhcp4, csv-format, always-send). |
+| Fails | never (the options were checked by normalize_dhcp). |
+| Feeds | jinja_env global kea_option_data (kea/kea-dhcp4.conf.j2), dhcp/dhcp_overview (overrides shown). |
+| Called by | `fabriclib.dhcp.kea_client_classes.kea_client_classes` |
+
+## `fabricctl/lib/fabriclib/dhcp/kea_option_defs.py`
+
+### `kea_option_defs(defs)`
+
+| | |
+|---|---|
+| Purpose | Kea's option-def list from dhcp.option_defs (as normalize_option_defs returns them). |
+| Inputs | defs — list of {name, code, type, space, array, record_types}, or None. |
+| Returns | list of Kea option-def dicts (name, code, type, space — dhcp4 by default —, array, record-types). |
+| Fails | never. |
+| Feeds | jinja_env global kea_option_defs (kea/kea-dhcp4.conf.j2). |
+| Called by | — (no static caller) |
+
 ## `fabricctl/lib/fabriclib/dhcp/list_leases.py`
 
 ### `list_leases(v)`
@@ -81,7 +210,20 @@
 | Returns | [{"ip", "mac", "hostname", "subnet_id", "state" (active / declined / expired / ?), "expires" (local time, ISO to the minute; "" without cltt)}], latest expiry first. |
 | Fails | ValidationError from kea_command; ValueError or TypeError on malformed lease fields. |
 | Feeds | dhcp_overview; tests/kea/run.py. |
-| Called by | `fabriclib.dhcp.dhcp_overview.dhcp_overview` |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.dhcp_overview.dhcp_overview`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+## `fabricctl/lib/fabriclib/dhcp/normalize_client_classes.py`
+
+### `normalize_client_classes(classes)`
+
+| | |
+|---|---|
+| Purpose | check dhcp.client_classes (design dhcp-management.md §2): clients matched by a Kea expression get their own options, and for network boot their own next-server, server name and boot file. |
+| Inputs | classes — list of {name, test, options, next_server, server_hostname, boot_file_name}, or None. |
+| Returns | the classes normalized (options through normalize_options; empty optional fields left out). |
+| Fails | ValidationError: not a list; a bad, reserved (ALL, KNOWN, VENDOR_CLASS_…) or repeated name; no test or one longer than 1000 characters or with a line break; next_server not an IPv4 address; a server name or boot file longer than 63 / 127 characters; errors of normalize_options. Kea checks the expression itself (deploy_kea). |
+| Feeds | normalize_dhcp, dhcp/add_client_class. |
+| Called by | — (no static caller) |
 
 ## `fabricctl/lib/fabriclib/dhcp/normalize_dhcp.py`
 
@@ -107,17 +249,67 @@
 | Feeds | normalize_dhcp (dhcp.ntp). |
 | Called by | `fabriclib.dhcp.normalize_dhcp.normalize_dhcp` |
 
+### `_subnet_ids(subnets)`
+
+| | |
+|---|---|
+| Purpose | a stable Kea subnet id for every subnet: leases are tied to it, so it must not follow the list's order (removing a subnet would move another's leases). |
+| Inputs | subnets — the dhcp.subnets entries (dicts), some with "id". |
+| Returns | list of ints, one per subnet: its own id; a subnet without one gets its position (1, 2, …) — what fabric rendered before ids were stored — unless taken, else the next free number. |
+| Fails | ValidationError for an id that is not 1-4294967294 or used twice. |
+| Feeds | normalize_dhcp. |
+| Called by | `fabriclib.dhcp.normalize_dhcp.normalize_dhcp` |
+
 ### `normalize_dhcp(v)`
 
 | | |
 |---|---|
 | Purpose | Check `dhcp:` (and that nothing static collides with it) before anything is rendered. |
-| Inputs | v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4 network, host bits zero), pools, routers, reservations [{mac, ip, hostname}]}], ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default 86400)}; dns (its A records). |
-| Returns | a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` with subnets normalized (subnet as str, reservations with lower-case colon MACs and a hostname only when set). |
-| Fails | ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4 subnet, a bad pool, a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain ValueError (not a ValidationError) if routers is not an IP address. |
+| Inputs | v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4 network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a record, fabric configures no switch), notes (at most 500 characters), pools, routers, options, reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes (design dhcp-management.md §2), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default this host), lease_time (int 300-2592000, default 86400)}; dns (its A records). |
+| Returns | a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` normalized: every subnet with its id (_subnet_ids: existing installs keep the ids their position gave them), subnet as str, name/vlan/ notes/options only when set, reservations with lower-case colon MACs and a hostname / options only when set; options, option_defs and client_classes normalized (left out when empty). |
+| Fails | ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4 subnet, a bad or repeated id, name or vlan, notes too long, a bad pool or two pools overlapping (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options, normalize_option_defs and normalize_client_classes. |
 | Feeds | deploy/check_settings (apply, before rendering), add_reservation; tests/kea/run.py, tests/render.py. |
 | Notes | a static A record inside a pool is refused because Kea would hand that address out. |
-| Called by | `fabriclib.deploy.check_settings.check_settings`, `fabriclib.dhcp.add_reservation.add_reservation` |
+| Called by | `fabriclib.deploy.check_settings.check_settings`, `fabriclib.dhcp.add_reservation.add_reservation`, `fabriclib.dhcp.common.edit_dhcp.edit_dhcp` |
+
+## `fabricctl/lib/fabriclib/dhcp/normalize_option_defs.py`
+
+### `normalize_option_defs(defs)`
+
+| | |
+|---|---|
+| Purpose | check dhcp.option_defs: options Kea has no name for (vendor or site-specific, e.g. a ZTP URL on code 239), so options can then name them (design dhcp-management.md §2). |
+| Inputs | defs — list of {name, code, type, space (default dhcp4), array, record_types}, or None. |
+| Returns | the definitions normalized (space only when not dhcp4; array only when true; record_types only for type record). |
+| Fails | ValidationError: not a list; a bad name or space; code outside 1-254; an unknown type; a name or (space, code) defined twice; record without record_types. Kea refuses a definition that clashes with a standard option (deploy_kea's check). |
+| Feeds | normalize_dhcp. |
+| Called by | — (no static caller) |
+
+## `fabricctl/lib/fabriclib/dhcp/normalize_options.py`
+
+### `normalize_options(options, where)`
+
+| | |
+|---|---|
+| Purpose | check a list of DHCP options as fabric stores them (design dhcp-management.md §2): Kea's own option-data at global, class, subnet or reservation level. |
+| Inputs | options — list of {name \| code, data, space (default dhcp4), csv_format, always_send}, or None; where — what the list belongs to, for messages ("dhcp.options", "subnet iot", ...). |
+| Returns | the options normalized: name (lower-case) or code (int), data (str, "" allowed for options without data), space only when not dhcp4, csv_format / always_send only when given (bool). [] for None. |
+| Fails | ValidationError: not a list; an entry that is not a mapping; neither or both of name and code; a bad name or space; a code outside 1-254; data not text or longer than 1024 characters (or with a line break); csv_format / always_send not true/false; the same option twice in one list. Kea's own check (deploy_kea, `kea-dhcp4 -t`) decides whether a name exists and its data fits. |
+| Feeds | normalize_dhcp (every level), dhcp/set_option. |
+| Called by | `fabriclib.dhcp.normalize_client_classes.normalize_client_classes`, `fabriclib.dhcp.normalize_dhcp.normalize_dhcp`, `fabriclib.dhcp.set_option.set_option` |
+
+## `fabricctl/lib/fabriclib/dhcp/remove_client_class.py`
+
+### `remove_client_class(actor, name, source='cli')`
+
+| | |
+|---|---|
+| Purpose | remove a DHCP client class and its options. Applied by the next apply. |
+| Inputs | actor — who asks (audit); name — the class; source — "cli" or "web". |
+| Returns | None. |
+| Fails | ValidationError "no client class …"; OSError / yaml.YAMLError from edit_dhcp. |
+| Feeds | run_dhcp_command (class remove), agent route POST /v1/dhcp/classes/<name>/delete. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
 ## `fabricctl/lib/fabriclib/dhcp/remove_reservation.py`
 
@@ -131,7 +323,20 @@
 | Fails | ValidationError "no reservation for …"; OSError or yaml.YAMLError from vars_lock / load_vars / save_vars / write_audit. |
 | Feeds | agent route POST /v1/dhcp/reservations/<mac>/delete (fabric-agent, fabricctl/lib/agent/, called by the web UI); run_dhcp_command (unreserve). |
 | Notes | only the first subnet holding the MAC is changed (normalize_dhcp keeps MACs unique). |
-| Called by | `agent.post_network.post_network`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+## `fabricctl/lib/fabriclib/dhcp/remove_subnet.py`
+
+### `remove_subnet(actor, which, leases, force=False, source='cli')`
+
+| | |
+|---|---|
+| Purpose | remove a DHCP subnet, its pools and reservations (design dhcp-management.md §3-4). The other subnets keep their ids, so their leases stay theirs. Applied by the next apply. |
+| Inputs | actor — who asks (audit); which — the subnet's name or network; leases — the leases Kea holds now (list_leases; [] when Kea is off; None when they could not be read — then only with force); force — remove even with active leases in it; source. |
+| Returns | the removed subnet's network (str). |
+| Fails | ValidationError: no such subnet; active leases in it, or leases unknown, without force (says how many); the last subnet (normalize_dhcp: DHCP needs one — turn DHCP off instead); OSError / yaml.YAMLError. |
+| Feeds | run_dhcp_command (remove-subnet), agent route POST /v1/dhcp/subnets/<subnet>/delete. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
 ## `fabricctl/lib/fabriclib/dhcp/run_dhcp_command.py`
 
@@ -143,16 +348,99 @@
 | Inputs | args — list of str (looks for "--no-apply"). Runs apply_changes as root (interactive.py --apply). |
 | Returns | 0 if skipped or applied; 1 if apply failed (last 2000 characters of its output on stdout). |
 | Fails | subprocess.TimeoutExpired (900 s) and OSError from apply_changes propagate. |
-| Feeds | run_dhcp_command (reserve, unreserve). |
+| Feeds | run_dhcp_command (every change). |
+| Called by | `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+### `_parse(args)`
+
+| | |
+|---|---|
+| Purpose | split command arguments into positionals and --flag values (repeatable flags keep every value). |
+| Inputs | args — list of str. |
+| Returns | (positionals, {flag: [values]}, set of bare flags such as --force). |
+| Fails | ValidationError for a value flag without a value. |
+| Feeds | run_dhcp_command. |
+| Called by | `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+### `_vlan(text)`
+
+| | |
+|---|---|
+| Purpose | a --vlan value: a number, or none to clear. |
+| Inputs | text — str. |
+| Returns | int, or None for "none". |
+| Fails | ValidationError for anything else. |
+| Feeds | run_dhcp_command. |
+| Called by | `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+### `_show(d)`
+
+| | |
+|---|---|
+| Purpose | print `fabricctl dhcp status`. |
+| Inputs | d — dhcp_overview's result (DHCP on). |
+| Returns | None. |
+| Fails | never. |
+| Feeds | run_dhcp_command. |
+| Called by | `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+### `_keep(one, flag)`
+
+| | |
+|---|---|
+| Purpose | a set-subnet value: KEEP when the flag is absent, None for "none", else the text. |
+| Inputs | one — {flag: last value}; flag — e.g. "--router". |
+| Returns | KEEP, None or str. |
+| Fails | never. |
+| Feeds | run_dhcp_command (set-subnet). |
 | Called by | `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
 
 ### `run_dhcp_command(v, argv)`
 
 | | |
 |---|---|
-| Purpose | `fabricctl dhcp status \| leases \| reserve \| unreserve` — the Kea tab's operations without the web UI. |
-| Inputs | v — the rendered vars (SetupContext.load_state().vars). argv — list of str after "dhcp" (default status): reserve <mac> <ip> [<hostname>], unreserve <mac>, each with optional --no-apply. |
+| Purpose | `fabricctl dhcp …` — the Kea tab's operations without the web UI: status, leases, reservations, subnets (name, VLAN record, notes, router, pools), options at every level, client classes (design dhcp-management.md §4). |
+| Inputs | v — the rendered vars (SetupContext.load_state().vars); argv — list of str after "dhcp" (default status); see USAGE. Every change applies at once unless --no-apply. |
 | Returns | exit status: 0 success; 1 a ValidationError, unreadable leases or a failed apply; 2 usage (printed to stderr). |
 | Fails | ValidationError is caught (exit 1); other exceptions propagate. |
 | Feeds | fabriclib/cli.py (`fabricctl dhcp`). |
 | Called by | `fabriclib.cli.main` |
+
+## `fabricctl/lib/fabriclib/dhcp/set_option.py`
+
+### `set_option(actor, option, data, subnet=None, client_class=None, mac=None, always_send=None, source='cli')`
+
+| | |
+|---|---|
+| Purpose | set any DHCP option (PXE, ZTP, NTP, vendor options…) for every subnet, one subnet, one client class or one reservation (design dhcp-management.md §2, §4); an option of the same name there is replaced. Kea checks the name and data at the next apply (deploy_kea) and refuses what it cannot send. |
+| Inputs | actor — who asks (audit); option — a Kea option name ("tftp-server-name") or code ("66", 1-254); data — its value (Kea's text form, e.g. "192.168.4.30" or "a, b"); subnet / client_class / mac — where (none: every subnet); always_send — send even when the client did not ask (None: Kea's default); source — "cli" or "web". |
+| Returns | (label of the place, the saved option). |
+| Fails | ValidationError from option_target or normalize_options (bad name, code or data); OSError / yaml.YAMLError from edit_dhcp. |
+| Feeds | run_dhcp_command (option set), agent route POST /v1/dhcp/options. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+## `fabricctl/lib/fabriclib/dhcp/unset_option.py`
+
+### `unset_option(actor, option, subnet=None, client_class=None, mac=None, source='cli')`
+
+| | |
+|---|---|
+| Purpose | remove an option the admin set (design dhcp-management.md §4); an option fabric sets itself (DNS, time, domain) comes back to fabric's value. Applied by the next apply. |
+| Inputs | actor — who asks (audit); option — its name or code; subnet / client_class / mac — where (none: every subnet); source — "cli" or "web". |
+| Returns | label of the place. |
+| Fails | ValidationError: the option is not set there; errors of option_target; OSError / yaml.YAMLError. |
+| Feeds | run_dhcp_command (option unset), agent route POST /v1/dhcp/options/delete. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |
+
+## `fabricctl/lib/fabriclib/dhcp/update_subnet.py`
+
+### `update_subnet(actor, which, name=KEEP, vlan=KEEP, router=KEEP, notes=KEEP, add_pools=(), remove_pools=(), source='cli')`
+
+| | |
+|---|---|
+| Purpose | change a DHCP subnet's name, VLAN record, router, notes or pools (design dhcp-management.md §4). Its network and id stay (leases are tied to the id). Applied by the next apply. |
+| Inputs | actor — who asks (audit); which — the subnet's name or network; name, vlan, router, notes — the new value, None or "" to clear it, KEEP (default) to leave it; add_pools / remove_pools — "first - last" strings; source — "cli" or "web". |
+| Returns | the saved subnet (normalized). |
+| Fails | ValidationError: no such subnet; a pool to remove that is not there; anything normalize_dhcp refuses (name or vlan taken, pool overlapping, a reservation now inside a pool, …); OSError / yaml.YAMLError. |
+| Feeds | run_dhcp_command (set-subnet), agent route POST /v1/dhcp/subnets/<subnet>. |
+| Called by | `agent.post_dhcp.post_dhcp`, `fabriclib.dhcp.run_dhcp_command.run_dhcp_command` |

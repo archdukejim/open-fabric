@@ -28,31 +28,36 @@
     "hostname-char-set": "[^A-Za-z0-9.-]",
     "hostname-char-replacement": "-",
 {% endif %}
-    "option-data": [
-        { "name": "domain-name-servers", "data": "{{ d.dns | default([host_ip]) | join(', ') }}" },
-{% if d.ntp is defined or ntp_serve | default(true) %}
-        // time (ntp.md): this host's chrony unless dhcp.ntp names others ([] hands out none)
-{% if (d.ntp | default([host_ip])) %}
-        { "name": "ntp-servers", "data": "{{ d.ntp | default([host_ip]) | join(', ') }}" },
+{# fabric's own options (DNS, time, domain, search list); the admin's dhcp.options replace them by name and add
+   any others (dhcp-management.md) #}
+{% set fabric_options = [{"name": "domain-name-servers", "data": (d.dns | default([host_ip])) | join(', ')}] %}
+{% if (d.ntp is defined or ntp_serve | default(true)) and (d.ntp | default([host_ip])) %}
+{% set _ = fabric_options.append({"name": "ntp-servers", "data": (d.ntp | default([host_ip])) | join(', ')}) %}
 {% endif %}
+{% set _ = fabric_options.append({"name": "domain-name", "data": d.domain | default(domain)}) %}
+{% set _ = fabric_options.append({"name": "domain-search", "data": (([ddns_zone] if d.ddns | default(true) else []) + [domain]) | join(', ')}) %}
+    "option-data": {{ kea_option_data(fabric_options, d.options) | to_json }},
+{% if d.option_defs | default([]) %}
+    "option-def": {{ kea_option_defs(d.option_defs) | to_json }},
 {% endif %}
-        { "name": "domain-name", "data": "{{ d.domain | default(domain) }}" },
-        { "name": "domain-search", "data": "{{ ([ddns_zone] if d.ddns | default(true) else []) | join(', ') }}{{ ', ' if d.ddns | default(true) else '' }}{{ domain }}" }
-    ],
+{% if d.client_classes | default([]) %}
+    "client-classes": {{ kea_client_classes(d.client_classes) | to_json }},
+{% endif %}
     "subnet4": [
 {% for s in d.subnets | default([]) %}
         {
-            "id": {{ loop.index }},
+            "id": {{ s.id | default(loop.index) }},
             "subnet": "{{ s.subnet }}",
-            "pools": [ {% for p in s.pools | default([]) %}{ "pool": "{{ p }}" }{{ ', ' if not loop.last }}{% endfor %} ],
-            "option-data": [
-{% if s.routers is defined %}
-                { "name": "routers", "data": "{{ s.routers }}" }
+{% set uc = {} %}
+{% for k in ['name', 'vlan', 'notes'] if s[k] is defined %}{% set _ = uc.update({k: s[k]}) %}{% endfor %}
+{% if uc %}
+            "user-context": {{ uc | to_json }},
 {% endif %}
-            ],
+            "pools": [ {% for p in s.pools | default([]) %}{ "pool": "{{ p }}" }{{ ', ' if not loop.last }}{% endfor %} ],
+            "option-data": {{ kea_option_data([{"name": "routers", "data": s.routers}] if s.routers is defined and s.routers else [], s.options) | to_json }},
             "reservations": [
 {% for r in s.reservations | default([]) %}
-                { "hw-address": "{{ r.mac | lower }}", "ip-address": "{{ r.ip }}"{% if r.hostname is defined and r.hostname %}, "hostname": "{{ r.hostname }}"{% endif %} }{{ ',' if not loop.last }}
+                { "hw-address": "{{ r.mac | lower }}", "ip-address": "{{ r.ip }}"{% if r.hostname is defined and r.hostname %}, "hostname": "{{ r.hostname }}"{% endif %}{% if r.options is defined and r.options %}, "option-data": {{ kea_option_data([], r.options) | to_json }}{% endif %} }{{ ',' if not loop.last }}
 {% endfor %}
             ]
         }{{ ',' if not loop.last }}

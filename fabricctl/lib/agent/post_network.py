@@ -1,7 +1,5 @@
 from agent.read_text import read_text
 from agent.route_not_found import RouteNotFound
-from fabriclib.dhcp.add_reservation import add_reservation
-from fabriclib.dhcp.remove_reservation import remove_reservation
 from fabriclib.radius.add_radius_client import add_radius_client
 from fabriclib.radius.map_radius_group import map_radius_group
 from fabriclib.radius.remove_radius_client import remove_radius_client
@@ -11,22 +9,15 @@ from fabriclib.system.apply_changes import apply_changes
 
 
 def post_network(route, actor, data):
-    """Purpose: DHCP reservations and 802.1X settings, each saved and applied at once: POST
-             /v1/dhcp/reservations[/<mac>/delete], /v1/radius/clients[/<name>/rotate|delete],
-             /v1/radius/people[/<group>/delete].
-    Inputs:  route — segments after /v1/; actor — the verified user; data — the body (mac, ip, hostname; name, address,
+    """Purpose: 802.1X settings, each saved and applied at once: POST /v1/radius/clients[/<name>/rotate|delete],
+             /v1/radius/people[/<group>/delete] (DHCP: post_dhcp).
+    Inputs:  route — segments after /v1/; actor — the verified user; data — the body (name, address,
              message_authenticator, secret; group, vlan, priority).
-    Returns: the saved item (reservation, mapping) or the client's secret (shown once), with "applied" (bool) and the
+    Returns: the saved mapping or the client's secret (shown once), with "applied" (bool) and the
              last 2000 characters of the apply's output.
     Fails:   ValidationError from the readers and fabriclib (-> 400); RouteNotFound for another route.
     Feeds:   agent/post_route.py."""
-    if route == ["dhcp", "reservations"]:
-        result = {"reservation": add_reservation(actor, read_text(data, "mac"), read_text(data, "ip"),
-                                                 read_text(data, "hostname"), source="web")}
-    elif len(route) == 4 and route[:2] == ["dhcp", "reservations"] and route[3] == "delete":
-        remove_reservation(actor, route[2], source="web")
-        result = {}
-    elif route == ["radius", "clients"]:
+    if route == ["radius", "clients"]:
         result = {"secret": add_radius_client(actor, read_text(data, "name"), read_text(data, "address"),
                                               bool(data.get("message_authenticator", True)),
                                               read_text(data, "secret") or None, source="web")}

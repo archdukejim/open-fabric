@@ -1,6 +1,7 @@
 import os
 
 from fabriclib.common.write_file_if_changed import write_file_if_changed
+from fabriclib.dhcp.check_kea_config import check_kea_config
 from fabriclib.dhcp.ensure_ddns_zone import ensure_ddns_zone
 
 
@@ -12,7 +13,8 @@ def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
              jinja_env — Jinja environment holding kea/*.j2.
              bind_uid, bind_gid — int owner of the subzone file.
     Returns: True if either Kea config file changed (Kea must be restarted), else False.
-    Fails:   KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors
+    Fails:   ValidationError when Kea refuses a changed file (check_kea_config: `kea-dhcp4 -t` in fabric's Kea
+             image; nothing is written then); KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors
              from ensure_ddns_zone.
     Feeds:   deploy/deploy_optional_parts (apply); tests/kea/run.py.
     Notes:   config/ is root:kea 0750 and the files root:kea 0640 (the DDNS one holds the TSIG secret); leases/ and run/
@@ -26,9 +28,14 @@ def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
         os.chown(path, *owner)
         os.chmod(path, mode)
     ctx = {**v, "kea_ddns_secret": secrets.get("kea_ddns_secret", "")}
+    texts = {name: jinja_env.get_template(f"kea/{name}.j2").render(**ctx)
+             for name in ("kea-dhcp4.conf", "kea-dhcp-ddns.conf")}
+    for name, text in texts.items():            # both checked before either is written: a refusal changes nothing
+        dest = os.path.join(base, "config", name)
+        if not os.path.exists(dest) or open(dest).read() != text:
+            check_kea_config(v.get("image_kea", "fabric/kea:local"), name, text)
     changed = False
-    for name in ("kea-dhcp4.conf", "kea-dhcp-ddns.conf"):
-        text = jinja_env.get_template(f"kea/{name}.j2").render(**ctx)
+    for name, text in texts.items():
         changed |= write_file_if_changed(os.path.join(base, "config", name), text, 0o640, 0, kgid)
     if (v.get("dhcp") or {}).get("ddns", True):
         ensure_ddns_zone(v, bind_uid, bind_gid)

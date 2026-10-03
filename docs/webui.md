@@ -177,7 +177,7 @@ them). The list lives in `fabriclib/rbac/permissions.py` (`PERMISSIONS`,
 | `tsig:manage` | Create TSIG keys, give them a new secret, delete them | BIND9 → TSIG keys |
 | `dns:filter` | Open AdGuard Home's own UI (lists, upstreams, rules, clients) with the optional DNS filter | `https://adguard.<domain>` (oauth2-proxy checks it) |
 | `dhcp:read` | See DHCP subnets, reservations and leases | Kea tab |
-| `dhcp:write` | Add and remove DHCP reservations (applied at once) | Kea tab |
+| `dhcp:write` | Add and remove DHCP subnets, reservations, options and client classes (applied at once) | Kea tab |
 | `pki:read` | See the CA and the certificates issued by hand; inspect a certificate or CSR; review a CSR before signing | Step-CA tab |
 | `pki:issue` | Generate a key + certificate; convert a certificate (with its key to `.p12`) | Step-CA → New key + certificate, Convert |
 | `pki:sign` | Sign an uploaded CSR | Step-CA → Sign a CSR |
@@ -275,7 +275,7 @@ sign-in" means any signed-in fabric user.
 | POST | `/v1/roles`, `/v1/roles/<name>`, `/v1/roles/<name>/delete` | `roles:admin` |
 | POST | `/v1/people` | `people:create` |
 | POST | `/v1/people/<uid>/reset` | `people:reset` (members of fabric groups: also `system:admin`) |
-| POST | `/v1/dhcp/reservations`, `/v1/dhcp/reservations/<mac>/delete` | `dhcp:write` |
+| POST | `/v1/dhcp/reservations`, `/v1/dhcp/reservations/<mac>/delete`, `/v1/dhcp/subnets`, `/v1/dhcp/subnets/{update,delete}`, `/v1/dhcp/options`, `/v1/dhcp/options/delete`, `/v1/dhcp/classes`, `/v1/dhcp/classes/<name>/delete` | `dhcp:write` |
 | POST | `/v1/radius/clients`, `/v1/radius/clients/<name>/{rotate,delete}`, `/v1/radius/people`, `/v1/radius/people/<group>/delete` | `radius:admin` |
 
 ---
