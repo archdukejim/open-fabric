@@ -1,6 +1,6 @@
 # fabriclib/consent
 
-Asking before fabric changes the host (design [host-consent.md](../../../../docs/design/host-consent.md)): what
+Asking before fabric changes the host (design [2.7.1](../../../../docs/volume_2_technologies_and_features/2.7.1-host-consent.md#2711-status)): what
 setup would change outside fabric's own folders, grouped; one yes/no per group before the first step; the
 recorded answers; the check every step makes before it changes the host.
 

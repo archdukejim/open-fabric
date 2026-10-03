@@ -17,52 +17,66 @@
 {% block content %}
     <div class="tabs-wrapper">
       <div class="tabs" id="doc-tabs">
-        <button class="tab" onclick="loadDoc(event, 'install.md')">Installation</button>
-        <button class="tab" onclick="loadDoc(event, 'operations.md')">Operations</button>
-        <button class="tab" onclick="loadDoc(event, 'architecture.md')">Architecture</button>
-        <button class="tab" onclick="loadDoc(event, 'vars.md')">Variables</button>
-        <button class="tab" onclick="loadDoc(event, 'keycloak.md')">Keycloak</button>
-        <button class="tab" onclick="loadDoc(event, 'subordinate.md')">Subordinate Nodes</button>
-        <button class="tab" onclick="loadDoc(event, 'webui.md')">Web UI</button>
-        <button class="tab" onclick="loadDoc(event, 'lib-doc.md')">Lib Docs</button>
+        <button class="tab" data-doc="README.md">Index</button>
+        <button class="tab" data-doc="volume_1_systems_and_services/README.md">1 Systems</button>
+        <button class="tab" data-doc="volume_2_technologies_and_features/README.md">2 Technologies</button>
+        <button class="tab" data-doc="volume_3_operations/README.md">3 Operations</button>
+        <button class="tab" data-doc="volume_4_infrequent_ops/README.md">4 Infrequent</button>
+        <button class="tab" data-doc="volume_5_notes_and_troubleshooting/README.md">5 Notes</button>
       </div>
     </div>
 
     <div class="card active">
       <div id="markdown-content">
-        <p>Select a document from the tabs above to view.</p>
+        <p>Loading the manual…</p>
       </div>
     </div>
 {% endblock %}
 
 {% block extra_scripts %}
   <script>
-    async function loadDoc(e, filename) {
-        // Update active tab
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        if (e && e.target) {
-            e.target.classList.add('active');
-        } else if (e) { // e could be a string if called manually
-            const tabBtn = Array.from(document.querySelectorAll('.tab')).find(t => t.textContent.includes(e));
-            if (tabBtn) tabBtn.classList.add('active');
-        }
+    // The manual (docs/, design: manual 5.1.1): docs/README.md is the master index, each volume has its own index,
+    // and every subchapter links to others by relative path. Links are followed here, relative to the page shown.
 
+    // GitHub's heading anchor, so the manual's #links land on their heading
+    function slug(text) {
+        return text.trim().toLowerCase().replace(/[^\w\- ]/g, '').replace(/ /g, '-');
+    }
+
+    function resolve(base, href) {
+        const parts = base.split('/').slice(0, -1);
+        for (const p of href.split('/')) {
+            if (p === '..') parts.pop();
+            else if (p !== '.' && p !== '') parts.push(p);
+        }
+        return parts.join('/');
+    }
+
+    function markTab(path) {
+        const volume = path.split('/')[0];
+        document.querySelectorAll('.tab').forEach(t => {
+            const doc = t.getAttribute('data-doc');
+            t.classList.toggle('active', doc === path || (doc.includes('/') && doc.split('/')[0] === volume));
+        });
+    }
+
+    // push: a new browser-history entry (a click); false when the history itself moved (back, forward, a typed #)
+    async function loadDoc(path, anchor, push = true) {
+        markTab(path);
         const contentDiv = document.getElementById('markdown-content');
         contentDiv.innerHTML = '<p>Loading...</p>';
-
         try {
-            const response = await fetch('docs/' + filename);
+            const response = await fetch('docs/' + path);
             if (!response.ok) throw new Error('Network response was not ok');
-            const text = await response.text();
-            contentDiv.innerHTML = marked.parse(text);
-            
+            contentDiv.innerHTML = marked.parse(await response.text());
+            contentDiv.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(h => { h.id = slug(h.textContent); });
+
             // Render mermaid diagrams
             contentDiv.querySelectorAll('pre code.language-mermaid').forEach(block => {
-                const pre = block.parentElement;
                 const div = document.createElement('div');
                 div.className = 'mermaid';
                 div.textContent = block.textContent;
-                pre.replaceWith(div);
+                block.parentElement.replaceWith(div);
             });
             if (typeof mermaid !== 'undefined') {
                 try {
@@ -71,30 +85,44 @@
                     console.error('Mermaid rendering failed', err);
                 }
             }
-            
-            // Rewrite local links to other .md files to switch tabs
+
+            // Follow links to other manual pages here; anchors scroll; everything else is left as it is
             contentDiv.querySelectorAll('a').forEach(a => {
                 const href = a.getAttribute('href');
-                if (href && href.endsWith('.md') && !href.startsWith('http')) {
-                    a.onclick = (ev) => {
-                        ev.preventDefault();
-                        const tabBtn = Array.from(document.querySelectorAll('.tab')).find(t => t.getAttribute('onclick').includes(href));
-                        if(tabBtn) { tabBtn.click(); }
-                    };
+                if (!href || /^[a-z]+:/i.test(href)) return;
+                const [file, frag] = href.split('#');
+                if (!file) {
+                    a.onclick = ev => { ev.preventDefault(); scrollToAnchor(frag); };
+                } else if (file.endsWith('.md')) {
+                    a.onclick = ev => { ev.preventDefault(); loadDoc(resolve(path, file), frag); };
                 }
             });
+            const hash = '#' + path + (anchor ? '#' + anchor : '');
+            if (push && location.hash !== hash) history.pushState(null, '', hash);
+            if (anchor) scrollToAnchor(anchor); else window.scrollTo(0, 0);
         } catch (error) {
-            contentDiv.innerHTML = '<p style="color:var(--error);">Failed to load document.</p>';
+            contentDiv.innerHTML = '<p style="color:var(--error);">Failed to load ' + path + '.</p>';
             console.error('Error fetching doc:', error);
         }
     }
 
-    // Default load
+    function scrollToAnchor(anchor) {
+        const target = anchor && document.getElementById(anchor);
+        if (target) target.scrollIntoView();
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
-        const firstTab = document.querySelector('.tab');
-        if (firstTab) {
-            firstTab.click();
+        document.querySelectorAll('.tab').forEach(t => {
+            t.addEventListener('click', () => loadDoc(t.getAttribute('data-doc')));
+        });
+        // #<path>[#anchor] reopens the page that was shown (a reload, a shared link, back and forward)
+        function fromHash(push) {
+            const [path, anchor] = decodeURIComponent(location.hash.slice(1)).split('#');
+            loadDoc(path && path.endsWith('.md') ? path : 'README.md', anchor, push);
         }
+        window.addEventListener('popstate', () => fromHash(false));
+        window.addEventListener('hashchange', () => fromHash(false));
+        fromHash(false);
     });
   </script>
 {% endblock %}

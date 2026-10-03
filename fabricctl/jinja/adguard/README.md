@@ -1,6 +1,6 @@
 # jinja/adguard
 
-The optional DNS filter (design [dns-filter.md](../../../docs/design/dns-filter.md)); only with `dns_filter: adguard`.
+The optional DNS filter (design [2.4.1](../../../docs/volume_2_technologies_and_features/2.4.1-adguard.md#2411-status)); only with `dns_filter: adguard`.
 
 | File | What |
 |---|---|

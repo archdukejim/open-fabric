@@ -1,6 +1,6 @@
 # fabriclib/dns_filter
 
-The optional DNS filter in front of BIND (design [dns-filter.md](../../../../docs/design/dns-filter.md)).
+The optional DNS filter in front of BIND (design [2.4.1](../../../../docs/volume_2_technologies_and_features/2.4.1-adguard.md#2411-status)).
 
 | File | What |
 |---|---|

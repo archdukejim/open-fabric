@@ -2,7 +2,7 @@
 
 Guidance for anyone (human or AI agent) changing this repository. Read it
 before writing code. Product design lives in
-[docs/design/fabricctl-package.md](docs/design/fabricctl-package.md); this
+[1.1.1](docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md#1111-status); this
 file is about *how* we build.
 
 ## 1. What we are building
@@ -64,7 +64,7 @@ The repo must stay easy to navigate. For all of our own code:
   unused variables/settings, orphaned scratch files, duplicate copies).
   Say what was removed and why in the commit message.
 - **Possibly useful but unused → do not delete.** Add it to
-  [docs/maintenance/stale-code.md](docs/maintenance/stale-code.md) with path,
+  [5.2.1](docs/volume_5_notes_and_troubleshooting/5.2.1-stale-code.md#5211-open-items) with path,
   what it is, why it is stale, its possible value and a recommendation. The
   owner decides later.
 - Verify before calling code stale: search for callers across the repo

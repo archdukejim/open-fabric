@@ -54,10 +54,10 @@ builds:
 ### Deployment Modes
 - **Install:** `sudo apt install ./fabricctl_<version>_all.deb` (built by `installers/deb/build-deb.sh`, attached to each GitHub release), then `sudo fabricctl setup` — shows the hardened default plan; Proceed or Advanced (relax any item).
 - **From a checkout:** `sudo installers/deb/install-from-checkout.sh [setup options]` — builds the .deb from the checkout, installs it with apt, runs `fabricctl setup`; run it again to upgrade to the checkout's code.
-- **Non-interactive:** `sudo fabricctl setup --file vars.yaml --non-interactive --yes --approve all` (`--approve` names the host changes allowed without asking: [host-consent.md](docs/design/host-consent.md)).
+- **Non-interactive:** `sudo fabricctl setup --file vars.yaml --non-interactive --yes --approve all` (`--approve` names the host changes allowed without asking: [2.7.1](docs/volume_2_technologies_and_features/2.7.1-host-consent.md#2711-status)).
 - **Run:** every service under systemd `fabric.target` — `fabricctl status|start|stop|restart`.
 - **Remove:** `sudo fabricctl uninstall` (offers an export of all data first); `sudo apt purge fabricctl` exports to `/var/backups/fabric/` and uninstalls.
-- **Offline (Air-gapped):** `--offline` never downloads; packages and images must already be present. Signed offline image bundles (`fabricctl images export/import`) are planned — see [the design](docs/design/fabricctl-package.md#7b-image-channels-tested-versions-decoupled-from-releases).
+- **Offline (Air-gapped):** `--offline` never downloads; packages and images must already be present. Signed offline image bundles (`fabricctl images export/import`) are planned — see [the design](docs/volume_2_technologies_and_features/2.6.1-image-channels.md#2611-image-channels-tested-versions-decoupled-from-releases).
 
 ---
 
@@ -65,16 +65,16 @@ builds:
 
 Comprehensive documentation is provided in the `docs/` directory to help you understand, deploy, and maintain the infrastructure.
 
-- [**Full Setup Guide**](docs/install.md) — Requirements, the default plan, non-interactive and offline installs, reinstall/uninstall.
-- [**Configuration Variables**](docs/vars.md) — Detailed reference for every setting in the vars file (`fabricctl setup --file`).
-- [**Keycloak Deployment**](docs/keycloak.md) — Configuration nuances, architecture, and gotchas for the Keycloak and LDAP integration.
-- [**Operations**](docs/operations.md) — Live configuration changes via the `fabricctl` interactive editor (DNS records, TSIG keys), lifecycle commands (`setup`, `doctor`, `certs`, `tsig`, `client-cert`, `reinstall`, `uninstall`), TSIG keys for RFC2136 clients.
-- [**Open Fabric web UI**](docs/webui.md) — Browser front end for `fabricctl`: security model, client certificates, first login, troubleshooting.
-- [**Design and decisions**](docs/design/fabricctl-package.md) — the `fabricctl` package, the `fabric-agent` privilege model, signed image channels and offline bundles, OpenBao, DHCP, 802.1X, the repository layout (D1–D25).
-- [**Architecture and Reference**](docs/architecture.md) — In-depth execution flow, directory structures, PKI chains, and template rendering logic.
-- [**Test Plan**](docs/testplan.md) — Manual test plan and which parts the suites in `tests/` automate.
-- [**Subordinate CA Setup**](docs/subordinate.md) — How to configure this stack as a downstream CA.
-- [**Disk encryption**](docs/disk-encryption.md) — Manual: LUKS for fabric's data, unlocked by the same YubiKey or USB stick.
+- [**Full Setup Guide**](docs/volume_4_infrequent_ops/4.1.1-requirements.md#4111-overview) — Requirements, the default plan, non-interactive and offline installs, reinstall/uninstall.
+- [**Configuration Variables**](docs/volume_2_technologies_and_features/2.1.1-about-settings.md#2111-the-settings-file) — Detailed reference for every setting in the vars file (`fabricctl setup --file`).
+- [**Keycloak Deployment**](docs/volume_1_systems_and_services/1.6.2-keycloak.md#1621-overview) — Configuration nuances, architecture, and gotchas for the Keycloak and LDAP integration.
+- [**Operations**](docs/volume_3_operations/3.1.1-fabricctl.md#3111-live-configuration-changes-fabricctl) — Live configuration changes via the `fabricctl` interactive editor (DNS records, TSIG keys), lifecycle commands (`setup`, `doctor`, `certs`, `tsig`, `client-cert`, `reinstall`, `uninstall`), TSIG keys for RFC2136 clients.
+- [**Open Fabric web UI**](docs/volume_1_systems_and_services/1.5.1-webui-architecture.md#1511-overview) — Browser front end for `fabricctl`: security model, client certificates, first login, troubleshooting.
+- [**Design and decisions**](docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md#1111-status) — the `fabricctl` package, the `fabric-agent` privilege model, signed image channels and offline bundles, OpenBao, DHCP, 802.1X, the repository layout (D1–D25).
+- [**Architecture and Reference**](docs/volume_1_systems_and_services/1.3.1-topology.md#1311-overview) — In-depth execution flow, directory structures, PKI chains, and template rendering logic.
+- [**Test Plan**](docs/volume_4_infrequent_ops/4.8.1-manual-test-plan.md#4811-overview) — Manual test plan and which parts the suites in `tests/` automate.
+- [**Subordinate CA Setup**](docs/volume_4_infrequent_ops/4.4.1-subordinate-ca.md#4411-overview) — How to configure this stack as a downstream CA.
+- [**Disk encryption**](docs/volume_4_infrequent_ops/4.5.1-disk-encryption.md#4511-overview) — Manual: LUKS for fabric's data, unlocked by the same YubiKey or USB stick.
 - [**Function reference**](docs/lib-doc/README.md) — every function of `fabricctl/`, `webui/` and `installers/`: purpose, inputs, results, failures and what uses them (generated from the code).
 
 ---

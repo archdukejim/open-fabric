@@ -1,6 +1,6 @@
 # fabriclib/images
 
-Container images on the host (design [image-updates.md](../../../../docs/design/image-updates.md), D21).
+Container images on the host (design [2.6.2](../../../../docs/volume_2_technologies_and_features/2.6.2-image-updates.md#2621-status), D21).
 Every image is pinned by digest; the validated list is `fabricctl/images.lock.yaml`
 of the installed fabric. Nothing here runs on its own: a fabric upgrade keeps
 the images a host runs, and only `fabricctl images update` moves them.

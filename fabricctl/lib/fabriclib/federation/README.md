@@ -1,7 +1,7 @@
 # fabriclib/federation
 
 Sites joined into one fabric: an upstream that owns identity and the root CA, downstream sites with
-their own local network (design [federation.md](../../../../docs/design/federation.md)).
+their own local network (design [1.8.1](../../../../docs/volume_1_systems_and_services/1.8.1-sites.md#1811-status)).
 
 | File | What |
 |---|---|

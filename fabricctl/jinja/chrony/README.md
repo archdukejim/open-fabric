@@ -1,6 +1,6 @@
 # jinja/chrony
 
-Time on the host (design [ntp.md](../../../docs/design/ntp.md)); rendered by `fabriclib/ntp/deploy_chrony.py`, not a container.
+Time on the host (design [2.5.1](../../../docs/volume_2_technologies_and_features/2.5.1-chrony.md#2511-status)); rendered by `fabriclib/ntp/deploy_chrony.py`, not a container.
 
 | File | What |
 |---|---|

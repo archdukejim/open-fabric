@@ -1,6 +1,6 @@
 # fabriclib/ntp
 
-Time for the host and its network (design [ntp.md](../../../../docs/design/ntp.md)): chrony on the host.
+Time for the host and its network (design [2.5.1](../../../../docs/volume_2_technologies_and_features/2.5.1-chrony.md#2511-status)): chrony on the host.
 
 | File | What |
 |---|---|
