@@ -52,7 +52,7 @@ def sh(cmd, ok=True, **kw):
 
 
 def cleanup():
-    sh(["docker", "rm", "-f", DC, BIND], ok=False)
+    sh(["docker", "rm", "-f", DC, BIND, "sambatest-rodc"], ok=False)
     sh(["docker", "network", "rm", NET], ok=False)
 
 
@@ -248,6 +248,79 @@ check("refused: a wrong password", wrong.returncode != 0 and BASE not in wrong.s
 admin = as_user("Administrator", admin_pw, "ldbsearch")
 check("the Administrator signs in with fabric's generated password", admin.returncode == 0 and BASE in admin.stdout,
       admin.stderr)
+
+# a read-only DC joining with fabric's image (its join path), and NTLM at it for an account it does not cache:
+# forwarded to the writable DC while it is up (the Q6 follow-up S1 owes: PEAP at an RODC site relies on it); with the
+# writable DC down, cached accounts only, and no writes (manual 1.8.8.3)
+RODC, RODC_IP = "sambatest-rodc", "10.254.30.12"
+rw = os.path.join(W, "rodc")
+for sub in ("data", "secrets"):
+    os.makedirs(os.path.join(rw, sub), mode=0o700)
+with open(os.path.join(rw, "secrets", "join.auth"), "w") as f:
+    f.write(f"username=Administrator\npassword={admin_pw}\ndomain=AD\n")
+os.chmod(os.path.join(rw, "secrets", "join.auth"), 0o600)
+renv = {**compose["environment"], "HOST_NAME": "rodc1", "HOST_IP": RODC_IP, "INTERFACES": f"127.0.0.1 {RODC_IP}",
+        "JOIN_ROLE": "RODC", "JOIN_SERVER": "dc1.ad.lan.test"}
+rrun = ["docker", "run", "-d", "--name", RODC, "--hostname", "rodc1", "--network", NET, "--ip", RODC_IP,
+        "--dns", IP, "--read-only", "--memory", compose["mem_limit"], "--cap-drop", "ALL"]
+rrun += [x for c in compose["cap_add"] for x in ("--cap-add", c)]
+rrun += [x for o in compose["security_opt"] for x in ("--security-opt", o)]
+rrun += [x for t in compose["tmpfs"] for x in ("--tmpfs", t)]
+rrun += [x for k, val in renv.items() for x in ("-e", f"{k}={val}")]
+rrun += ["-v", f"{rw}/data:/data", "-v", f"{rw}/secrets:/run/secrets:ro", "-v", f"{W}/samba/tls:/tls:ro",
+         "--health-cmd", shlex.join(compose["healthcheck"]["test"][1:]), "--health-interval", "10s",
+         "--health-start-period", "180s", IMAGE]
+sh(rrun)
+rhealth = ""
+for _ in range(60):
+    rhealth = sh(["docker", "inspect", "-f", "{{.State.Health.Status}}", RODC], ok=False).stdout.strip()
+    if rhealth in ("healthy", ""):
+        break
+    sh("sleep 5")
+rlog = sh(["docker", "logs", RODC], ok=False)
+check("an RODC joins with fabric's image (hardened like the DC) and turns healthy",
+      rhealth == "healthy" and "joined" in rlog.stdout, (rlog.stdout + rlog.stderr)[-600:])
+rep = sh(["docker", "exec", RODC, "ldbsearch", "-H", "/data/private/sam.ldb", "-b", f"OU=lan,OU=sites,{BASE}",
+          "-s", "base", "dn"], ok=False).stdout
+check("the domain, its layout and fabric's schema replicated to the RODC", f"OU=lan,OU=sites,{BASE}" in rep)
+
+
+def ntlm_at_rodc(user, password):
+    """An NTLM-only sign-in (Kerberos off) at the RODC over LDAP: its search of the base succeeds or fails."""
+    auth = os.path.join(W, f"{user}-ntlm.auth")
+    with open(auth, "w") as f:
+        f.write(f"username={user}\npassword={password}\ndomain=AD\n")
+    os.chmod(auth, 0o600)
+    res = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{auth}:/auth:ro", "--entrypoint", "ldbsearch", IMAGE,
+              "-H", f"ldap://{RODC_IP}", "-A", "/auth", "--use-kerberos=off", "-b", BASE, "-s", "base", "dn"],
+             ok=False)
+    return res.returncode == 0 and BASE in res.stdout
+
+
+check("NTLM at the RODC for an account it does not cache is forwarded to the writable DC (Q6 follow-up)",
+      ntlm_at_rodc("labadmin", lab_pw))
+cached_pw = random_password(20)
+dc("samba-tool", "user", "create", "cachy", cached_pw, "--userou=OU=people,OU=lab,OU=sites", "-s", "/data/etc/smb.conf")
+dc("samba-tool", "group", "addmembers", "Allowed RODC Password Replication Group", "cachy", "-s", "/data/etc/smb.conf")
+pre = sh(["docker", "exec", RODC, "samba-tool", "rodc", "preload", "cachy", "-s", "/data/etc/smb.conf",
+          "--server=dc1.ad.lan.test"], ok=False)
+check("a site person's password is preloaded at the RODC", pre.returncode == 0, pre.stderr[-300:])
+sh(["docker", "stop", DC])
+check("with the writable DC down: a cached person signs in at the RODC", ntlm_at_rodc("cachy", cached_pw))
+check("with the writable DC down: refused, the Administrator (never cached)", not ntlm_at_rodc("Administrator",
+                                                                                               admin_pw))
+check("with the writable DC down: refused, a person the RODC does not cache", not ntlm_at_rodc("labadmin", lab_pw))
+with open(os.path.join(W, "op.ldif"), "w") as f:
+    f.write(f"dn: CN=cachy,OU=people,OU=lab,OU=sites,{BASE}\nchangetype: modify\nreplace: description\n"
+            "description: written at the RODC\n")
+wr = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/cachy-ntlm.auth:/auth:ro", "-v",
+         f"{W}/op.ldif:/op.ldif:ro", "--entrypoint", "ldbmodify", IMAGE, "-H", f"ldap://{RODC_IP}", "-A", "/auth",
+         "--use-kerberos=off", "/op.ldif"], ok=False)
+check("refused: a write at the RODC", "successfully" not in wr.stdout + wr.stderr, wr.stdout[-200:])
+rinfo = json.loads(sh(["docker", "inspect", RODC]).stdout)[0]["HostConfig"]
+check("the RODC is hardened like the DC (the five capabilities, read-only, a limit)",
+      len(rinfo["CapAdd"]) == 5 and rinfo["ReadonlyRootfs"] and rinfo["Memory"] > 0)
+print("RODC memory: " + sh(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", RODC], ok=False).stdout.strip())
 
 if not os.environ.get("SAMBA_TEST_KEEP"):        # keep the containers to look into a failure
     cleanup()
