@@ -1,6 +1,7 @@
 import re
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
 # the password policy's keys (D89): every one is the admin's, none has a default
 POLICY_KEYS = {"minimum_length": (0, 64), "history": (0, 24), "minimum_age_days": (0, 998),
@@ -28,15 +29,15 @@ def check_samba_settings(v):
     labels = ad.split(".")
     if not ad:
         raise ValidationError("install_samba needs ad_domain: the AD domain, chosen once (manual 2.1.9.7; "
-                              f"recommended: ad.{domain})")
+                              f"suggested: {suggested_ad_domain(domain) or 'ad.<parent of ' + domain + '>'})")
     if len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253:
         raise ValidationError(f"ad_domain {ad!r} is not a valid DNS domain of two labels or more")
     if ad == domain:
         raise ValidationError(f"ad_domain cannot be fabric's own domain ({ad}): the AD zone is always a zone of its "
-                              f"own (D87); the suggestion is ad.{domain}")
+                              f"own (D87); suggested: {suggested_ad_domain(domain) or 'a sibling of it'}")
     if domain.endswith("." + ad):
         raise ValidationError(f"ad_domain {ad} is a parent of fabric's domain {domain}: AD's zone would hold "
-                              "fabric's; use a sub-domain such as ad." + domain)
+                              "fabric's (D87)")
     if not _NETBIOS.match(str(v.get("ad_netbios") or "")):
         raise ValidationError(f"ad_netbios {v.get('ad_netbios')!r}: at most 15 letters, digits or hyphens")
     if not _NETBIOS.match(str(v.get("hostname") or "").upper()):

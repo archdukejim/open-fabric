@@ -1,5 +1,6 @@
 from fabriclib.common.console import BOLD, NC, YELLOW
 from fabriclib.deploy.check_samba_settings import POLICY_KEYS
+from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
 # what each policy question asks (D89: nothing is preselected)
 POLICY_QUESTIONS = [
@@ -51,14 +52,17 @@ def ask_windows_domain(ctx):
     domain = str(ctx.vars.get("domain") or "").lower()
     current = str(ctx.vars.get("ad_domain") or "").lower()
     print(f"    The AD domain is {BOLD}permanent{NC}: it cannot be changed once the domain exists.")
-    print(f"    Suggested: ad.{domain}. It cannot be fabric's own domain ({domain}).")
+    suggestion = current or suggested_ad_domain(domain)
+    if suggested_ad_domain(domain):
+        print(f"    Suggested: {suggested_ad_domain(domain)}, beside fabric's domain, apart from the sites' names. "
+              f"It cannot be {domain} itself.")
     while True:
-        answer = input(f"    AD domain [{current or 'ad.' + domain}]: ").strip().lower()
-        chosen = answer or current or f"ad.{domain}"
-        if chosen != domain and "." in chosen:
+        answer = input(f"    AD domain{f' [{suggestion}]' if suggestion else ''}: ").strip().lower()
+        chosen = answer or suggestion
+        if chosen and chosen != domain and "." in chosen and not domain.endswith("." + chosen):
             ctx.vars["ad_domain"] = chosen
             break
-        print(f"    {YELLOW}a domain of two labels or more, not {domain} itself{NC}")
+        print(f"    {YELLOW}a domain of two labels or more, not {domain} itself nor a parent of it{NC}")
     print("    The password policy is yours: nothing is preselected (D89).")
     policy = dict(ctx.vars.get("ad_password_policy") or {})
     for key, question in POLICY_QUESTIONS:

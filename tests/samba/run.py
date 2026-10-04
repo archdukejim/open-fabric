@@ -1,7 +1,7 @@
 """The `samba` suite (manual 2.11.2.13, 4.8.2): the Windows domain controller.
 
 S1.2: the settings check (D87, D89), the Administrator's password, the rendered container (host network, exactly the
-five capabilities, read-only, its limit), nginx giving up 389/636, the unit and the certificate target.
+six capabilities, read-only, its limit), nginx giving up 389/636, the unit and the certificate target.
 Real containers (provisioning, DLZ, refusals) are added with S1.3-S1.5.
     python3 tests/samba/run.py
 """
@@ -19,6 +19,7 @@ from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.deploy.check_samba_settings import check_samba_settings  # noqa: E402
 from fabriclib.deploy.service_units import service_units  # noqa: E402
 from fabriclib.dns_filter.deploy_adguard import _domains as adguard_zones  # noqa: E402
+from fabriclib.samba.suggested_ad_domain import suggested_ad_domain  # noqa: E402
 from fabriclib.secrets.random_password import random_password  # noqa: E402
 
 PASS = FAIL = 0
@@ -86,6 +87,12 @@ check("accepted: passwords that never expire (maximum 0) with any minimum age",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "maximum_age_days": 0}}, ""))
 check("refused: an RPC range at or below 1024", refused({**GOOD, "ad_rpc_ports": "100-200"}, "ad_rpc_ports"))
 
+check("the suggestion is a sibling at the top of the organisation's name (D87)",
+      suggested_ad_domain("lan.j-j.family") == "ad.j-j.family" and suggested_ad_domain("pitest.home.arpa")
+      == "ad.home.arpa" and suggested_ad_domain("example.org") == "")
+check("accepted: a sub-domain of fabric's domain too", not refused({**GOOD, "ad_domain": "ad.lan.test"}, ""))
+check("accepted: the suggested sibling", not refused({**GOOD, "ad_domain": "ad.test2", "domain": "lan.test2"}, ""))
+
 print("--- the Administrator's password")
 pw = [random_password() for _ in range(200)]
 check("64 characters, letters of both cases and digits in every one (any allowed policy accepts it)",
@@ -110,8 +117,9 @@ dc = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(**v))
 check("host network (D98), read-only, no-new-privileges, every capability dropped",
       dc["network_mode"] == "host" and dc["read_only"] is True and dc["cap_drop"] == ["ALL"]
       and "no-new-privileges:true" in dc["security_opt"])
-check("exactly the five capabilities of the inventory (1.3.9)",
-      sorted(dc["cap_add"]) == ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"], dc["cap_add"])
+check("exactly the six capabilities of the inventory (1.3.9)",
+      sorted(dc["cap_add"]) == ["CHOWN", "DAC_OVERRIDE", "FOWNER", "NET_BIND_SERVICE", "SETGID", "SETUID"],
+      dc["cap_add"])
 check("bound to loopback and the host's address only", dc["environment"]["INTERFACES"] == "127.0.0.1 192.168.7.53")
 check("no secret in its environment (the Administrator's password comes as a file)",
       not any(k.endswith(("PASSWORD", "SECRET", "PASS")) for k in dc["environment"]), sorted(dc["environment"]))

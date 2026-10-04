@@ -136,8 +136,9 @@ check("provisioning prints no password (only that one was set)",
       all("password set for" in line for line in sh(["docker", "logs", DC], ok=False).stdout.lower().splitlines()
           if "password" in line))
 info = json.loads(sh(["docker", "inspect", DC]).stdout)[0]["HostConfig"]
-check("hardened as rendered: exactly the five capabilities, read-only, no-new-privileges, a memory limit",
-      sorted(info["CapAdd"]) == ["CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_FOWNER", "CAP_SETGID", "CAP_SETUID"]
+check("hardened as rendered: exactly the six capabilities, read-only, no-new-privileges, a memory limit",
+      sorted(info["CapAdd"]) == ["CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_FOWNER", "CAP_NET_BIND_SERVICE", "CAP_SETGID",
+                                 "CAP_SETUID"]
       and info["CapDrop"] == ["ALL"] and info["ReadonlyRootfs"] and "no-new-privileges:true" in info["SecurityOpt"]
       and info["Memory"] > 0, info["CapAdd"])
 
@@ -326,8 +327,8 @@ wr = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/cachy-ntlm.auth:
          "--use-kerberos=off", "/op.ldif"], ok=False)
 check("refused: a write at the RODC", "successfully" not in wr.stdout + wr.stderr, wr.stdout[-200:])
 rinfo = json.loads(sh(["docker", "inspect", RODC]).stdout)[0]["HostConfig"]
-check("the RODC is hardened like the DC (the five capabilities, read-only, a limit)",
-      len(rinfo["CapAdd"]) == 5 and rinfo["ReadonlyRootfs"] and rinfo["Memory"] > 0)
+check("the RODC is hardened like the DC (the six capabilities, read-only, a limit)",
+      len(rinfo["CapAdd"]) == 6 and rinfo["ReadonlyRootfs"] and rinfo["Memory"] > 0)
 print("RODC memory: " + sh(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", RODC], ok=False).stdout.strip())
 
 if not os.environ.get("SAMBA_TEST_KEEP"):        # keep the containers to look into a failure

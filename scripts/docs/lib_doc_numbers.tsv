@@ -335,6 +335,7 @@ file	fabriclib-samba|src/fabriclib/samba/deploy_samba.py	1
 file	fabriclib-samba|src/fabriclib/samba/domain_status.py	3	
 file	fabriclib-samba|src/fabriclib/samba/run_domain_command.py	4	
 file	fabriclib-samba|src/fabriclib/samba/set_domain_password_policy.py	5	
+file	fabriclib-samba|src/fabriclib/samba/suggested_ad_domain.py	7	
 file	fabriclib-samba|src/fabriclib/samba/write_bind_dlz.py	6	
 file	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py	1	
 file	fabriclib-secrets|src/fabriclib/secrets/common/write_vault_secrets.py	2	
@@ -1039,6 +1040,7 @@ function	fabriclib-samba|src/fabriclib/samba/domain_status.py|domain_status	2
 function	fabriclib-samba|src/fabriclib/samba/run_domain_command.py|_changes	1	
 function	fabriclib-samba|src/fabriclib/samba/run_domain_command.py|run_domain_command	2	
 function	fabriclib-samba|src/fabriclib/samba/set_domain_password_policy.py|set_domain_password_policy	1	
+function	fabriclib-samba|src/fabriclib/samba/suggested_ad_domain.py|suggested_ad_domain	1	
 function	fabriclib-samba|src/fabriclib/samba/write_bind_dlz.py|write_bind_dlz	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py|read_vault_secrets	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/write_vault_secrets.py|write_vault_secrets	1	

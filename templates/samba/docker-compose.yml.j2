@@ -2,8 +2,9 @@ services:
   # The Samba AD domain controller (manual 2.11.2). AD hands its own address to clients (DNS records, CLDAP, the
   # RPC endpoint mapper), so it runs in the host network on the host's address (D98), bound to it and loopback
   # only. A DC runs as root in its container (it switches to each user's identity for file access): every
-  # capability is dropped but the five it needs (SETUID, SETGID for sign-ins and shares; CHOWN, DAC_OVERRIDE,
-  # FOWNER for Group Policy's ACLs on SYSVOL), with a read-only root and no-new-privileges. Inventory: 1.3.9.
+  # capability is dropped but the six it needs (SETUID, SETGID for sign-ins and shares; CHOWN, DAC_OVERRIDE,
+  # FOWNER for Group Policy's ACLs on SYSVOL; NET_BIND_SERVICE for its low ports: in the host network Docker's
+  # unprivileged-port setting does not apply), with a read-only root and no-new-privileges. Inventory: 1.3.9.
   samba:
 {% set published = published_ref('samba') %}
     # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
@@ -33,6 +34,7 @@ services:
       - FOWNER
       - SETUID
       - SETGID
+      - NET_BIND_SERVICE
     environment:
       REALM: "{{ ad_realm }}"
       NETBIOS: "{{ ad_netbios }}"

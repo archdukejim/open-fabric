@@ -82,6 +82,8 @@ set_global() {
 set_global "interfaces" "$INTERFACES"
 set_global "bind interfaces only" "yes"
 set_global "server services" "-dns"
+# AD needs no NetBIOS: nothing binds 137-139
+set_global "disable netbios" "yes"
 set_global "rpc server dynamic port range" "$RPC_PORTS"
 # PEAP-MSCHAPv2 (802.1X): Samba refuses MS-CHAPv2 by default
 set_global "ntlm auth" "mschapv2-and-ntlmv2-only"
