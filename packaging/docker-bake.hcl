@@ -1,4 +1,4 @@
-# fabric's own images (decision D41, manual 4.7.1): eight images, each for amd64 and arm64 (D29).
+# fabric's own images (decision D41, manual 4.7.1): nine images, each for amd64 and arm64 (D29).
 #
 # The contexts are the build folders a host has (packaging/images/stage-contexts.sh); the pinned bases and
 # Kea's pinned package come from config/images.lock.yaml (packaging/images/bake_env.py). Nothing has a
@@ -24,7 +24,7 @@ variable "KEA_KEY_URL" { default = "" }
 variable "KEA_KEY_FINGERPRINT" { default = "" }
 
 group "default" {
-  targets = ["adguard", "bind9", "dirsrv", "freeradius", "kea", "keycloak", "stepca", "webui"]
+  targets = ["adguard", "bind9", "dirsrv", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
 }
 
 target "_fabric" {
@@ -84,6 +84,13 @@ target "keycloak" {
   context  = "${CONTEXTS}/keycloak"
   args     = { BASE_IMAGE = BASE_KEYCLOAK }
   tags     = ["${REGISTRY}/keycloak:${TAG}"]
+}
+
+target "samba" {
+  inherits = ["_fabric"]
+  context  = "${CONTEXTS}/samba"
+  args     = { BASE_IMAGE = BASE_DEBIAN }
+  tags     = ["${REGISTRY}/samba:${TAG}"]
 }
 
 target "stepca" {

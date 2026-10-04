@@ -20,6 +20,7 @@ containers in `src/containers/`.
 | [nginx/](nginx/) | Reverse proxy and the static pages: landing, certificates, LDAP guide, manual |
 | [openbao/](openbao/) | Secrets: compose file and server config |
 | [postgres/](postgres/) | Keycloak's database |
+| [samba/](samba/) | The Samba AD domain controller: compose file |
 | [stepca/](stepca/) | The CA: compose file, certificate templates |
 | [systemd/](systemd/) | The per-service wrapper unit, `fabric.target`, `fabric-agent.service` |
 | [webui/](webui/) | Deploying the web UI container: compose file and `webui.json` |

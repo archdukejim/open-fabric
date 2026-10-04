@@ -61,7 +61,7 @@ copy 's,^src/ux/web/,fabric/lib/webui/,' src/ux/web/server.py src/ux/web/devserv
 copy 's,^templates/webui-app/,fabric/lib/webui/templates/,;s,^static/webui-app/,fabric/lib/webui/static/,' \
     templates/webui-app static/webui-app
 copy 's,^templates/,fabric/jinja/,' templates ':(exclude)templates/webui-app'
-for svc in adguard bind9 dirsrv freeradius kea keycloak stepca; do
+for svc in adguard bind9 dirsrv freeradius kea keycloak samba stepca; do
     copy "s,^packaging/images/$svc/,fabric/jinja/$svc/build/," "packaging/images/$svc"
 done
 copy 's,^packaging/images/webui/,fabric/jinja/webui/build/,' packaging/images/webui/Dockerfile \

@@ -84,7 +84,8 @@ images:
     policy: auto
 
 # fabric's own images, built and smoke tested in CI, signed and published (manual 2.6.3, 4.7.1; D41).
-# An empty digest: not published yet, and hosts build that image themselves. `ids` are the service
+# An empty digest: not published yet, and hosts build that image themselves; it needs `pending` (why),
+# which pin_published drops when it pins the image (the images suite refuses an unexplained gap). `ids` are the service
 # account ids baked into the published image (the Dockerfile's defaults): a host whose
 # service_users.<account> differ builds that image itself (D80).
 published:
@@ -94,11 +95,12 @@ published:
   issuer: https://token.actions.githubusercontent.com
   images:
     adguard:    {var: image_fabric_adguard, tag: "1.5.0-rc.3", digest: "sha256:600da65296ceefdec893d4b5f18497c285bdd472bf1e4185f6c6909c2b0cabd2"}
-    bind9:      {var: image_fabric_bind9, tag: "1.5.0-rc.3", digest: "sha256:04ea9bbc6033774f2251b83b678f5d2ca6da61af969eb13e1f5cd937d42ed303", account: bind, ids: "600:600"}
+    bind9:      {var: image_fabric_bind9, tag: "", digest: "", account: bind, ids: "600:600", pending: "rebuilt with Samba's DLZ libraries (S1.1)"}
     dirsrv:     {var: image_fabric_dirsrv, tag: "1.5.0-rc.3", digest: "sha256:cfe6faa5c2c85b04c84b95a2a4221dc0e4e4a922415b844c6c2624d55a79d397", account: ldap, ids: "601:601"}
     freeradius: {var: image_fabric_freeradius, tag: "1.5.0-rc.3", digest: "sha256:74319ea634bdb7c67d3c4b9361f984fa6adda95d065e4859c70314bd84de87d8", account: freeradius, ids: "610:610"}
     kea:        {var: image_fabric_kea, tag: "1.5.0-rc.3", digest: "sha256:45c49a2c46f0f2fc6e3ec453ed628a790a85ba3d272f040a14424da7790ea53a", account: kea, ids: "609:609"}
     keycloak:   {var: image_fabric_keycloak, tag: "1.5.0-rc.3", digest: "sha256:f9ff8d0124921b4c43136573fe406e97b086a6bbfde2d6db4ebec33c9119e257"}
+    samba:      {var: image_fabric_samba, tag: "", digest: "", groups: "BIND_GID=600,RADIUS_GID=610", pending: "new in S1.1"}
     stepca:     {var: image_fabric_stepca, tag: "1.5.0-rc.3", digest: "sha256:0d972a7279fbcd6d65b23b7300c890a2d3c06b3f3f3e7be1405d902882dddbaa"}
     webui:      {var: image_fabric_webui, tag: "1.5.0-rc.3", digest: "sha256:e925f15216b6a97a20fdfe29dc33b328cf8b3a76a529aad2a14d029317180e24", account: webui, ids: "606:606"}
 

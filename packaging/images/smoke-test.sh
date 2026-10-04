@@ -14,7 +14,9 @@ set -uo pipefail
 NAME="${1:?usage: smoke-test.sh <image name> <image ref>}"
 IMAGE="${2:?usage: smoke-test.sh <image name> <image ref>}"
 
-# the user it runs as, the ids baked in (empty: none) and the program with its version flag
+# the user it runs as, the ids baked in (empty: none) and the program with its version flag; other services'
+# groups baked in (only the DC)
+groups=""
 case "$NAME" in
     adguard)    user=611:611; ids="";        run=(/opt/adguardhome/AdGuardHome --version) ;;
     bind9)      user=600:600; ids=600:600;   run=(/usr/sbin/named -v) ;;
@@ -23,6 +25,7 @@ case "$NAME" in
     freeradius) user=610:610; ids=610:610;   run=(/usr/sbin/freeradius -v) ;;
     kea)        user=609:609; ids=609:609;   run=(/usr/sbin/kea-dhcp-ddns -V) ;;
     keycloak)   user=604:0;   ids="";        run=(/opt/keycloak/bin/kc.sh --version) ;;
+    samba)      user=0:0;     ids="";        run=(/usr/sbin/samba -V); groups="BIND_GID=600,RADIUS_GID=610" ;;
     stepca)     user=603:603; ids="";        run=(/usr/local/bin/step-ca version) ;;
     webui)      user=606:606; ids=606:606;   run=(/usr/bin/python3 /app/webui/server.py --help) ;;
     *) echo "unknown image $NAME" >&2; exit 2 ;;
@@ -51,5 +54,8 @@ label() { docker image inspect -f "{{index .Config.Labels \"$1\"}}" "$IMAGE" 2>/
 [ -n "$(label org.fabric.base)" ]; report "names the base it was built FROM (org.fabric.base: $(label org.fabric.base))" $?
 if [ -n "$ids" ]; then
     [ "$(label org.fabric.ids)" = "$ids" ]; report "has the default service account ids baked in ($ids)" $?
+fi
+if [ -n "$groups" ]; then
+    [ "$(label org.fabric.groups)" = "$groups" ]; report "has the default groups of other services baked in ($groups)" $?
 fi
 exit "$fail"
