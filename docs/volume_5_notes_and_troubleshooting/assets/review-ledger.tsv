@@ -2,7 +2,7 @@
 .gitattributes	f273656c60a04a693192b0bdc27eb5465842e911	2026-09-30	
 .github/workflows/images.yml	7fdc159a44a15546035d0a9a61172865edf60f1c	2026-10-04	
 .github/workflows/lint.yml	73461f942487bc6108f21bbb420ee97584eac928	2026-10-03	
-.github/workflows/package.yml	4d5f2bbdefa9ba43e1d071e34eb34af32a494ffc	2026-10-03	
+.github/workflows/package.yml	a63f50d55bdc9738625bb5140599d00f4e024b8d	2026-10-04	
 .gitignore	e3c8a04befe6886c88daa50ca0a26df4e27679b0	2026-10-04	
 AGENTS.md	8b6138a3c209d4a41bd8c360d4ca1f592a79fa56	2026-10-03	
 CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30	
@@ -73,7 +73,7 @@ docs/volume_1_systems_and_services/1.5.5-rbac.md	0ca58cc55acd2a11fd5c7d64a476a88
 docs/volume_1_systems_and_services/1.6.1-directory.md	6762ab7ae7852b65c76e7d667a0b17ec2e69825d	2026-10-03	
 docs/volume_1_systems_and_services/1.6.2-keycloak.md	85fffa81a8f461549d04d6aca6be9d40afd19d4c	2026-10-03	
 docs/volume_1_systems_and_services/1.7.1-openbao.md	d1b2f0921aec67455914252fbb287a820bffefbd	2026-10-03	
-docs/volume_1_systems_and_services/1.8.1-sites.md	37f6f3084139ddb35d0b6482192e4045109c3c9a	2026-10-03	
+docs/volume_1_systems_and_services/1.8.1-sites.md	3180f738f0426aeeddf6eca2011328a9fc98372d	2026-10-04	
 docs/volume_1_systems_and_services/1.8.2-ha-partners.md	826864b8eaffb8a42178f9572b8fb075f14842c4	2026-10-03	
 docs/volume_1_systems_and_services/1.8.3-between-sites.md	0b9f0f18e3cfeff027f4f49d05f25067b4bc1ee8	2026-10-03	
 docs/volume_1_systems_and_services/1.8.4-joining.md	861bf348e12f2ea5af2daf8f2323adff3fa7346c	2026-10-03	
@@ -98,7 +98,7 @@ docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	301d3b76d
 docs/volume_2_technologies_and_features/2.2.1-kea-design.md	da4655d3733b7fdf899606642209a7e0288d12ab	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	89e60e01fa08b336cfa2c96b0899753ad61648be	2026-10-03	
 docs/volume_2_technologies_and_features/2.3.1-freeradius-design.md	342b9d9d07a9ea0dec421b86732ad5084d28832f	2026-10-03	
-docs/volume_2_technologies_and_features/2.4.1-adguard.md	c55dac7193bba66a04c883437d233cf70b87e231	2026-10-03	
+docs/volume_2_technologies_and_features/2.4.1-adguard.md	9140a66c15d5dee3b15d0e33ca4e4b0489339ae3	2026-10-04	
 docs/volume_2_technologies_and_features/2.5.1-chrony.md	f5ab5c790a87e74fc708fc9bee953e977ba2f384	2026-10-03	
 docs/volume_2_technologies_and_features/2.6.1-image-channels.md	f6359b0286194760662748b8d6080f66ea039dba	2026-10-04	
 docs/volume_2_technologies_and_features/2.6.2-image-updates.md	6a92f1f32439e95add277c00b68c89db574fcd32	2026-10-04	

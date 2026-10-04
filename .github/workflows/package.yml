@@ -1,11 +1,11 @@
 # Build the fabricctl .deb (Architecture: all — amd64 and arm64).
-# Every push/PR: downloadable build artifact. A tag v<VERSION>: attached to
+# Every push (any branch) and PR: downloadable build artifact. A tag v<VERSION>: attached to
 # the GitHub Release, so hosts install it with `apt install ./fabricctl_*.deb`.
 name: package
 
 on:
   push:
-    branches: [fabric, main]
+    branches: ["**"]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
