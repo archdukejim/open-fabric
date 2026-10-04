@@ -3,7 +3,7 @@
 images, the multi-arch digest a publish produced under <tag>, after checking it has both architectures and a valid
 signature by fabric's images workflow (the same check hosts make, D81). Needs Docker and network access.
 
-    python3 scripts/images/pin_published.py <tag>        e.g. 1.5.0-rc.12
+    python3 scripts/images/pin_published.py <tag>        e.g. 0.6.0-rc.1
 
 Commit the changed lock (a reviewed commit): that is what hosts will run.
 """
