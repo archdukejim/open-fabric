@@ -5,11 +5,15 @@ services:
     # binary's file capabilities (build/Dockerfile): it runs with none, on 5300 inside; Docker publishes 53
     # to it. Its UI is reached only through nginx. The sign-in (oauth2-proxy) is a unit of its own
     # (jinja/adguard-auth): DNS never waits for, or goes down with, Keycloak or the sign-in.
-    image: fabric/adguard:local
+{% set published = published_ref('adguard') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or 'fabric/adguard:local' }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/adguard/build
       args:
         BASE_IMAGE: "{{ image_adguard }}"
+{% endif %}
     container_name: adguardhome
     logging:
       driver: journald

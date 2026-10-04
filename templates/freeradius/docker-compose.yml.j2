@@ -2,13 +2,17 @@ services:
   # 802.1X (design §6): switches and access points ask here; fabric's policy
   # answers from 389-DS. Non-root, no capabilities, read-only.
   freeradius:
-    image: {{ image_freeradius }}
+{% set published = published_ref('freeradius') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or image_freeradius }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/freeradius/build
       args:
         BASE_IMAGE: "{{ image_debian }}"
         RADIUS_UID: "{{ service_users.freeradius.uid }}"
         RADIUS_GID: "{{ service_users.freeradius.gid }}"
+{% endif %}
     container_name: freeradius
     user: "{{ service_users.freeradius.uid }}:{{ service_users.freeradius.gid }}"
     logging:

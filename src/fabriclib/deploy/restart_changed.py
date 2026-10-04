@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.deploy.compose_builds import compose_builds
 from fabriclib.dns.install_zone_file import install_zone_file
 from fabriclib.dns.reload_zone import reload_zone
 from fabriclib.dns.rndc import rndc
@@ -62,9 +63,10 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
     restart_webui = "fabric-web" in restart or state["webui"]
     restart.discard("fabric-web")
     for folder in sorted(state["rebuild"]):
-        print(f"Rebuilding {folder} image...")
-        subprocess.run(["docker", "compose", "-f", os.path.join(paths["base"], folder, "docker-compose.yml"), "build"],
-                       timeout=1200)
+        compose = os.path.join(paths["base"], folder, "docker-compose.yml")
+        verb = "build" if compose_builds(compose) else "pull"     # fabric's published images are pulled
+        print(f"{'Rebuilding' if verb == 'build' else 'Pulling'} {folder} image...")
+        subprocess.run(["docker", "compose", "-f", compose, verb], timeout=1200)
     for svc in restart:
         print(f"Restarting {svc} due to configuration changes...")
         _quiet(["systemctl", "restart", svc], f"Restart of {svc}", TIMEOUT.get(svc, 30))

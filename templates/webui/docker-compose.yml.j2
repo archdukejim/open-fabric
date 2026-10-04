@@ -1,12 +1,16 @@
 services:
   webui:
-    image: {{ image_webui }}
+{% set published = published_ref('webui') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or image_webui }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/webui/build
       args:
         BASE_IMAGE: "{{ image_debian }}"
         WEBUI_UID: "{{ service_users.webui.uid }}"
         WEBUI_GID: "{{ service_users.webui.gid }}"
+{% endif %}
     container_name: fabric-web
     # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
     # and the optional log forwarder reads everything from one place

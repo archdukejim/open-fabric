@@ -2,6 +2,7 @@ import os
 
 from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.dhcp.check_kea_config import check_kea_config
+from fabriclib.dhcp.common.kea_image import kea_image
 from fabriclib.dhcp.ensure_ddns_zone import ensure_ddns_zone
 
 
@@ -34,7 +35,7 @@ def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
     for name, text in texts.items():            # both checked before either is written: a refusal changes nothing
         dest = os.path.join(base, "config", name)
         if not os.path.exists(dest) or open(dest).read() != text:
-            check_kea_config(v.get("image_kea", "fabric/kea:local"), name, text)
+            check_kea_config(kea_image(jinja_env, v), name, text)
     changed = False
     for name, text in texts.items():
         changed |= write_file_if_changed(os.path.join(base, "config", name), text, 0o640, 0, kgid)

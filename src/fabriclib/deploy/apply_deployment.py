@@ -36,6 +36,7 @@ from fabriclib.deploy.render_templates import render_templates
 from fabriclib.deploy.render_vars import render_vars
 from fabriclib.deploy.restart_changed import restart_changed
 from fabriclib.deploy.service_units import service_units
+from fabriclib.deploy.verify_published_images import verify_published_images
 from fabriclib.dns.reverse_zones import reverse_zones
 from fabriclib.federation.deploy_federation_endpoint import deploy_federation_endpoint
 from fabriclib.federation.common.load_registry import load_registry
@@ -105,6 +106,8 @@ def _deploy(paths, start_services):
     context["federation_parent"] = (load_registry(paths["federation"]).get("upstream") or {}).get("site_name") or ""
     print("Rendering Jinja2 templates...")
     render_templates(paths, jinja_env, context, final_vars, secrets, p["tsig_keys"], units, reverse)
+    if verify_published_images(paths, final_vars):  # nothing installed yet: a refusal changes nothing
+        print("Signatures of fabric's published images: verified")
 
     print("Deploying configurations...")
     install_fabric_tree(paths, final_vars)
@@ -151,7 +154,8 @@ def apply_deployment(start_services=True):
              (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings,
              dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or
              ldap_base_dn not valid or not what they were at install; a template that does not render; an image
-             build that fails (start_services=False); BIND9 refusing `rndc reconfig`; fabric's own units (the
+             build that fails (start_services=False); BIND9 refusing `rndc reconfig`; a published image
+             whose signature does not verify (verify_published_images); fabric's own units (the
              `services` host change) not approved — an install set up before consent existed is not refused. A bad
              link-vars file is only
              reported. OSError from file operations propagates.

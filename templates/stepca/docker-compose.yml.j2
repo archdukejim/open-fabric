@@ -2,11 +2,15 @@ services:
   step-ca:
     # Thin local layer: drops the upstream binary's file capability so it can
     # run with no-new-privileges and no capabilities (see build/Dockerfile).
-    image: fabric/stepca:local
+{% set published = published_ref('stepca') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or 'fabric/stepca:local' }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/stepca/build
       args:
         BASE_IMAGE: "{{ image_stepca }}"
+{% endif %}
     container_name: step-ca
     # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
     # and the optional log forwarder reads everything from one place

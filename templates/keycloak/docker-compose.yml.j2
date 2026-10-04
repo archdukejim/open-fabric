@@ -2,11 +2,15 @@ services:
   keycloak:
     # Pre-built (optimized) local layer: no re-augmentation at start, so the
     # root filesystem can be read-only (see build/Dockerfile).
-    image: fabric/keycloak:local
+{% set published = published_ref('keycloak') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or 'fabric/keycloak:local' }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/keycloak/build
       args:
         BASE_IMAGE: "{{ image_keycloak }}"
+{% endif %}
     container_name: keycloak
     # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
     # and the optional log forwarder reads everything from one place

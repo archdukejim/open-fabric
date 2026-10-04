@@ -2,13 +2,17 @@ services:
   bind9:
     # Built from Debian packages on the validated Debian base: bind uid/gid baked
     # in, runs as bind from the first instruction, no capabilities (build/Dockerfile).
-    image: fabric/bind9:local
+{% set published = published_ref('bind9') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or 'fabric/bind9:local' }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/bind9/build
       args:
         BASE_IMAGE: "{{ image_debian }}"
         BIND_UID: "{{ service_users.bind.uid }}"
         BIND_GID: "{{ service_users.bind.gid }}"
+{% endif %}
     container_name: bind9
     # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
     # and the optional log forwarder reads everything from one place

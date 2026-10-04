@@ -64,4 +64,5 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `vault_status.py` | OpenBao at a glance for the OpenBao page; never secrets. Agent route: GET /v1/vault (vault:status). |
 | `version_info.py` | The fabric version and build shown in every page's header. Agent route: GET /v1/version (permission: session). |
 | `zone_detail.py` | One zone's records and BIND sync status, for the forward-zone view. Agent route: GET /v1/zones/<key> (dns:read). |
+| `relaxed_settings.py` | The security relaxations turned on, shown at the top of the overview. Agent route: GET /v1/relaxed-settings (status:read). |
 | `__init__.py` | Imports every function of this folder, so callers keep `module.function` |

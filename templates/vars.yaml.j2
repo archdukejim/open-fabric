@@ -102,6 +102,22 @@ image_dirsrv: {{ image_dirsrv | default('fabric/dirsrv:local') }}
 image_webui: {{ image_webui | default('fabric/web:local') }}
 image_kea: {{ image_kea | default('fabric/kea:local') }}
 image_freeradius: {{ image_freeradius | default('fabric/freeradius:local') }}
+{# fabric's own images as published (manual 2.6.3): "" until the lock pins a digest. The compose files run one
+   when it is set and the host's ids match it (published_ref); otherwise the host builds that image itself.
+   They carry fabric's own code, so they follow the release (as a local build did): always the lock's, unless the
+   admin pinned one in image_pins. #}
+image_fabric_adguard: "{{ image_fabric_adguard if 'image_fabric_adguard' in (image_pins | default([], true)) else published_lock.adguard }}"
+image_fabric_bind9: "{{ image_fabric_bind9 if 'image_fabric_bind9' in (image_pins | default([], true)) else published_lock.bind9 }}"
+image_fabric_dirsrv: "{{ image_fabric_dirsrv if 'image_fabric_dirsrv' in (image_pins | default([], true)) else published_lock.dirsrv }}"
+image_fabric_freeradius: "{{ image_fabric_freeradius if 'image_fabric_freeradius' in (image_pins | default([], true)) else published_lock.freeradius }}"
+image_fabric_kea: "{{ image_fabric_kea if 'image_fabric_kea' in (image_pins | default([], true)) else published_lock.kea }}"
+image_fabric_keycloak: "{{ image_fabric_keycloak if 'image_fabric_keycloak' in (image_pins | default([], true)) else published_lock.keycloak }}"
+image_fabric_stepca: "{{ image_fabric_stepca if 'image_fabric_stepca' in (image_pins | default([], true)) else published_lock.stepca }}"
+image_fabric_webui: "{{ image_fabric_webui if 'image_fabric_webui' in (image_pins | default([], true)) else published_lock.webui }}"
+{# verifies their signatures before a new digest is used (D81, D86) #}
+image_cosign: {{ image_cosign | default(images_lock.cosign) }}
+{# false turns the signature check off (D85): a relaxation, listed by `fabricctl status` and the web UI #}
+image_signature_check: {{ image_signature_check | default(true) | bool }}
 {# image_* keys the admin set explicitly: `fabricctl images update` leaves them alone. #}
 image_pins: {{ image_pins | default([], true) | to_json }}
 # After `fabricctl images update`: remove old images of fabric's repositories (never the rollback one).

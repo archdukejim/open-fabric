@@ -20,12 +20,14 @@ from fabriclib.system.version_info import version_info
 from fabriclib.vault.detect_devices import detect_devices
 from fabriclib.vault.list_slots import list_slots
 from fabriclib.vault.vault_status import vault_status
+from fabriclib.system.relaxed_settings import relaxed_settings
 
 # GET /v1/<route> -> the read operation answering it (vars are read per request)
 READS = {
     ("version",): lambda: version_info(),
     ("services",): lambda: service_status(),
     ("host-changes",): lambda: consent_status(os.path.join(load_vars()["deploy_base_dir"], "fabric", "config")),
+    ("relaxed-settings",): lambda: relaxed_settings(load_vars()),
     ("zones",): lambda: list_zones(),
     ("audit",): lambda: read_audit(),
     ("pki", "ca"): lambda: ca_summary(load_vars()),

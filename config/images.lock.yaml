@@ -67,6 +67,13 @@ images:
     digest: sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
     track: "v7.15.*"
     policy: auto
+  cosign:                            # verifies the signatures of fabric's published images (D81, D86)
+    var: image_cosign
+    repo: ghcr.io/sigstore/cosign/cosign
+    tag: "v3.0.6"
+    digest: sha256:de9c65609e6bde17e6b48de485ee788407c9502fa08b8f4459f595b21f56cd00
+    track: "v3.*"
+    policy: manual                   # a verifier changes only by a reviewed decision
   debian:                            # base of fabric/bind9:local, fabric/dirsrv:local, fabric/web:local,
                                      # fabric/kea:local and fabric/freeradius:local
     var: image_debian
@@ -75,6 +82,25 @@ images:
     digest: sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
     track: trixie-slim
     policy: auto
+
+# fabric's own images, built and smoke tested in CI, signed and published (manual 2.6.3, 4.7.1; D41).
+# An empty digest: not published yet, and hosts build that image themselves. `ids` are the service
+# account ids baked into the published image (the Dockerfile's defaults): a host whose
+# service_users.<account> differ builds that image itself (D80).
+published:
+  registry: ghcr.io/archdukejim/open-fabric
+  # who may have signed them: this repository's images workflow, from main, an rc/ branch or a v tag (D84)
+  signer: ^https://github\.com/archdukejim/open-fabric/\.github/workflows/images\.yml@refs/(heads/main|heads/rc/.+|tags/v.+)$
+  issuer: https://token.actions.githubusercontent.com
+  images:
+    adguard:    {var: image_fabric_adguard, tag: "", digest: ""}
+    bind9:      {var: image_fabric_bind9, tag: "", digest: "", account: bind, ids: "600:600"}
+    dirsrv:     {var: image_fabric_dirsrv, tag: "", digest: "", account: ldap, ids: "601:601"}
+    freeradius: {var: image_fabric_freeradius, tag: "", digest: "", account: freeradius, ids: "610:610"}
+    kea:        {var: image_fabric_kea, tag: "", digest: "", account: kea, ids: "609:609"}
+    keycloak:   {var: image_fabric_keycloak, tag: "", digest: ""}
+    stepca:     {var: image_fabric_stepca, tag: "", digest: ""}
+    webui:      {var: image_fabric_webui, tag: "", digest: "", account: webui, ids: "606:606"}
 
 # Packages installed into fabric's own images from an upstream's signed apt
 # repository (not Debian's): the exact version and the signing key's

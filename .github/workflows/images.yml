@@ -1,11 +1,14 @@
-# fabric's own images (decision D41, manual 4.7.1): build the eight images on native amd64 and arm64 runners
-# (P3, D82) and smoke test each one. Publishing — push to GHCR as one multi-arch image per name, then sign it
-# keyless with cosign (P2, D81) — happens only when run by hand on main with `publish` ticked; the digests then
-# go into config/images.lock.yaml through a reviewed commit (D40).
+# fabric's own images (decision D41, manual 4.7.1, 2.6.3.6): build the eight images on native amd64 and arm64
+# runners (P3, D82) and smoke test each one. Publishing (D84): run by hand with `publish` ticked on main
+# (tag <version>) or an rc/<version> branch (tag <version>-rc.<run>): push one multi-arch image per name and
+# sign it keyless with cosign (P2, D81); the digests then go into config/images.lock.yaml through a reviewed
+# commit (D40). A v<version> tag builds nothing: it verifies the digests its lock pins and tags them <version>.
 name: images
 
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]           # path filters do not apply to tags: a release tag always promotes
     paths:
       - packaging/images/**
       - packaging/docker-bake.hcl
@@ -39,11 +42,37 @@ on:
 permissions:
   contents: read
 
-env:
-  PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main' }}
-
 jobs:
+  plan:
+    if: github.ref_type != 'tag'
+    runs-on: ubuntu-24.04
+    outputs:
+      publish: ${{ steps.plan.outputs.publish }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Publish? Under which tag?
+        id: plan
+        env:
+          WANT: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        run: |
+          version="$(tr -d ' \n' < config/VERSION)"
+          publish=false; tag="$version"
+          if [ "$WANT" = true ]; then
+            case "$GITHUB_REF" in
+              refs/heads/main) publish=true ;;
+              refs/heads/rc/*)
+                # an rc branch is named for the version it prepares
+                [ "$GITHUB_REF_NAME" = "rc/$version" ] || { echo "::error::rc branch must be rc/$version"; exit 1; }
+                publish=true; tag="$version-rc.$GITHUB_RUN_NUMBER" ;;
+              *) echo "::error::images publish only from main or rc/<version> (D84)"; exit 1 ;;
+            esac
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: plan
     strategy:
       matrix:
         include:
@@ -62,7 +91,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends python3-yaml
           python3 packaging/images/bake_env.py >> "$GITHUB_ENV"
           {
-            echo "TAG=$(tr -d ' \n' < config/VERSION)"
+            echo "TAG=${{ needs.plan.outputs.tag }}"
             echo "REVISION=$GITHUB_SHA"
             echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY,,}"
             echo "CONTEXTS=$RUNNER_TEMP/contexts"
@@ -79,7 +108,7 @@ jobs:
           done
           exit "$fail"
       - name: Push this architecture
-        if: env.PUBLISH == 'true'
+        if: needs.plan.outputs.publish == 'true'
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
@@ -88,8 +117,8 @@ jobs:
           done
 
   publish:
-    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
-    needs: build
+    if: needs.plan.outputs.publish == 'true'
+    needs: [plan, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -102,7 +131,9 @@ jobs:
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           REGISTRY="ghcr.io/${GITHUB_REPOSITORY,,}"
-          TAG="$(tr -d ' \n' < config/VERSION)"
+          TAG="${{ needs.plan.outputs.tag }}"
+          echo "Published as \`$TAG\`; pin with \`python3 scripts/images/pin_published.py $TAG\` (manual 4.7.1.4)" \
+            >> "$GITHUB_STEP_SUMMARY"
           echo "| image | digest |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
           for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
@@ -113,3 +144,35 @@ jobs:
             cosign sign --yes "$REGISTRY/$name@$digest"
             echo "| $name | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
           done
+
+  promote:
+    # a release runs exactly what its candidate tested: the digests the tagged lock pins, verified, tagged <version>
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2 (cosign 3.0.6)
+      - name: Verify the pinned digests and tag them with the release
+        run: |
+          version="$(tr -d ' \n' < config/VERSION)"
+          [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "::error::tag $GITHUB_REF_NAME is not v$version"; exit 1; }
+          sudo apt-get install -y --no-install-recommends python3-yaml
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          python3 - > pinned.txt <<'PY'
+          import yaml
+          p = yaml.safe_load(open("config/images.lock.yaml"))["published"]
+          print(p["signer"]); print(p["issuer"])
+          for name, e in p["images"].items():
+              assert e.get("digest"), f"{name}: no digest pinned (publish an rc and pin it first)"
+              print(f'{p["registry"]}/{name} {e["digest"]}')
+          PY
+          { read -r signer; read -r issuer
+            while read -r repo digest; do
+              cosign verify --certificate-identity-regexp "$signer" --certificate-oidc-issuer "$issuer" \
+                "$repo@$digest" >/dev/null
+              docker buildx imagetools create -t "$repo:$version" "$repo@$digest"
+              echo "$repo:$version -> $digest" >> "$GITHUB_STEP_SUMMARY"
+            done; } < pinned.txt

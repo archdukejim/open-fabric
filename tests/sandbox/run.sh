@@ -104,6 +104,23 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
+echo "--- fabric's own images (manual 2.6.3): published and signature-checked once the lock pins them"
+published=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
+print(sum(1 for e in r('$REPO/config')['images'].values() if e['ref']))")
+if [ "$published" -eq 8 ]; then
+    check "the core services run fabric's published images (pulled, not built here)" \
+        "in_box 'docker inspect -f {{.Config.Image}} bind9 dirsrv keycloak step-ca fabric-web' \
+         | grep -c '^ghcr.io/archdukejim/open-fabric/' | grep -qx 5 && ! in_box 'docker image inspect fabric/bind9:local' >/dev/null 2>&1"
+    check "each was signature-checked before use (verified digests remembered, root-only)" \
+        "in_box 'stat -c %a /etc/fabric/images/verified.json' | grep -qx 600 \
+         && [ \"\$(in_box \"grep -cE '^ +.at.: ' /etc/fabric/images/verified.json\")\" -ge 5 ]"
+else
+    check "nothing published in this lock yet ($published of 8): the images are built here, as before" \
+        "in_box 'docker image inspect fabric/bind9:local fabric/web:local' >/dev/null"
+fi
+check "fabricctl status lists the relaxed security settings (none here)" \
+    "in_box 'fabricctl status' | grep -A1 '^relaxed security settings:' | grep -qx '  none'"
+
 echo "--- undoing one host change (manual 2.7.1.5): trust, then approved again"
 UFW_BEFORE=$(in_box 'cat /opt/fabric/config/host-originals/ufw.state' 2>/dev/null)
 check "the host's own files were kept before fabric first changed them (chrony's, ufw's state)" \

@@ -1,6 +1,10 @@
 {% extends "base.html" %}{% block body %}
 {% set ok = services | selectattr(1, 'equalto', 'active') | rejectattr(2, 'in', ['unhealthy', 'starting']) | list | length %}
 <h1>Overview</h1>
+{% if relaxed %}
+<div class="warn-text" role="status"><strong>Security relaxed on this host:</strong>
+<ul>{% for r in relaxed %}<li><code>{{ r.setting }}</code> — {{ r.effect }}</li>{% endfor %}</ul></div>
+{% endif %}
 <p class="muted">{{ ok }} of {{ services | length }} services healthy.</p>
 <section class="tiles">
 {% for name, state, health in services %}

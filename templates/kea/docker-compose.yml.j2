@@ -5,7 +5,10 @@ services:
   # capabilities, non-root": Kea cannot drop to another user, so it runs as
   # root inside the container, with a read-only root and no-new-privileges.
   kea-dhcp4:
-    image: {{ image_kea }}
+{% set published = published_ref('kea') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or image_kea }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/kea/build
       args:
@@ -17,6 +20,7 @@ services:
         KEA_KEY_FINGERPRINT: "{{ packages_lock.kea.key_fingerprint }}"
         KEA_UID: "{{ service_users.kea.uid }}"
         KEA_GID: "{{ service_users.kea.gid }}"
+{% endif %}
     container_name: kea-dhcp4
     logging:
       driver: journald
@@ -52,7 +56,7 @@ services:
 
   # DHCP-DDNS: registers lease hostnames in dhcp.<domain> with its own TSIG key.
   kea-ddns:
-    image: {{ image_kea }}
+    image: {{ published or image_kea }}
     container_name: kea-ddns
     depends_on:
       - kea-dhcp4

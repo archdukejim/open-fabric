@@ -76,6 +76,7 @@ from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
+from fabriclib.system.show_relaxed_settings import show_relaxed_settings  # noqa: E402
 
 
 def _base(args):
@@ -213,7 +214,9 @@ def main(argv):
         if cmd != "status":
             print(f"fabric: {cmd} done (systemctl {cmd} fabric.target)")
         else:
-            show_consent_status(SetupContext(deploy_base=_base(args)).config_dir)
+            ctx = SetupContext(deploy_base=_base(args))
+            show_consent_status(ctx.config_dir)
+            show_relaxed_settings(ctx.load_state().vars)
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)

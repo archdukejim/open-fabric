@@ -12,7 +12,8 @@ sys.path[0:0] = [os.path.join(REPO, 'src'), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402  (the same env deploy.py uses)
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 
-env = jinja_env(os.path.join(REPO, 'templates'))
+# FABRIC_TEST_TEMPLATES: another templates folder (its lock beside it), e.g. one with published digests pinned
+env = jinja_env(os.environ.get('FABRIC_TEST_TEMPLATES') or os.path.join(REPO, 'templates'))
 
 secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
@@ -223,16 +224,20 @@ for e in lock.values():
     assert v2[e['var']] == e['ref'], f"{e['var']} default is not the lock's ref: {v2[e['var']]}"
 for key, val in v2.items():
     if key.startswith('image_') and isinstance(val, str):
-        assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local'), f'{key} not pinned: {val}'
+        # image_fabric_*: "" until the lock pins fabric's published image (manual 2.6.3)
+        assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local') or \
+            (key.startswith('image_fabric_') and val == ''), f'{key} not pinned: {val}'
 for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     for name, spec in dc['services'].items():
         ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
-        assert '@sha256:' in ref or (spec.get('build') and '@sha256:' in spec['build']['args'].get('BASE_IMAGE', '')),             f'{svc}/{name}: image not pinned: {ref}'
+        assert '@sha256:' in ref or (spec.get('build') and '@sha256:' in spec['build']['args'].get('BASE_IMAGE', '')), \
+            f'{svc}/{name}: image not pinned: {ref}'
 for df in glob.glob(os.path.join(REPO, 'packaging', 'images', '*', 'Dockerfile')):
     text = open(df).read()
     assert not re.search(r'^ARG BASE_IMAGE=', text, re.M), f'{df}: BASE_IMAGE must have no default'
-    assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')),         f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
+    assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')), \
+        f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
 print('every image pinned by digest (lock, vars defaults, compose files, Dockerfiles)')
 
 # Fluent Bit (optional log forwarding, D20): verified TLS to every destination, no credential in the file
@@ -316,7 +321,10 @@ for bad, msg in ((lambda d: d["subnets"][0].update(pools=["192.168.8.1 - 192.168
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]
 assert kc["kea-dhcp4"]["cap_add"] == ["NET_RAW", "NET_BIND_SERVICE"] and kc["kea-dhcp4"]["network_mode"] == "host"
 assert kc["kea-ddns"]["user"] == "609:609" and not kc["kea-ddns"].get("cap_add")
-assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
+if "build" in kc["kea-dhcp4"]:      # built here; a host on fabric's published Kea image pulls it (manual 2.6.3)
+    assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
+else:
+    assert "@sha256:" in kc["kea-dhcp4"]["image"] and kc["kea-ddns"]["image"] == kc["kea-dhcp4"]["image"]
 print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, two capabilities only')
 
 # FreeRADIUS (802.1X): clients with their secrets, BlastRADIUS protection unless relaxed per client,

@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.deploy.compose_builds import compose_builds
 from fabriclib.dns.install_zone_file import install_zone_file
 from fabriclib.dns.reload_zone import reload_zone
 from fabriclib.dns.rndc import rndc
@@ -40,10 +41,11 @@ def finish_without_start(paths, state, bind_ids):
     if state["daemon_reload"]:
         subprocess.run(["systemctl", "daemon-reload"], timeout=30)
     for folder in sorted(state["rebuild"]):
-        print(f"Building {folder} image...")
-        res = subprocess.run(["docker", "compose", "-f", os.path.join(paths["base"], folder, "docker-compose.yml"),
-                              "build"], capture_output=True, text=True, timeout=1800)
+        compose = os.path.join(paths["base"], folder, "docker-compose.yml")
+        verb = "build" if compose_builds(compose) else "pull"     # fabric's published images are pulled
+        print(f"{'Building' if verb == 'build' else 'Pulling'} {folder} image...")
+        res = subprocess.run(["docker", "compose", "-f", compose, verb], capture_output=True, text=True, timeout=1800)
         if res.returncode != 0:
-            raise ValidationError(f"building the {folder} image failed:\n{res.stdout[-1500:]}{res.stderr[-1500:]}")
+            raise ValidationError(f"{verb} of the {folder} image failed:\n{res.stdout[-1500:]}{res.stderr[-1500:]}")
     print("Configuration deployed (services not started).")
     return restart

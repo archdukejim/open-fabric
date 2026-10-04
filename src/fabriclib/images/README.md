@@ -7,7 +7,7 @@ the images a host runs, and only `fabricctl images update` moves them.
 
 | File | What |
 |---|---|
-| `constants.py` | Managed services in update order (unit, container, image var, local build) and the rollback state file |
+| `constants.py` | Managed services in update order (unit, container, image var, local build, published image) and the rollback and verified-digest files |
 | `installed_services.py` | The managed services this install has |
 | `built_from.py` | The base a local fabric image was built FROM (its `org.fabric.base` label) |
 | `needs_rebuild.py` | Whether a compose file's local image is missing or built from another base than its pinned one |
@@ -18,3 +18,6 @@ the images a host runs, and only `fabricctl images update` moves them.
 | `rollback_image.py` | Back to the image before the last update |
 | `prune_images.py` | Remove old images of fabric's repositories: not pinned, not the rollback image, not used by any container |
 | `run_images_command.py` | `fabricctl images status / update / rollback / prune` |
+| `published_image.py` | The one rule: does this host run fabric's published image or build its own (ids must match, D80) |
+| `effective_service.py` | A managed service as this host runs it (published image: its own var, no local build) |
+| `verify_signature.py` | `cosign verify` (pinned image) of a published image against fabric's signer; verified digests remembered |

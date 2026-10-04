@@ -2,7 +2,7 @@
 # refused (default deny). "session" = any signed-in fabric user.
 GET = {
     ("version",): "session",
-    ("services",): "status:read", ("host-changes",): "status:read",
+    ("services",): "status:read", ("host-changes",): "status:read", ("relaxed-settings",): "status:read",
     ("zones",): "dns:read", ("zones", "*"): "dns:read", ("reverse-zones",): "dns:read", ("tsig",): "dns:read",
     ("audit",): "audit:read",
     ("dhcp",): "dhcp:read",

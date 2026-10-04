@@ -36,6 +36,7 @@ Technologies, hardware, vendors and integrations.
 
 - [2.6.1 Image channels](2.6.1-image-channels.md)
 - [2.6.2 Image updates: validation and the host side](2.6.2-image-updates.md)
+- [2.6.3 fabric's published images on hosts](2.6.3-published-images-on-hosts.md)
 
 ## 2.7 Host changes and consent
 

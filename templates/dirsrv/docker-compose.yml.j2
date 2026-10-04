@@ -1,6 +1,9 @@
 services:
   dirsrv:
-    image: {{ image_dirsrv }}
+{% set published = published_ref('dirsrv') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or image_dirsrv }}
+{% if not published %}
     build:
       context: {{ deploy_base_dir }}/dirsrv/build
       args:
@@ -8,6 +11,7 @@ services:
         DS_UID: "{{ service_users.ldap.uid }}"
         DS_GID: "{{ service_users.ldap.gid }}"
         BUILD_REV: "2"            # 2: stale pid files removed at start (dscontainer-launch.py)
+{% endif %}
     container_name: dirsrv
     # to the host journal (fabric-web, openbao, … by name): `docker logs` still works,
     # and the optional log forwarder reads everything from one place

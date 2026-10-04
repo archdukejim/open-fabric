@@ -9,6 +9,7 @@ from fabriclib.common.vars_lock import vars_lock
 from fabriclib.common.write_audit import write_audit
 from fabriclib.deploy.deploy_paths import deploy_paths
 from fabriclib.dhcp.check_kea_config import check_kea_config
+from fabriclib.dhcp.common.kea_image import kea_image
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp
 from fabriclib.federation.network_conflicts import network_conflicts
 from fabriclib.federation.read_address_plan import read_address_plan
@@ -66,8 +67,9 @@ def edit_dhcp(actor, event, change, source="cli"):
         data["dhcp"] = normalize_dhcp({**data, "dhcp": dhcp, "install_kea": True})
         _check_address_plan(before, data)
         if data.get("install_kea"):         # vars.yaml holds the rendered settings: render Kea's file from them
-            text = jinja_env(deploy_paths()["jinja"]).get_template("kea/kea-dhcp4.conf.j2").render(**data)
-            check_kea_config(data.get("image_kea", "fabric/kea:local"), "kea-dhcp4.conf", text)
+            env = jinja_env(deploy_paths()["jinja"])
+            text = env.get_template("kea/kea-dhcp4.conf.j2").render(**data)
+            check_kea_config(kea_image(env, data), "kea-dhcp4.conf", text)
         save_vars(data)
     write_audit(actor, event, detail, source)
     return result, data["dhcp"]

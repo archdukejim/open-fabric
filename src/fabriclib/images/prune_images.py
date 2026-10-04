@@ -3,6 +3,7 @@ import os
 import subprocess
 
 from fabriclib.common.read_images_lock import read_images_lock
+from fabriclib.common.read_published_lock import read_published_lock
 from fabriclib.images.constants import SERVICES, STATE
 
 
@@ -20,8 +21,8 @@ def _repo(name):
 
 def prune_images(ctx):
     """Purpose: remove old images of the repositories fabric uses (nginx, postgres, the bases of its local
-             builds, …): everything not pinned now, not the previous image of a service (kept for rollback) and
-             not used by any container, fabric's or not; then prune dangling local builds (label
+             builds, fabric's published images, …): everything not pinned now, not the previous image of a service
+             (kept for rollback) and not used by any container, fabric's or not; then prune dangling local builds (label
              org.fabric.base). Never touches images of other repositories.
     Inputs:  ctx — SetupContext with vars and target_dir. Reads images.lock.yaml, the rollback STATE file,
              and Docker (containers, images).
@@ -30,8 +31,11 @@ def prune_images(ctx):
              docker is missing. A `docker rmi` that fails is skipped silently.
     Feeds:   run_images_command (prune, and after update when vars image_prune is true)."""
     v = ctx.vars
-    repos = {_repo(e["repo"]) for e in read_images_lock(ctx.target_dir).values()}
-    keep = {v.get(s["var"]) for s in SERVICES}
+    published = read_published_lock(ctx.target_dir).get("images") or {}
+    repos = {_repo(e["repo"]) for e in [*read_images_lock(ctx.target_dir).values(), *published.values()]}
+    # every service's image, fabric's published ones (image_fabric_*) and the cosign that verifies them
+    keep = ({v.get(s["var"]) for s in SERVICES} | {v.get(e["var"]) for e in published.values()}
+            | {v.get("image_cosign")})
     if os.path.exists(STATE):
         with open(STATE) as f:
             keep |= {e.get("previous") for e in json.load(f).values()}

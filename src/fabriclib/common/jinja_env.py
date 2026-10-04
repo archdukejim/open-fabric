@@ -9,11 +9,14 @@ import time
 import jinja2
 import yaml
 
+from fabriclib.common.lock_dir import lock_dir
 from fabriclib.common.read_images_lock import read_images_lock
 from fabriclib.common.read_packages_lock import read_packages_lock
+from fabriclib.common.read_published_lock import read_published_lock
 from fabriclib.dhcp.kea_client_classes import kea_client_classes
 from fabriclib.dhcp.kea_option_data import kea_option_data
 from fabriclib.dhcp.kea_option_defs import kea_option_defs
+from fabriclib.images.published_image import published_image
 
 
 class _RelativeEnvironment(jinja2.Environment):
@@ -94,8 +97,9 @@ def jinja_env(template_dir):
              filters, the `match` test, relative extends, trim_blocks/lstrip_blocks, trailing newlines kept.
     Inputs:  template_dir — str, the jinja folder (templates); its parent holds images.lock.yaml (an installed
              tree), or the parent's config/ does (the repository).
-    Returns: jinja2.Environment with globals images_lock ({name: ref}), packages_lock, lookup and the Kea helpers
-             (kea_option_data, kea_option_defs, kea_client_classes).
+    Returns: jinja2.Environment with globals images_lock ({name: ref}), packages_lock, published_lock ({name: ref or
+             ""}), published_ref(name) (the published image a host runs, or "": images/published_image), lookup and
+             the Kea helpers (kea_option_data, kea_option_defs, kea_client_classes).
     Fails:   yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is
              unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest.
              A missing lock file gives empty globals, not an error.
@@ -122,10 +126,12 @@ def jinja_env(template_dir):
     env.globals.update(kea_option_data=kea_option_data, kea_option_defs=kea_option_defs,
                        kea_client_classes=kea_client_classes)
     # image_* defaults: the validated, digest-pinned refs — fabric/images.lock.yaml on a host, config/ in the repository
-    lock_dir = os.path.dirname(template_dir)
-    if not os.path.exists(os.path.join(lock_dir, "images.lock.yaml")) and os.path.isdir(os.path.join(lock_dir,
-                                                                                                     "config")):
-        lock_dir = os.path.join(lock_dir, "config")
-    env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(lock_dir).items()}
-    env.globals["packages_lock"] = read_packages_lock(lock_dir)
+    locks = lock_dir(template_dir)
+    env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(locks).items()}
+    env.globals["packages_lock"] = read_packages_lock(locks)
+    # fabric's own published images (manual 2.6.3): image_fabric_* defaults, and which one a host runs
+    published = (read_published_lock(locks) or {}).get("images") or {}
+    env.globals["published_lock"] = {k: e["ref"] for k, e in published.items()}
+    env.globals["published_ref"] = jinja2.pass_context(
+        lambda ctx, name: published_image(ctx, published[name]) if name in published else "")
     return env
