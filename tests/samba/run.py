@@ -18,6 +18,7 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.deploy.check_samba_settings import check_samba_settings  # noqa: E402
 from fabriclib.deploy.service_units import service_units  # noqa: E402
+from fabriclib.dns_filter.deploy_adguard import _domains as adguard_zones  # noqa: E402
 from fabriclib.secrets.random_password import random_password  # noqa: E402
 
 PASS = FAIL = 0
@@ -144,6 +145,10 @@ check("BIND gets a Kerberos replay cache and 128 MiB at 4 GB with the domain (80
       any(t.startswith("/var/tmp:") for t in b_on["tmpfs"])
       and b_on["deploy"]["resources"]["limits"]["memory"] == "128M"
       and b_off["deploy"]["resources"]["limits"]["memory"] == "80M")
+sibling = {**v, "ad_domain": "ad.test"}
+check("the DNS filter forwards the AD zone to BIND, also when it sits beside fabric's domain (ad.<parent>)",
+      "ad.test" in adguard_zones(sibling, {}) and "ad.lan.test" in adguard_zones(v, {})
+      and "ad.lan.test" not in adguard_zones(off, {}))
 units = {u["service"]: u for u in service_units("/opt", v)}
 check("a samba unit, enabled with install_samba, requiring nothing",
       units["samba"]["enabled"] and units["samba"]["requires"] == []

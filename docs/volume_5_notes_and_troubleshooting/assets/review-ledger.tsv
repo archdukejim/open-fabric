@@ -22,7 +22,7 @@ docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3f
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
 docs/volume_1_systems_and_services/1.11.10-fabriclib-dns.md	acecf4d3ae27b57b09e11823bfe6f0c23c526ded	2026-10-03	
-docs/volume_1_systems_and_services/1.11.11-fabriclib-dns_filter.md	9bbfd6ab682662dbdd4e53493294427381e6d7d1	2026-10-03	
+docs/volume_1_systems_and_services/1.11.11-fabriclib-dns_filter.md	bee086571f5d98759bd1ed508931867b15ce0d71	2026-10-04	
 docs/volume_1_systems_and_services/1.11.12-fabriclib-federation.md	2d725a866aa1be4d221c7f15d61be4682805516d	2026-10-04	
 docs/volume_1_systems_and_services/1.11.13-fabriclib-images.md	3445b2434d00c67154bd7edc0734cd7eca945a99	2026-10-04	
 docs/volume_1_systems_and_services/1.11.14-fabriclib-keycloak.md	38738d2af47eb57c3a1473e16f44ef6f967c2c98	2026-10-03	
@@ -96,7 +96,7 @@ docs/volume_2_technologies_and_features/2.1.5-docker.md	c96f3335dc5fb8c94b8071be
 docs/volume_2_technologies_and_features/2.1.6-security.md	2021dba361dc923264aacede24d753d14d9f819e	2026-10-03	
 docs/volume_2_technologies_and_features/2.1.7-directory.md	7b697e1f5ef7f2f0b4349b22e781e7dea90c07e8	2026-10-03	
 docs/volume_2_technologies_and_features/2.1.8-landing-links.md	fe90652ee66699bbb24d1e58a45dfc40ff23f01c	2026-10-03	
-docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	77fbf3401513a20af508987525c18c617e1beed7	2026-10-04	
+docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	6dbeed77c9da31b674f708ba1b6bf0e19f94fa0e	2026-10-04	
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	103a4ee9a4f8184323c1060cf66f0436f3c17bc3	2026-10-04	
 docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	f745f2711a47bb65f7e5b9d0772a3d59464f23e4	2026-10-04	
 docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	72f82eaf4d59314ace1c5c09f2226a63a9dd9c56	2026-10-04	
@@ -460,7 +460,7 @@ src/fabriclib/dns/zone_name.py	b09815fd4726920e0bd9aeaebf9a23f0ad4fd0c3	2026-09-
 src/fabriclib/dns_filter/README.md	b02e538a5bc23ec499e2980555ee917e508f3bd2	2026-10-03	
 src/fabriclib/dns_filter/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/dns_filter/build_adguard_config.py	a4d1f8ffda1e91279a089cabcfc5c3b9ac8684a7	2026-10-03	
-src/fabriclib/dns_filter/deploy_adguard.py	462dfdba4abcda55750d7e90c18da65f3f0d90d5	2026-10-03	
+src/fabriclib/dns_filter/deploy_adguard.py	9c2e02934293c52a46780e46a5bfb66ec4bd1c20	2026-10-04	
 src/fabriclib/federation/README.md	238db89ff6a4e1655355ad7e71eaf9442dd3365d	2026-10-03	
 src/fabriclib/federation/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-01	
 src/fabriclib/federation/accept_join.py	c0cd135ba59690c2f633c79e9ef5063196c6f28f	2026-10-03	
@@ -1127,7 +1127,7 @@ tests/render.py	a2d65966e45d6a28ab1995a6f8e0af275e3d1b8b	2026-10-04
 tests/run-all.sh	ddd4774dba494f5cf8a4d60acbaa63d248265ca9	2026-10-04	
 tests/samba/README.md	a4824504d00ed9b6ff46caacea20cde28717d792	2026-10-04	
 tests/samba/dc.py	ba62d613ab05371b6aa351f5b3ebf31831edb3e4	2026-10-04	
-tests/samba/run.py	765b763fc9453f21d6ba99496e367ef14e84ed5c	2026-10-04	
+tests/samba/run.py	a9f6e758f8bd99a4467d0d342623fbc32c0cbd0b	2026-10-04	
 tests/sandbox/Dockerfile	46a7ff3893744a092bf54127ef8debbc66bd9091	2026-09-30	
 tests/sandbox/README.md	cd9a9766a87b582251cd9a36e1c5246ead576551	2026-10-03	
 tests/sandbox/certs_page_test.sh	f9d69252199bc570f30f920ab52ee6800cf0e728	2026-09-30	
