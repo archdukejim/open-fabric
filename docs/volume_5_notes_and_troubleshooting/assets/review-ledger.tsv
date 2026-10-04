@@ -49,13 +49,13 @@ docs/volume_1_systems_and_services/1.11.6-fabriclib-consent.md	424b9927b5c2538a3
 docs/volume_1_systems_and_services/1.11.7-fabriclib-core.md	9c5e7972b32f25f0d78e2e6b2862213f6933a2d0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.8-fabriclib-deploy.md	026976d0f62b7cb92fe69f6cba44163f98097629	2026-10-04	
 docs/volume_1_systems_and_services/1.11.9-fabriclib-dhcp.md	a0ffcb74cd8618df61c84cee5c65319aec1b6931	2026-10-04	
-docs/volume_1_systems_and_services/1.2.1-product-decisions.md	10c74b0dec2030148f4d45e402d0167fb6b91b91	2026-10-04	
+docs/volume_1_systems_and_services/1.2.1-product-decisions.md	171b71138d78f99bf04323116c361bea6dbfe620	2026-10-04	
 docs/volume_1_systems_and_services/1.2.2-checklist-answers.md	fe0aceca8b55d2eba1e2147e78795ec07af6c9de	2026-10-04	
 docs/volume_1_systems_and_services/1.2.3-deviations.md	667736491286116d373eb476a6978f6ba148ee84	2026-10-03	
 docs/volume_1_systems_and_services/1.2.4-federation-decisions.md	ea933f3f76d1ce85f29c23449a87e32f59668e9a	2026-10-03	
 docs/volume_1_systems_and_services/1.2.5-domain-join-decisions.md	6b9f95082bf7f6ff57f92a4073f95d0397233346	2026-10-03	
-docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	13715e7215b9f58840e11409eb4b4d3077a030da	2026-10-04	
-docs/volume_1_systems_and_services/1.2.7-alignment-decisions.md	d3eefa28d0b0b705ec6172f4047b6e04ecd5c2fe	2026-10-04	
+docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	a6a7ee5906155005dcb81e00bc446296a7df6fd6	2026-10-04	
+docs/volume_1_systems_and_services/1.2.7-alignment-decisions.md	8d392955cee3870fe12f7a3f222ae0e56b8e5e05	2026-10-04	
 docs/volume_1_systems_and_services/1.3.1-topology.md	0711f333a20c0c66bd96456f723503dd198e956c	2026-10-03	
 docs/volume_1_systems_and_services/1.3.2-repository-layout.md	150fec40e2dc2f35bdc767829c98fbafb53b3083	2026-10-03	
 docs/volume_1_systems_and_services/1.3.3-installed-layout.md	94454ad3586c06cf19c3accae9640c7fde54d447	2026-10-03	
@@ -166,7 +166,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	a015d9e67fce35a4f8946cd2591c0a240f138868	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e75a50ebc2a14f6d8a6c7c942810aa8de91ae139	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	2558590302694a1cab6c039a7cd0af76aadb0dfe	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	555ee02ea3a59c27724751d244dab3ae0c42b73f	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
