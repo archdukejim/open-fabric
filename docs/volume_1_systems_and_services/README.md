@@ -7,6 +7,7 @@ Architecture, services, APIs and runtime infrastructure.
 - [1.1.1 What fabric is](1.1.1-what-fabric-is.md)
 - [1.1.2 Where fabric came from](1.1.2-history.md)
 - [1.1.3 Phases](1.1.3-phases.md)
+- [1.1.4 Roadmap](1.1.4-roadmap.md)
 
 ## 1.2 Decision register
 
@@ -18,7 +19,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 - [1.2.4 Federation decisions F1–F10 (D60–D69, in order)](1.2.4-federation-decisions.md)
 - [1.2.5 Domain-join decisions J1–J3 (D70–D72, in order)](1.2.5-domain-join-decisions.md)
 - [1.2.6 Samba decisions S1–S6 (D73–D78, in order)](1.2.6-samba-decisions.md)
-- [1.2.7 Alignment decisions D79–D83](1.2.7-alignment-decisions.md)
+- [1.2.7 Alignment decisions D79–D86](1.2.7-alignment-decisions.md)
 
 ## 1.3 Architecture
 

@@ -16,7 +16,8 @@ config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-
 docs/README.md	cd1882070d1e8ad1ff80ad68e4bd0155d37e4ed5	2026-10-03	
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
-docs/volume_1_systems_and_services/1.1.3-phases.md	4756e706016ac97ddd63099dc427f8edf875484e	2026-10-03	
+docs/volume_1_systems_and_services/1.1.3-phases.md	663052961ae0200a3d8bb5d5d35fe1289dd0385a	2026-10-04	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	9272db7573edcb3671e3a374bc06e50a53ac2205	2026-10-04	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -79,9 +80,9 @@ docs/volume_1_systems_and_services/1.8.3-between-sites.md	0b9f0f18e3cfeff027f4f4
 docs/volume_1_systems_and_services/1.8.4-joining.md	861bf348e12f2ea5af2daf8f2323adff3fa7346c	2026-10-03	
 docs/volume_1_systems_and_services/1.8.5-attachment.md	8c019f156583486eb671291a5e346faaf0727d18	2026-10-03	
 docs/volume_1_systems_and_services/1.8.6-changes.md	b48ab8b8e8849006ebba4d0a504eb7adc8642f7f	2026-10-03	
-docs/volume_1_systems_and_services/1.8.7-milestones.md	97f74a867c1383689c18ace007c65fc897e6cc2b	2026-10-03	
+docs/volume_1_systems_and_services/1.8.7-milestones.md	b00feddf4faa1b7459bad7fcfe809f17ad85b846	2026-10-04	
 docs/volume_1_systems_and_services/1.9.1-security-defaults.md	e299efc1f11dc528fd23949e503e1db1ba4ed468	2026-10-04	
-docs/volume_1_systems_and_services/README.md	54112dd127f9d4494bb6b3ed3598ae38f0618420	2026-10-03	
+docs/volume_1_systems_and_services/README.md	3224ab8a96b05b65cff46174c8a91338d6473453	2026-10-04	
 docs/volume_2_technologies_and_features/2.1.1-about-settings.md	217838baae8569b20211e5b704463b720b8af374	2026-10-03	
 docs/volume_2_technologies_and_features/2.1.10-webui.md	6c42de257b210a96f3603cb152f7c7afaf2834f3	2026-10-03	
 docs/volume_2_technologies_and_features/2.1.2-global.md	6f5c0e07f92ae2813ec01de1a258a2dc0e8c1dec	2026-10-03	
@@ -93,7 +94,7 @@ docs/volume_2_technologies_and_features/2.1.7-directory.md	7b697e1f5ef7f2f0b4349
 docs/volume_2_technologies_and_features/2.1.8-landing-links.md	fe90652ee66699bbb24d1e58a45dfc40ff23f01c	2026-10-03	
 docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	a4973f0b6d0e6c8a06229e8be60c7cca984d3e80	2026-10-03	
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	9d27e30127127e600778bf95386ecbc2afb61d1e	2026-10-03	
-docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	8b44da2e42ae4c2e6e13a61c52717ce31b1da77f	2026-10-03	
+docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	a498548186cd671ab0d472daad6809b1a7705576	2026-10-04	
 docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	301d3b76db26fdfbb7f6cda69696841db43c30ef	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.1-kea-design.md	da4655d3733b7fdf899606642209a7e0288d12ab	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	89e60e01fa08b336cfa2c96b0899753ad61648be	2026-10-03	
@@ -156,8 +157,8 @@ docs/volume_5_notes_and_troubleshooting/5.1.3-repository-layout-proposal.md	7797
 docs/volume_5_notes_and_troubleshooting/5.1.4-image-publishing-proposal.md	79f14a6b9059c5894e5deb7382dbed45bec0c9d5	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.2.1-stale-code.md	296dc71d94e1f3ea2b696792141114c4417fa666	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.3.1-review-2026-09-30.md	5d3aa20aa58960bfc232e14c782627ab0558e3bd	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.4.1-deferred-work.md	110ecaefae48f3cfa5c2fdcf9ecb448298be2729	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.4.2-known-gaps.md	18b6ece09142f5f4b6440321410c09c6f7151bc9	2026-10-03	
+docs/volume_5_notes_and_troubleshooting/5.4.1-deferred-work.md	4c577df430f817042fb7b35cf0e34d4816c1e504	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.4.2-known-gaps.md	6988390fb8b6c3306962d1e305bc8fad8271da63	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.5.1-checklist-reasoning.md	7254d0499dcb9e5cad53cd192fc3a46eb8a72b2a	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.5.2-references.md	49e24e286eb08331648dbee81c04edf55de0776c	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.5.3-rejected-options.md	614a28afd980fe9471b235eb98fbd752932e963f	2026-10-03	
