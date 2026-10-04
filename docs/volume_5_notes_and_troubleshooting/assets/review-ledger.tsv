@@ -17,7 +17,7 @@ docs/README.md	cd1882070d1e8ad1ff80ad68e4bd0155d37e4ed5	2026-10-03
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	663052961ae0200a3d8bb5d5d35fe1289dd0385a	2026-10-04	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	42da8b5ba1642592195eba79ce9daae8f63bd429	2026-10-04	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	13e82f2b94048a25e66b2d7f910fdf3027834b33	2026-10-04	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -166,7 +166,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	a015d9e67fce35a4f8946cd2591c0a240f138868	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e75a50ebc2a14f6d8a6c7c942810aa8de91ae139	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	83dec2800650879cfd488ad4bbb0ae353cc9396b	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	2558590302694a1cab6c039a7cd0af76aadb0dfe	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
@@ -218,7 +218,7 @@ scripts/images/README.md	c16836e4bd5966e65ac173da026d82e7eab4afc4	2026-10-04
 scripts/images/pin_published.py	93b95080ff435f976f63cf7c3a25f879a9f7e011	2026-10-04	
 scripts/install-from-checkout.sh	b03b6b30bb230d09753b070af8f196285dfe788a	2026-10-03	
 spikes/README.md	e7f26894734f8305edb7c43d85ac5425fc0b86c6	2026-10-04	
-spikes/samba/README.md	2feb9d1ab68abbbfab149c1e7d427e62fc605746	2026-10-04	
+spikes/samba/README.md	a80605b77f67581494ac99f4cf93bbfd6a8b50c9	2026-10-04	
 spikes/samba/ad-schema.py	49a45325cdcc6ca7dc41d3b7f54906d4eb40d6d4	2026-10-04	
 spikes/samba/bind/Dockerfile	83ef852c7793ad610f1ddea405094230ac2a8978	2026-10-04	
 spikes/samba/bind/README.md	d2a879df21df1c15c82ef4a1f798550432dd0e19	2026-10-04	
@@ -234,6 +234,9 @@ spikes/samba/dc/entrypoint.sh	0802eceff85845100faabfb60f62230f9514da1d	2026-10-0
 spikes/samba/dc/setpass.py	3be751fb28dada89aea0c47045f08bd9baa29866	2026-10-04	
 spikes/samba/fabric-schema.py	7d07d0a7e3e09bf0d9a0adbf37275437fcf48352	2026-10-04	
 spikes/samba/q1-q2.sh	4ca594585a32bf73a77bba9264a0a9c0daa35312	2026-10-04	
+spikes/samba/q11-migrate.py	bfaa1b8480adaa8c82524ca5cc9cf549764ede0d	2026-10-04	
+spikes/samba/q11-populate.py	d1ae64b0e7fad958f0fcdf828b46473be1691176	2026-10-04	
+spikes/samba/q11.sh	6f926adbab7ee1ad6b6338a56b16468fb7586a4d	2026-10-04	
 spikes/samba/q3-q6.sh	5f28674913b0fa393862f242055d256df9eb478d	2026-10-04	
 spikes/samba/q4.sh	c62a7a63e73db085426dd56334fe88217fbb77eb	2026-10-04	
 spikes/samba/q7.sh	f14461ae1315c96f74baad8d1daa536ed18080a4	2026-10-04	
