@@ -38,6 +38,10 @@ Engineering notes, troubleshooting, trade-offs and blockers.
 - [5.7.1 Test environments](5.7.1-test-environments.md)
 - [5.7.2 The owner's network](5.7.2-owner-network.md)
 
+## 5.8 Design proposals
+
+- [5.8.1 Proposal: Samba AD replaces 389-DS as fabric's directory](5.8.1-samba-replaces-389ds.md)
+
 ## Assets
 
 [`assets/`](assets/README.md): data the chapters rest on (the review ledger, 5.3).
