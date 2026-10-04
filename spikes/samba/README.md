@@ -20,6 +20,8 @@ network `s0net`, images `s0/*`) and kept in `/var/tmp/s0`; nothing else is touch
 | `client/` | Ubuntu 24.04 with SSSD, adcli and sudo: a Linux machine joining AD |
 | `q9.sh` | Q9 (Linux join into the site's OU, identities with fabric's ids, Kerberos, access by group, sudo from AD) |
 | `q11-populate.py`, `q11-migrate.py`, `q11.sh` | Q11 (a real 389-DS filled the way fabric fills it, migrated into AD and compared) |
+| `q12.sh` | Q12 (a writable site DC cut off, changes on both sides, a conflict, reconnecting and converging) |
+| `q15.sh` | Q15 (a site DC writable -> read-only -> writable under the same name) |
 | `q3-q6.sh` | Q3 (fabric's schema, a device and a network in AD) and Q6 (an RODC: replication, cached sign-in with the root DC down, refusals) |
 
 ```bash
