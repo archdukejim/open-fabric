@@ -13,10 +13,12 @@ network `s0net`, images `s0/*`) and kept in `/var/tmp/s0`; nothing else is touch
 | `bind/` | fabric's BIND (9.20, uid 600) plus Samba's DLZ module, serving the AD zone from the DC's database |
 | `q1-q2.sh` | Q1 (a hardened DC, minimum capabilities, re-run) and Q2 (BIND with DLZ: answers, signed updates, refusals) |
 | `q4.sh` | Q4 (per-site delegation on an OU) and Q5 (child domains) |
-| `fabric-schema.py` | fabric's directory schema as AD schema objects (OIDs AD accepts, from fabric's UUID) |
+| `ad-schema.py` | Schema sets as AD schema objects: fabric's (OIDs AD accepts, from fabric's UUID) and sudo's |
 | `q7.sh` | Q7 (Keycloak with AD as its user store: sign-in, refusals, a password reset landing in AD) |
 | `radius/` | Debian's FreeRADIUS (uid 610) with `ntlm_auth` and `eapol_test`: PEAP-MSCHAPv2 checked by AD through the DC's winbind |
 | `q8.sh` | Q8 (PEAP for a person and a machine, refusals) |
+| `client/` | Ubuntu 24.04 with SSSD, adcli and sudo: a Linux machine joining AD |
+| `q9.sh` | Q9 (Linux join into the site's OU, identities with fabric's ids, Kerberos, access by group, sudo from AD) |
 | `q3-q6.sh` | Q3 (fabric's schema, a device and a network in AD) and Q6 (an RODC: replication, cached sign-in with the root DC down, refusals) |
 
 ```bash
@@ -37,6 +39,10 @@ sudo bash spikes/samba/q7.sh
 
 ```bash
 sudo bash spikes/samba/q8.sh
+```
+
+```bash
+sudo bash spikes/samba/q9.sh
 ```
 
 Keep the WSL distribution running for the whole run (a background `sleep`): if it idles out, Docker restarts

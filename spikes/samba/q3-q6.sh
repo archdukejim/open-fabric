@@ -12,7 +12,7 @@ ldap() {  # tool host ldif-text [auth] -> the tool's last line
 echo "--- Q3"
 schema_ok=1
 for part in attributes classes; do      # two sessions: the classes need the reloaded schema
-    python3 "$HERE/fabric-schema.py" "$B" "$part" | docker exec -i s0-dc sh -c "cat > /tmp/$part.ldif"
+    python3 "$HERE/ad-schema.py" "$B" fabric "$part" | docker exec -i s0-dc sh -c "cat > /tmp/$part.ldif"
     r=$(dx ldbmodify -H /data/private/sam.ldb --option="dsdb:schema update allowed=true" "/tmp/$part.ldif" 2>&1 \
         | tail -1)
     echo "$r" | grep -q successfully || { schema_ok=0; echo "FAIL schema $part: $r"; }
