@@ -26,21 +26,24 @@ shell_files() {
     done
 }
 
-out=$(docker run --rm -v "$REPO:/io" -w /io "$RUFF" check src scripts tests 2>&1)
+# pulled first, so a check's output is only the tool's findings (a pull reports its progress on stderr)
+for image in "$RUFF" "$SHELLCHECK"; do docker pull -q "$image" >/dev/null || { echo "FAIL cannot pull $image"; exit 1; }; done
+
+out=$(docker run --rm -v "$REPO:/io" -w /io "$RUFF" check src scripts tests 2>&1); rc=$?
 echo "$out" | tail -15 | sed 's/^/    /'
-check "ruff: no findings in src/, scripts/ and tests/ (pyproject.toml)" "grep -q 'All checks passed' <<<\"\$out\""
+check "ruff: no findings in src/, scripts/ and tests/ (pyproject.toml)" "[ $rc -eq 0 ]"
 
 mapfile -t product < <(shell_files src packaging scripts)
-out=$(docker run --rm -v "$REPO:/mnt" -w /mnt "$SHELLCHECK" -S warning "${product[@]}" 2>&1)
+out=$(docker run --rm -v "$REPO:/mnt" -w /mnt "$SHELLCHECK" -S warning "${product[@]}" 2>&1); rc=$?
 echo "$out" | tail -15 | sed 's/^/    /'
-check "shellcheck: no warnings in the product's ${#product[@]} shell scripts" "[ -z \"\$out\" ]"
+check "shellcheck: no warnings in the product's ${#product[@]} shell scripts" "[ $rc -eq 0 ]"
 
 # the suites' checks run as strings through eval, which shellcheck cannot follow: variables they read look
 # unused (SC2034) and per-command assignments look unseen (SC2097/SC2098)
 mapfile -t suites < <(shell_files tests)
-out=$(docker run --rm -v "$REPO:/mnt" -w /mnt "$SHELLCHECK" -S warning -e SC2034,SC2097,SC2098 "${suites[@]}" 2>&1)
+out=$(docker run --rm -v "$REPO:/mnt" -w /mnt "$SHELLCHECK" -S warning -e SC2034,SC2097,SC2098 "${suites[@]}" 2>&1); rc=$?
 echo "$out" | tail -15 | sed 's/^/    /'
-check "shellcheck: no warnings in the tests' ${#suites[@]} shell scripts (eval-only findings excepted)" "[ -z \"\$out\" ]"
+check "shellcheck: no warnings in the tests' ${#suites[@]} shell scripts (eval-only findings excepted)" "[ $rc -eq 0 ]"
 
 echo
 echo "$PASS passed, $FAIL failed"
