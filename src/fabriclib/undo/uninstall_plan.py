@@ -14,7 +14,8 @@ KEPT = {
 
 
 def uninstall_plan():
-    """Purpose: what `fabricctl uninstall` does with each kind of host change, shown before it asks (manual 2.7.1.4, step 8).
+    """Purpose: what `fabricctl uninstall` does with each kind of host change, shown before it asks (manual 2.7.1.4,
+                step 8).
     Inputs:  none.
     Returns: list of (group title, "removed" | "undone" | "kept", what) in groups.GROUPS order.
     Fails:   never.

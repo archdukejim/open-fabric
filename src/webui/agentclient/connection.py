@@ -18,7 +18,8 @@ def set_token(token):
              Stored in the thread-local `_local`, so each request thread has its own.
     Returns: None.
     Fails:   never — it only sets a thread-local attribute.
-    Feeds:   call_agent (reads it); set by src/webui/handler.Handler.handle_request (None first, then the session's token)
+    Feeds:   call_agent (reads it); set by src/webui/handler.Handler.handle_request (None first, then the session's
+             token)
              and Handler.callback (the fresh login token, for the login audit calls).
     """
     _local.token = token

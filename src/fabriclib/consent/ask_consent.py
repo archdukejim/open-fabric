@@ -41,7 +41,8 @@ def _ask(group, changes, new):
 
 
 def ask_consent(config_dir, plan, interactive, approve=None, decline=None):
-    """Purpose: get an answer for every host change setup is about to make, before the first step (manual 2.7.1.4): one question per group, asked again only for changes not approved before.
+    """Purpose: get an answer for every host change setup is about to make, before the first step (manual 2.7.1.4): one
+                question per group, asked again only for changes not approved before.
     Inputs:  config_dir — the install's config folder (consent.yaml); plan — {group: [change, ...]} from
              plan_host_changes; interactive — False for --non-interactive (never asks); approve, decline — the
              --approve / --decline values (group names, comma-separated, or "all" for approve); they override

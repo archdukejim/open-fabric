@@ -18,7 +18,8 @@ def run(ctx):
              resolved drop-in RESOLVED_DROPIN is written and /etc/resolv.conf re-linked to systemd-resolved's
              file, restarting it — only when the drop-in changed (the first time
              both are kept as they were: common/keep_original).
-    Fails:   SetupError when the resolver change was not approved; CalledProcessError from `docker network create` or `systemctl restart systemd-resolved`; OSError
+    Fails:   SetupError when the resolver change was not approved; CalledProcessError from `docker network create` or
+             `systemctl restart systemd-resolved`; OSError
              on the files.
     Feeds:   setup step `network`, run by run_setup via STEPS."""
     subnet = ctx.vars.get("fabric_subnet", "10.255.0.0/24")

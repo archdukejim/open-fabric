@@ -1,0 +1,13 @@
+# Tool configuration only: fabric is not packaged as a Python project (its package is the .deb, manual 1.4.1).
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# pycodestyle errors and warnings, pyflakes (decision D34, manual 4.8.2)
+select = ["E", "F", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+# the suites' check messages and expected outputs are long on purpose: one line per check reads best
+"tests/**" = ["E501"]

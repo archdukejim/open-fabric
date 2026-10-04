@@ -60,7 +60,7 @@ copy 's,^src/webui/,fabric/lib/webui/,' src/webui
 copy 's,^src/ux/web/,fabric/lib/webui/,' src/ux/web/server.py src/ux/web/devserver.py
 copy 's,^templates/webui-app/,fabric/lib/webui/templates/,;s,^static/webui-app/,fabric/lib/webui/static/,' \
     templates/webui-app static/webui-app
-copy 's,^templates/,fabric/jinja/,' $(cd "$REPO" && ls -d templates/* | grep -v '^templates/webui-app$')
+copy 's,^templates/,fabric/jinja/,' templates ':(exclude)templates/webui-app'
 for svc in adguard bind9 dirsrv freeradius kea keycloak stepca; do
     copy "s,^packaging/images/$svc/,fabric/jinja/$svc/build/," "packaging/images/$svc"
 done

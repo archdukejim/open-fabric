@@ -22,7 +22,8 @@ def block_device(path=None, fs_uuid=None):
     for disk in json.loads(res.stdout).get("blockdevices", []):
         nodes = [disk] + list(disk.get("children") or [])
         mounted = [m for n in nodes for m in (n.get("mountpoints") or []) if m]
-        facts = {"path": disk.get("path"), "model": (disk.get("model") or "").strip(), "serial": disk.get("serial") or "",
+        facts = {"path": disk.get("path"), "model": (disk.get("model") or "").strip(),
+                 "serial": disk.get("serial") or "",
                  "tran": disk.get("tran") or "", "rm": bool(disk.get("rm")), "mounted": mounted}
         if path and disk.get("path") == path:
             return dict(facts, fs_path=disk.get("path"), uuid=disk.get("uuid") or "")

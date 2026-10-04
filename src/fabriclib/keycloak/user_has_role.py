@@ -9,7 +9,8 @@ def user_has_role(v, s, user, role):
              user — username; role — realm role name.
     Returns: True if the user's effective realm roles include role; False, also when Keycloak does not
              know the user.
-    Fails:   SystemExit from the admin client (keycloak/admin_client) on an admin API error or failed login; OSError / ssl
+    Fails:   SystemExit from the admin client (keycloak/admin_client) on an admin API error or failed login; OSError /
+             ssl
              errors if Keycloak is unreachable; KeyError on missing vars or secrets.
     Feeds:   setup/verify_install.py checks ("Keycloak grants <admin> <role>").
     Notes:   the lookup imports an LDAP user into Keycloak.

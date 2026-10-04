@@ -41,7 +41,8 @@ def _check_entry(entry, data, acl):
     try:
         net = ipaddress.ip_network(body, strict=False)
     except ValueError:
-        raise ValidationError(f"not an IP, CIDR, 'key <name>', ACL or any/none/localhost/localnets: {entry!r}") from None
+        raise ValidationError("not an IP, CIDR, 'key <name>', ACL or any/none/localhost/localnets: "
+                              f"{entry!r}") from None
     return neg + (str(net.network_address) if net.num_addresses == 1 and "/" not in body else str(net))
 
 

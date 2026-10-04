@@ -10,7 +10,8 @@ from fabriclib.vault.common.block_device import block_device
 from fabriclib.vault.common.mounted_stick import mounted_stick
 from fabriclib.vault.common.write_private_file import write_private_file
 
-TESTED = "loop device (format, UUID, read, rotate, remove); real stick on a Pi 5 (add, unlock, pull/re-plug kill switch)"
+TESTED = ("loop device (format, UUID, read, rotate, remove); "
+          "real stick on a Pi 5 (add, unlock, pull/re-plug kill switch)")
 KEY_DIR = "fabric-vault"
 
 

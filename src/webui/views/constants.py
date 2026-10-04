@@ -44,7 +44,8 @@ SERVICES = {
     "freeradius": ("802.1X", "freeradius"), "fabric-web": ("This web UI", None), "fabric-agent": ("Host API", None),
 }
 # every permission a page asks about (the dev preview's fallback when it runs without fabriclib)
-PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write", "pki:read", "pki:issue", "pki:sign",
+PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write", "pki:read",
+                 "pki:issue", "pki:sign",
                  "pki:link-device", "devices:read", "devices:enroll", "devices:admin", "roles:admin", "radius:read",
                  "radius:admin",
                  "people:read", "vault:status", "vault:unlock", "audit:read"]

@@ -10,7 +10,8 @@ def reverse_zones(v):
     Returns: {"zones": {zone: [{"label", "target" (FQDN with trailing dot), "ip", "source"}]} sorted by zone and label,
              "skipped": [{"name", "ip", "reason"}] for addresses that get no PTR}.
     Fails:   never — addresses that cannot get a PTR are listed in "skipped".
-    Feeds:   deploy/apply_deployment (render_templates renders them with bind9/data/reverse-zone.j2); agent route GET /v1/reverse-zones
+    Feeds:   deploy/apply_deployment (render_templates renders them with bind9/data/reverse-zone.j2); agent route GET
+             /v1/reverse-zones
              (fabric-agent, src/agent/); the web UI's dev preview (src/webui/devpreview).
     Notes:   one PTR per address: the first named record wins, then an apex (@) record, then the zone's `ns` host.
              Private IPv4 (RFC 1918, CGNAT) and IPv6 ULA only. A reverse zone written by hand in `dns:` is left alone.

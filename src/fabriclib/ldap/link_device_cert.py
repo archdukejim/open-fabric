@@ -26,7 +26,8 @@ def link_device_cert(v, actor, name, fingerprint, link=True, source="web"):
              run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
              entry", "that name is already taken", "the directory refused the change ...", "directory
              error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
-    Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>/certs) -> webui agentclient.link_device_cert;
+    Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>/certs) -> webui
+             agentclient.link_device_cert;
              pki/issue_key_pair, pki/sign_csr.
     Notes:   audited as DEVICE_CERT_LINK or DEVICE_CERT_UNLINK.
     """

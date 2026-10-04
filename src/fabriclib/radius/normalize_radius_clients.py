@@ -17,7 +17,8 @@ def normalize_radius_clients(clients):
              "message_authenticator" (bool)}, and the secrets taken out of them, to be kept in fabric's secrets.
     Fails:   ValidationError: an entry that is not a dict, a bad name, a name listed twice, an address that is not an IP
              or network (host bits must be zero), 0/0, overlapping clients, or a bad secret.
-    Feeds:   deploy/merge_radius_clients (apply), add_radius_client; SECRET_RE is reused by rotate_radius_secret; tests/freeradius/run.py,
+    Feeds:   deploy/merge_radius_clients (apply), add_radius_client; SECRET_RE is reused by rotate_radius_secret;
+             tests/freeradius/run.py,
              tests/render.py.
     Notes:   SECRET_RE keeps a secret typeable on a switch CLI without quoting and free of `$` (FreeRADIUS expands
              ${...} inside quoted strings).

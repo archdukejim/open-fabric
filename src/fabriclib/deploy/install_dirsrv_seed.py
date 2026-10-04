@@ -17,5 +17,6 @@ def install_dirsrv_seed(paths, final_vars):
         return False
     uid, gid = service_user(final_vars, "ldap")
     ensure_dir(os.path.join(paths["base"], "dirsrv/data"), 0o750, uid, gid)
-    return copy_tree_with_perms(os.path.join(paths["render"], "dirsrv/seed"), os.path.join(paths["base"], "dirsrv/seed"),
+    return copy_tree_with_perms(os.path.join(paths["render"], "dirsrv/seed"), os.path.join(paths["base"],
+                                                                                           "dirsrv/seed"),
                                 0, gid, 0o640, 0o750)

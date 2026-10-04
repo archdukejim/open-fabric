@@ -6,7 +6,8 @@ KINDS = (string.ascii_lowercase, string.ascii_uppercase, string.digits, "-_")
 
 def one_time_password(length=20):
     """Purpose: a random password for a person (a one-time password at creation or reset) that every password
-             policy fabric sets accepts: 389-DS wants 3 of its 4 character kinds (passwordMinCategories, 00-config.ldif),
+             policy fabric sets accepts: 389-DS wants 3 of its 4 character kinds (passwordMinCategories,
+             00-config.ldif),
              and a plain token_urlsafe misses digits and "-"/"_" together about once in 60.
     Inputs:  length — characters (default 20, at least 12: passwordMinLength).
     Returns: str of URL-safe characters with at least one lower-case letter, one capital, one digit and one of "-_",

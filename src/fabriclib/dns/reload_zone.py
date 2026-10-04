@@ -58,6 +58,7 @@ def reload_zone(zone, src, dst, uid, gid):
             break
         print(f"  BIND9 still serves the old {zone} (its own write raced ours); again")
     if res is None or res.returncode != 0:
-        print(f"  Warning: BIND9 did not accept zone {zone}: {(res.stderr or res.stdout).strip() if res else 'timeout'}")
+        why = (res.stderr or res.stdout).strip() if res else "timeout"
+        print(f"  Warning: BIND9 did not accept zone {zone}: {why}")
     elif want and _served_serial(zone) != want:
         print(f"  Warning: BIND9 serves {zone} serial {_served_serial(zone)}, not {want}")

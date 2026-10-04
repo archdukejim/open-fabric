@@ -3,7 +3,8 @@ import os
 LIB_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 FABRIC_DIR = os.path.dirname(LIB_DIR)
 # the templates: jinja/ in an installed tree, templates/ in a checkout (manual 1.3.2)
-JINJA_DIR = next((d for d in (os.path.join(FABRIC_DIR, "jinja"), os.path.join(FABRIC_DIR, "templates")) if os.path.isdir(d)),
+JINJA_DIR = next((d for d in (os.path.join(FABRIC_DIR, "jinja"), os.path.join(FABRIC_DIR,
+                                                                              "templates")) if os.path.isdir(d)),
                  os.path.join(FABRIC_DIR, "jinja"))
 
 

@@ -14,7 +14,8 @@ def decode_invitation(text):
     """Purpose: On a joining node: read and check an invitation made by create_invitation (no network).
     Inputs:  text — the invitation string ("fabric-join-1.<base64url JSON>"); surrounding whitespace ignored.
     Returns: {"id", "secret", "site", "upstream", "org_domain", "ldap_base_dn", "host", "address", "root_sha256",
-             "expires", "via" ("" unless the invitation names a relay)} with every field checked: site SITE_NAME_RE, host and org_domain DNS names, ldap_base_dn
+             "expires", "via" ("" unless the invitation names a relay)} with every field checked: site SITE_NAME_RE,
+             host and org_domain DNS names, ldap_base_dn
              BASE_DN_RE, address an IP,
              root_sha256 an upper-case colon-separated SHA-256 fingerprint.
     Fails:   ValidationError "not a fabric invitation"; "the invitation is damaged (...)"; "the invitation has
@@ -31,7 +32,8 @@ def decode_invitation(text):
         raise ValidationError(f"the invitation is damaged ({e.__class__.__name__}): copy it again") from None
     if not isinstance(body, dict) or body.get("v") != 1:
         raise ValidationError("the invitation is damaged (unknown version): copy it again")
-    checks = {"id": lambda x: re.fullmatch(r"[0-9a-f]{12}", x), "secret": lambda x: re.fullmatch(r"[A-Za-z0-9_-]{40,}", x),
+    checks = {"id": lambda x: re.fullmatch(r"[0-9a-f]{12}", x), "secret": lambda x: re.fullmatch(r"[A-Za-z0-9_-]{40,}",
+                                                                                                 x),
               "site": SITE_NAME_RE.match, "upstream": SITE_NAME_RE.match, "org_domain": DOMAIN_RE.match,
               "host": DOMAIN_RE.match, "root_sha256": _FP_RE.match, "ldap_base_dn": BASE_DN_RE.match}
     for field, ok in checks.items():

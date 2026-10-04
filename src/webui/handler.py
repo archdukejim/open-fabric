@@ -82,7 +82,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def deny(self, status, message):
         """Purpose: Send an error page with a status and a message.
-        Inputs:  status — int HTTP status (400, 401, 403, 404, 500, 503); message — str shown to the person (autoescaped).
+        Inputs:  status — int HTTP status (400, 401, 403, 404, 500, 503); message — str shown to the person
+                 (autoescaped).
         Returns: None; the error page is sent.
         Fails:   as send.
         Feeds:   the routes, the sign-in and handle_request.

@@ -14,7 +14,7 @@ check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $
 docker rm -f dstest >/dev/null 2>&1
 docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/packaging/images/dirsrv" >/dev/null || { echo "FAIL image build"; exit 1; }
 rm -rf "$W"; mkdir -p "$W/data/tls/ca" "$W/seed"
-cd "$W"
+cd "$W" || exit 1
 
 # ---- PKI: root -> intermediate -> ldap.lan.j-j.family
 openssl req -x509 -newkey rsa:2048 -nodes -keyout root.key -out root.crt -days 2 -subj '/CN=Test Root' \

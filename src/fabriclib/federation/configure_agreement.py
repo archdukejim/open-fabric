@@ -23,7 +23,8 @@ want = {"nsDS5ReplicaRoot": [IN["suffix"].encode()], "nsDS5ReplicaHost": [IN["ho
         "nsDS5ReplicaBindMethod": [b"SIMPLE"], "nsDS5ReplicaBindDN": [IN["bind_dn"].encode()],
         "nsDS5ReplicaCredentials": [e["F_SECRET"].encode()], "description": [IN["description"].encode()]}
 try:
-    have = c.search_s(dn, ldap.SCOPE_BASE, "(objectClass=*)", ["*", "nsds5replicaLastInitStatus", "nsds5BeginReplicaRefresh"])[0][1]
+    have = c.search_s(dn, ldap.SCOPE_BASE, "(objectClass=*)", ["*", "nsds5replicaLastInitStatus",
+                                                               "nsds5BeginReplicaRefresh"])[0][1]
 except ldap.NO_SUCH_OBJECT:
     have = None
 if have is None:

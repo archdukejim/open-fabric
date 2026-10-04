@@ -24,7 +24,8 @@ def rotate_radius_secret(actor, name, secret=None, source="cli"):
     """
     name = str(name).strip().lower()
     if secret is not None and not SECRET_RE.match(secret):
-        raise ValidationError("the secret must be 16-128 printable characters, without spaces, quotes, backslashes or $")
+        raise ValidationError("the secret must be 16-128 printable characters, "
+                              "without spaces, quotes, backslashes or $")
     secret = secret or "".join(_random.choice(string.ascii_letters + string.digits) for _ in range(32))
     with vars_lock():
         if not any(c.get("name") == name for c in load_vars().get("radius_clients") or []):

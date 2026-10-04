@@ -18,7 +18,8 @@ STEPS = [
     ("bootstrap", start_bootstrap.run, "start bind9 and step-ca; check zones"),
     ("certs", mint_service_certs.run, "issue/renew service certificates"),
     ("start", start_services.run, "start everything; seed 389-DS; configure Keycloak; web UI"),
-    ("vault", setup_openbao.run, "OpenBao: vault key + unlock methods, init once (recovery keys to ~/fabric-admin), configure, import secrets"),
+    ("vault", setup_openbao.run,
+     "OpenBao: vault key + unlock methods, init once (recovery keys to ~/fabric-admin), configure, import secrets"),
     ("admin", create_admin.run, "first web UI admin: LDAP user, client certificate, login kit"),
     ("verify", verify_install.run, "end-to-end checks (same as fabricctl doctor)"),
 ]

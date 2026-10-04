@@ -18,7 +18,8 @@ def detect_network():
     dev = route[route.index("dev") + 1] if "dev" in route else None
     guess["interface"] = dev
     if dev:
-        addr = subprocess.run(["ip", "-o", "-4", "addr", "show", "dev", dev], capture_output=True, text=True).stdout.split()
+        addr = subprocess.run(["ip", "-o", "-4", "addr", "show", "dev", dev], capture_output=True,
+                              text=True).stdout.split()
         if "inet" in addr:
             iface = ipaddress.ip_interface(addr[addr.index("inet") + 1])
             guess["host_ip"] = str(iface.ip)

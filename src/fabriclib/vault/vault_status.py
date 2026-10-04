@@ -29,7 +29,8 @@ def _key_state(v):
                ([f"{len(left)} key file(s) still in RAM"] if left else [])
     n = len(store.get("slots", []))
     return {"path": path, "present": True, "ok": not problems, "methods": n, "key_id": store.get("key_id"),
-            "detail": "; ".join(problems) or f"{n} unlock method{'s' if n != 1 else ''}, vault key {store.get('key_id')}, "
+            "detail": "; ".join(problems) or f"{n} unlock method{'s' if n != 1 else ''}, "
+                                               f"vault key {store.get('key_id')}, "
                                                "store root-only, no key left in RAM"}
 
 
@@ -59,7 +60,8 @@ def vault_status(v):
             token = approle_login(v, AGENT_CREDS)
             mounts = bao_request(v, "GET", "sys/mounts", token=token)[1]
             auth = bao_request(v, "GET", "sys/auth", token=token)[1]
-            out["mounts"] = sorted(({"path": k, "type": m.get("type"), "version": (m.get("options") or {}).get("version"),
+            out["mounts"] = sorted(({"path": k, "type": m.get("type"),
+                                     "version": (m.get("options") or {}).get("version"),
                                      "description": m.get("description", "")}
                                     for k, m in (mounts.get("data") or mounts).items() if isinstance(m, dict)),
                                    key=lambda m: m["path"])

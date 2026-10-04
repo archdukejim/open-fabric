@@ -32,7 +32,8 @@ def create_person(v, actor, uid, first, last, email, source="web"):
              CA); actor — str, for the audit; uid — ^[a-z][a-z0-9._-]{1,31}$; first, last — letters and
              simple punctuation, 1-60 characters; email — an address with a dotted domain; source — audit
              source, default "web". Reads the Keycloak admin credentials via load_secrets (file or OpenBao).
-    Returns: the one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored nowhere. The person also gets their
+    Returns: the one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored
+             nowhere. The person also gets their
              POSIX identity at once (ldap/ensure_posix_identities; if that fails, the 5-minute timer gives it).
     Fails:   ValidationError "people are created at the root site …" at a federated site (M5: the directory is a
              read-only copy there); "user name: 2-32 characters, ..."; "first and last name: ..."; "e-mail address

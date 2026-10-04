@@ -92,7 +92,8 @@ class KeycloakOIDC:
         Inputs:  none (uses issuer, client_id and redirect_uri).
         Returns: (authorization URL str, state str, nonce str, code_verifier str).
         Fails:   never.
-        Feeds:   src/webui/session/start_login, which stores state, nonce and verifier in App.pending and redirects to the
+        Feeds:   src/webui/session/start_login, which stores state, nonce and verifier in App.pending and redirects to
+                 the
                  URL.
         Notes:   prompt=login makes Keycloak ask for the password (and TOTP) every time, even with an SSO session, so
                  auth_time is fresh for the vault step-up check.

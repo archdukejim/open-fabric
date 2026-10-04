@@ -37,7 +37,8 @@ def dev_post_action(h, path, form):
                   "text": "DEV PREVIEW — a real install shows the decoded request here."}
         return h.send(200, views.stepca(ctx, "sign", SAMPLE_CA, review=review))
     if path == "/stepca/inspect":
-        item = {"info": SAMPLE_INFO, "trusted": True, "text": "DEV PREVIEW — a real install shows `openssl x509 -text` here."}
+        item = {"info": SAMPLE_INFO, "trusted": True,
+                "text": "DEV PREVIEW — a real install shows `openssl x509 -text` here."}
         return h.send(200, views.stepca(ctx, "inspect", SAMPLE_CA, inspected={"kind": "cert", "items": [item]}))
     if path in ("/stepca/sign", "/stepca/issue", "/stepca/convert"):
         kind = path.rsplit("/", 1)[1]

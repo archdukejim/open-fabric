@@ -10,9 +10,7 @@ zone — including what must be refused.
     sudo python3 tests/pki/run.py          (needs Docker, openssl, root)
 """
 import base64
-import json
 import os
-import re
 import shutil
 import subprocess
 import sys

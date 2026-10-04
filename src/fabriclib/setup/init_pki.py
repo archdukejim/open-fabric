@@ -97,7 +97,8 @@ def _make_root(ctx, data, uid, gid):
                    "keyUsage": ["certSign", "crlSign"],
                    "basicConstraints": {"isCA": True, "maxPathLen": int(depth) + 1}}, f)
     _chown_tree(data, uid, gid)
-    res = subprocess.run(["docker", "run", "--rm", "--network", "none", "-v", f"{data}:/home/step", "-u", f"{uid}:{gid}",
+    res = subprocess.run(["docker", "run", "--rm", "--network", "none", "-v", f"{data}:/home/step", "-u",
+                          f"{uid}:{gid}",
                           "--entrypoint", "/usr/local/bin/step", ctx.vars["image_stepca"], "certificate", "create",
                           f"{name} Root CA", "/home/step/root-new/root_ca.crt", "/home/step/root-new/root_ca_key",
                           "--template", "/home/step/root-new/root.tpl", "--kty", "EC", "--curve", "P-256",
@@ -150,7 +151,8 @@ def run(ctx):
              ca.json configured, chain verified, published and trusted; intermediate_ca.crt holds the
              intermediate alone (also converged on later runs, restarting stepca). With byoc the brought-in intermediate
              key may be encrypted with ca_password (a federation site's is) or not; the root key `step ca
-             init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only the
+             init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only
+             the
              permissions, publishing and trust are (re)done.
     Fails:   SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when
              `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets

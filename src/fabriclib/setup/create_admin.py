@@ -65,7 +65,8 @@ def run(ctx):
              (default 365), domain, hostname_mgr, hostname_certs, host_ip; secrets (Keycloak admin); the
              published CA under <deploy_base>/nginx/www/certs. Env SUDO_USER via sudo_owner.
     Returns: None. Without web UI, Keycloak or LDAP: nothing. At a federated site the person is not created here
-             (people come from the root, M5): only the client certificate and the kit. Otherwise the kit folder (0700) holds root-ca.crt/.cer,
+             (people come from the root, M5): only the client certificate and the kit. Otherwise the kit folder (0700)
+             holds root-ca.crt/.cer,
              README.txt and, when due, <user>.p12, <user>.crt and p12-password.txt; initial-password.txt only when
              the user was created (then Keycloak forces a password change). Idempotent: an existing user keeps
              their password; the certificate is renewed when due or from another CA.

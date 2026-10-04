@@ -36,7 +36,8 @@ def replace_site_ca(v, staged):
     with open(staged["ica_parents_path"]) as f:
         parents = f.read().strip()
     parents = parents + "\n" if parents else ""
-    for name, text in (("intermediate_ca.crt", cert), ("ca_parents.crt", parents), ("intermediate_chain.crt", cert + parents)):
+    for name, text in (("intermediate_ca.crt", cert), ("ca_parents.crt", parents), ("intermediate_chain.crt",
+                                                                                    cert + parents)):
         with open(os.path.join(certs, name), "w") as f:
             f.write(text)
         os.chmod(os.path.join(certs, name), 0o644)

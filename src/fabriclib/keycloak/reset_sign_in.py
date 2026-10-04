@@ -24,7 +24,8 @@ def reset_sign_in(v, actor, uid, privileged=False, source="web"):
     Inputs:  v — fabric vars (keycloak_admin, fabric_groups); actor — str, for the audit; uid — username
              (exact match); privileged — bool: the caller is root or holds system:admin (admin bundle);
              source — default "web". Reads Keycloak admin credentials via load_secrets.
-    Returns: the new one-time password (common/one_time_password: every character kind 389-DS asks for): shown once, stored nowhere.
+    Returns: the new one-time password (common/one_time_password: every character kind 389-DS asks for): shown once,
+             stored nowhere.
     Fails:   ValidationError "no user <uid>"; "<uid> is in a fabric group (...): only an admin can reset
              their sign-in"; "Keycloak refused: ..." (admin API error or failed login); load_secrets'
              ValidationError; OSError / ssl errors if Keycloak is unreachable.
@@ -44,7 +45,8 @@ def reset_sign_in(v, actor, uid, privileged=False, source="web"):
         groups = {g["name"] for g in kc.call("GET", f"/{r}/users/{user['id']}/groups")[1]}
         held = sorted(groups & fabric_groups(v))
         if held and not privileged:
-            raise ValidationError(f"{uid} is in a fabric group ({', '.join(held)}): only an admin can reset their sign-in")
+            raise ValidationError(f"{uid} is in a fabric group ({', '.join(held)}): "
+                                  "only an admin can reset their sign-in")
         for cred in kc.call("GET", f"/{r}/users/{user['id']}/credentials")[1]:
             if cred.get("type") == "otp":
                 kc.call("DELETE", f"/{r}/users/{user['id']}/credentials/{cred['id']}")

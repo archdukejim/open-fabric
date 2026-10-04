@@ -36,7 +36,8 @@ def stepca_post(h, sess, op, form):
                                             form.get("days", ""), form.get("device", ""))
             return h.send(200, views.pki_result(ctx, "issue", result))
         if op == "inspect":
-            return stepca_page(h, ctx, "inspect", inspected=actions.inspect_pem(user, upload_value(form, "file", "data")))
+            return stepca_page(h, ctx, "inspect", inspected=actions.inspect_pem(user, upload_value(form, "file",
+                                                                                                   "data")))
         result = actions.convert_cert(user, upload_value(form, "cert_file", "cert"),
                                       upload_value(form, "key_file", "key"))
         return h.send(200, views.pki_result(ctx, "convert", result))

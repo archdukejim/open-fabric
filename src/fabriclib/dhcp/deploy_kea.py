@@ -14,7 +14,8 @@ def deploy_kea(v, secrets, jinja_env, bind_uid, bind_gid):
              bind_uid, bind_gid — int owner of the subzone file.
     Returns: True if either Kea config file changed (Kea must be restarted), else False.
     Fails:   ValidationError when Kea refuses a changed file (check_kea_config: `kea-dhcp4 -t` in fabric's Kea
-             image; nothing is written then); KeyError on missing vars; OSError from makedirs, chown or writing; jinja2 errors while rendering; errors
+             image; nothing is written then); KeyError on missing vars; OSError from makedirs, chown or writing; jinja2
+             errors while rendering; errors
              from ensure_ddns_zone.
     Feeds:   deploy/deploy_optional_parts (apply); tests/kea/run.py.
     Notes:   config/ is root:kea 0750 and the files root:kea 0640 (the DDNS one holds the TSIG secret); leases/ and run/

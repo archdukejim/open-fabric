@@ -81,7 +81,8 @@ def run(ctx):
             time.sleep(15)
         else:
             raise SetupError(f"Keycloak configuration failed:\n{res.stdout}{res.stderr}")
-        ok("Keycloak configured (realm, LDAP federation" + (", web UI client, TOTP)" if v.get("install_webui") else ")"))
+        ok("Keycloak configured (realm, LDAP federation"
+           + (", web UI client, TOTP)" if v.get("install_webui") else ")"))
 
     if v.get("install_ldap", True):             # after Keycloak moved to its new bind account
         moved = migrate_local_suffix(v)

@@ -2,7 +2,8 @@ import ipaddress
 
 
 def site_networks(v):
-    """Purpose: the networks this site uses, as the address plan across sites records them (manual 2.2.2.6): its LAN and every DHCP subnet, with name, VLAN, notes and an overlap reason.
+    """Purpose: the networks this site uses, as the address plan across sites records them (manual 2.2.2.6): its LAN and
+                every DHCP subnet, with name, VLAN, notes and an overlap reason.
     Inputs:  v — fabric vars: lan_cidr; install_kea and dhcp.subnets [{subnet, name, vlan, notes, allow_overlap}].
     Returns: list of {"name", "cidr", "kind" ("lan" | "dhcp"), "vlan" (int or None), "notes", "allow_overlap"}, one
              per distinct network (a DHCP subnet that is the LAN itself is listed once, as the DHCP subnet with

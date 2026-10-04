@@ -46,7 +46,7 @@ docker network create --subnet 10.255.0.0/24 fabric_net >/dev/null
 for s in bind9 stepca keycloak dirsrv; do mkdir -p "$BASE/$s"; cp -a "$REPO/packaging/images/$s" "$BASE/$s/build"; done
 
 # ---- PKI: root -> intermediate -> leaves -----------------------------
-cd "$W"
+cd "$W" || exit 1
 openssl req -x509 -newkey rsa:2048 -nodes -keyout root.key -out root.crt -days 2 -subj '/CN=Test Root' \
   -addext basicConstraints=critical,CA:TRUE -addext keyUsage=critical,keyCertSign,cRLSign 2>/dev/null
 openssl req -newkey rsa:2048 -nodes -keyout int.key -out int.csr -subj '/CN=Test Int' 2>/dev/null

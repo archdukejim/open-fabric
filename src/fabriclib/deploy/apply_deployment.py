@@ -152,7 +152,8 @@ def apply_deployment(start_services=True):
              dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or
              ldap_base_dn not valid or not what they were at install; a template that does not render; an image
              build that fails (start_services=False); BIND9 refusing `rndc reconfig`; fabric's own units (the
-             `services` host change) not approved — an install set up before consent existed is not refused. A bad link-vars file is only
+             `services` host change) not approved — an install set up before consent existed is not refused. A bad
+             link-vars file is only
              reported. OSError from file operations propagates.
     Feeds:   lib/deploy.py (`python3 deploy.py`, fabriclib/setup/deploy_config.py, images/switch_image.py),
              menu/apply_and_report (`fabricctl --apply`, the vars editor, system/apply_changes.py for the web UI).

@@ -25,7 +25,8 @@ def pkcs11_session(module, serial, pin, attended=False):
     if info.flags & P.CKF_USER_PIN_LOCKED:
         raise ValidationError("the token's PIN is locked: reset it with the vendor tool (PUK), then re-add the key")
     if info.flags & P.CKF_USER_PIN_FINAL_TRY:
-        raise ValidationError("one PIN try left on the token: fabric will not spend it; check the PIN with the vendor tool")
+        raise ValidationError("one PIN try left on the token: fabric will not spend it; "
+                              "check the PIN with the vendor tool")
     if not attended and info.flags & P.CKF_USER_PIN_COUNT_LOW:
         raise ValidationError("the token saw a wrong PIN: not retried unattended; run `fabricctl vault test` once")
     session = lib.openSession(slot, P.CKF_SERIAL_SESSION | P.CKF_RW_SESSION)

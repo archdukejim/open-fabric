@@ -14,7 +14,7 @@ check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $
 docker rm -f kc-dirsrv kc-keycloak >/dev/null 2>&1
 docker network rm kctest >/dev/null 2>&1
 rm -rf "$W"; mkdir -p "$W/kc" "$W/opt/stepca/data/certs" "$W/opt/fabric/config"
-cd "$W"
+cd "$W" || exit 1
 cp "$D/root.crt" opt/stepca/data/certs/root_ca.crt
 
 # Keycloak server cert from the same intermediate

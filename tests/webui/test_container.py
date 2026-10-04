@@ -376,7 +376,7 @@ st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                  {"csrf": csrf, "type": "TXT", "name": "x", "text": 'a"\n$INCLUDE /etc/shadow'}, cookie=session)
 check("zone-file injection via TXT rejected", st == 303 and "err=" in hd["Location"], hd)
 st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
-idx = [l for l in body.split("<tr>") if "shelfmark" in l][0].split('name="index" value="')[1].split('"')[0]
+idx = [row for row in body.split("<tr>") if "shelfmark" in row][0].split('name="index" value="')[1].split('"')[0]
 st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
                  {"csrf": csrf, "type": "CNAME", "index": idx, "name": "wrong-name"}, cookie=session)
 check("stale delete (name mismatch) refused", "err=" in hd.get("Location", ""), hd)
@@ -600,5 +600,6 @@ kc.shutdown()
 failed = [n for n, ok in results if not ok]
 print(f"\n{len(results) - len(failed)}/{len(results)} passed")
 if failed:
-    print(agent.stdout.read()[-3000:]); print(subprocess.run(['docker','logs','cwebui'],capture_output=True,text=True).stdout[-2000:])
+    print(agent.stdout.read()[-3000:])
+    print(subprocess.run(['docker', 'logs', 'cwebui'], capture_output=True, text=True).stdout[-2000:])
 sys.exit(1 if failed else 0)

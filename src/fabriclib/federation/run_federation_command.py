@@ -15,7 +15,8 @@ from fabriclib.setup.errors import SetupError
 from fabriclib.system.apply_changes import apply_changes
 from fabriclib.setup.read_join_invitation import read_join_invitation
 
-USAGE = """usage: fabricctl federation status                 this install's place in its fabric: upstream, sites, invitations
+USAGE = """usage: fabricctl federation status                 this install's place in its fabric: upstream, sites,
+                                                   invitations
        fabricctl federation enable | disable       the endpoint sites join through (https://federation.<domain>)
        fabricctl federation invite <site> [--nest N] [--via NODE]
                                                    a one-time invitation for a new site (good for one hour); on the
@@ -61,7 +62,8 @@ def run_federation_command(ctx, argv):
             print(f"federation endpoint: {'on, https://' + s['endpoint_host'] if s['endpoint'] else 'off'}")
             if s["upstream"]:
                 u = s["upstream"]
-                print(f"upstream: {u.get('site_name')} ({u.get('domain')}, {u.get('address')}), joined {u.get('joined')}"
+                print(f"upstream: {u.get('site_name')} ({u.get('domain')}, {u.get('address')}), "
+                      f"joined {u.get('joined')}"
                       + (f", through relay {u['relay'].get('site')}" if u.get("relay") else ""))
             for name, site in sorted(s["sites"].items()):
                 print(f"  site {name:<16} {site.get('domain', ''):<28} {site.get('address', ''):<16} "

@@ -98,7 +98,8 @@ def sign_site_ca(v, actor, site_name, csr, root_key="", root_password_file="", s
     root_pem = open(root_crt).read()
     if as_parent:
         issuer_crt = "/home/step/certs/intermediate_ca.crt"
-        key, password_file = os.path.join(data, "secrets", "intermediate_ca_key"), os.path.join(data, "secrets", "password")
+        key, password_file = os.path.join(data, "secrets", "intermediate_ca_key"), os.path.join(data, "secrets",
+                                                                                                "password")
         issuer_pem = open(ica_crt).read()
         chain = issuer_pem.strip() + "\n" + ca_parents_pem(v)
         depth = ca_path_len(issuer_pem)

@@ -80,11 +80,13 @@ def run(ctx):
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
              (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123
              from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks
-             removed: config/.firewall-ntp-allowed; DHCP likewise) — the rules come from security/firewall_rules; vars_file,
+             removed: config/.firewall-ntp-allowed; DHCP likewise) — the rules come from security/firewall_rules;
+             vars_file,
              target_dir, config_dir. Env SSH_CONNECTION.
     Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
              (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
-             config/.firewall-ssh-allowed records fabric's own; whether ufw was on before is recorded once for undo), UNIT written, enabled and restarted, DOCKER-USER
+             config/.firewall-ssh-allowed records fabric's own; whether ufw was on before is recorded once for undo),
+             UNIT written, enabled and restarted, DOCKER-USER
              rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is).
              Off: DOCKER-USER
              opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left

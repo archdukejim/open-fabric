@@ -25,7 +25,8 @@ LABELS = {
     "webui_admin_user": "Username of the first web UI admin (created in LDAP/Keycloak)",
 }
 ADMIN_RE = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}$")
-HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
+HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
+                     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
 
 
 def _valid(key, value):

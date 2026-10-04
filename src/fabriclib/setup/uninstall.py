@@ -11,11 +11,14 @@ from fabriclib.undo.undo_resolver import undo_resolver
 from fabriclib.undo.undo_time import undo_time
 from fabriclib.undo.undo_trust import undo_trust
 
-UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca", "bind9", "fabric-firewall"]
+UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "adguard", "adguard-auth", "fabric-agent",
+         "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca",
+         "bind9", "fabric-firewall"]
 TARGET = "/etc/systemd/system/fabric.target"
 CONTAINERS = ["fabric-web", "webui", "fluentbit", "kea-dhcp4", "kea-ddns", "freeradius", "adguardhome",
               "oauth2-proxy-adguard", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
-DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openbao", "fluentbit", "kea", "freeradius", "federation", "adguard", "adguard-auth"]
+DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openbao", "fluentbit", "kea",
+        "freeradius", "federation", "adguard", "adguard-auth"]
 LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:local", "fabric/keycloak:local",
                 "fabric/web:local", "fabric/webui:local", "fabric/kea:local", "fabric/freeradius:local"]
 

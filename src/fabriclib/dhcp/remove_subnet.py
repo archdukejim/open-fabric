@@ -22,7 +22,7 @@ def remove_subnet(actor, which, leases, force=False, source="cli"):
         if leases is None and not force:
             raise ValidationError("Kea's leases cannot be read now, so active leases in "
                                   f"{s['subnet']} cannot be ruled out: remove it with --force")
-        active = [l for l in leases or [] if ipaddress.ip_address(l["ip"]) in net and l.get("state") != "expired"]
+        active = [x for x in leases or [] if ipaddress.ip_address(x["ip"]) in net and x.get("state") != "expired"]
         if active and not force:
             raise ValidationError(f"{s['subnet']} has {len(active)} active lease(s): clients would lose their "
                                   "addresses at renewal. Remove it anyway with --force")

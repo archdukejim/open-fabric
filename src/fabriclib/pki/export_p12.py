@@ -28,7 +28,8 @@ def export_p12(crt, key, chain_files, friendly_name, password, out):
         old = os.umask(0o077)
         try:
             subprocess.run(["openssl", "pkcs12", "-export", "-in", crt, "-inkey", key,
-                            *(["-certfile", chain] if chain_files else []), "-name", friendly_name, "-keypbe", "AES-256-CBC", "-certpbe", "AES-256-CBC",
+                            *(["-certfile", chain] if chain_files else []), "-name", friendly_name, "-keypbe",
+                            "AES-256-CBC", "-certpbe", "AES-256-CBC",
                             "-macalg", "sha256", "-passout", f"file:{pw_file}", "-out", out],
                            check=True, capture_output=True)
         finally:

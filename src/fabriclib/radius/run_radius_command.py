@@ -11,7 +11,8 @@ from fabriclib.radius.rotate_radius_secret import rotate_radius_secret
 from fabriclib.radius.unmap_radius_group import unmap_radius_group
 from fabriclib.system.apply_changes import apply_changes
 
-USAGE = """usage: fabricctl radius status                     server name, RADIUS clients, groups that may join by password
+USAGE = """usage: fabricctl radius status                     server name, RADIUS clients, groups that may join
+                                                   by password
        fabricctl radius log [-n N]                 recent 802.1X decisions (accepted, refused and why)
        fabricctl radius add-client <name> <address> [--secret-prompt] [--no-message-authenticator] [--no-apply]
        fabricctl radius rotate-secret <name> [--secret-prompt] [--no-apply]
@@ -70,7 +71,7 @@ def run_radius_command(v, argv):
             print(f"server name (supplicants check it): {o['server_name']}   RADIUS on {o['host_ip']}:1812/udp")
             for c in o["clients"] or []:
                 print(f"  {c['name']:<16} {c['address']:<20} "
-                      f"{'Message-Authenticator required' if c['message_authenticator'] else 'Message-Authenticator NOT required'}")
+                      "Message-Authenticator " + ("required" if c["message_authenticator"] else "NOT required"))
             if not o["clients"]:
                 print("  no RADIUS clients yet: fabricctl radius add-client <name> <address>")
             print("people who may join by password (EAP-TTLS):")

@@ -24,7 +24,8 @@ def stage_site_ca(work_dir, cert, root, root_sha256="", chain=""):
              the certificates written 0644.
     Fails:   ValidationError "give exactly one certificate" (cert or root); "the root's fingerprint is not the
              one in the invitation"; "the root is not a self-signed CA"; "the site certificate does not chain
-             to the root (<openssl's reason, e.g. certificate is not yet valid>)"; "the site certificate is not a CA"; "the site certificate is not for
+             to the root (<openssl's reason, e.g. certificate is not yet valid>)"; "the site certificate is not a CA";
+             "the site certificate is not for
              this site's key"; "no key/request in <work_dir>: make the request first"; to_pem's messages.
     Feeds:   setup --join (federation M3), before the `pki` step.
     """
@@ -58,7 +59,8 @@ def stage_site_ca(work_dir, cert, root, root_sha256="", chain=""):
         want = openssl("req", "-noout", "-pubkey", data=f.read())
     if openssl("x509", "-noout", "-pubkey", data=cert) != want:
         raise ValidationError("the site certificate is not for this site's key")
-    paths = {"ca_crt_path": os.path.join(work_dir, "root_ca.crt"), "ica_crt_path": os.path.join(work_dir, "site_ca.crt"),
+    paths = {"ca_crt_path": os.path.join(work_dir, "root_ca.crt"), "ica_crt_path": os.path.join(work_dir,
+                                                                                                "site_ca.crt"),
              "ica_parents_path": os.path.join(work_dir, "ca_parents.crt")}
     for name, pem in (("ca_crt_path", root), ("ica_crt_path", cert), ("ica_parents_path", "".join(parents))):
         with open(paths[name], "w") as f:

@@ -1,0 +1,19 @@
+# Lint (decision D34, manual 4.8.2): the same suite as `sudo tests/run-all.sh lint` — ruff and shellcheck from
+# their images, pinned by digest. A change is not done while this fails.
+name: lint
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: ruff and shellcheck
+        run: bash tests/lint/run.sh

@@ -356,7 +356,7 @@ check("EAP-TLS: a certificate from another CA is refused in the TLS handshake", 
 link_mod.link_device_cert(V, "test", "laptop1", FP["laptop1"], link=False)
 ok, _, out = eap_tls("laptop1")
 check("EAP-TLS: unlinking the certificate refuses it at the next authentication",
-      not ok and f"REJECT method=eap-tls device=- reason=no_device_has_it" in logs()
+      not ok and "REJECT method=eap-tls device=- reason=no_device_has_it" in logs()
       and f"sha256={FP['laptop1']}" in logs().rsplit("REJECT method=eap-tls", 1)[-1], logs()[-400:])
 link_mod.link_device_cert(V, "test", "laptop1", FP["laptop1"])
 

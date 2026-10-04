@@ -34,6 +34,7 @@ def vault_device_event(v, systemctl=None):
         return "stopped"
     if not running and here:
         systemctl("start", "openbao")
-        write_audit("fabric-unlock", "VAULT_UNLOCK", f"unlock device present ({', '.join(here)}): starting OpenBao", "host")
+        write_audit("fabric-unlock", "VAULT_UNLOCK", f"unlock device present ({', '.join(here)}): starting OpenBao",
+                    "host")
         return "started"
     return "unchanged"

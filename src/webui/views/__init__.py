@@ -1,6 +1,8 @@
 """The pages of the web UI (Jinja2, autoescaped; templates in templates/webui-app, the stylesheet in
 static/webui-app): one file per page, all importable from here (`from webui import views`)."""
-from webui.views.constants import TABS, FREERADIUS_SECTIONS, BIND9_SECTIONS, OPENBAO_SECTIONS, OPENBAO_VIEWS, SLOT_TYPES, DIRSRV_SECTIONS, STEPCA_MENU, STEPCA_VIEWS, KEY_TYPES, TSIG_SCOPES, TSIG_ANY_TYPES, SERVICES, PREVIEW_PERMS, TAB_PERMS, MENU_PERMS  # noqa: F401
+from webui.views.constants import (TABS, FREERADIUS_SECTIONS, BIND9_SECTIONS, OPENBAO_SECTIONS,  # noqa: F401
+                                   OPENBAO_VIEWS, SLOT_TYPES, DIRSRV_SECTIONS, STEPCA_MENU, STEPCA_VIEWS, KEY_TYPES,
+                                   TSIG_SCOPES, TSIG_ANY_TYPES, SERVICES, PREVIEW_PERMS, TAB_PERMS, MENU_PERMS)
 from webui.views.apply_result import apply_result  # noqa: F401
 from webui.views.audit import audit  # noqa: F401
 from webui.views.bind9 import bind9  # noqa: F401

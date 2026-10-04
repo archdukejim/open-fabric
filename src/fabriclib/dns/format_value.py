@@ -16,5 +16,6 @@ def format_value(rtype, record):
     if rtype == "MX":
         return f"{record.get('priority', '')} {record.get('exchange', '')}"
     if rtype == "SRV":
-        return f"{record.get('priority', '')} {record.get('weight', '')} {record.get('port', '')} {record.get('target', '')}"
+        return f"{record.get('priority', '')} {record.get('weight', '')} {record.get('port', '')} {record.get('target',
+                                                                                                              '')}"
     return str(record.get("value", record.get("target", "")))

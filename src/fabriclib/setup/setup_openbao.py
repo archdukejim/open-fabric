@@ -108,7 +108,8 @@ def run(ctx):
                 ok("OpenBao sign-in with Keycloak" + (f" ({', '.join(oidc)})" if oidc else " (no changes)")
                    + f": https://{v['hostname_openbao']}/ui/")
             except (ValidationError, KeyError) as exc:
-                warn(f"OpenBao sign-in with Keycloak not configured ({exc}); re-run `sudo fabricctl setup --step vault`")
+                warn(f"OpenBao sign-in with Keycloak not configured ({exc}); "
+                     "re-run `sudo fabricctl setup --step vault`")
         if os.path.exists(bootstrap):
             if not revoke_token(v, token):
                 raise SetupError("the initial root token could not be revoked")

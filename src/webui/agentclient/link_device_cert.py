@@ -13,4 +13,5 @@ def link_device_cert(actor, name, sha256, link=True):
              ValidationError for an unknown device or bad fingerprint.
     Feeds:   src/webui/routes/dirsrv_post (devices, certs — always link=False).
     """
-    return call_agent("POST", f"/v1/devices/{quote_segment(name)}/certs", {"actor": actor, "sha256": sha256, "link": link})
+    return call_agent("POST", f"/v1/devices/{quote_segment(name)}/certs", {"actor": actor, "sha256": sha256,
+                                                                           "link": link})

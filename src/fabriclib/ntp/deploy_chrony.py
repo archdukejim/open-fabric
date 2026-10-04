@@ -20,7 +20,8 @@ def deploy_chrony(v, registry_path, jinja_env, root="/", manage_units=True, conf
              tree); manage_units — systemctl calls (False in tests); config_dir — the install's config folder:
              the host's own files are kept there before fabric first writes them (None: not kept).
     Returns: True if chrony's configuration changed (chrony restarted when manage_units).
-    Fails:   ValidationError from normalize_ntp (through chrony_settings); OSError writing; CalledProcessError from systemctl.
+    Fails:   ValidationError from normalize_ntp (through chrony_settings); OSError writing; CalledProcessError from
+             systemctl.
     Feeds:   deploy/deploy_optional_parts (every apply: the upstream site or the subnets may have changed).
     Notes:   /etc/default/chrony: -s sets the clock at start from the drift file's time when there is no RTC (a
              Pi), so it never starts in the past; -x (ntp_set_clock false) never touches the clock. systemd-timesyncd
@@ -35,7 +36,8 @@ def deploy_chrony(v, registry_path, jinja_env, root="/", manage_units=True, conf
                "-x never sets it\n" f'DAEMON_OPTS="{opts}"\n')
     for d in ("/etc/chrony", "/etc/default", "/etc/systemd/system/chrony-wait.service.d"):
         os.makedirs(at(d), exist_ok=True)
-    for p in ("/etc/chrony/chrony.conf", "/etc/default/chrony", "/etc/systemd/system/chrony-wait.service.d/fabric.conf"):
+    for p in ("/etc/chrony/chrony.conf", "/etc/default/chrony",
+              "/etc/systemd/system/chrony-wait.service.d/fabric.conf"):
         keep_original(at(p), config_dir, marker="# fabric")     # `setup --undo time` puts them back
     changed = write_file_if_changed(at("/etc/chrony/chrony.conf"), conf, 0o644)
     changed |= write_file_if_changed(at("/etc/default/chrony"), default, 0o644)

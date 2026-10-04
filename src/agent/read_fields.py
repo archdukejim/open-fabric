@@ -12,7 +12,8 @@ def read_fields(data):
     if not isinstance(value, dict) or len(value) > 20:
         raise ValidationError("fields must be an object")
     for k, x in value.items():
-        ok = isinstance(x, (str, bool)) or (isinstance(x, list) and len(x) <= 100 and all(isinstance(i, str) for i in x))
+        ok = isinstance(x, (str, bool)) or (isinstance(x, list) and len(x) <= 100 and all(isinstance(i,
+                                                                                                     str) for i in x))
         if not ok:
             raise ValidationError(f"field {k} has an unsupported value")
     return value

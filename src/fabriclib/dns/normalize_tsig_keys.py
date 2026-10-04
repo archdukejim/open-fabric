@@ -25,7 +25,8 @@ def normalize_tsig_keys(keys, domain, secrets=None):
     Fails:   ValidationError "tsig_keys entry needs a name", "invalid or duplicate TSIG key name", "…: algorithm must be
              one of …", "…: invalid domain …", "…: invalid record_types …", "…: invalid record names …", "…: invalid ACL
              names …", "…: secret is not valid base64".
-    Feeds:   deploy/merge_tsig_keys (apply), setup/collect_vars.py, add_tsig_key, update_tsig_key, replace_tsig_secret (to check a
+    Feeds:   deploy/merge_tsig_keys (apply), setup/collect_vars.py, add_tsig_key, update_tsig_key, replace_tsig_secret
+             (to check a
              secret); ACL_RE, LABEL_RE and RTYPE_RE are reused by normalize_acl_policies.
     Notes:   records clear any_name; any_name is kept only when explicitly true.
     """

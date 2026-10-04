@@ -16,7 +16,8 @@ def ca_summary(v):
     Feeds:   agent route GET /v1/pki/ca (agent/ (fabric-agent) Handler.dispatch) -> webui agentclient.ca_summary
              -> the PKI page.
     """
-    out = {"domain": v.get("domain", ""), "certs_url": f"http://{v.get('hostname_certs', '')}/", "max_days": int(v.get("pki_manual_max_days")
+    out = {"domain": v.get("domain", ""), "certs_url": f"http://{v.get('hostname_certs', '')}/",
+           "max_days": int(v.get("pki_manual_max_days")
                                                                                  or DEFAULT_MAX_DAYS)}
     for label, path in zip(("root", "intermediate"), ca_files(v)):
         with open(path) as f:

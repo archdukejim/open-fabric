@@ -96,7 +96,8 @@ class Handler(BaseHTTPRequestHandler):
         """Purpose: POST /v1/join — an invited site joins (accept_join).
         Inputs:  a JSON body of at most JOIN_BODY_MAX bytes.
         Returns: None; 200 with accept_join's answer (or relay_join's, when the request's via names this site), then
-                 an apply in the background after a join here (the new site's DNS delegation and zones); 400 {"error": message} for a refusal (ValidationError) or a
+                 an apply in the background after a join here (the new site's DNS delegation and zones); 400 {"error":
+                 message} for a refusal (ValidationError) or a
                  bad body; 413 when too large; 404 for any other path; 500 {"error": "internal error"} otherwise
                  (details only in the journal).
         Fails:   OSError writing the reply.

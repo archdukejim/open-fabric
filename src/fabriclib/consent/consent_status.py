@@ -3,7 +3,8 @@ from fabriclib.consent.load_consent import load_consent
 
 
 def consent_status(config_dir):
-    """Purpose: this install's answers to the host-change questions, for `fabricctl status` and the web UI (manual 2.7.1.4, step 7): what fabric may change on the host, and what declining left unmanaged.
+    """Purpose: this install's answers to the host-change questions, for `fabricctl status` and the web UI (manual
+                2.7.1.4, step 7): what fabric may change on the host, and what declining left unmanaged.
     Inputs:  config_dir — the install's config folder.
     Returns: list of {"group", "title", "state": "approved"|"declined"|"not asked", "when", "by", "relaxation"
              (the consequence when declined, else "")}, in GROUPS order; [] for an install set up before consent

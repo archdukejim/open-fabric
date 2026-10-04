@@ -99,7 +99,8 @@ def jinja_env(template_dir):
     Fails:   yaml.YAMLError or OSError from read_images_lock / read_packages_lock if images.lock.yaml is
              unreadable; KeyError from read_images_lock if an image entry lacks repo, tag or digest.
              A missing lock file gives empty globals, not an error.
-    Feeds:   deploy/apply_deployment (and render_templates), dhcp/deploy_kea.py, logs/deploy_fluentbit.py, logs/run_logs_command.py,
+    Feeds:   deploy/apply_deployment (and render_templates), dhcp/deploy_kea.py, logs/deploy_fluentbit.py,
+             logs/run_logs_command.py,
              radius/deploy_freeradius.py; tests/render.py and the kea, fluentbit and freeradius suites."""
     env = _RelativeEnvironment(loader=jinja2.FileSystemLoader(template_dir), keep_trailing_newline=True,
                                trim_blocks=True, lstrip_blocks=True)
@@ -122,7 +123,8 @@ def jinja_env(template_dir):
                        kea_client_classes=kea_client_classes)
     # image_* defaults: the validated, digest-pinned refs — fabric/images.lock.yaml on a host, config/ in the repository
     lock_dir = os.path.dirname(template_dir)
-    if not os.path.exists(os.path.join(lock_dir, "images.lock.yaml")) and os.path.isdir(os.path.join(lock_dir, "config")):
+    if not os.path.exists(os.path.join(lock_dir, "images.lock.yaml")) and os.path.isdir(os.path.join(lock_dir,
+                                                                                                     "config")):
         lock_dir = os.path.join(lock_dir, "config")
     env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(lock_dir).items()}
     env.globals["packages_lock"] = read_packages_lock(lock_dir)

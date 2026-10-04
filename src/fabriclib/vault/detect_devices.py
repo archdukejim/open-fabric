@@ -36,7 +36,8 @@ def _tokens(sys_root):
         if vendor not in TOKEN_VENDORS:
             continue
         out.append({"vendor": TOKEN_VENDORS[vendor], "product": _read(os.path.join(dev, "product")) or "security key",
-                    "serial": _read(os.path.join(dev, "serial")), "usb_id": f"{vendor}:{_read(os.path.join(dev, 'idProduct'))}",
+                    "serial": _read(os.path.join(dev, "serial")),
+                    "usb_id": f"{vendor}:{_read(os.path.join(dev, 'idProduct'))}",
                     "port": os.path.basename(dev)})
     return out
 

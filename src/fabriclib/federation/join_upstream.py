@@ -20,7 +20,8 @@ ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert
 
 def join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None,
                   http_port=80, https_port=443, replace=False, dns_port=53):
-    """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (manual 1.8.4.1 step 2): make this site's CA key and request, fetch and pin the upstream's root,
+    """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (manual 1.8.4.1 step
+                2): make this site's CA key and request, fetch and pin the upstream's root,
              send the join over TLS verified against that root, check and stage the signed intermediate, and
              record the upstream.
     Inputs:  v — fabric vars: service_users.step, image_stepca (make_site_ca_request), lan_cidr and the DHCP
@@ -31,7 +32,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              domain (DOMAIN_RE); address — this host's IP (host_ip); config_dir — the install's config folder
              for federation.yaml and its lock (default: next to this code — setup runs from the package, so it
              passes <base>/fabric/config); audit_path — default AUDIT_FILE; http_port, https_port — the
-             upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join although an upstream is recorded
+             upstream's ports (the relay's, when the invitation names one), default 80 and 443 (tests); replace — join
+             although an upstream is recorded
              (re-parenting: the invitation's upstream becomes this site's parent), default False; dns_port —
              the port this site's DNS is published on (bind_dns_port), default 53: linked sites send zone
              transfers and notifies there.
@@ -81,7 +83,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     staged = stage_site_ca(work_dir, answer.get("cert", ""), answer["root"], root_sha256=inv["root_sha256"],
                            chain=answer.get("chain") or "")
     org = answer.get("org") or {}
-    up = {**(answer.get("upstream") or {}), "site": inv["site"], "org_domain": org.get("org_domain") or inv["org_domain"],
+    up = {**(answer.get("upstream") or {}), "site": inv["site"],
+          "org_domain": org.get("org_domain") or inv["org_domain"],
           "ldap_base_dn": org.get("ldap_base_dn") or inv["ldap_base_dn"],
           "root_sha256": inv["root_sha256"], "site_ca_depth": staged["site_ca_depth"],
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -100,7 +103,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
         save_registry(registry, reg_path)
     write_audit("root", "FED_JOINED", f"upstream={up.get('site_name')} site={inv['site']} domain={domain}", "cli",
                 path=audit_path or AUDIT_FILE)
-    return {"vars": _vars(inv, up, work_dir), "upstream": {k: up.get(k) for k in ("site_name", "domain", "host", "address")},
+    return {"vars": _vars(inv, up, work_dir), "upstream": {k: up.get(k) for k in ("site_name", "domain", "host",
+                                                                                  "address")},
             "joined": True, "dns_secret": (answer.get("dns") or {}).get("secret"),
             "replication_secret": (answer.get("directory") or {}).get("secret")}
 
@@ -114,7 +118,9 @@ def _vars(inv, up, work_dir):
     Fails:   never.
     Feeds:   join_upstream (both the first join and a re-run)."""
     return {"byoc": True, "ca_crt_path": os.path.join(work_dir, "root_ca.crt"),
-            "ica_crt_path": os.path.join(work_dir, "site_ca.crt"), "ica_key_path": os.path.join(work_dir, "site_ca_key"),
-            "ica_parents_path": os.path.join(work_dir, "ca_parents.crt"), "site_ca_depth": int(up.get("site_ca_depth") or 0),
+            "ica_crt_path": os.path.join(work_dir, "site_ca.crt"), "ica_key_path": os.path.join(work_dir,
+                                                                                                "site_ca_key"),
+            "ica_parents_path": os.path.join(work_dir,
+                                             "ca_parents.crt"), "site_ca_depth": int(up.get("site_ca_depth") or 0),
             "site_name": inv["site"], "org_domain": up.get("org_domain") or inv["org_domain"],
             "ldap_base_dn": up.get("ldap_base_dn") or inv["ldap_base_dn"], **(up.get("org") or {})}

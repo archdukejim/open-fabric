@@ -14,4 +14,5 @@ def vault_add_security_key(actor, module, token, pin, key_id, label):
     Notes:   The PIN travels only in this request body over the agent socket.
     """
     return call_agent("POST", "/v1/vault/slots/add-security-key", {"actor": actor, "module": module, "token": token,
-                                                              "pin": pin, "key_id": key_id, "label": label}, timeout=120)
+                                                              "pin": pin, "key_id": key_id, "label": label},
+                                                              timeout=120)

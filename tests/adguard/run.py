@@ -7,7 +7,6 @@ Includes what must be refused.
     sudo python3 tests/adguard/run.py            (needs Docker and dig)
 """
 import base64
-import json
 import os
 import shutil
 import subprocess
