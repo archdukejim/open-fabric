@@ -39,7 +39,10 @@ check "the build plan has the eight images" \
 
 # the bake inputs against the rendered compose files of a host with the default ids: the same base, the same
 # pinned package and build revision, and ids that are the Dockerfiles' defaults
-python3 tests/render.py "$W/rendered" >/dev/null || echo "FAIL render"
+# (rendered with the lock's published digests blanked: what a host builds when it cannot use a published image)
+mkdir -p "$W/tree/config"; ln -s "$REPO/templates" "$W/tree/templates"
+sed -E 's/(tag: )"[^"]*", (digest: )"[^"]*"/\1"", \2""/' config/images.lock.yaml > "$W/tree/config/images.lock.yaml"
+FABRIC_TEST_TEMPLATES="$W/tree/templates" python3 tests/render.py "$W/rendered" >/dev/null || echo "FAIL render"
 parity() {
     python3 - "$W/plan.json" "$W/rendered" "$CONTEXTS" <<'PY'
 import json, os, re, sys

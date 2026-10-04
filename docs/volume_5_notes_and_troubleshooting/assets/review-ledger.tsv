@@ -11,7 +11,7 @@ README.md	7dfbb671ed0beb62a53cc49b1ba8ccf777e874b9	2026-10-03
 THIRD_PARTY_NOTICES	458e3061e4bf3d43a927cb3cdb4530fb263fd5a3	2026-10-03	
 config/README.md	8ab7d73da2b01a35bbd1bbe4046e53dbf1d37c23	2026-10-03	
 config/VERSION	bc80560fad66ca670bdfbd1e5c973a024d4d0325	2026-09-30	
-config/images.lock.yaml	41433624e3225e93c9be925df10305bcf6dcef4e	2026-10-04	
+config/images.lock.yaml	1e23e1dd6ed33d4afc31b2d4143939e9c16b2ae2	2026-10-04	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	cd1882070d1e8ad1ff80ad68e4bd0155d37e4ed5	2026-10-03	
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
@@ -150,7 +150,7 @@ docs/volume_4_infrequent_ops/4.8.2-automated-tests.md	011d11a97f102beb64bf315d32
 docs/volume_4_infrequent_ops/4.9.1-dev-preview.md	8721440c08affc04abe0f2603c5a4ac239b236be	2026-10-03	
 docs/volume_4_infrequent_ops/4.9.2-working-on-fabric.md	e99d9c1fdc3e7fd9d8b75b854ed71fcdb56eeef8	2026-10-03	
 docs/volume_4_infrequent_ops/README.md	eb139fcb69bee5480ef9a028550f0bdc2788a9bc	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.1.1-alignment-plan.md	c30356bc12566ca412cd6ff89883fc870c6c2082	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.1.1-alignment-plan.md	e735297984827a1866a4a0a75f74f565c6cd6a1b	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.1.2-section-map.md	db4dad173fb53a38e38514b01721aee0f1a98751	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.1.3-repository-layout-proposal.md	779764199e3c0e96ac7858b65ab26f6b405b77e8	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.1.4-image-publishing-proposal.md	79f14a6b9059c5894e5deb7382dbed45bec0c9d5	2026-10-04	
@@ -1028,7 +1028,7 @@ tests/host/run.sh	b4512d1ec01376e03472aeda83e44ab16162641c	2026-10-03
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
 tests/images/README.md	3d9cb6e69951a547993a9b23fab7cfb54c1e24ab	2026-10-04	
 tests/images/published.py	09c51d854e26199ee630805181ead5f256b50dde	2026-10-04	
-tests/images/run.sh	f175dcf27e57ce9b5af8ab26529e1610b7af23f4	2026-10-04	
+tests/images/run.sh	07aae09262f68ed0ec9bb5be44ca49dd70b6dda5	2026-10-04	
 tests/images/verify.py	b76e4b01831667055e4f28b5db2874a340f156dc	2026-10-04	
 tests/kea/README.md	b8373859c948c010128d868414658cd9534e9627	2026-10-02	
 tests/kea/run.py	8c58e321988c3fe364c8950cb0bb300d4911ec10	2026-10-03	
