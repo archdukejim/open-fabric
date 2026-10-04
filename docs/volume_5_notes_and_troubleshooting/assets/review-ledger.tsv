@@ -17,7 +17,7 @@ docs/README.md	cd1882070d1e8ad1ff80ad68e4bd0155d37e4ed5	2026-10-03
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	663052961ae0200a3d8bb5d5d35fe1289dd0385a	2026-10-04	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	13e82f2b94048a25e66b2d7f910fdf3027834b33	2026-10-04	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	30c122a60617a414969f1200e16e517bff9ce08b	2026-10-04	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -164,9 +164,9 @@ docs/volume_5_notes_and_troubleshooting/5.5.2-references.md	49e24e286eb08331648d
 docs/volume_5_notes_and_troubleshooting/5.5.3-rejected-options.md	614a28afd980fe9471b235eb98fbd752932e963f	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0cb329b5eb5083ccf154c15b706deda6a	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	a015d9e67fce35a4f8946cd2591c0a240f138868	2026-10-03	
+docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	035c4aa31c9d35ae1cd33120d7cf48da0e70d582	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e75a50ebc2a14f6d8a6c7c942810aa8de91ae139	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	47cc21f6dbf1c085df9919538e1a55accddb2ebc	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	ba154baf09faef98c9ade573525ac2201699a9ec	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
