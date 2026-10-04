@@ -1,0 +1,116 @@
+# The validated container images fabric runs (manual 2.6.2).
+#
+# Every image is pinned by its multi-arch index digest (amd64 + arm64): an
+# upstream push never changes what a host runs. vars.yaml.j2 takes its
+# image_* defaults from here, and `fabricctl images status/update` compares
+# each host against this list. Later a watch-images workflow (planned,
+# not in .github/workflows yet) proposes changes to this file after the
+# regression suites pass.
+#
+#   track:  which new upstream tags may become candidates (a tag pattern
+#           within one major/minor, or a floating tag whose digest moves)
+#   policy: auto | manual (manual: frozen, the watcher only reports)
+images:
+  nginx:
+    var: image_nginx
+    repo: nginx
+    tag: "1.30.5"
+    digest: sha256:b972f831f200b19ef0767938224f9711e74cd783718738cd7405d5cabf75c442
+    track: "1.30.*"                  # the stable branch
+    policy: auto
+  stepca:                            # base of fabric/stepca:local
+    var: image_stepca
+    repo: smallstep/step-ca
+    tag: "0.30.2"
+    digest: sha256:a2b17872915c193259b75a5474c398326f41bd199f0842093e52cf4182bc8270
+    track: "0.30.*"
+    policy: auto
+  keycloak:                          # base of fabric/keycloak:local
+    var: image_keycloak
+    repo: keycloak/keycloak
+    tag: "26.7.4"
+    digest: sha256:82a77884f3af238beab1e7afd63b5f530e1b5c0590bd7aa60b40a40463e29b2c
+    track: "26.*"
+    policy: auto
+  postgres:
+    var: image_postgres
+    repo: postgres
+    tag: "18.6"
+    digest: sha256:5a5a84b19854a9ffaa54082c166ff4ec27473a361e496e5ea167f298f2da9722
+    track: "18.*"                    # a new major needs a data upgrade: never automatic
+    policy: auto
+  openbao:
+    var: image_openbao
+    repo: openbao/openbao
+    tag: "2.7.0"
+    digest: sha256:71156a1c6623a5fa3f5e61b0c6a8ead0faf0df29a778339188443551995d1315
+    track: "2.7.*"
+    policy: auto
+  fluentbit:                         # optional: log forwarding (install_fluentbit)
+    var: image_fluentbit
+    repo: fluent/fluent-bit
+    tag: "5.1.2"
+    digest: sha256:d792375ca8e53be72fc25716c28f291f32c6fc6f4f31d12d0d14bc78cefe9226
+    track: "5.1.*"
+    policy: auto
+  adguard:                           # optional: DNS filter in front of BIND (dns_filter: adguard)
+    var: image_adguard
+    repo: adguard/adguardhome
+    tag: "v0.107.79"
+    digest: sha256:aba9e3bf0613be3ba3755e1fc311b126e2c24bec25e18b6483894a88283074f0
+    track: "v0.107.*"
+    policy: auto
+  oauth2proxy:                       # optional: OIDC sign-in in front of AdGuard's UI
+    var: image_oauth2proxy
+    repo: quay.io/oauth2-proxy/oauth2-proxy
+    tag: "v7.15.5"
+    digest: sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+    track: "v7.15.*"
+    policy: auto
+  cosign:                            # verifies the signatures of fabric's published images (D81, D86)
+    var: image_cosign
+    repo: ghcr.io/sigstore/cosign/cosign
+    tag: "v3.0.6"
+    digest: sha256:de9c65609e6bde17e6b48de485ee788407c9502fa08b8f4459f595b21f56cd00
+    track: "v3.*"
+    policy: manual                   # a verifier changes only by a reviewed decision
+  debian:                            # base of fabric/bind9:local, fabric/dirsrv:local, fabric/web:local,
+                                     # fabric/kea:local and fabric/freeradius:local
+    var: image_debian
+    repo: debian
+    tag: trixie-slim
+    digest: sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+    track: trixie-slim
+    policy: auto
+
+# fabric's own images, built and smoke tested in CI, signed and published (manual 2.6.3, 4.7.1; D41).
+# An empty digest: not published yet, and hosts build that image themselves. `ids` are the service
+# account ids baked into the published image (the Dockerfile's defaults): a host whose
+# service_users.<account> differ builds that image itself (D80).
+published:
+  registry: ghcr.io/archdukejim/open-fabric
+  # who may have signed them: this repository's images workflow, from main, an rc/ branch or a v tag (D84)
+  signer: ^https://github\.com/archdukejim/open-fabric/\.github/workflows/images\.yml@refs/(heads/main|heads/rc/.+|tags/v.+)$
+  issuer: https://token.actions.githubusercontent.com
+  images:
+    adguard:    {var: image_fabric_adguard, tag: "1.5.0-rc.3", digest: "sha256:600da65296ceefdec893d4b5f18497c285bdd472bf1e4185f6c6909c2b0cabd2"}
+    bind9:      {var: image_fabric_bind9, tag: "1.5.0-rc.3", digest: "sha256:04ea9bbc6033774f2251b83b678f5d2ca6da61af969eb13e1f5cd937d42ed303", account: bind, ids: "600:600"}
+    dirsrv:     {var: image_fabric_dirsrv, tag: "1.5.0-rc.3", digest: "sha256:cfe6faa5c2c85b04c84b95a2a4221dc0e4e4a922415b844c6c2624d55a79d397", account: ldap, ids: "601:601"}
+    freeradius: {var: image_fabric_freeradius, tag: "1.5.0-rc.3", digest: "sha256:74319ea634bdb7c67d3c4b9361f984fa6adda95d065e4859c70314bd84de87d8", account: freeradius, ids: "610:610"}
+    kea:        {var: image_fabric_kea, tag: "1.5.0-rc.3", digest: "sha256:45c49a2c46f0f2fc6e3ec453ed628a790a85ba3d272f040a14424da7790ea53a", account: kea, ids: "609:609"}
+    keycloak:   {var: image_fabric_keycloak, tag: "1.5.0-rc.3", digest: "sha256:f9ff8d0124921b4c43136573fe406e97b086a6bbfde2d6db4ebec33c9119e257"}
+    stepca:     {var: image_fabric_stepca, tag: "1.5.0-rc.3", digest: "sha256:0d972a7279fbcd6d65b23b7300c890a2d3c06b3f3f3e7be1405d902882dddbaa"}
+    webui:      {var: image_fabric_webui, tag: "1.5.0-rc.3", digest: "sha256:e925f15216b6a97a20fdfe29dc33b328cf8b3a76a529aad2a14d029317180e24", account: webui, ids: "606:606"}
+
+# Packages installed into fabric's own images from an upstream's signed apt
+# repository (not Debian's): the exact version and the signing key's
+# fingerprint are pinned, so a rebuild gets exactly this (design D22).
+packages:
+  kea:                               # Kea DHCP 3.0 LTS (ISC); Debian trixie ships only 2.6
+    version: "3.0.4-isc20260728182757"
+    repo: https://dl.cloudsmith.io/public/isc/kea-3-0/deb/debian
+    suite: trixie
+    key_url: https://dl.cloudsmith.io/public/isc/kea-3-0/gpg.key
+    key_fingerprint: 9DA570BB192211885E4EB280B16C44CD45514C3C
+    track: "3.0.*"
+    policy: auto

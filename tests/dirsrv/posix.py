@@ -1,11 +1,11 @@
-"""POSIX identities (fabriclib/ldap/ensure_posix_identities.py, design domain-join.md step 1) against the test
+"""POSIX identities (fabriclib/ldap/ensure_posix_identities.py, manual 2.10.1 step 1) against the test
 389-DS container: the DNA plugin assigns uidNumbers server-side from the users OU's range, every person gets one
 once, unsafe names are skipped, numbers are never handed out twice. Inputs from the environment."""
 import os
 import subprocess
 import sys
 
-sys.path[0:0] = [os.path.join(os.environ["REPO"], "fabricctl", "lib"), os.environ["REPO"]]
+sys.path[0:0] = [os.path.join(os.environ["REPO"], "src"), os.environ["REPO"]]
 from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities  # noqa: E402
 
 BASE = os.environ["BASE"]

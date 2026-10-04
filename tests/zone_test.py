@@ -5,7 +5,7 @@ import sys
 import tempfile
 import time
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 from fabriclib.dns import reload_zone as reload_zone_module  # noqa: E402
 from fabriclib.dns.find_changed_zones import find_changed_zones  # noqa: E402
 from fabriclib.dns.reload_zone import file_serial, reload_zone  # noqa: E402

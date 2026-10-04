@@ -12,7 +12,9 @@ import os
 import subprocess
 import sys
 
-from product_code import REPO
+# the shared helpers live with the generator in scripts/docs/
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts", "docs"))  # noqa: E501
+from product_code import REPO  # noqa: E402
 
 
 def _strip_docstrings(tree):

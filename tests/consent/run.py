@@ -1,4 +1,4 @@
-"""Asking before fabric changes the host (design host-consent.md): the recorded answers, the questions setup asks
+"""Asking before fabric changes the host (manual 2.7.1): the recorded answers, the questions setup asks
 (unattended and interactive), what steps may do with them, the account plan with its move from the previous
 accounts, and the upgrade of an older install's settings. No containers and nothing changed on this host: the
 answers live in a scratch folder and the account checks read (or stand in for) the host's accounts."""
@@ -12,7 +12,7 @@ import tempfile
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.keep_original import keep_original  # noqa: E402
 from fabriclib.common.restore_original import restore_original  # noqa: E402
@@ -31,7 +31,7 @@ from fabriclib.undo.undo_group import undo_group  # noqa: E402
 from fabriclib.undo.uninstall_plan import uninstall_plan  # noqa: E402
 
 FAILED = 0
-JINJA = os.path.join(REPO, "fabricctl", "jinja")
+JINJA = os.path.join(REPO, "templates")
 
 
 def check(name, cond, detail=""):

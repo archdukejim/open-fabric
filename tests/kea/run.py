@@ -21,7 +21,7 @@ W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/kea"
 NET, SUBNET = "keatest_net", "10.254.23.0/24"
 BIND_IP, DDNS_IP = "10.254.23.30", "10.254.23.97"
 FAILED = 0
-sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
+sys.path[0:0] = [os.path.join(REPO, "src"), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.common.read_packages_lock import read_packages_lock  # noqa: E402
@@ -62,7 +62,7 @@ def cleanup():
 cleanup()
 shutil.rmtree(W, ignore_errors=True)
 os.makedirs(f"{W}/bind9/data")
-lock, pkgs = read_images_lock(os.path.join(REPO, "fabricctl")), read_packages_lock(os.path.join(REPO, "fabricctl"))
+lock, pkgs = read_images_lock(os.path.join(REPO, "config")), read_packages_lock(os.path.join(REPO, "config"))
 DEBIAN, BUSYBOX = lock["debian"]["ref"], \
     "busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
 k = pkgs["kea"]
@@ -71,19 +71,19 @@ k = pkgs["kea"]
 build = sh(["docker", "build", "-q", "-t", "fabric/kea:test", "--build-arg", f"BASE_IMAGE={DEBIAN}",
             "--build-arg", f"KEA_VERSION={k['version']}", "--build-arg", f"KEA_REPO={k['repo']}",
             "--build-arg", f"KEA_SUITE={k['suite']}", "--build-arg", f"KEA_KEY_URL={k['key_url']}",
-            "--build-arg", f"KEA_KEY_FINGERPRINT={k['key_fingerprint']}", f"{REPO}/fabricctl/jinja/kea/build"], ok=False)
+            "--build-arg", f"KEA_KEY_FINGERPRINT={k['key_fingerprint']}", f"{REPO}/packaging/images/kea"], ok=False)
 check("Kea image builds from ISC's repository (signing key pinned, exact version)", build.returncode == 0,
       build.stderr[-600:])
 bad = sh(["docker", "build", "-q", "--build-arg", f"BASE_IMAGE={DEBIAN}", "--build-arg", f"KEA_VERSION={k['version']}",
           "--build-arg", f"KEA_REPO={k['repo']}", "--build-arg", f"KEA_SUITE={k['suite']}",
           "--build-arg", f"KEA_KEY_URL={k['key_url']}", "--build-arg", "KEA_KEY_FINGERPRINT=" + "0" * 40,
-          f"{REPO}/fabricctl/jinja/kea/build"], ok=False)
+          f"{REPO}/packaging/images/kea"], ok=False)
 check("the build refuses a repository key that is not the pinned one", bad.returncode != 0
       and "is not the pinned" in bad.stderr + bad.stdout, bad.stderr[-300:])
 version = sh("docker run --rm --entrypoint /usr/sbin/kea-dhcp4 fabric/kea:test -V", ok=False).stdout
 check("Kea 3.0 LTS inside (the pinned version)", version.startswith("3.0."), version[:80])
 sh(["docker", "build", "-q", "-t", "fabric/bind9:keatest", "--build-arg", f"BASE_IMAGE={DEBIAN}",
-    f"{REPO}/fabricctl/jinja/bind9/build"])
+    f"{REPO}/packaging/images/bind9"])
 
 # ------------------------------------------------------------------ fabric's files
 V = {"deploy_base_dir": W, "domain": "lan.test", "install_kea": True, "ip_kea_ddns": DDNS_IP, "ip_bind9": BIND_IP,
@@ -99,7 +99,7 @@ V = {"deploy_base_dir": W, "domain": "lan.test", "install_kea": True, "ip_kea_dd
                            "reservations": [{"mac": "02:00:00:00:00:42", "ip": "10.254.23.42",
                                              "hostname": "printer"}]}]}}
 V["dhcp"] = normalize_dhcp(V)
-env = jinja_env(os.path.join(REPO, "fabricctl", "jinja"))
+env = jinja_env(os.path.join(REPO, "templates"))
 secret = sh("openssl rand -base64 32").stdout.strip()
 check("Kea's configs, lease and socket folders, and the DHCP subzone file written",
       deploy_kea(V, {"kea_ddns_secret": secret}, env, 53, 53) and os.path.exists(f"{W}/bind9/data/db.dhcp.lan.test")
@@ -196,8 +196,8 @@ time.sleep(3)
 check("another client asking for the same name cannot take it over (DHCID)", ip3 and ip3 != ip1
       and dig("laptop1.dhcp.lan.test") == ip1, (ip3, dig("laptop1.dhcp.lan.test")))
 leases = list_leases(V)
-check("lease list over the control socket shows the clients", any(l["ip"] == ip1 and l["hostname"].startswith("laptop1")
-      for l in leases) and any(l["ip"] == "10.254.23.42" for l in leases), leases)
+check("lease list over the control socket shows the clients", any(lease["ip"] == ip1 and lease["hostname"].startswith("laptop1")
+      for lease in leases) and any(lease["ip"] == "10.254.23.42" for lease in leases), leases)
 evil = sh(f"printf 'server {BIND_IP}\\nzone lan.test\\nupdate add evil.lan.test 60 A 1.2.3.4\\nsend\\n' "
           f"| nsupdate -y hmac-sha256:kea-ddns:{secret} 2>&1", ok=False).stdout
 check("the key may not touch anything but the DHCP subzone", "REFUSED" in evil or "NOTAUTH" in evil, evil[-300:])
@@ -217,7 +217,7 @@ check("kea-dhcp4 starts again over the previous container's run folder; leases k
       until(lambda: sh("docker inspect -f {{.State.Running}} kt-dhcp4", ok=False).stdout.strip() == "true"
             and os.path.exists(f"{W}/kea/run/kea4-ctrl-socket") and time.sleep(3) is None
             and sh("docker inspect -f {{.State.Running}} kt-dhcp4", ok=False).stdout.strip() == "true"
-            and any(l["ip"] == ip1 for l in leases_or_none())),
+            and any(lease["ip"] == ip1 for lease in leases_or_none())),
       sh("docker logs kt-dhcp4", ok=False).stderr[-600:])
 
 insp = {c: json.loads(sh(f"docker inspect {c}").stdout)[0] for c in ("kt-dhcp4", "kt-ddns")}
@@ -230,7 +230,7 @@ check("kea-ddns: uid 915, no capabilities, read-only",
       insp["kt-ddns"]["Config"]["User"] == "915:915" and not hd.get("CapAdd") and hd["ReadonlyRootfs"])
 
 
-# ------------------------------------------------------------------ commands (dhcp-management.md §4)
+# ------------------------------------------------------------------ commands (manual 2.2.2.5)
 # The vars file is a scratch copy: edit_dhcp's load/save/lock/audit are pointed at it.
 import contextlib  # noqa: E402
 from fabriclib.dhcp.common import edit_dhcp as ed  # noqa: E402

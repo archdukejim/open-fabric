@@ -1,0 +1,58 @@
+# fabric-agent routes -> the permission they need. A route not listed here is
+# refused (default deny). "session" = any signed-in fabric user.
+GET = {
+    ("version",): "session",
+    ("services",): "status:read", ("host-changes",): "status:read", ("relaxed-settings",): "status:read",
+    ("zones",): "dns:read", ("zones", "*"): "dns:read", ("reverse-zones",): "dns:read", ("tsig",): "dns:read",
+    ("audit",): "audit:read",
+    ("dhcp",): "dhcp:read",
+    ("radius",): "radius:read", ("radius", "guides"): "radius:read",
+    ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read",
+    ("devices",): "devices:read",
+    ("people",): "people:read",
+    ("vault",): "vault:status", ("vault", "slots"): "vault:status", ("vault", "devices"): "vault:status",
+}
+POST = {
+    ("events",): "session",
+    ("zones", "*", "records"): "dns:write", ("zones", "*", "records", "delete"): "dns:write",
+    ("apply",): "dns:write",
+    ("pki", "describe-csr"): "pki:read", ("pki", "inspect"): "pki:read",
+    ("pki", "sign"): "pki:sign", ("pki", "issue"): "pki:issue", ("pki", "convert"): "pki:issue",
+    ("tsig",): "tsig:manage", ("tsig", "*", "rotate"): "tsig:manage", ("tsig", "*", "delete"): "tsig:manage",
+    ("vault", "rotate"): "vault:unlock", ("vault", "slots", "add-usb"): "vault:unlock",
+    ("vault", "slots", "add-security-key"): "vault:unlock", ("vault", "slots", "add-hsm"): "vault:unlock",
+    ("vault", "slots", "*", "test"): "vault:unlock", ("vault", "slots", "*", "remove"): "vault:unlock",
+    ("devices",): "devices:enroll", ("devices", "*"): "devices:admin", ("devices", "*", "delete"): "devices:admin",
+    ("devices", "*", "certs"): "pki:link-device",
+    ("roles",): "roles:admin", ("roles", "*"): "roles:admin", ("roles", "*", "delete"): "roles:admin",
+    ("people",): "people:create", ("people", "*", "reset"): "people:reset",
+    ("dhcp", "reservations"): "dhcp:write", ("dhcp", "reservations", "*", "delete"): "dhcp:write",
+    ("dhcp", "subnets"): "dhcp:write", ("dhcp", "subnets", "update"): "dhcp:write",
+    ("dhcp", "subnets", "delete"): "dhcp:write", ("dhcp", "options"): "dhcp:write",
+    ("dhcp", "options", "delete"): "dhcp:write", ("dhcp", "classes"): "dhcp:write",
+    ("dhcp", "classes", "*", "delete"): "dhcp:write",
+    ("radius", "clients"): "radius:admin", ("radius", "clients", "*", "rotate"): "radius:admin",
+    ("radius", "clients", "*", "delete"): "radius:admin",
+    ("radius", "people"): "radius:admin", ("radius", "people", "*", "delete"): "radius:admin",
+}
+
+
+def required_permission(method, route):
+    """Purpose: The permission an agent request needs; routes not in the table are refused (default deny).
+    Inputs:  method — "GET" or "POST" (anything else allows nothing); route — the path after /v1/ as a list
+             or tuple of segments.
+    Returns: a permission name (e.g. "dns:write"), "session" (any signed-in fabric user), or None (route
+             not allowed).
+    Fails:   never — an unknown route gives None.
+    Feeds:   agent/handler.py Handler.authorize (None -> 403 "not allowed").
+    Notes:   an exact entry wins; otherwise the first same-length pattern in table order where "*" matches
+             any one segment.
+    """
+    table = GET if method == "GET" else POST if method == "POST" else {}
+    route = tuple(route)
+    if route in table:
+        return table[route]
+    for pattern, perm in table.items():
+        if len(pattern) == len(route) and all(p == "*" or p == r for p, r in zip(pattern, route)):
+            return perm
+    return None

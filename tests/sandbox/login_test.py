@@ -216,7 +216,7 @@ def vault_login(user, password):
 
 
 def adguard_login(user, password):
-    """AdGuard Home's UI behind oauth2-proxy (design dns-filter.md §5): the page sends a stranger to sign-in,
+    """AdGuard Home's UI behind oauth2-proxy (manual 2.4.1.6): the page sends a stranger to sign-in,
     Keycloak, the callback, then the page again. Returns (status, page) of that last request."""
     b = Browser()
     st, loc, page = b.request("GET", f"https://{ADG}/")

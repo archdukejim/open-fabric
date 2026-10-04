@@ -1,0 +1,87 @@
+# 389-DS server hardening. Applied by seed.py on every deploy; only
+# attributes whose value differs are written. Changes under cn=config that
+# seed.py reports as restart-required trigger one `systemctl restart ldap`.
+
+# Every simple bind must be over TLS/LDAPI, and every operation except the
+# rootDSE lookup and StartTLS needs an encrypted channel (SSF >= 56).
+dn: cn=config
+changetype: modify
+replace: nsslapd-require-secure-binds
+nsslapd-require-secure-binds: on
+-
+replace: nsslapd-minssf
+nsslapd-minssf: 56
+-
+replace: nsslapd-minssf-exclude-rootdse
+nsslapd-minssf-exclude-rootdse: on
+-
+replace: nsslapd-allow-anonymous-access
+nsslapd-allow-anonymous-access: on
+-
+replace: nsslapd-allow-unauthenticated-binds
+nsslapd-allow-unauthenticated-binds: off
+-
+replace: passwordStorageScheme
+passwordStorageScheme: PBKDF2-SHA512
+-
+replace: passwordChecksyntax
+passwordChecksyntax: on
+-
+replace: passwordMinLength
+passwordMinLength: {{ ldap_password_min_length | default(12) }}
+-
+replace: passwordMinCategories
+passwordMinCategories: 3
+-
+replace: passwordLockout
+passwordLockout: on
+-
+replace: passwordMaxFailure
+passwordMaxFailure: {{ ldap_lockout_max_failures | default(5) }}
+-
+replace: passwordLockoutDuration
+passwordLockoutDuration: {{ ldap_lockout_duration | default(900) }}
+-
+replace: passwordResetFailureCount
+passwordResetFailureCount: 900
+
+dn: cn=encryption,cn=config
+changetype: modify
+replace: sslVersionMin
+sslVersionMin: TLS1.2
+
+# memberOf lets Keycloak and sssd resolve a user's groups in one lookup.
+dn: cn=MemberOf Plugin,cn=plugins,cn=config
+changetype: modify
+replace: nsslapd-pluginEnabled
+nsslapd-pluginEnabled: on
+-
+replace: memberOfAutoAddOC
+memberOfAutoAddOC: nsMemberOf
+
+# Keycloak links federated users by entryUUID.
+dn: cn=entryuuid,cn=plugins,cn=config
+changetype: modify
+replace: nsslapd-pluginEnabled
+nsslapd-pluginEnabled: on
+
+# POSIX identities (manual 2.10.1 step 1): the server hands out uidNumber itself — atomically, never
+# twice — when an entry under ou=users becomes a posixAccount with uidNumber -1 (ldap/ensure_posix_identities).
+# The range is the users OU's uid_range. Added once: dnaNextValue moves on with every number handed out.
+{% set _users_ou = (ldap_organizational_units | default([]) | selectattr('name', 'equalto', 'users') | list | first) or {} %}
+{% set _uid_range = (_users_ou.get('uid_range') or '5001-50000').split('-') %}
+dn: cn=Distributed Numeric Assignment Plugin,cn=plugins,cn=config
+changetype: modify
+replace: nsslapd-pluginEnabled
+nsslapd-pluginEnabled: on
+
+dn: cn=Person UIDs,cn=Distributed Numeric Assignment Plugin,cn=plugins,cn=config
+objectClass: top
+objectClass: extensibleObject
+cn: Person UIDs
+dnaType: uidNumber
+dnaMagicRegen: -1
+dnaFilter: (objectClass=posixAccount)
+dnaScope: ou=users,ou=accounts,{{ ldap_base_dn }}
+dnaNextValue: {{ _uid_range[0] | trim }}
+dnaMaxValue: {{ _uid_range[1] | trim }}

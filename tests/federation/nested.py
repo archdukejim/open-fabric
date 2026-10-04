@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nested sites and re-parenting (design federation.md §6) with the real Step-CA image:
+"""Nested sites and re-parenting (manual 1.8.5.1) with the real Step-CA image:
 
 the root site `lan` (a root of path length 2: one level of nesting) invites `lab` with --nest 1; lab, now
 a site that may hold sites, invites `lab2` (nested under it); lab2 is then re-parented under the root.
@@ -15,7 +15,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import time
 
 import yaml
 
@@ -57,7 +56,7 @@ def free_port():
 def install(name, site, domain, password, extra=None):
     """An install tree of its own (code, config) and a Step-CA data folder for site `site`."""
     tree = f"{W}/{name}"
-    subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", tree], check=True)
+    subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", tree], check=True)
     os.makedirs(f"{tree}/fabric/config")
     data = f"{tree}/stepca/data"
     for d in ("certs", "secrets", "artifacts", "config"):
@@ -112,7 +111,7 @@ def become_upstream(data, staged, root_pem):
 try:
     shutil.rmtree(W, ignore_errors=True)
     main_tree = f"{W}/main"
-    subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", main_tree], check=True)
+    subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", main_tree], check=True)
     sys.path.insert(0, f"{main_tree}/fabric/lib")
     from fabriclib.common.errors import ValidationError  # noqa: E402
     from fabriclib.federation.join_upstream import join_upstream  # noqa: E402

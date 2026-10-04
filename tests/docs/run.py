@@ -2,10 +2,10 @@
 """The docs suite: the documentation says what the code does.
 
   - every product function has a structured docstring (check_docstrings.py)
-  - docs/lib-doc/ is what those docstrings say (gen_lib_doc.py --check)
+  - the function reference (manual 1.11) is what those docstrings say (scripts/docs/gen_lib_doc.py --check)
   - docs and code agree on settings, commands, routes, permissions, suites,
     setup steps, READMEs and links (check_consistency.py)
-  - every file in the repository has been reviewed (review_ledger.py)
+  - every file in the repository has been reviewed (scripts/docs/review_ledger.py)
 
     python3 tests/docs/run.py        (no Docker, no root)
 """
@@ -14,10 +14,11 @@ import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-STEPS = [("every function has a structured docstring", ["check_docstrings.py", "--summary"]),
-         ("docs/lib-doc/ matches the code", ["gen_lib_doc.py", "--check"]),
-         ("docs and code agree", ["check_consistency.py"]),
-         ("every file has been reviewed", ["review_ledger.py"])]
+TOOLS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "scripts", "docs")   # the generator and the ledger
+STEPS = [("every function has a structured docstring", [os.path.join(HERE, "check_docstrings.py"), "--summary"]),
+         ("the function reference (manual 1.11) matches the code", [os.path.join(TOOLS, "gen_lib_doc.py"), "--check"]),
+         ("docs and code agree", [os.path.join(HERE, "check_consistency.py")]),
+         ("every file has been reviewed", [os.path.join(TOOLS, "review_ledger.py")])]
 
 
 def main():
@@ -28,7 +29,7 @@ def main():
     Feeds:   tests/run-all.sh (suite `docs`)."""
     failed = 0
     for name, cmd in STEPS:
-        res = subprocess.run([sys.executable, os.path.join(HERE, cmd[0]), *cmd[1:]], cwd=HERE,
+        res = subprocess.run([sys.executable, *cmd], cwd=HERE,
                              capture_output=True, text=True)
         ok = res.returncode == 0
         failed += not ok

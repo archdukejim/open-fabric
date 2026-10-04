@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Directory replication between two sites (design federation.md §3.2a, M5) with two real 389-DS containers:
+# Directory replication between two sites (manual 1.8.3.2, M5) with two real 389-DS containers:
 # the root (ldap.lan.test) writes the organisation, the site (ldap.lab.lan.test) writes its own part. Proves:
 # the organisation reaches the site read-only, the site's part reaches the root, writes at the wrong end are
 # refused, the site keeps answering with the root down and catches up afterwards. fabriclib's
@@ -9,7 +9,7 @@
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${REPO:-$(cd "$HERE/../.." && pwd)}"
-LIB="$REPO/fabricctl/lib"
+LIB="$REPO/src"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 W="$OUT/replication"
 BASE="dc=lan,dc=test"; ROOT_PART="ou=lan,$BASE"; SITE_PART="ou=lab,$BASE"
@@ -17,9 +17,9 @@ NET=repl_test_net
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 cleanup() { docker rm -f dsroot dssite >/dev/null 2>&1; docker network rm "$NET" >/dev/null 2>&1; }
-cleanup; rm -rf "$W"; mkdir -p "$W"; cd "$W"
+cleanup; rm -rf "$W"; mkdir -p "$W"; cd "$W" || exit 1
 docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 \
-  --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabricctl/jinja/dirsrv/build" >/dev/null || { echo "FAIL image"; exit 1; }
+  --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/packaging/images/dirsrv" >/dev/null || { echo "FAIL image"; exit 1; }
 docker network create "$NET" >/dev/null
 
 # one CA for the organisation, a server certificate per site
@@ -135,11 +135,11 @@ dm dsroot "c.add_s(\"uid=bob,ou=users,$BASE\", ldap.modlist.addModlist({'objectC
 check "changes made while the root was down arrive when it is back" "seen dsroot 'cn=camera,$SITE_PART'"
 check "and the root's new changes reach the site" "seen dssite 'uid=bob,ou=users,$BASE'"
 
-# ---- the address plan across sites (dhcp-management.md §5), over the same replication
+# ---- the address plan across sites (manual 2.2.2.6), over the same replication
 schema=$(py "
 import re
 from fabriclib.common.jinja_env import jinja_env
-text = jinja_env('$REPO/fabricctl/jinja').get_template('dirsrv/seed/05-schema.ldif.j2').render()
+text = jinja_env('$REPO/templates').get_template('dirsrv/seed/05-schema.ldif.j2').render()
 print(repr([l for l in text.splitlines() if re.match(r'(attributeTypes|objectClasses): ', l)]))")
 for ds in dsroot dssite; do
   dm "$ds" "

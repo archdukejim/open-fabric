@@ -1,0 +1,26 @@
+# templates
+
+Templates rendered by `deploy.py` (and `fabriclib`) from `vars.yaml` into `/opt/<service>/` (systemd units into
+`/etc/systemd/system/`). One folder per service. On a host this folder is `jinja/` (manual 1.3.2); the images'
+build files are in `packaging/images/` (installed as `jinja/<service>/build/`) and the code that runs inside
+containers in `src/containers/`.
+
+| Path | What |
+|---|---|
+| `vars.yaml.j2` | Every setting with its default; rendered over the admin's `vars.yaml` |
+| [bind9/](bind9/) | Authoritative DNS: named.conf parts, zones |
+| [dirsrv/](dirsrv/) | 389 Directory Server: seed LDIF (server config, schema, tree, accounts, ACIs) |
+| [fluentbit/](fluentbit/) | Optional log forwarding |
+| [adguard/](adguard/) | Optional DNS filter: AdGuard Home in front of BIND, its configuration and oauth2-proxy's |
+| [adguard-auth/](adguard-auth/) | The DNS filter's sign-in (oauth2-proxy), a unit of its own |
+| [chrony/](chrony/) | Time on the host (chrony's configuration; not a container) |
+| [freeradius/](freeradius/) | Optional 802.1X: config |
+| [kea/](kea/) | Optional DHCP: Kea configs |
+| [keycloak/](keycloak/) | SSO: compose file |
+| [nginx/](nginx/) | Reverse proxy and the static pages: landing, certificates, LDAP guide, manual |
+| [openbao/](openbao/) | Secrets: compose file and server config |
+| [postgres/](postgres/) | Keycloak's database |
+| [stepca/](stepca/) | The CA: compose file, certificate templates |
+| [systemd/](systemd/) | The per-service wrapper unit, `fabric.target`, `fabric-agent.service` |
+| [webui/](webui/) | Deploying the web UI container: compose file and `webui.json` |
+| [webui-app/](webui-app/) | The web UI's own page templates (installed in the app as `lib/webui/templates/`) |

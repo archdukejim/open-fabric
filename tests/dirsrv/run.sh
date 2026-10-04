@@ -12,9 +12,9 @@ PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 
 docker rm -f dstest >/dev/null 2>&1
-docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/fabricctl/jinja/dirsrv/build" >/dev/null || { echo "FAIL image build"; exit 1; }
+docker build -q --build-arg BASE_IMAGE="$(python3 "$REPO/tests/image_ref.py" debian)" --build-arg DS_UID=911 --build-arg DS_GID=911 -t fabric/dirsrv:test "$REPO/packaging/images/dirsrv" >/dev/null || { echo "FAIL image build"; exit 1; }
 rm -rf "$W"; mkdir -p "$W/data/tls/ca" "$W/seed"
-cd "$W"
+cd "$W" || exit 1
 
 # ---- PKI: root -> intermediate -> ldap.lan.j-j.family
 openssl req -x509 -newkey rsa:2048 -nodes -keyout root.key -out root.crt -days 2 -subj '/CN=Test Root' \
@@ -26,7 +26,7 @@ openssl req -newkey rsa:2048 -nodes -keyout ldap.key -out ldap.csr -subj '/CN=ld
 printf 'subjectAltName=DNS:ldap.lan.j-j.family\nextendedKeyUsage=serverAuth,clientAuth\n' > ldap.ext
 openssl x509 -req -in ldap.csr -CA int.crt -CAkey int.key -CAcreateserial -out ldap.crt -days 2 -extfile ldap.ext 2>/dev/null
 cp ldap.crt data/tls/server.crt; cp ldap.key data/tls/server.key; cp root.crt int.crt data/tls/ca/
-cp "$OUT"/rendered/dirsrv/seed/*.ldif seed/; cp "$REPO/fabricctl/jinja/dirsrv/seed.py" seed/
+cp "$OUT"/rendered/dirsrv/seed/*.ldif seed/; cp "$REPO/src/containers/dirsrv/seed.py" seed/
 chown -R 911:911 data; chmod 750 seed; chown -R 0:911 seed; chmod 640 seed/*
 
 start() {
@@ -40,7 +40,7 @@ start() {
   done
   docker logs dstest | tail -30; return 1
 }
-seed() {  # same steps as fabricctl/lib/fabriclib/ldap/seed_directory.py
+seed() {  # same steps as src/fabriclib/ldap/seed_directory.py
   for _ in $(seq 1 12); do
     docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null 2>&1 &&
       docker exec dstest sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"' >/dev/null 2>&1 && break
@@ -127,7 +127,7 @@ check "a person and another service account read the organisation, not the site 
     "grep -qx 'uid=jim org 1 site 0' <<<\"\$part\" && grep -qx 'cn=group_admin org 1 site 0' <<<\"\$part\""
 # the one-time passwords fabric gives people (create, reset, the first admin) always pass 389-DS's policy
 # (3 of 4 character kinds): a plain token_urlsafe failed about once in 60 (common/one_time_password.py)
-PWS=$(PYTHONPATH="$REPO/fabricctl/lib" python3 -c "
+PWS=$(PYTHONPATH="$REPO/src" python3 -c "
 from fabriclib.common.one_time_password import one_time_password
 print(' '.join(one_time_password() for _ in range(40)))")
 pwpol=$(docker exec -e PWS="$PWS" -e DM="$DM_PW" dstest python3 -c "

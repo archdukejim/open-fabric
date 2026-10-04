@@ -1,0 +1,99 @@
+{% set fl = federation_links | default({'children': [], 'upstream': none}) %}
+{% set peers = fl.children + ([fl.upstream] if fl.upstream else []) %}
+{% set local_zones = [] %}
+{% for zone_key, zone_records in dns.items() %}
+{% set zone_name = domain if zone_key == 'dynamic_zone_var' else zone_key %}
+{% set _ = local_zones.append(zone_name) %}
+zone "{{ zone_name }}" {
+    type master;
+    file "/var/lib/bind/db.{{ zone_name }}";
+    allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+{% if zone_name == domain and peers %}
+    // Federation: the sites next to this one keep a secondary copy (TSIG-signed transfers, manual 1.8 M4)
+    allow-transfer { {% for link in peers %}key "{{ link.key }}"; {% endfor %}};
+    notify explicit;
+    also-notify { {% for link in peers %}{{ link.address }} port {{ link.port | default(53) }} key "{{ link.key }}"; {% endfor %}};
+{% else %}
+    allow-transfer { none; };
+{% endif %}
+    update-policy {
+{# Update rights are deny-by-default; a TSIG key may change only what is
+   granted here (validated by fabriclib/dns/normalize_tsig_keys.py and
+   normalize_acl_policies.py):
+   - key records    -> _acme-challenge.<record>.<zone> (DNS-01 for those hosts)
+   - key primary    -> the zone's ACME challenge name
+   - key any_name   -> zonesub (any name) for its record types
+   - ACL policies   -> every key in the ACL gets the ACL's grants #}
+{% for key in tsig_keys | default([]) %}
+{% if key.domain == zone_name %}
+{% if key.records is defined and key.records %}
+        // {{ key.name }} — DNS-01 challenges for {{ key.records | join(', ') }}
+{% for record in key.records %}
+        grant "{{ key.name }}" name _acme-challenge.{{ record }}.{{ zone_name }}. {{ key.record_types | join(' ') }};
+{% endfor %}
+{% elif key.primary is defined and key.primary %}
+        // {{ key.name }} — ACME challenge updates
+        grant "{{ key.name }}" subdomain _acme-challenge {{ key.record_types | join(' ') }};
+{% elif key.any_name is defined and key.any_name %}
+        // {{ key.name }} — any name in the zone
+        grant "{{ key.name }}" zonesub {{ key.record_types | join(' ') }};
+{% endif %}
+{% endif %}
+{% endfor %}
+{% for acl_name, policy in (bind_acl_policies | default({})).items() %}
+{% if policy.domain == zone_name %}
+{% for entry in bind_acls.get(acl_name, []) %}
+{% if entry is string and entry.startswith('key ') %}
+{% set member = entry[4:] | replace('"', '') | trim %}
+{% if policy.records is defined and policy.records %}
+        // ACL {{ acl_name }}: {{ member }} — DNS-01 challenges for {{ policy.records | join(', ') }}
+{% for record in policy.records %}
+        grant "{{ member }}" name _acme-challenge.{{ record }}.{{ zone_name }}. {{ policy.record_types | join(' ') }};
+{% endfor %}
+{% elif policy.any_name is defined and policy.any_name %}
+        // ACL {{ acl_name }}: {{ member }} — any name in the zone
+        grant "{{ member }}" zonesub {{ policy.record_types | join(' ') }};
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+    };
+};
+
+{% endfor %}
+{% if install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
+{% set ddns_zone = ((dhcp | default({})).ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
+// DHCP-registered hosts: created once, then only Kea's DDNS writes here (BIND's
+// journal); fabric never rewrites this file (design D16).
+zone "{{ ddns_zone }}" {
+    type master;
+    file "/var/lib/bind/db.{{ ddns_zone }}";
+    allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+    allow-transfer { none; };
+    update-policy {
+        grant "kea-ddns" zonesub A AAAA DHCID;
+    };
+};
+
+{% endif %}
+{% for link in peers if link.domain not in local_zones %}
+// Federation: a secondary copy of site {{ link.site }}'s zone, transferred from it with its key
+zone "{{ link.domain }}" {
+    type secondary;
+    primaries { {{ link.address }} port {{ link.port | default(53) }} key "{{ link.key }}"; };
+    file "/var/lib/bind/sec.{{ link.domain }}";
+    allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+    allow-transfer { none; };
+};
+
+{% endfor %}
+{% for rev_zone in reverse_zone_names | default([]) %}
+zone "{{ rev_zone }}" {
+    type master;
+    file "/var/lib/bind/db.{{ rev_zone }}";
+    allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
+    allow-transfer { none; };
+};
+
+{% endfor %}

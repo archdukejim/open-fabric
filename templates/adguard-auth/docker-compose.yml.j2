@@ -1,0 +1,38 @@
+services:
+  oauth2-proxy:
+    # OIDC sign-in for AdGuard's UI (manual 2.4.1.6): nginx asks it before every request
+    # (auth_request); people need the fabric:dns:filter permission. Secrets from secrets.env, never argv.
+    # A unit of its own (adguard-auth), apart from AdGuard: when it or Keycloak is down only the UI is
+    # unreachable, DNS keeps answering. Its files live in /opt/adguard/oauth2-proxy (deploy_adguard).
+    image: "{{ image_oauth2proxy }}"
+    container_name: oauth2-proxy-adguard
+    logging:
+      driver: journald
+    user: "{{ service_users.oauth2proxy.uid }}:{{ service_users.oauth2proxy.gid }}"
+    command: ["--config=/etc/oauth2-proxy/oauth2-proxy.cfg"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    env_file:
+      - {{ deploy_base_dir }}/adguard/oauth2-proxy/secrets.env
+    volumes:
+      - {{ deploy_base_dir }}/adguard/oauth2-proxy:/etc/oauth2-proxy:ro
+    extra_hosts:
+      # Keycloak's public name, at nginx on fabric_net (the issuer URL must match the tokens')
+      - "{{ hostname_keycloak }}:{{ ip_nginx }}"
+    networks:
+      fabric_net:
+        ipv4_address: "{{ ip_oauth2proxy }}"
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD", "/bin/oauth2-proxy", "--version"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+networks:
+  fabric_net:
+    name: fabric_net
+    external: true

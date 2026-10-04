@@ -1,4 +1,4 @@
-"""The address plan across sites without containers (design dhcp-management.md §5): what a site reports as its
+"""The address plan across sites without containers (manual 2.2.2.6): what a site reports as its
 networks, which overlaps are conflicts, what a joining site with an overlapping network is told, and the local
 checks a DHCP subnet gets (fabric's own container network, the overlap reason). The directory side runs with two
 real 389-DS in replication.sh."""
@@ -6,7 +6,7 @@ import os
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 from fabriclib.federation import accept_join as aj  # noqa: E402

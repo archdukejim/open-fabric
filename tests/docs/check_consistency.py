@@ -3,12 +3,12 @@
 on that drift silently otherwise:
 
   readmes      every folder has a README.md naming each of its files and subfolders
-  vars         every setting in vars.yaml.j2 is in docs/vars.md, and vars.md names no setting that is gone
+  vars         every setting in vars.yaml.j2 is in the settings reference (manual 2.1), which names no setting that is gone
   cli          every `fabricctl` command and subcommand is in the docs
-  api          fabric-agent's routes = the permission table = the list in docs/webui.md
-  permissions  every permission is explained in docs/webui.md
+  api          fabric-agent's routes = the permission table = the list in the manual (1.5)
+  permissions  every permission is explained in the manual (1.5)
   suites       every test suite in tests/run-all.sh has a folder or file and is in tests/README.md
-  steps        every setup step is in docs/install.md
+  steps        every setup step is in the manual's installation chapter (4.1)
   links        every relative Markdown link points at something that exists
 
     python3 tests/docs/check_consistency.py [check ...]     exit 1 if any check finds a problem
@@ -18,7 +18,9 @@ import os
 import re
 import sys
 
-from product_code import REPO, tracked_files
+# the shared helpers live with the generator in scripts/docs/
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts", "docs"))  # noqa: E501
+from product_code import REPO, tracked_files  # noqa: E402
 
 SKIP_README = {"__init__.py", "README.md"}     # a README need not list itself or package markers
 
@@ -27,24 +29,36 @@ def _read(path):
     return open(os.path.join(REPO, path), encoding="utf-8").read()
 
 
+def _manual(*numbers):
+    """Purpose: the text of the manual's subchapters under the given chapter or subchapter numbers.
+    Inputs:  numbers — "2.1", "1.5.3", … (a subchapter file is docs/volume_*/<V.C.S>-name.md).
+    Returns: their text, joined, in number order; "" when none match.
+    Fails:   OSError if a matching file cannot be read.
+    Feeds:   check_vars, check_api, check_permissions, check_steps."""
+    def key(p):
+        return [int(x) for x in os.path.basename(p).split("-")[0].split(".")]
+    files = [p for p in tracked_files("docs") if re.match(r"docs/volume_\d_[a-z_]+/\d+(\.\d+)+-", p)
+             and any(os.path.basename(p).split("-")[0] == n or os.path.basename(p).startswith(n + ".")
+                     for n in numbers)]
+    return "\n".join(_read(p) for p in sorted(files, key=key))
+
+
 def check_readmes():
     """Purpose: each folder's README.md names every file and subfolder in it.
     Inputs:  none (the repository's files; hidden folders, the repository
-             root and generated docs/lib-doc/ are exempt).
+             root is exempt).
     Returns: problems (str), one per missing README or unlisted entry.
     Fails:   never (unreadable READMEs count as missing).
     Feeds:   main."""
     folders = {}
     for p in tracked_files():
         parts = p.split("/")
-        if len(parts) < 2 or any(x.startswith(".") for x in parts[:-1]) or p.startswith("docs/lib-doc/"):
+        if len(parts) < 2 or any(x.startswith(".") for x in parts[:-1]):
             continue
         folder = "/".join(parts[:-1])
         folders.setdefault(folder, set()).add(parts[-1])
         for i in range(1, len(parts) - 1):                    # the subfolder, in its parent's README
-            parent = "/".join(parts[:i])
-            if not parent.startswith("docs/lib-doc"):
-                folders.setdefault(parent, set()).add(parts[i] + "/")
+            folders.setdefault("/".join(parts[:i]), set()).add(parts[i] + "/")
     out = []
     for folder, entries in sorted(folders.items()):
         readme = os.path.join(REPO, folder, "README.md")
@@ -61,7 +75,7 @@ def check_readmes():
 
 def _vars_template_keys():
     keys = set()
-    for line in _read("fabricctl/jinja/vars.yaml.j2").splitlines():
+    for line in _read("templates/vars.yaml.j2").splitlines():
         m = re.match(r"^([a-z][a-z0-9_]*):", line)
         if m:
             keys.add(m.group(1))
@@ -69,23 +83,23 @@ def _vars_template_keys():
 
 
 def check_vars():
-    """Purpose: vars.yaml.j2 and docs/vars.md name the same settings.
+    """Purpose: vars.yaml.j2 and the settings reference (manual 2.1) name the same settings.
     Inputs:  none.
     Returns: problems: settings without docs, and documented settings
-             (### `x` headings, first table cells) that do not exist.
-    Fails:   OSError if either file is missing.
+             (`x` headings, first table cells) that do not exist.
+    Fails:   OSError if a file is unreadable.
     Feeds:   main."""
     keys = _vars_template_keys()
-    doc = _read("docs/vars.md")
-    documented = set(re.findall(r"^###\s+`([a-z][a-z0-9_]*)`", doc, re.M))
+    doc = _manual("2.1")
+    documented = set(re.findall(r"^###+\s+(?:\d+(?:\.\d+)+\s+)?`([a-z][a-z0-9_]*)`", doc, re.M))
     documented |= set(re.findall(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", doc, re.M))
     # a setting read only where it is used (`x | default(...)` in a template, v.get("x") in code) is real too
-    code = "\n".join(_read(p) for p in tracked_files("fabricctl", "webui")
+    code = "\n".join(_read(p) for p in tracked_files("src", "templates")
                      if p.endswith((".j2", ".py", ".sh")) and not p.endswith("vars.yaml.j2"))
     used = {k for k in documented - keys
             if re.search(rf"(\{{\{{-?\s*{k}\b|\b{k}\s*\||get\(\s*['\"]{k}['\"]|\[['\"]{k}['\"]\])", code)}
-    out = [f"vars.yaml.j2 setting `{k}` is not in docs/vars.md" for k in sorted(keys) if f"`{k}`" not in doc]
-    out += [f"docs/vars.md documents `{k}`, which nothing reads" for k in sorted(documented - keys - used)]
+    out = [f"vars.yaml.j2 setting `{k}` is not in the manual (2.1)" for k in sorted(keys) if f"`{k}`" not in doc]
+    out += [f"the manual (2.1) documents `{k}`, which nothing reads" for k in sorted(documented - keys - used)]
     return out
 
 
@@ -93,12 +107,12 @@ def _cli_commands():
     """(command, subcommand or None) pairs from cli.py's docstring and every
     `fabricctl <cmd> <sub>` in a USAGE string."""
     cmds = set()
-    doc = ast.get_docstring(ast.parse(_read("fabricctl/lib/fabriclib/cli.py"))) or ""
+    doc = ast.get_docstring(ast.parse(_read("src/fabriclib/cli.py"))) or ""
     for m in re.finditer(r"^\s+fabricctl ([a-z][a-z-]*)(?: ([a-z|-]+))?", doc, re.M):
         subs = [s for s in (m.group(2) or "").split("|") if s and not s.startswith("-")]
         cmds.add((m.group(1), None))
         cmds.update((m.group(1), s) for s in subs)
-    for path in tracked_files("fabricctl/lib/fabriclib"):
+    for path in tracked_files("src/fabriclib"):
         if path.endswith(".py"):
             for usage in re.findall(r'USAGE = """(.*?)"""', _read(path), re.S):
                 for m in re.finditer(r"fabricctl ([a-z][a-z-]*) ([a-z][a-z-]*)", usage):
@@ -108,12 +122,11 @@ def _cli_commands():
 
 def check_cli():
     """Purpose: every fabricctl command and subcommand appears in the docs.
-    Inputs:  none (cli.py, the USAGE strings; docs/*.md, README.md).
+    Inputs:  none (cli.py, the USAGE strings; the manual, README.md).
     Returns: problems, one per command not mentioned as `fabricctl <cmd> [<sub>]`.
     Fails:   OSError if cli.py is missing.
     Feeds:   main."""
-    docs = "\n".join(_read(p) for p in tracked_files("docs", "README.md") if p.endswith(".md")
-                     and not p.startswith("docs/lib-doc/"))
+    docs = "\n".join(_read(p) for p in tracked_files("docs", "README.md") if p.endswith(".md"))
     out = []
     for cmd, sub in sorted(_cli_commands(), key=lambda c: (c[0], c[1] or "")):
         pattern = rf"fabricctl {re.escape(cmd)}" + (rf"(?: [^\n`]*?)?[ |]{re.escape(sub)}\b" if sub else r"\b")
@@ -123,7 +136,7 @@ def check_cli():
 
 
 def _routes_in_table():
-    src = ast.parse(_read("fabricctl/lib/fabriclib/rbac/required_permission.py"))
+    src = ast.parse(_read("src/fabriclib/rbac/required_permission.py"))
     routes = set()
     for node in src.body:
         if isinstance(node, ast.Assign) and node.targets[0].id in ("GET", "POST"):
@@ -133,14 +146,14 @@ def _routes_in_table():
 
 
 def check_api():
-    """Purpose: fabric-agent's permission table and docs/webui.md list the same routes.
+    """Purpose: fabric-agent's permission table and the manual (1.5) list the same routes.
     Inputs:  none.
     Returns: problems: routes the table has but the docs do not, and routes
              the docs list that the table does not (so they would be refused).
     Fails:   OSError if a file is missing.
     Feeds:   main."""
     table = {r for _, r in _routes_in_table()}
-    doc = _read("docs/webui.md")
+    doc = _manual("1.5")
     listed = set()
     for m in re.finditer(r"`(/v1/[^`]+)`", doc):
         path = m.group(1)[len("/v1/"):]
@@ -148,23 +161,23 @@ def check_api():
         variants = [brace.group(1) + v + brace.group(3) for v in brace.group(2).split(",")] if brace else [path]
         for v in variants:
             listed.add(re.sub(r"<[^>]+>", "*", v))
-    out = [f"agent route /v1/{r} is not in docs/webui.md" for r in sorted(table - listed)]
-    out += [f"docs/webui.md lists /v1/{r}, which fabric-agent refuses (not in the permission table)"
+    out = [f"agent route /v1/{r} is not in the manual (1.5)" for r in sorted(table - listed)]
+    out += [f"the manual (1.5) lists /v1/{r}, which fabric-agent refuses (not in the permission table)"
             for r in sorted(listed - table)]
     return out
 
 
 def check_permissions():
-    """Purpose: every permission in rbac/permissions.py is explained in docs/webui.md.
+    """Purpose: every permission in rbac/permissions.py is explained in the manual (1.5).
     Inputs:  none.
     Returns: problems, one per permission not mentioned as `area:action`.
     Fails:   OSError / SyntaxError if permissions.py is unreadable.
     Feeds:   main."""
-    src = ast.parse(_read("fabricctl/lib/fabriclib/rbac/permissions.py"))
+    src = ast.parse(_read("src/fabriclib/rbac/permissions.py"))
     perms = next(ast.literal_eval(n.value) for n in src.body
                  if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "PERMISSIONS")
-    doc = _read("docs/webui.md")
-    return [f"permission `{p}` is not in docs/webui.md" for p in sorted(perms) if f"`{p}`" not in doc]
+    doc = _manual("1.5")
+    return [f"permission `{p}` is not in the manual (1.5)" for p in sorted(perms) if f"`{p}`" not in doc]
 
 
 def check_suites():
@@ -185,19 +198,37 @@ def check_suites():
 
 
 def check_steps():
-    """Purpose: every setup step (setup/steps.py) is described in docs/install.md.
+    """Purpose: every setup step (setup/steps.py) is described in the manual's installation chapter (4.1).
     Inputs:  none.
     Returns: problems, one per step name not mentioned as `name`.
     Fails:   OSError if a file is missing.
     Feeds:   main."""
-    steps = re.findall(r'^\s+\("([a-z]+)", ', _read("fabricctl/lib/fabriclib/setup/steps.py"), re.M)
-    doc = _read("docs/install.md")
-    return [f"setup step `{s}` is not in docs/install.md" for s in steps if f"`{s}`" not in doc]
+    steps = re.findall(r'^\s+\("([a-z]+)", ', _read("src/fabriclib/setup/steps.py"), re.M)
+    doc = _manual("4.1")
+    return [f"setup step `{s}` is not in the manual (4.1)" for s in steps if f"`{s}`" not in doc]
+
+
+def _anchors(path):
+    """Purpose: the heading anchors of a Markdown file, as GitHub (and the in-browser manual) make them.
+    Inputs:  path — repository-relative .md file.
+    Returns: set of anchors (lower case, punctuation other than "-" dropped, spaces as "-"); "#" lines inside code
+             fences are not headings.
+    Fails:   OSError if the file cannot be read.
+    Feeds:   check_links."""
+    out, fence = set(), False
+    for line in _read(path).split("\n"):
+        if line.lstrip().startswith("```"):
+            fence = not fence
+        elif not fence and line.startswith("#"):
+            text = line.lstrip("#").strip().lower()
+            out.add(re.sub(r"[^\w\- ]", "", text).replace(" ", "-"))
+    return out
 
 
 def check_links():
-    """Purpose: relative links in Markdown files resolve.
-    Inputs:  none (every tracked .md; http(s), mailto and pure #anchors are skipped).
+    """Purpose: relative links in Markdown files resolve: the file exists and, for a .md target, the #anchor is one
+             of its headings; a link target with whitespace in it is broken too.
+    Inputs:  none (every tracked .md; http(s) and mailto links are skipped).
     Returns: problems, one per broken link (file and target).
     Fails:   never.
     Feeds:   main."""
@@ -205,12 +236,19 @@ def check_links():
     for path in tracked_files():
         if not path.endswith(".md"):
             continue
-        for target in re.findall(r"\]\(([^)\s]+)\)", _read(path)):
-            if re.match(r"(https?:|mailto:|#)", target):
+        text = _read(path)
+        for target in re.findall(r"\]\(([^)\s]+\s[^)]*)\)", text):
+            if not re.match(r"(https?:|mailto:)", target) and "\n" not in target and not target.startswith("<"):
+                out.append(f"{path}: link with a space in its target: {target}")
+        for target in re.findall(r"\]\(([^)\s]+)\)", text):
+            if re.match(r"(https?:|mailto:)", target):
                 continue
-            rel = target.split("#", 1)[0]
-            if rel and not os.path.exists(os.path.normpath(os.path.join(REPO, os.path.dirname(path), rel))):
+            rel, _, frag = target.partition("#")
+            dest = os.path.normpath(os.path.join(os.path.dirname(path), rel)).replace("\\", "/") if rel else path
+            if not os.path.exists(os.path.join(REPO, dest)):
                 out.append(f"{path}: broken link {target}")
+            elif frag and dest.endswith(".md") and frag not in _anchors(dest):
+                out.append(f"{path}: no heading for #{frag} in {dest}")
     return out
 
 

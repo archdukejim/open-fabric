@@ -7,9 +7,12 @@ Returns, Fails and Feeds, none empty or a placeholder.
 """
 import collections
 import re
+import os
 import sys
 
-from product_code import SECTIONS, functions
+# the shared helpers live with the generator in scripts/docs/
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "scripts", "docs"))  # noqa: E501
+from product_code import SECTIONS, functions  # noqa: E402
 
 PLACEHOLDER = re.compile(r"^(todo|tbd|fixme|\.\.\.|xxx|\?+)$", re.I)
 

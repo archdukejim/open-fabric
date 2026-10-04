@@ -22,7 +22,7 @@ import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path[0:0] = [os.path.join(REPO, "fabricctl", "lib"), REPO]
+sys.path[0:0] = [os.path.join(REPO, "src"), REPO]
 from fabriclib.rbac.permissions import BUNDLES  # noqa: E402
 
 
@@ -165,7 +165,7 @@ kc.socket = ctx.wrap_socket(kc.socket, server_side=True)
 threading.Thread(target=kc.serve_forever, daemon=True).start()
 
 # ------------------------------------------- fabric-agent (host, root)
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.makedirs(f"{W}/fabric/config")
 open(f"{W}/fabric/VERSION", "w").write("9.9.9\n")
 open(f"{W}/fabric/config/vars.yaml", "w").write(
@@ -376,7 +376,7 @@ st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                  {"csrf": csrf, "type": "TXT", "name": "x", "text": 'a"\n$INCLUDE /etc/shadow'}, cookie=session)
 check("zone-file injection via TXT rejected", st == 303 and "err=" in hd["Location"], hd)
 st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
-idx = [l for l in body.split("<tr>") if "shelfmark" in l][0].split('name="index" value="')[1].split('"')[0]
+idx = [row for row in body.split("<tr>") if "shelfmark" in row][0].split('name="index" value="')[1].split('"')[0]
 st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
                  {"csrf": csrf, "type": "CNAME", "index": idx, "name": "wrong-name"}, cookie=session)
 check("stale delete (name mismatch) refused", "err=" in hd.get("Location", ""), hd)
@@ -600,5 +600,6 @@ kc.shutdown()
 failed = [n for n, ok in results if not ok]
 print(f"\n{len(results) - len(failed)}/{len(results)} passed")
 if failed:
-    print(agent.stdout.read()[-3000:]); print(subprocess.run(['docker','logs','cwebui'],capture_output=True,text=True).stdout[-2000:])
+    print(agent.stdout.read()[-3000:])
+    print(subprocess.run(['docker', 'logs', 'cwebui'], capture_output=True, text=True).stdout[-2000:])
 sys.exit(1 if failed else 0)

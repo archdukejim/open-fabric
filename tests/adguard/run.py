@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The DNS filter (design dns-filter.md) with real containers: fabric's BIND image serving a test zone and
+"""The DNS filter (manual 2.4.1) with real containers: fabric's BIND image serving a test zone and
 AdGuard Home (the pinned image) run from the configuration deploy_adguard generates, exactly as deployed
 (built without the binary's file capabilities, run with none, DNS on 5300 inside, read-only root).
 Includes what must be refused.
@@ -7,7 +7,6 @@ Includes what must be refused.
     sudo python3 tests/adguard/run.py            (needs Docker and dig)
 """
 import base64
-import json
 import os
 import shutil
 import subprocess
@@ -64,14 +63,14 @@ def until(fn, seconds=60):
     return False
 
 
-sys.path.insert(0, os.path.join(REPO, "fabricctl", "lib"))
+sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.dns_filter.build_adguard_config import GENERATED_END, SETTING_END  # noqa: E402
 from fabriclib.dns_filter.deploy_adguard import deploy_adguard  # noqa: E402
 
-env = jinja_env(os.path.join(REPO, "fabricctl", "jinja"))
-lock = read_images_lock(os.path.join(REPO, "fabricctl"))
+env = jinja_env(os.path.join(REPO, "templates"))
+lock = read_images_lock(os.path.join(REPO, "config"))
 USERS = {"adguard": {"uid": 917, "gid": 917}, "oauth2proxy": {"uid": 918, "gid": 918}, "nginx": {"uid": 443, "gid": 443}}
 V = {"deploy_base_dir": W, "service_users": USERS, "domain": "lan.test", "org_domain": "lan.test", "host_ip": "192.168.77.53",
      "ip_bind9": BIND_IP, "lan_cidr": "192.168.77.0/24", "fabric_subnet": SUBNET, "dns": {"dynamic_zone_var": {}},
@@ -86,9 +85,9 @@ try:
     os.makedirs(f"{W}/bind9/data")
     debian = sh([sys.executable, os.path.join(REPO, "tests", "image_ref.py"), "debian"]).stdout.strip()
     sh(["docker", "build", "-q", "-t", "fabric/bind9:adgtest", "--build-arg", f"BASE_IMAGE={debian}",
-        f"{REPO}/fabricctl/jinja/bind9/build"])
+        f"{REPO}/packaging/images/bind9"])
     sh(["docker", "build", "-q", "-t", "fabric/adguard:test", "--build-arg", f"BASE_IMAGE={lock['adguard']['ref']}",
-        f"{REPO}/fabricctl/jinja/adguard/build"])
+        f"{REPO}/packaging/images/adguard"])
     caps = sh("docker run --rm --entrypoint getcap fabric/adguard:test /opt/adguardhome/AdGuardHome", ok=False)
     check("the built image's AdGuardHome carries no file capabilities", caps.stdout.strip() == "",
           caps.stdout + caps.stderr)

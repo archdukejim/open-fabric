@@ -1,0 +1,210 @@
+{% extends "base.html" %}{% block body %}
+<h1>OpenBao · Secrets</h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
+{% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
+<nav class="sections">
+{% for id, label in sections %}<a href="/openbao{{ '' if id == 'status' else '?view=' ~ id }}" class="section{{ ' active' if id == section }}">{{ label }}</a>{% endfor %}
+</nav>
+{% set light = 'bad' if not s.reachable or s.sealed or not s.initialized else ('warn' if not s.key.ok else 'ok') %}
+
+{% if view == 'status' %}
+<section class="card"><h2><span class="light {{ light }}"></span>
+{% if not s.reachable %}Unreachable{% elif not s.initialized %}Not initialised{% elif s.sealed %}Sealed{% else %}Unsealed{% endif %}</h2>
+{% if s.error %}<p class="flash bad">{{ s.error }}</p>{% endif %}
+<dl class="kv">
+{% if s.reachable %}<dt>Version</dt><dd>OpenBao {{ s.version }}</dd>
+<dt>Seal</dt><dd>{{ s.seal_type }}{% if s.seal_type == 'static' %} — unlocked at start by one of its <a href="/openbao?view=unlock">unlock methods</a>{% endif %}</dd>
+<dt>Storage</dt><dd>{{ s.storage }}</dd>
+<dt>fabric's secrets</dt><dd>{% if s.secrets %}in OpenBao — <code class="small">fabric/secrets</code>, version {{ s.secrets.version }}, updated {{ s.secrets.updated }}{% else %}<span class="warn-text">still in a file on disk</span> — moved in by the next <code>fabricctl setup</code>{% endif %}</dd>{% endif %}
+<dt>Address</dt><dd><a href="{{ s.url }}ui/">{{ s.url }}</a> <span class="muted">(OpenBao's own UI and API)</span></dd>
+</dl></section>
+{% if s.mounts %}
+<section class="card"><h2>Secret engines</h2>
+<table><thead><tr><th>Path</th><th>Type</th><th>What for</th></tr></thead><tbody>
+{% for m in s.mounts %}<tr><td><code>{{ m.path }}</code></td><td>{{ m.type }}{% if m.version %} v{{ m.version }}{% endif %}</td><td class="muted">{{ m.description }}</td></tr>{% endfor %}
+</tbody></table>
+<p class="muted">Sign-in methods: {{ s.auth | join(', ') or '—' }}. fabric-setup and fabric-agent use AppRoles bound to this host; the initial root token was revoked.</p></section>
+{% endif %}
+
+{% elif view == 'unlock' %}
+{% set removable = slots | rejectattr('type', 'equalto', 'local') | list %}
+{% set has_local = slots | selectattr('type', 'equalto', 'local') | list | length > 0 %}
+<section class="card"><h2>Unlock methods <span class="muted">{{ slots | length }}</span></h2>
+<p class="muted">OpenBao has one vault key. Each method below holds its own protected copy; <strong>any one</strong> of them present at start unlocks the vault. None present: the vault stays locked and everything else keeps running.</p>
+<p><span class="light {{ 'warn' if has_local else ('ok' if removable else 'bad') }}"></span>
+{% if has_local %} <strong>Kill switch off</strong> — the key file on this host always unlocks the vault; removing a device changes nothing.
+{% elif removable %} <strong>Kill switch armed</strong> — removing the last present device locks the vault.
+{% else %} No unlock methods.{% endif %}</p>
+{% if slots %}
+<table><thead><tr><th></th><th>Method</th><th>Device</th><th>Key</th><th>Added</th><th></th></tr></thead><tbody>
+{% for sl in slots %}
+<tr><td><span class="light {{ 'ok' if sl.present else 'bad' }}" title="{{ 'present now' if sl.present else 'not present' }}"></span></td>
+<td><strong>{{ slot_types[sl.type][0] }}</strong><div class="muted small">{{ sl.label }}</div>{% if sl.tested %}<div class="muted small">tested: {{ sl.tested }}</div>{% endif %}</td>
+<td><code class="small">{{ sl.device }}</code>{% if sl.detail %}<div class="muted small">{{ sl.detail }}</div>{% endif %}</td>
+<td><code class="small">{{ sl.key_id }}</code></td><td class="small">{{ sl.added }}</td>
+<td class="num"><div class="row-actions">
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/{{ sl.id | urlencode }}/test"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost"{{ '' if live else ' disabled' }}>Test</button></form>{% endif %}
+<a class="btn danger-link{{ '' if live and slots | length > 1 else ' disabled' }}" href="/openbao?view=remove&slot={{ sl.id | urlencode }}">Remove</a>
+</div></td></tr>
+{% endfor %}</tbody></table>
+{% endif %}
+</section>
+{% if has_local and removable %}<p class="flash warn">A device slot works, but the key file on this host still unlocks the vault on its own: anyone with this disk needs nothing else. <a href="/openbao?view=remove&slot=local">Remove the key file</a>.</p>
+{% elif removable | length == 1 and not has_local %}<p class="flash warn">Only one device can unlock this vault. If it is lost or breaks, the vault's data is gone — OpenBao's recovery keys cannot decrypt it. Add a second one for your safe.</p>{% endif %}
+<section class="card"><h2>Add an unlock method</h2>
+{% if add_live | select | list | length < 3 %}<p class="muted">Each type says what it was tested against; <span class="pill">arrives next</span> marks types whose adding is still being built.</p>{% endif %}
+<div class="tiles">
+{% for t in ['security-key', 'usb', 'hsm'] %}
+<div class="tile"><div class="tile-head"><strong>{{ slot_types[t][0] }}</strong>{% if t == 'security-key' %}<span class="pill ok">recommended</span>{% endif %}{% if not add_live[t] %}<span class="pill">arrives next</span>{% endif %}</div>
+<div class="muted small">{{ slot_types[t][1] }}</div>
+<div><a class="btn" href="/openbao?view=add-{{ t }}">Add…</a></div></div>
+{% endfor %}
+</div></section>
+<section class="card"><h2>Rotate the vault key</h2>
+<p class="muted">Makes a new vault key and re-protects it in every method whose device is present now. Methods whose device is not present stop working — the answer to a lost stick or token.</p>
+<p><a class="btn" href="/openbao?view=rotate">Rotate…</a></p></section>
+
+{% elif view == 'add-security-key' %}
+<p><a href="/openbao?view=unlock">← Unlock methods</a></p>
+<section class="card"><h2>Add a security key</h2>
+<p class="muted">YubiKey 5 (PIV), Nitrokey, SmartCard-HSM or any PKCS#11 token. An RSA key on the token that can never be read out wraps the vault key; at start the token unwraps it. The PIN is kept root-only on this host, so the token itself is the factor — but unlike a stick it cannot be copied.</p>
+<p class="flash warn">Tested with a software token (SoftHSM2) only. YubiKey, Nitrokey and other hardware tokens are untested.</p>
+{% set pk = devices.pkcs11 or [] %}
+{% if pk %}
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-security-key" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<fieldset class="wide"><legend>Tokens the PKCS#11 libraries see</legend>
+{% set enrolled = slots | map(attribute='device') | join(' ') %}
+{% for t in pk %}{% set used = ('serial ' ~ t.serial ~ ' ') in (enrolled ~ ' ') %}{% set bad = t.pin_state in ('locked', 'last try') %}<label class="check perm"><input type="radio" name="token" value="{{ t.module }}|{{ t.serial }}"{{ ' disabled' if used or bad }}{{ ' checked' if loop.first and not used and not bad }}> <strong>{{ t.manufacturer }} {{ t.model }}</strong> <span class="muted small">serial {{ t.serial }}{% if t.label %} · “{{ t.label }}”{% endif %} · {{ t.library }} · PIN {{ t.pin_state }}{{ ' · already an unlock method' if used }}</span></label>{% endfor %}
+</fieldset>
+<fieldset class="wide"><legend>Key on the token</legend>
+<label class="check perm"><input type="radio" name="key" value="new" checked> Make a new RSA-2048 key on the token</label>
+<label class="check perm"><input type="radio" name="key" value="existing"> Use an existing key, id (hex) <input name="key_id" pattern="[0-9a-fA-F]{2,64}" placeholder="03" size="8"></label>
+<p class="muted small">YubiKey: tokens usually cannot make keys through PKCS#11. Create one with <code>ykman piv keys generate 9d …</code> (add <code>--touch-policy always</code> to require a touch at every unlock), then use id <code>03</code>.</p>
+</fieldset>
+<label>Label<input name="label" placeholder="Pi key / safe key" maxlength="60"></label>
+<label>Token PIN<input name="pin" type="password" autocomplete="off" required minlength="4" maxlength="64"></label>
+<label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
+<div><button{{ '' if add_live['security-key'] else ' disabled' }}>Add security key</button></div>
+</form>{% endif %}
+<p class="muted small">fabric wraps the vault key with the token, unwraps it again and checks it before saving. It never spends a token's last PIN try, and after a wrong PIN it does not retry unattended. You may be asked to sign in again first.</p>
+{% else %}<p class="blank">No PKCS#11 token found. Plug one in; the library must be installed (<code>ykcs11</code> for YubiKey, <code>opensc-pkcs11</code> for most others, both with <code>pcscd</code>).</p>{% endif %}
+{% set seen = pk | map(attribute='serial') | list %}
+{% for t in devices.tokens if t.serial not in seen %}{% if loop.first %}<p class="muted small">On USB but not seen by a PKCS#11 library:{% endif %} {{ t.vendor }} {{ t.product }} (serial {{ t.serial or '—' }}){{ '.' if loop.last else ',' }}{% if loop.last %}</p>{% endif %}{% endfor %}
+</section>
+
+{% elif view == 'add-usb' %}
+<p><a href="/openbao?view=unlock">← Unlock methods</a></p>
+<section class="card"><h2>Add a USB stick</h2>
+<p class="muted">The stick is wiped and gets a copy of the vault key. fabric records its serial and filesystem UUID and ignores sticks it did not make. Keypad-encrypted drives (Apricorn, IronKey, iStorage) work too: unlock them with their PIN first. A plain stick can be copied by anyone who holds it for a moment — a security key cannot.</p>
+{% if devices.disks %}
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-usb" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<fieldset class="wide"><legend>Plugged into this host (will be erased)</legend>
+{% for d in devices.disks %}<label class="check perm"><input type="radio" name="disk" value="{{ d.path }}"{{ ' checked' if loop.first }}> <strong>{{ d.model }}</strong> <span class="muted small">{{ d.size_gb }} GB · serial {{ d.serial or '—' }} · {{ d.path }}{% if d.labels %} · {{ d.labels | join(', ') }}{% endif %}</span></label>{% endfor %}
+</fieldset>
+<label>Label<input name="label" placeholder="safe stick" maxlength="60"></label>
+<label class="wide">Type this host's name to confirm erasing it<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
+<div><button class="danger"{{ '' if add_live['usb'] else ' disabled' }}>Erase and add</button></div>
+</form>{% endif %}
+{% else %}<p class="blank">No USB disk found. Plug one into this host and reload.</p>{% endif %}
+</section>
+
+{% elif view == 'add-hsm' %}
+<p><a href="/openbao?view=unlock">← Unlock methods</a></p>
+<section class="card"><h2>Add an HSM or key manager (KMIP)</h2>
+<p class="muted">Any KMIP server that can Encrypt/Decrypt (AES-256-CBC) with a key you created on it — CipherTrust, Fortanix, Entrust KeyControl, IBM GKLM, Cosmian, OVHcloud KMS, … The vault key is encrypted by a key that never leaves the device, over mutual TLS (the device's certificate verified against the CA you give). Revoking fabric's client, or disabling the key, on the device is the kill switch.</p>
+<p class="flash warn">Tested with the PyKMIP server only. Vendor HSMs and key managers are untested.</p>
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/add-hsm" enctype="multipart/form-data" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Endpoint<input name="endpoint" required placeholder="kms.lan:5696"></label>
+<label>Key id (an active AES-256 key on the device)<input name="key_id" required maxlength="128"></label>
+<label>TLS server name (if not the endpoint's host)<input name="server_name" placeholder="kms.lan"></label>
+<label>Label<input name="label" maxlength="60"></label>
+<label class="wide">Device's CA certificate (PEM)<input type="file" name="ca_file" required></label>
+<label class="wide">fabric's client certificate (PEM, registered on the device)<input type="file" name="cert_file" required></label>
+<label class="wide">Its private key (PEM)<input type="file" name="key_file" required></label>
+<label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
+<div><button{{ '' if add_live['hsm'] else ' disabled' }}>Test and add</button></div>
+</form>{% endif %}
+<p class="muted small">No client certificate yet? Make one under Step-CA → New key + certificate (e.g. CN <code>fabric-{{ host }}</code>), register the certificate on the device, then upload both here. A wrap and unwrap through the device run before anything is saved; the certificates are kept root-only on this host.</p></section>
+
+{% elif view == 'rotate' %}
+<p><a href="/openbao?view=unlock">← Unlock methods</a></p>
+<section class="card"><h2>Rotate the vault key</h2>
+<table><thead><tr><th></th><th>Method</th><th>After rotation</th></tr></thead><tbody>
+{% for sl in slots %}<tr><td><span class="light {{ 'ok' if sl.present else 'bad' }}"></span></td><td>{{ slot_types[sl.type][0] }} <span class="muted small">{{ sl.label }}</span></td>
+<td>{% if sl.present %}re-protected with the new key{% else %}<span class="bad-text">stops working (device not present)</span>{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+{% if can('vault:unlock') %}<form method="post" action="/openbao/rotate" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
+<div><button{{ '' if live and slots | selectattr('present') | list else ' disabled' }}>Rotate</button></div>
+</form>{% endif %}
+<p class="muted small">OpenBao restarts once with the old and new key, re-protects itself, then keeps only the new one. You will be asked to sign in again first.</p></section>
+
+{% elif view == 'remove' %}
+<p><a href="/openbao?view=unlock">← Unlock methods</a></p>
+{% set sl = slots | selectattr('id', 'equalto', slot_id) | first %}
+<section class="card"><h2>Remove {{ slot_types[sl.type][0] | lower if sl else 'method' }}</h2>
+{% if sl %}<p>{{ sl.label }} — <code class="small">{{ sl.device }}</code></p>
+<p class="muted">{% if sl.type == 'local' %}The key file is shredded. From then on only your devices unlock the vault.{% elif sl.type == 'usb' %}Its record is removed; the copy on the stick stays usable until you rotate the key — rotate if the stick is lost.{% else %}Its protected copy is deleted; the device's own key is untouched.{% endif %}</p>
+{% if can('vault:unlock') %}<form method="post" action="/openbao/slots/{{ sl.id | urlencode }}/remove" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label class="wide">Type this host's name to confirm<input name="confirm" autocomplete="off" required placeholder="{{ host }}"></label>
+<div><button class="danger"{{ '' if live and slots | length > 1 else ' disabled' }}>Remove</button></div>
+</form>{% endif %}{% if slots | length < 2 %}<p class="muted">The last unlock method cannot be removed.</p>{% endif %}
+{% else %}<p class="blank">No such method.</p>{% endif %}
+</section>
+
+{% elif view == 'disk' %}
+<section class="card"><h2>Disk encryption with your security key or USB stick</h2>
+<p class="muted">fabric does not encrypt disks: you do it once, at the console. This encrypts the volume holding fabric's data (<code>/opt</code>, <code>/etc/fabric</code>) with LUKS2, unlocked by the <strong>same YubiKey or USB stick</strong> that unlocks OpenBao. A stolen disk or SD card then reveals nothing.</p>
+<p class="flash warn">Untested with hardware by the fabric project. Try it on a spare machine first, and always keep a passphrase slot. The full guide: the manual (<code>/manual/</code> on the landing page), 4.5.1.</p>
+<h3>Before you start</h3>
+<ul>
+<li><strong>Keep a passphrase</strong> (offline) and back up the LUKS header after every change: <code>sudo cryptsetup luksHeaderBackup /dev/sdX2 --header-backup-file luks-header.img</code></li>
+<li><strong>One YubiKey, two jobs:</strong> OpenBao uses its PIV application (PKCS#11), LUKS its FIDO2 application — both on one YubiKey 5.</li>
+<li>A <strong>data volume</strong> unlocked after boot works on Ubuntu 24.04 as installed. The <strong>root</strong> filesystem with FIDO2 needs <code>dracut</code> instead of initramfs-tools.</li>
+</ul>
+<h3>1. An encrypted volume for fabric's data</h3>
+<pre>sudo cryptsetup luksFormat --type luks2 /dev/sdX2       # passphrase: keep it
+sudo cryptsetup open /dev/sdX2 fabricdata
+sudo mkfs.ext4 -L fabricdata /dev/mapper/fabricdata
+sudo mkdir -p /srv/fabricdata && sudo mount /dev/mapper/fabricdata /srv/fabricdata
+sudo mkdir -p /srv/fabricdata/opt /srv/fabricdata/etc-fabric</pre>
+<p>Bind <code>/srv/fabricdata/opt</code> → <code>/opt</code> and <code>/srv/fabricdata/etc-fabric</code> → <code>/etc/fabric</code> in <code>/etc/fstab</code>, and open the volume from <code>/etc/crypttab</code>:</p>
+<pre>fabricdata  UUID=&lt;luks-partition-uuid&gt;  none  luks,discard</pre>
+<p class="muted small">Best on a fresh host, before <code>fabricctl setup</code> — or <code>fabricctl uninstall --export</code>, encrypt, then <code>fabricctl restore</code>.</p>
+<h3>2a. Unlock with a YubiKey (FIDO2)</h3>
+<pre>sudo apt install fido2-tools
+sudo systemd-cryptenroll --fido2-device=auto /dev/sdX2     # touch the key; --fido2-with-client-pin=yes adds its PIN
+sudo systemd-cryptenroll /dev/sdX2                         # lists: password + fido2</pre>
+<pre>fabricdata  UUID=&lt;luks-partition-uuid&gt;  none  luks,discard,fido2-device=auto</pre>
+<p class="muted small">Enrol a second YubiKey for your safe the same way. Remove one: <code>sudo systemd-cryptenroll --wipe-slot=&lt;slot&gt; /dev/sdX2</code>.</p>
+<h3>2b. Unlock with the USB stick</h3>
+<p>Add the stick in fabric <strong>first</strong> (Unlock methods → Add a USB stick erases it), then put a LUKS key file beside fabric's <code>fabric-vault/</code> folder:</p>
+<pre>sudo mount /dev/disk/by-label/FABRIC-KEY /mnt
+sudo dd if=/dev/urandom of=/mnt/luks.key bs=64 count=1 &amp;&amp; sudo chmod 0400 /mnt/luks.key
+sudo cryptsetup luksAddKey /dev/sdX2 /mnt/luks.key
+sudo blkid -s UUID -o value /dev/disk/by-label/FABRIC-KEY   # the stick's UUID
+sudo umount /mnt</pre>
+<pre>fabricdata  UUID=&lt;luks-partition-uuid&gt;  /luks.key:UUID=&lt;stick-uuid&gt;  luks,discard,keyfile-timeout=30s</pre>
+<p class="muted small">Without the stick the boot asks for the passphrase after 30 s. Adding the stick to fabric again erases it: add the key file again afterwards.</p>
+<h3>3. Check</h3>
+<p>Reboot; <code>lsblk -f</code> shows the volume open and mounted; <code>sudo fabricctl doctor</code> passes. Then reboot without the key or stick: the boot must stop at the passphrase prompt.</p>
+</section>
+
+{% elif view == 'secrets' %}
+<section class="card"><h2>fabric's own secrets</h2>
+{% if s.secrets %}<p><span class="light ok"></span> In OpenBao at <code>fabric/secrets</code> · version {{ s.secrets.version }} · updated {{ s.secrets.updated }}</p>
+<p class="muted">CA, directory, Keycloak and TSIG secrets. fabric reads them with its own AppRole; people cannot read them, not even in OpenBao's UI. On the host: <code>sudo fabricctl secrets list</code> / <code>show &lt;name&gt;</code> (audited).</p>
+{% else %}<p><span class="light bad"></span> Not readable now{% if s.error %}: {{ s.error }}{% endif %}.</p>{% endif %}
+</section>
+<section class="card"><h2>Your applications' secrets</h2>
+<p class="muted">Browse, edit and version secrets under <code>apps/</code> in OpenBao's own UI. Sign in with Keycloak (method OIDC, your web UI account and TOTP); the web UI admin role gets the <code>fabric-admin</code> policy.</p>
+<p><a class="btn" href="{{ s.url }}ui/vault/auth?with=oidc" target="_blank" rel="noopener">Open OpenBao</a></p>
+<p class="muted small">If nobody can sign in (Keycloak down): <code>sudo fabricctl vault break-glass</code> with the recovery keys gives a root token; revoke it with <code>sudo fabricctl vault revoke-token</code>.</p>
+</section>
+{% endif %}
+{% endblock %}

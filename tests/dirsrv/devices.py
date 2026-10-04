@@ -9,7 +9,7 @@ import tempfile
 
 REPO, BASE = os.environ["REPO"], os.environ["BASE"]
 W = tempfile.mkdtemp(prefix="fabric-devices-")
-subprocess.run(["bash", f"{REPO}/installers/deb/assemble-tree.sh", W], check=True)   # the installed tree
+subprocess.run(["bash", f"{REPO}/packaging/deb/assemble-tree.sh", W], check=True)   # the installed tree
 os.makedirs(f"{W}/fabric/config")
 with open(f"{W}/fabric/config/fabric-secrets.yml", "w") as f:
     f.write("ldap_device_admin_password: Da1\n")        # what tests/render.py seeded

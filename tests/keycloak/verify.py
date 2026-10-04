@@ -2,9 +2,8 @@
 import os
 import sys
 
-sys.path[0:0] = [os.path.join(os.environ["REPO"], "fabricctl", "lib"), os.environ["REPO"]]
+sys.path[0:0] = [os.path.join(os.environ["REPO"], "src"), os.environ["REPO"]]
 from fabriclib.keycloak.admin_client import Admin  # noqa: E402
-from fabriclib.keycloak.quote import q  # noqa: E402
 from webui.tlsclient import TLSClient  # noqa: E402
 
 W = os.environ["W"]

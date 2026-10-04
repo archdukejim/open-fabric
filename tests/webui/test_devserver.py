@@ -10,8 +10,9 @@ import time
 import urllib.parse
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-WEBUI = os.path.join(REPO, "webui")
-sys.path.insert(0, REPO)
+WEBUI = os.path.join(REPO, "src", "webui")
+UX_WEB = os.path.join(REPO, "src", "ux", "web")          # server.py and the dev preview's devserver.py
+sys.path.insert(0, os.path.join(REPO, "src"))
 from webui import views  # noqa: E402
 
 PORT = 18765
@@ -33,7 +34,7 @@ def req(method, path, form=None):
     return r.status, r.getheader("Location"), r.getheader("Content-Security-Policy"), data
 
 
-proc = subprocess.Popen([sys.executable, os.path.join(WEBUI, "devserver.py"), "--port", str(PORT)],
+proc = subprocess.Popen([sys.executable, os.path.join(UX_WEB, "devserver.py"), "--port", str(PORT)],
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
     for _ in range(50):
@@ -169,7 +170,7 @@ finally:
     proc.wait(timeout=5)
 
 PORT += 1                                   # people: the helpdesk bundle
-proc = subprocess.Popen([sys.executable, os.path.join(WEBUI, "devserver.py"), "--port", str(PORT),
+proc = subprocess.Popen([sys.executable, os.path.join(UX_WEB, "devserver.py"), "--port", str(PORT),
                          "--as", "fabric-helpdesk"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
     for _ in range(50):
@@ -192,7 +193,7 @@ finally:
     proc.wait(timeout=5)
 
 PORT += 1                                   # the preview as a role bundle sees it
-proc = subprocess.Popen([sys.executable, os.path.join(WEBUI, "devserver.py"), "--port", str(PORT),
+proc = subprocess.Popen([sys.executable, os.path.join(UX_WEB, "devserver.py"), "--port", str(PORT),
                          "--as", "fabric-auditor"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 try:
     for _ in range(50):
@@ -212,13 +213,13 @@ finally:
 
 prod = views.overview({"user": "u", "csrf": "x", "version": {"version": "1", "build": ""}}, [])
 check("production pages never show the banner", "DEV PREVIEW" not in prod)
-# every production file of the server (all of webui/ but the preview's own entry point and folder)
+# every production file of the server: src/webui/ but the preview's folder, and its entry point src/ux/web/server.py
 prod_files = [os.path.join(d, f) for d, _, fs in os.walk(WEBUI) for f in fs if f.endswith(".py")
-              and "devpreview" not in d and "__pycache__" not in d and f != "devserver.py"]
+              and "devpreview" not in d and "__pycache__" not in d] + [os.path.join(UX_WEB, "server.py")]
 src = "".join(open(p).read() for p in prod_files)
 check(f"the production server has no dev switch ({len(prod_files)} files): never imports the preview",
       len(prod_files) > 30 and "import devserver" not in src and "webui.devpreview" not in src
       and "devpreview import" not in src and '"dev"' not in src and "DEV" not in src)
 check("dev server listens on 127.0.0.1 unless told otherwise",
-      'default="127.0.0.1"' in open(os.path.join(WEBUI, "devserver.py")).read())
+      'default="127.0.0.1"' in open(os.path.join(UX_WEB, "devserver.py")).read())
 sys.exit(1 if FAILED else 0)

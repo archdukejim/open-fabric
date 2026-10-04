@@ -1,13 +1,14 @@
 # tests
 
-Suites prove behaviour against real containers (AGENTS.md §6). Run them with
+Suites prove behaviour against real containers ([4.8.2](../docs/volume_4_infrequent_ops/4.8.2-automated-tests.md#482-automated-tests)). Run them with
 `sudo tests/run-all.sh [suite ...]` (all but `sandbox` by default); each suite
 writes its log to `$FABRIC_TEST_OUT` (default `/tmp/fabric-tests`). The `docs`
 suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 
 | Suite | Where | What it proves |
 |---|---|---|
-| `docs` | [docs/](docs/) | Every function documented (Purpose/Inputs/Returns/Fails/Feeds), `docs/lib-doc/` current, docs and code agree, every file reviewed |
+| `docs` | [docs/](docs/) | Every function documented (Purpose/Inputs/Returns/Fails/Feeds), the function reference (manual 1.11) current, docs and code agree, every file reviewed |
+| `lint` | [lint/](lint/) | ruff (Python, `pyproject.toml`) and shellcheck (shell) from their pinned images: no findings in `src/`, `scripts/`, `tests/` (decision D34) |
 | `consent` | [consent/](consent/) | Asking before fabric changes the host: answers, questions, the subset rule, declined groups, the `fabric-*` accounts and their move, no containers |
 | `render` | `render.py` | Every template renders from `vars.yaml.j2`; security properties of the rendered configs; every module imports |
 | `nginx` | `nginx_check.sh` | The rendered nginx configuration passes `nginx -t` in the pinned image |
@@ -24,6 +25,7 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `dirsrv` | [dirsrv/](dirsrv/) | 389 Directory Server: seed, TLS, ACIs, the admin user, device RBAC |
 | `keycloak` | [keycloak/](keycloak/) | Keycloak bootstrap against the dirsrv suite's directory |
 | `hardening` | [hardening/](hardening/) | The core services and OpenBao started from their real compose files work and are hardened |
+| `images` | [images/](images/) | fabric's own images build from `packaging/docker-bake.hcl` with a default host's build inputs and pass the smoke test CI runs before publishing (decision D41) |
 | `sandbox` | [sandbox/](sandbox/) | A full install from the .deb in a disposable systemd + Docker container (about 30 min; not in the default list) |
 
 Not in `run-all.sh`: [host/](host/) (a subset of the sandbox checks on a real machine over SSH).

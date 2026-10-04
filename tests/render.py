@@ -8,11 +8,12 @@ import glob
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path[0:0] = [os.path.join(REPO, 'fabricctl', 'lib'), REPO]
+sys.path[0:0] = [os.path.join(REPO, 'src'), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402  (the same env deploy.py uses)
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 
-env = jinja_env(os.path.join(REPO, 'fabricctl', 'jinja'))
+# FABRIC_TEST_TEMPLATES: another templates folder (its lock beside it), e.g. one with published digests pinned
+env = jinja_env(os.environ.get('FABRIC_TEST_TEMPLATES') or os.path.join(REPO, 'templates'))
 
 secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
@@ -136,7 +137,7 @@ same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
 
-# Federation (design federation.md): the endpoint's vhost, socket mount, CNAME and unit only when it is
+# Federation (manual 1.8): the endpoint's vhost, socket mount, CNAME and unit only when it is
 # on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.
 assert v2['federation_endpoint'] is False and v2['org_domain'] == v2['domain'], (v2['federation_endpoint'], v2['org_domain'])
 assert v2['hostname_federation'] == 'federation.lan.j-j.family', v2['hostname_federation']
@@ -164,7 +165,7 @@ for base, oc in (('dc=lan', 'objectClass: domain\ndc: lan'), ('o=acme,dc=lan', '
     assert f'dn: {base}\nobjectClass: top\n{oc}' in tree, tree[:400]
     assert f'dn: ou=pi-core,{base}\nobjectClass: top\nobjectClass: organizationalUnit\nou: pi-core' in tree
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
-# DNS links (design federation.md M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
+# DNS links (manual 1.8 M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
 plain = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
 assert 'type secondary' not in plain and 'also-notify' not in plain, 'no federation links: no secondaries, no notify'
 links = {'children': [{'site': 'lab', 'key': 'fed-lab', 'algorithm': 'hmac-sha256', 'secret': 'c2VjcmV0', 'delegate': True,
@@ -180,7 +181,7 @@ db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=link
                                                    zone_records=v2['dns']['dynamic_zone_var'])
 assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
-# DNS filter (dns-filter.md): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
+# DNS filter (manual 2.4.1): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
 # the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
 assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False
 assert v2['bind_dns_port'] == user.get('bind_dns_port', 53), 'with the filter off the port is what vars say (53)'
@@ -203,7 +204,7 @@ _o2p = env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg)
 assert not [ln for ln in _o2p.splitlines() if ln.strip().startswith(('client_secret', 'cookie_secret'))], \
     'oauth2-proxy secrets only via secrets.env'
 print('DNS filter: off by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
-# time (ntp.md): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
+# time (manual 2.5.1): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
 assert v2['ntp_serve'] is True and v2['ntp_set_clock'] is True and all(x.endswith(' nts') for x in v2['ntp_servers'])
 assert 'ntp' in [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']]
 own = copy.deepcopy(PRISTINE)
@@ -217,22 +218,26 @@ print('time: served with NTS sources by default, ntp.<domain>, units after time-
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
-lock = read_images_lock(os.path.join(REPO, 'fabricctl'))
+lock = read_images_lock(os.path.join(REPO, 'config'))
 assert lock and all(re.fullmatch(r'sha256:[0-9a-f]{64}', e['digest']) for e in lock.values()), 'bad images.lock.yaml'
 for e in lock.values():
     assert v2[e['var']] == e['ref'], f"{e['var']} default is not the lock's ref: {v2[e['var']]}"
 for key, val in v2.items():
     if key.startswith('image_') and isinstance(val, str):
-        assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local'), f'{key} not pinned: {val}'
+        # image_fabric_*: "" until the lock pins fabric's published image (manual 2.6.3)
+        assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local') or \
+            (key.startswith('image_fabric_') and val == ''), f'{key} not pinned: {val}'
 for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     for name, spec in dc['services'].items():
         ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
-        assert '@sha256:' in ref or (spec.get('build') and '@sha256:' in spec['build']['args'].get('BASE_IMAGE', '')),             f'{svc}/{name}: image not pinned: {ref}'
-for df in glob.glob(os.path.join(REPO, 'fabricctl', 'jinja', '*', 'build', 'Dockerfile')) + [os.path.join(REPO, 'webui', 'Dockerfile')]:
+        assert '@sha256:' in ref or (spec.get('build') and '@sha256:' in spec['build']['args'].get('BASE_IMAGE', '')), \
+            f'{svc}/{name}: image not pinned: {ref}'
+for df in glob.glob(os.path.join(REPO, 'packaging', 'images', '*', 'Dockerfile')):
     text = open(df).read()
     assert not re.search(r'^ARG BASE_IMAGE=', text, re.M), f'{df}: BASE_IMAGE must have no default'
-    assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')),         f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
+    assert all(ln.split()[1].startswith('${BASE_IMAGE}') for ln in text.splitlines() if ln.startswith('FROM ')), \
+        f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
 print('every image pinned by digest (lock, vars defaults, compose files, Dockerfiles)')
 
 # Fluent Bit (optional log forwarding, D20): verified TLS to every destination, no credential in the file
@@ -276,7 +281,7 @@ sn = k4["subnet4"][0]
 assert sn["pools"] == [{"pool": "192.168.7.100 - 192.168.7.199"}] and sn["reservations"][0]["ip-address"] == "192.168.7.20"
 assert k4["ddns-qualifying-suffix"] == "dhcp.lan.j-j.family." and k4["ddns-conflict-resolution-mode"] == "check-with-dhcid"
 assert k4["control-socket"]["socket-name"].startswith("/var/run/kea/") and k4["interfaces-config"]["interfaces"] == ["eth0"]
-# time (ntp.md): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
+# time (manual 2.5.1): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
 assert {"name": "ntp-servers", "data": kv["host_ip"]} in k4["option-data"], k4["option-data"]
 kv["dhcp"] = {**kv["dhcp"], "ntp": ["192.168.7.2", "192.168.7.3"]}
 assert {"name": "ntp-servers", "data": "192.168.7.2, 192.168.7.3"} in kea_json("kea-dhcp4.conf")["Dhcp4"]["option-data"]
@@ -316,7 +321,10 @@ for bad, msg in ((lambda d: d["subnets"][0].update(pools=["192.168.8.1 - 192.168
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]
 assert kc["kea-dhcp4"]["cap_add"] == ["NET_RAW", "NET_BIND_SERVICE"] and kc["kea-dhcp4"]["network_mode"] == "host"
 assert kc["kea-ddns"]["user"] == "609:609" and not kc["kea-ddns"].get("cap_add")
-assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
+if "build" in kc["kea-dhcp4"]:      # built here; a host on fabric's published Kea image pulls it (manual 2.6.3)
+    assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
+else:
+    assert "@sha256:" in kc["kea-dhcp4"]["image"] and kc["kea-ddns"]["image"] == kc["kea-dhcp4"]["image"]
 print('Kea: configs, the DHCP subzone (A/AAAA/DHCID only, delegated), refusals, two capabilities only')
 
 # FreeRADIUS (802.1X): clients with their secrets, BlastRADIUS protection unless relaxed per client,
@@ -381,7 +389,7 @@ from fabriclib.deploy.service_units import service_units  # noqa: E402
 units = [(u["compose"], u["folder"]) for u in service_units("/opt", {})]
 assert len(units) >= 8, units
 for container, folder in units:
-    text = open(os.path.join(REPO, "fabricctl", "jinja", folder, "docker-compose.yml.j2")).read()
+    text = open(os.path.join(REPO, "templates", folder, "docker-compose.yml.j2")).read()
     assert re.search(rf"^\s+container_name: {re.escape(container)}\s*$", text, re.M), (folder, container)
 print('every unit waits on a container its compose file defines')
 print('all templates rendered')
@@ -423,9 +431,9 @@ assert "-Pfx" in _g["windows"]["tls"]["script"] and "<Type xmlns=\"http://www.mi
 print("802.1X guides: Windows scripts (CA, pinned server, well-formed profiles, CRLF, public data only)")
 
 # every fabricctl command on an install reaches cli.py: manage.sh hands it all its arguments (none: the menu)
-_manage = open(os.path.join(REPO, "fabricctl", "lib", "manage.sh")).read()
+_manage = open(os.path.join(REPO, "src", "ux", "cli", "manage.sh")).read()
 assert 'exec python3 "$FABRIC_DIR/lib/fabriclib/cli.py" "$@"' in _manage and "set -- --interactive" in _manage
-_cli = open(os.path.join(REPO, "fabricctl", "lib", "fabriclib", "cli.py")).read()
+_cli = open(os.path.join(REPO, "src", "fabriclib", "cli.py")).read()
 for _flag in ("--mint-certs", "--service-cert", "--render-jinja", "--print", "--interactive", "--apply",
               "--update-containers", "--client-cert", "--keycloak-sync", "--version"):
     assert f'"{_flag}"' in _cli, f"cli.py does not route {_flag}"
