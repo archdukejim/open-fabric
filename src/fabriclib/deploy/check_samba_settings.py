@@ -17,7 +17,7 @@ def check_samba_settings(v):
              ad_old_password_minutes, ad_rpc_ports.
     Returns: None (nothing is checked while install_samba is off).
     Fails:   ValidationError naming the first problem: no or an invalid ad_domain; ad_domain equal to fabric's domain
-             (same-domain mode, refused until build step S1.6) or a parent of it; a NetBIOS domain name or host name
+             (same-domain mode was dropped, D87) or a parent of it; a NetBIOS domain name or host name
              Windows cannot use (more than 15 characters); a missing, unknown or out-of-range password-policy key;
              a policy whose minimum age is not below its maximum, or whose lockout is shorter than its window; an
              invalid old-password window or RPC range.
@@ -32,8 +32,8 @@ def check_samba_settings(v):
     if len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253:
         raise ValidationError(f"ad_domain {ad!r} is not a valid DNS domain of two labels or more")
     if ad == domain:
-        raise ValidationError(f"ad_domain equal to domain ({ad}: same-domain mode) is not supported yet "
-                              "(build step S1.6); use a sub-domain such as ad." + domain)
+        raise ValidationError(f"ad_domain cannot be fabric's own domain ({ad}): the AD zone is always a zone of its "
+                              f"own (D87); the suggestion is ad.{domain}")
     if domain.endswith("." + ad):
         raise ValidationError(f"ad_domain {ad} is a parent of fabric's domain {domain}: AD's zone would hold "
                               "fabric's; use a sub-domain such as ad." + domain)

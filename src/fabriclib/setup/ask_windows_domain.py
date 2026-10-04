@@ -51,8 +51,7 @@ def ask_windows_domain(ctx):
     domain = str(ctx.vars.get("domain") or "").lower()
     current = str(ctx.vars.get("ad_domain") or "").lower()
     print(f"    The AD domain is {BOLD}permanent{NC}: it cannot be changed once the domain exists.")
-    print(f"    Recommended: ad.{domain} (needed to federate sites or locations later); "
-          f"fabric's own domain ({domain}) is not supported yet.")
+    print(f"    Suggested: ad.{domain}. It cannot be fabric's own domain ({domain}).")
     while True:
         answer = input(f"    AD domain [{current or 'ad.' + domain}]: ").strip().lower()
         chosen = answer or current or f"ad.{domain}"

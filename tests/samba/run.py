@@ -56,7 +56,10 @@ except ValidationError as e:
     check("a complete configuration passes", False, e)
 check("refused: no AD domain (it has no default)", refused({**GOOD, "ad_domain": ""}, "needs ad_domain"))
 check("refused: an AD domain of one label", refused({**GOOD, "ad_domain": "ad"}, "not a valid DNS domain"))
-check("refused: same-domain mode until S1.6", refused({**GOOD, "ad_domain": "lan.test"}, "not supported yet"))
+check("refused: fabric's own domain (same-domain mode dropped, D87)",
+      refused({**GOOD, "ad_domain": "lan.test"}, "cannot be fabric's own domain"))
+check("accepted: any other domain, not only the suggested ad.<domain>",
+      not refused({**GOOD, "ad_domain": "corp.example.net"}, ""))
 check("refused: a parent of fabric's domain", refused({**GOOD, "ad_domain": "test.x", "domain": "lan.test.x"},
                                                        "parent of fabric's domain"))
 check("refused: a NetBIOS domain name over 15 characters",
