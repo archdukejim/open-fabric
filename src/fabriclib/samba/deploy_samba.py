@@ -2,6 +2,7 @@ import os
 
 from fabriclib.common.ensure_dir import ensure_dir
 from fabriclib.common.write_file_if_changed import write_file_if_changed
+from fabriclib.samba.write_bind_dlz import write_bind_dlz
 
 
 def deploy_samba(v, secrets, jinja_env):
@@ -11,14 +12,22 @@ def deploy_samba(v, secrets, jinja_env):
              jinja_env — Jinja environment whose first search path holds samba/converge/*.py (an install) or sits
              beside src/containers/samba (a checkout).
     Returns: True if the converge code changed. (The password file is read only when the domain is provisioned:
-             a change to it changes nothing in a running domain.)
+             a change to it changes nothing in a running domain.) BIND's DLZ files are written when missing, so BIND
+             can start; turning DLZ on (and restarting BIND) happens after the domain is converged.
     Fails:   KeyError without ad_admin_password; OSError from creating, owning or writing.
     Feeds:   deploy/deploy_optional_parts (apply); tests/samba.
     Notes:   every folder is root-only (the DC runs as root in its container): data/ (the domain's database and
-             SYSVOL), secrets/, tls/ (filled by setup's certificate step), converge/ (read-only in the container)."""
+             SYSVOL; its etc/ and bind-dns/ are mounted into BIND), secrets/, tls/ (filled by setup's certificate
+             step), converge/ (read-only in the container); bind/ is BIND's (write_bind_dlz)."""
     base = os.path.join(v["deploy_base_dir"], "samba")
     for sub in ("data", "secrets", "tls", "converge"):
         ensure_dir(os.path.join(base, sub), 0o700, 0, 0)
+    # BIND mounts these two (its DLZ): made once if missing, never reset — provisioning gives them BIND's group
+    for sub in ("etc", "bind-dns"):
+        os.makedirs(os.path.join(base, "data", sub), mode=0o755, exist_ok=True)
+    # BIND includes these when it starts: they must exist; turning DLZ on is for after the domain is converged
+    if not os.path.exists(os.path.join(base, "bind", "dlz.conf")):
+        write_bind_dlz(v)
     write_file_if_changed(os.path.join(base, "secrets", "admin_password"), secrets["ad_admin_password"] + "\n", 0o600)
     src = os.path.join(jinja_env.loader.searchpath[0], "samba", "converge")
     if not os.path.isdir(src):              # a checkout: the converge code lives in src/containers/ (manual 1.3.2)

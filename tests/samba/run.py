@@ -124,6 +124,23 @@ ports_on = yaml.safe_load(env.get_template("nginx/docker-compose.yml.j2").render
 check("nginx no longer passes 389/636 to 389-DS (the DC owns them)",
       "listen 389" not in ngx_on and "listen 389" in ngx_off and not any(":389:" in p or ":636:" in p for p in ports_on),
       ports_on)
+off = {**v, "install_samba": False}
+named_on, named_off = (env.get_template("bind9/config/named.conf.j2").render(**x) for x in (v, off))
+opts_on, opts_off = (env.get_template("bind9/config/named.conf.options.j2").render(**x) for x in (v, off))
+check("BIND includes the AD zone (DLZ) and the keytab option only with the Windows domain (manual 2.11.2.6)",
+      'include "/etc/bind-samba/dlz.conf";' in named_on and "bind-samba" not in named_off
+      and 'include "/etc/bind-samba/options.conf";' in opts_on and "bind-samba" not in opts_off)
+bind_on = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**{**v, "host_ram_capacity": 4}))
+bind_off = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**{**off, "host_ram_capacity": 4}))
+b_on, b_off = bind_on["services"]["bind9"], bind_off["services"]["bind9"]
+check("BIND mounts fabric's DLZ files and the DC's smb.conf read-only, the DNS partition writable",
+      "/opt/samba/bind:/etc/bind-samba:ro" in b_on["volumes"] and "/opt/samba/data/etc:/etc/samba:ro" in b_on["volumes"]
+      and "/opt/samba/data/bind-dns:/data/bind-dns" in b_on["volumes"]
+      and not any("samba" in m for m in b_off["volumes"]), b_on["volumes"])
+check("BIND gets a Kerberos replay cache and 128 MiB at 4 GB with the domain (80 MiB without)",
+      any(t.startswith("/var/tmp:") for t in b_on["tmpfs"])
+      and b_on["deploy"]["resources"]["limits"]["memory"] == "128M"
+      and b_off["deploy"]["resources"]["limits"]["memory"] == "80M")
 units = {u["service"]: u for u in service_units("/opt", v)}
 check("a samba unit, enabled with install_samba, requiring nothing",
       units["samba"]["enabled"] and units["samba"]["requires"] == []

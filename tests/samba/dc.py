@@ -19,11 +19,15 @@ from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.samba.converge_domain import converge_domain  # noqa: E402
 from fabriclib.samba.deploy_samba import deploy_samba  # noqa: E402
+from fabriclib.samba.write_bind_dlz import write_bind_dlz  # noqa: E402
 from fabriclib.secrets.random_password import random_password  # noqa: E402
 
 W = os.path.join(os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests"), "samba")
 NET, SUBNET, IP = "sambatest_net", "10.254.30.0/24", "10.254.30.10"
-DC, IMAGE = "sambatest-dc", "fabric/samba:test"
+# BIND shares the DC's address, as both share the host's on an install (the AD zone sends updates to the DC's name)
+BIND_IP = IP
+DC, IMAGE, BIND = "sambatest-dc", "fabric/samba:test", "sambatest-bind"
+CLIENT = IMAGE                  # the DC's image has dig and nsupdate (bind9-dnsutils)
 BASE = "DC=ad,DC=lan,DC=test"
 POLICY = {"minimum_length": 14, "complexity": True, "history": 24, "minimum_age_days": 0, "maximum_age_days": 0,
           "lockout_threshold": 5, "lockout_minutes": 15, "lockout_window_minutes": 15}
@@ -48,7 +52,7 @@ def sh(cmd, ok=True, **kw):
 
 
 def cleanup():
-    sh(["docker", "rm", "-f", DC], ok=False)
+    sh(["docker", "rm", "-f", DC, BIND], ok=False)
     sh(["docker", "network", "rm", NET], ok=False)
 
 
@@ -104,7 +108,7 @@ check("deploy_samba: root-only folders, the password file 0600, the converge cod
 
 # run it as the compose file says, on the test network
 sh(["docker", "network", "create", "--subnet", SUBNET, NET])
-run = ["docker", "run", "-d", "--name", DC, "--hostname", "dc1", "--network", NET, "--ip", IP,
+run = ["docker", "run", "-d", "--name", DC, "--hostname", "dc1", "--network", NET, "--ip", IP, "--dns", BIND_IP,
        "--read-only", "--memory", compose["mem_limit"], "--cap-drop", "ALL"]
 run += [x for c in compose["cap_add"] for x in ("--cap-add", c)]
 run += [x for o in compose["security_opt"] for x in ("--security-opt", o)]
@@ -153,6 +157,68 @@ check("the trust GPO and the site's log-on GPO exist", "fabric: trust in fabric'
 files = dc("find", "/data/state/sysvol", "-name", "Registry.pol", "-o", "-name", "GptTmpl.inf").stdout
 check("their files are in SYSVOL (Registry.pol, GptTmpl.inf)", "Registry.pol" in files and "GptTmpl.inf" in files)
 
+# BIND serves the AD zone from the DC's database through DLZ (manual 2.11.2.6, Q2): fabric's BIND image with the
+# files write_bind_dlz makes, mounted as the rendered compose file mounts them; a minimal named.conf around them
+check("before the domain exists BIND's DLZ files load nothing", "not provisioned" in open(
+    os.path.join(W, "samba", "bind", "dlz.conf")).read())
+check("once provisioned, write_bind_dlz turns DLZ on (BIND must restart)", write_bind_dlz(v) is True)
+check("and again changes nothing", write_bind_dlz(v) is False)
+bind_build = sh(["docker", "build", "-q", "-t", "fabric/bind9:samba-test", "--build-arg", f"BASE_IMAGE={DEBIAN}",
+                 f"{REPO}/packaging/images/bind9"], ok=False)
+check("fabric's BIND image (with Samba's DLZ libraries) builds", bind_build.returncode == 0, bind_build.stderr)
+etc_bind = os.path.join(W, "bindtest")
+os.makedirs(etc_bind)
+with open(os.path.join(etc_bind, "named.conf"), "w") as f:
+    f.write('options {\n directory "/var/cache/bind";\n listen-on port 53 { any; };\n listen-on-v6 { none; };\n'
+            ' recursion no;\n allow-query { any; };\n include "/etc/bind-samba/options.conf";\n};\n'
+            'zone "lan.test" { type primary; file "/etc/bind/db.lan.test"; };\n'
+            'include "/etc/bind-samba/dlz.conf";\n')
+with open(os.path.join(etc_bind, "db.lan.test"), "w") as f:
+    f.write("$TTL 300\n@ IN SOA ns.lan.test. admin.lan.test. 1 3600 600 86400 300\n@ IN NS ns.lan.test.\n"
+            "ns IN A 10.254.30.10\nweb IN A 10.254.30.20\n")
+for name in os.listdir(etc_bind):
+    os.chmod(os.path.join(etc_bind, name), 0o644)
+os.chmod(etc_bind, 0o755)
+bind_compose = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**v))["services"]["bind9"]
+samba_mounts = [m for m in bind_compose["volumes"]
+                if m.split(":")[1] in ("/etc/bind-samba", "/data/bind-dns", "/etc/samba")]
+sh(["docker", "run", "-d", "--name", BIND, "--network", f"container:{DC}", "--user", "600:600", "--read-only",
+    "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true", "--memory", "128m",
+    "--tmpfs", "/run/named:uid=600,gid=600,mode=0755,size=4m", "--tmpfs", "/tmp:size=8m",
+    "--tmpfs", "/var/cache/bind:uid=600,gid=600,size=8m"]
+   + [x for t in bind_compose["tmpfs"] if t.startswith("/var/tmp") for x in ("--tmpfs", t)]
+   + [x for m in samba_mounts for x in ("-v", m)] + ["-v", f"{etc_bind}:/etc/bind:ro", "fabric/bind9:samba-test"])
+sh("sleep 8")
+
+
+def client(*args):
+    return sh(["docker", "run", "--rm", "--network", NET, "--entrypoint", args[0], CLIENT, *args[1:]], ok=False)
+
+
+def unsigned_update(zone):
+    """An nsupdate with no key: BIND must refuse it in every zone."""
+    with open(os.path.join(W, "upd"), "w") as f:
+        f.write(f"server {BIND_IP}\nzone {zone}\nupdate add evil.{zone} 60 A 10.254.30.66\nsend\n")
+    return sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/upd:/upd:ro", "--entrypoint", "nsupdate",
+               CLIENT, "/upd"], ok=False)
+
+
+srv = client("dig", "+short", f"@{BIND_IP}", "SRV", "_ldap._tcp.ad.lan.test").stdout
+check("BIND answers the AD zone from the DC's database (DLZ)", "389 dc1.ad.lan.test." in srv,
+      sh(["docker", "logs", BIND], ok=False).stderr[-600:])
+check("and fabric's own zone, unchanged", client("dig", "+short", f"@{BIND_IP}", "A", "web.lan.test").stdout.strip()
+      == "10.254.30.20")
+upd = dc("samba_dnsupdate", "-s", "/data/etc/smb.conf", "--all-names")
+check("the DC's signed (GSS-TSIG) updates are accepted through BIND",
+      upd.returncode == 0 and "Failed update" not in upd.stdout + upd.stderr, (upd.stdout + upd.stderr)[-400:])
+evil = unsigned_update("ad.lan.test")
+check("refused: an unsigned update to the AD zone", "REFUSED" in evil.stdout + evil.stderr, evil.stderr[-200:])
+evil = unsigned_update("lan.test")
+check("refused: an unsigned update to fabric's zone", "REFUSED" in evil.stdout + evil.stderr, evil.stderr[-200:])
+bind_info = json.loads(sh(["docker", "inspect", BIND]).stdout)[0]
+check("BIND still runs as its own user with no capabilities", bind_info["Config"]["User"] == "600:600"
+      and not bind_info["HostConfig"]["CapAdd"] and bind_info["State"]["Running"])
+
 # refusals: a site's admin writes its own site only (Q4), the policy is enforced
 lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": [],
        "root_ca_pem": open(f"{pki}/root_ca.crt").read()}
@@ -183,6 +249,7 @@ admin = as_user("Administrator", admin_pw, "ldbsearch")
 check("the Administrator signs in with fabric's generated password", admin.returncode == 0 and BASE in admin.stdout,
       admin.stderr)
 
-cleanup()
+if not os.environ.get("SAMBA_TEST_KEEP"):        # keep the containers to look into a failure
+    cleanup()
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

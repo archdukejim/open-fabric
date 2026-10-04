@@ -335,6 +335,7 @@ file	fabriclib-samba|src/fabriclib/samba/deploy_samba.py	1
 file	fabriclib-samba|src/fabriclib/samba/domain_status.py	3	
 file	fabriclib-samba|src/fabriclib/samba/run_domain_command.py	4	
 file	fabriclib-samba|src/fabriclib/samba/set_domain_password_policy.py	5	
+file	fabriclib-samba|src/fabriclib/samba/write_bind_dlz.py	6	
 file	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py	1	
 file	fabriclib-secrets|src/fabriclib/secrets/common/write_vault_secrets.py	2	
 file	fabriclib-secrets|src/fabriclib/secrets/export_secrets.py	3	
@@ -591,6 +592,7 @@ function	fabricctl-agent|src/agent/read_text.py|read_text	1
 function	fabricctl-agent|src/agent/server.py|main	1	
 function	fabricctl-jinja|packaging/images/bake_env.py|bake_env	1	
 function	fabricctl-jinja|packaging/images/dirsrv/dscontainer-launch.py|_signal	1	
+function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|clear_data	3	
 function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|set_global	2	
 function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|show_log	1	
 function	fabricctl-jinja|packaging/images/samba/set_password.py|set_password	1	
@@ -1037,6 +1039,7 @@ function	fabriclib-samba|src/fabriclib/samba/domain_status.py|domain_status	2
 function	fabriclib-samba|src/fabriclib/samba/run_domain_command.py|_changes	1	
 function	fabriclib-samba|src/fabriclib/samba/run_domain_command.py|run_domain_command	2	
 function	fabriclib-samba|src/fabriclib/samba/set_domain_password_policy.py|set_domain_password_policy	1	
+function	fabriclib-samba|src/fabriclib/samba/write_bind_dlz.py|write_bind_dlz	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py|read_vault_secrets	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/write_vault_secrets.py|write_vault_secrets	1	
 function	fabriclib-secrets|src/fabriclib/secrets/export_secrets.py|export_secrets	1	

@@ -11,6 +11,7 @@ from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities
 from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.ldap.seed_directory import seed_directory
 from fabriclib.samba.converge_domain import converge_domain
+from fabriclib.samba.write_bind_dlz import write_bind_dlz
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
@@ -60,6 +61,8 @@ def run(ctx):
         except ValidationError as e:
             raise SetupError(str(e))
         ok(f"Windows domain {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
+        if write_bind_dlz(v):                     # the first provisioning: BIND now serves the AD zone
+            ok(f"bind9: {start_unit('bind9', 'bind9', True)} (the AD zone through DLZ)")
 
     if v.get("install_ldap", True):
         registry = os.path.join(ctx.config_dir, "federation.yaml")

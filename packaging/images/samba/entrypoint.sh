@@ -27,13 +27,24 @@ OPTS=(--option="acl_xattr:security_acl_name = user.NTACL")
 # Feeds:   the provision and join branches below.
 show_log() { grep -vi 'password' "$1" | tail -20 || true; }
 
+# Purpose: remove what a failed provisioning or join left in /data, keeping the folders BIND mounts (etc,
+#          bind-dns: a mount of a folder made anew would still show BIND the old one), emptied.
+# Inputs:  none ($DATA).
+# Returns: 0.
+# Fails:   under set -e if find fails.
+# Feeds:   the provision and join branches below.
+clear_data() {
+    find "$DATA" -mindepth 1 -maxdepth 1 ! -name etc ! -name bind-dns -exec rm -rf {} +
+    find "$DATA/etc" "$DATA/bind-dns" -mindepth 1 -delete 2>/dev/null || true
+}
+
 # written only once provisioning or a join has fully succeeded: data without it is a failed attempt, never a domain
 DONE=$DATA/.fabric-provisioned
 if [ -f "$DONE" ]; then
     echo "domain data found: converging ${REALM,,}"
 elif [ -n "${JOIN_ROLE:-}" ]; then
     echo "joining ${REALM,,} as $JOIN_ROLE through $JOIN_SERVER"
-    find "$DATA" -mindepth 1 -delete             # what a failed attempt left
+    clear_data
     mkdir -p "$DATA/etc"
     samba-tool domain join "${REALM,,}" "$JOIN_ROLE" --server="$JOIN_SERVER" -A /run/secrets/join.auth \
         --targetdir="$DATA" --dns-backend=BIND9_DLZ --option="netbios name = $HOST_NAME" "${OPTS[@]}" \
@@ -43,7 +54,7 @@ elif [ -n "${JOIN_ROLE:-}" ]; then
     echo "joined"
 else
     echo "provisioning ${REALM,,}"
-    find "$DATA" -mindepth 1 -delete             # what a failed attempt left
+    clear_data
     # no --adminpass: provisioning makes a random one (and prints it: the log is discarded), replaced from the
     # secret file at once
     samba-tool domain provision --targetdir="$DATA" --server-role=dc --use-rfc2307 --dns-backend=BIND9_DLZ \

@@ -10,6 +10,7 @@ from fabriclib.federation.configure_directory_links import configure_directory_l
 from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.ldap.seed_directory import seed_directory
 from fabriclib.samba.converge_domain import converge_domain
+from fabriclib.samba.write_bind_dlz import write_bind_dlz
 
 TIMEOUT = {"keycloak": 90, "postgres": 60, "samba": 300}   # seconds per restart (others 30); the DC provisions once
 
@@ -92,6 +93,9 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
         try:                                      # idempotent: the domain as fabric wants it (manual 2.11.2.15)
             done = converge_domain(final_vars, paths["federation"])
             print("Windows domain: " + ("; ".join(done) if done else "as wanted"))
+            if write_bind_dlz(final_vars):        # the first provisioning: BIND now serves the AD zone
+                print("Restarting bind9 (the AD zone through DLZ)...")
+                _quiet(["systemctl", "restart", "bind9"], "Restart of bind9", 60)
         except ValidationError as e:              # reported: the rest of the apply still has to happen
             print(f"Warning: {e}")
     org_here = people_written_here(paths["federation"])

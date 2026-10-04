@@ -16,10 +16,11 @@ ARG BIND_GID=600
 ARG RADIUS_GID=610
 LABEL org.fabric.groups="BIND_GID=${BIND_GID},RADIUS_GID=${RADIUS_GID}"
 
+# bind9-dnsutils: nsupdate, with which the DC registers its own names in BIND (signed, GSS-TSIG)
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       samba-ad-dc samba-ad-provision python3-samba winbind krb5-user ldb-tools tdb-tools smbclient \
-      ca-certificates tini \
+      bind9-dnsutils ca-certificates tini \
  && rm -rf /var/lib/apt/lists/* \
  # fabric writes its own configuration at provisioning; Debian's defaults are not used
  && rm -f /etc/samba/smb.conf /etc/krb5.conf \

@@ -29,6 +29,10 @@ services:
     tmpfs:
       - /run/named:uid={{ service_users.bind.uid }},gid={{ service_users.bind.gid }},mode=0755,size=4m
       - /tmp:noexec,nosuid,size=8m
+{% if install_samba | default(false) | bool %}
+      # Kerberos' replay cache for signed updates (GSS-TSIG)
+      - /var/tmp:uid={{ service_users.bind.uid }},gid={{ service_users.bind.gid }},mode=0700,size=16m
+{% endif %}
     ports:
       - "{{ host_ip }}:{{ bind_dns_port }}:53/tcp"
       - "{{ host_ip }}:{{ bind_dns_port }}:53/udp"
@@ -38,13 +42,22 @@ services:
       - {{ deploy_base_dir }}/bind9/log:/var/log
       - {{ deploy_base_dir }}/bind9/cache:/var/cache/bind
       - {{ deploy_base_dir }}/bind9/ssl:/etc/bind9/ssl:ro
+{% if install_samba | default(false) | bool %}
+      # the Windows domain (manual 2.11.2.6): what fabric includes, the DC's DNS partition (DLZ writes members'
+      # updates there) and the DC's smb.conf (its paths)
+      - {{ deploy_base_dir }}/samba/bind:/etc/bind-samba:ro
+      - {{ deploy_base_dir }}/samba/data/bind-dns:/data/bind-dns
+      - {{ deploy_base_dir }}/samba/data/etc:/etc/samba:ro
+{% endif %}
     networks:
       fabric_net:
         ipv4_address: "{{ ip_bind9 }}"
         aliases:
           - "{{ hostname_bind9 }}"
 {% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
-{% set bind_mem = 40 if (host_ram_capacity | default(0) | int) == 3 else 80 %}
+{# Samba's DLZ libraries need more (Q10: 69 MiB measured) #}
+{% set bind_mem = (96 if (host_ram_capacity | default(0) | int) == 3 else 128) if install_samba | default(false) | bool
+   else (40 if (host_ram_capacity | default(0) | int) == 3 else 80) %}
     deploy:
       resources:
         limits:
