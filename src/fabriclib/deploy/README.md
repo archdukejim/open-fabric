@@ -14,7 +14,8 @@ installs what changed and restarts or reloads what is affected.
 | `render_vars.py` | `vars.yaml.j2` rendered over the admin's vars and the secrets (the full settings); the RAM minimum |
 | `archive_vars.py` | Keep the deployed `vars.yaml` in `archive/` before it is replaced |
 | `check_fixed_identity.py` | `site_name`, `org_domain` and `ldap_base_dn` valid and unchanged since install (the markers in `config/`) |
-| `check_settings.py` | DHCP, time and `dns_filter` settings checked before anything is rendered |
+| `check_settings.py` | DHCP, time, `dns_filter` and Windows-domain settings checked before anything is rendered |
+| `check_samba_settings.py` | The Windows domain's settings: the AD domain, NetBIOS names, the whole password policy (D87, D89) |
 | `load_link_vars.py` | The landing page's links, rendered into the context (a bad file is reported, never fatal) |
 | `service_units.py` | fabric's container services and their wrapper units, with which are on |
 | `render_templates.py` | Every configuration file into the render folder |

@@ -18,4 +18,5 @@ re-imported.
 | `export_secrets.py` | A root-only 0600 copy for a reinstall's backup (setup re-imports and shreds it) |
 | `run_secrets_command.py` | `fabricctl secrets list` (names) / `show <name>` (one value, audited) |
 | `random_secret.py` | A new random secret from the OS's CSPRNG (base64, or 32 letters and digits) |
+| `random_password.py` | A new random password every allowed policy accepts (64 characters, both cases and digits) |
 | `common/` | OpenBao read/write of the `fabric/secrets` entry (see its README) |

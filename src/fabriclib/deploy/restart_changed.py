@@ -10,7 +10,7 @@ from fabriclib.federation.configure_directory_links import configure_directory_l
 from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.ldap.seed_directory import seed_directory
 
-TIMEOUT = {"keycloak": 90, "postgres": 60}        # seconds per restart (others 30)
+TIMEOUT = {"keycloak": 90, "postgres": 60, "samba": 300}   # seconds per restart (others 30); the DC provisions once
 
 
 def _quiet(cmd, what, timeout, capture=False):

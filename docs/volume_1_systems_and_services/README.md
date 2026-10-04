@@ -110,4 +110,5 @@ The home chapter for security (5.8).
 - [1.11.27 fabriclib-vault](1.11.27-fabriclib-vault.md) — OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass
 - [1.11.28 installers](1.11.28-installers.md) — The Debian package wrapper
 - [1.11.29 webui](1.11.29-webui.md) — Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview
+- [1.11.30 fabriclib-samba](1.11.30-fabriclib-samba.md)
 <!-- end of generated 1.11 -->

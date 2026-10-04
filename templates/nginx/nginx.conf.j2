@@ -56,7 +56,8 @@ events {
 stream {
     resolver 127.0.0.11 valid=30s;
 
-{% if install_ldap | default(true) | bool %}
+{# with the Windows domain on, its DC owns 389 and 636 on the host's address (manual 2.11.2.4) #}
+{% if install_ldap | default(true) | bool and not install_samba | default(false) | bool %}
     # 389 Directory Server terminates TLS itself, so both listeners are plain
     # TCP passthrough and the directory's certificate reaches the client.
     # LDAP (389): 389-DS rejects everything except StartTLS and the rootDSE

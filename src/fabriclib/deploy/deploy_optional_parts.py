@@ -8,12 +8,14 @@ from fabriclib.dns_filter.deploy_adguard import deploy_adguard
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit
 from fabriclib.ntp.deploy_chrony import deploy_chrony
 from fabriclib.radius.deploy_freeradius import deploy_freeradius
+from fabriclib.samba.deploy_samba import deploy_samba
 
 
 def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
-    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea and
-             FreeRADIUS — each only when it is on (chrony whenever it is installed and the `time` host change is
-             approved — manual 2.7.1; an install set up before consent existed keeps converging).
+    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea,
+             FreeRADIUS and the Windows domain — each only when it is on (chrony whenever it is installed and the
+             `time` host change is approved — manual 2.7.1; an install set up before consent existed keeps
+             converging).
     Inputs:  paths — deploy_paths() (federation, config); final_vars — rendered settings; secrets; jinja_env; links —
              dns_links() (the zones AdGuard forwards to BIND).
     Returns: {"restart": set of units to restart, "nginx": True if nginx's sign-in snippet for AdGuard changed}.
@@ -44,4 +46,8 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
     # FreeRADIUS (optional): config with the client secrets, fabric's policy code, CA bundle
     if final_vars.get("install_freeradius") and deploy_freeradius(final_vars, secrets, jinja_env):
         restart.add("freeradius")
+    # the Windows domain (optional): the Administrator's password file (read only when provisioning: nothing
+    # to restart) and the converge code
+    if final_vars.get("install_samba"):
+        deploy_samba(final_vars, secrets, jinja_env)
     return {"restart": restart, "nginx": nginx}

@@ -24,8 +24,11 @@ services:
     ports:
       - 80:80
       - "{{ host_ip }}:443:443"
+{% if install_ldap | default(true) | bool and not install_samba | default(false) | bool %}
+      # 389-DS through nginx; with the Windows domain on, its DC owns these ports (manual 2.11.2.4)
       - "{{ host_ip }}:389:389"
       - "{{ host_ip }}:636:636"
+{% endif %}
     volumes:
       - {{ deploy_base_dir }}/nginx/config/nginx.conf:/etc/nginx/nginx.conf:ro
       - {{ deploy_base_dir }}/nginx/config/conf.d:/etc/nginx/conf.d:ro

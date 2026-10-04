@@ -43,8 +43,8 @@ def _forget_rules(config_dir, kind, allowed, what):
     """Purpose: remove the ufw rules fabric added earlier for networks or interfaces no longer allowed; record the
              current ones.
     Inputs:  config_dir — the install's config folder (security/ufw_rule RECORDS: what fabric opened last time);
-             kind — "ssh", "ntp" or "dhcp"; allowed — the networks or interfaces now; what — the service's name for
-             messages.
+             kind — "ssh", "ntp", "dhcp" or "ad"; allowed — the networks or interfaces now; what — the service's
+             name for messages.
     Returns: None; the record rewritten with allowed. Rules fabric did not add are never touched.
     Fails:   OSError writing the record (a failing `ufw delete` is ignored: the rule may be gone already).
     Feeds:   run."""
@@ -80,7 +80,8 @@ def run(ctx):
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
              (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123
              from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks
-             removed: config/.firewall-ntp-allowed; DHCP likewise) — the rules come from security/firewall_rules;
+             removed: config/.firewall-ntp-allowed; DHCP likewise), install_samba (the domain controller's ports,
+             likewise) — the rules come from security/firewall_rules;
              vars_file,
              target_dir, config_dir. Env SSH_CONNECTION.
     Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
@@ -130,6 +131,10 @@ def run(ctx):
     for iface in rules["dhcp"]:
         subprocess.run(["ufw", "allow", *ufw_rule("dhcp", iface)], check=True, capture_output=True)
     _forget_rules(ctx.config_dir, "dhcp", rules["dhcp"], "DHCP")
+    # the Windows domain controller (optional, manual 2.11.2.4): on the host network, so ufw, not DOCKER-USER
+    for rule in rules["ad"]:
+        subprocess.run(["ufw", "allow", *ufw_rule("ad", rule)], check=True, capture_output=True)
+    _forget_rules(ctx.config_dir, "ad", rules["ad"], "the domain controller")
     subprocess.run(["ufw", "--force", "enable"], check=True, capture_output=True)
 
     lib = os.path.join(ctx.target_dir, "lib")

@@ -16,5 +16,7 @@ def plan_firewall(v, config_dir):
             + [f"ufw: allow 22/tcp (SSH) from {c}" for c in rules["ssh"]]
             + [f"ufw: allow 123/udp (NTP) from {c}" for c in rules["ntp"]]
             + [f"ufw: allow 67/udp (DHCP) in on {i}" for i in rules["dhcp"]]
+            + [f"ufw: allow {r.split('@')[2]}/{r.split('@')[0]} (the Windows domain controller) from {r.split('@')[1]}"
+               for r in rules["ad"]]
             + ["iptables DOCKER-USER: ports Docker publishes are reachable only from " + ", ".join(rules["ssh"])
                + " (fabric-firewall.service re-applies this at boot)"])

@@ -15,7 +15,8 @@ from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
 
 # (systemd unit, container, enabled-if flag); order = start order
-ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("ldap", "dirsrv", "install_ldap"),
+ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("samba", "samba", "install_samba"),
+         ("ldap", "dirsrv", "install_ldap"),
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit"),
          ("kea", "kea-dhcp4", "install_kea"), ("freeradius", "freeradius", "install_freeradius"),
@@ -27,7 +28,8 @@ def run(ctx):
              directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate
              fabric.target.
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
-             install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint; restart_services
+             install_fluentbit, install_kea, install_freeradius, install_samba, install_adguard, federation_endpoint;
+             restart_services
              (units to restart);
              target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its

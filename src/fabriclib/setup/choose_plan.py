@@ -1,4 +1,5 @@
 from fabriclib.common.console import BOLD, NC, YELLOW, heading
+from fabriclib.setup.ask_windows_domain import ask_windows_domain
 
 # (settings key, default, what enabling it does, what relaxing it costs)
 PLAN = [
@@ -162,6 +163,10 @@ def choose_plan(ctx):
             print(f"  ✓ Optional: 802.1X with FreeRADIUS ({n} RADIUS client{'s' if n != 1 else ''})")
         else:
             print("  · Optional, off: 802.1X with FreeRADIUS — choose it in Advanced")
+        if ctx.vars.get("install_samba"):
+            print(f"  ✓ Optional: a Windows domain (Samba AD) {ctx.vars.get('ad_domain') or '(no domain yet)'}")
+        else:
+            print("  · Optional, off: a Windows domain (Samba AD) — choose it in Advanced")
         if ctx.vars.get("install_fluentbit"):
             print(f"  ✓ Optional: forward all logs with Fluent Bit to {', '.join(dests) or '(no destination yet)'}")
         else:
@@ -193,5 +198,6 @@ def choose_plan(ctx):
                 _set(ctx.vars, "install_webui", False)
             _ask_dhcp(ctx)
             _ask_radius(ctx)
+            ask_windows_domain(ctx)
             _ask_log_forwarding(ctx)
             show()

@@ -189,7 +189,7 @@ def checks(ctx):
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
     for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "kea", "freeradius",
-                 "fluentbit",
+                 "samba", "fluentbit",
                  "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()

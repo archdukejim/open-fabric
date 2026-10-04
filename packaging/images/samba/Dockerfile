@@ -18,7 +18,8 @@ LABEL org.fabric.groups="BIND_GID=${BIND_GID},RADIUS_GID=${RADIUS_GID}"
 
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      samba-ad-dc samba-ad-provision python3-samba winbind krb5-user ldb-tools smbclient ca-certificates tini \
+      samba-ad-dc samba-ad-provision python3-samba winbind krb5-user ldb-tools tdb-tools smbclient \
+      ca-certificates tini \
  && rm -rf /var/lib/apt/lists/* \
  # fabric writes its own configuration at provisioning; Debian's defaults are not used
  && rm -f /etc/samba/smb.conf /etc/krb5.conf \

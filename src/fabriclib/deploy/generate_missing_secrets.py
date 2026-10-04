@@ -1,3 +1,4 @@
+from fabriclib.secrets.random_password import random_password
 from fabriclib.secrets.random_secret import random_secret
 
 BASE64 = {"ca_password": 32, "rndc_secret": 32, "ldap_admin_password": 24, "ldap_keycloak_password": 24,
@@ -28,6 +29,10 @@ def generate_missing_secrets(secrets):
         if name not in secrets:
             secrets[name] = random_secret(alnum=True)
             changed = True
+    # the Windows domain's Administrator (manual 1.6.3.7): long and of every class, so any allowed policy accepts it
+    if "ad_admin_password" not in secrets:
+        secrets["ad_admin_password"] = random_password()
+        changed = True
     if "tsig_secrets" not in secrets:
         secrets["tsig_secrets"] = {}
         changed = True

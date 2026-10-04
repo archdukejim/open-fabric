@@ -68,6 +68,7 @@ copy 's,^packaging/images/webui/,fabric/jinja/webui/build/,' packaging/images/we
     packaging/images/webui/.dockerignore
 copy 's,^src/containers/dirsrv/,fabric/jinja/dirsrv/,;s,^src/containers/freeradius/,fabric/jinja/freeradius/python/,' \
     src/containers/dirsrv/seed.py src/containers/freeradius
+copy 's,^src/containers/samba/,fabric/jinja/samba/converge/,' src/containers/samba
 copy 's,^static/vendor/,fabric/jinja/nginx/www/manual/,;s,^static/nginx/,fabric/jinja/nginx/www/shared/,' \
     static/vendor/marked.min.js static/vendor/mermaid.min.js static/nginx/style.css
 copy 's,^config/,fabric/,' config/VERSION config/images.lock.yaml config/link-vars-template.yaml

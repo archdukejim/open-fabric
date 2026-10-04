@@ -2,8 +2,9 @@
 # -----------------------------------------------------------------------
 # fabric's Samba AD DC (manual 2.11.2): provision the domain once, or join
 # it as a DC or RODC (JOIN_ROLE), then converge the settings fabric owns in
-# smb.conf and run the DC in the foreground. A provisioned /data is reused,
-# so every later start only converges. Secrets come as files, never on a
+# smb.conf and run the DC in the foreground. A provisioned /data (its
+# .fabric-provisioned marker) is reused, so every later start only
+# converges; data without the marker is a failed attempt, cleared first. Secrets come as files, never on a
 # command line: the Administrator's password (/run/secrets/admin_password),
 # a join's credentials (/run/secrets/join.auth).
 #
@@ -26,18 +27,23 @@ OPTS=(--option="acl_xattr:security_acl_name = user.NTACL")
 # Feeds:   the provision and join branches below.
 show_log() { grep -vi 'password' "$1" | tail -20 || true; }
 
-if [ -f "$DATA/private/sam.ldb" ]; then
+# written only once provisioning or a join has fully succeeded: data without it is a failed attempt, never a domain
+DONE=$DATA/.fabric-provisioned
+if [ -f "$DONE" ]; then
     echo "domain data found: converging ${REALM,,}"
 elif [ -n "${JOIN_ROLE:-}" ]; then
     echo "joining ${REALM,,} as $JOIN_ROLE through $JOIN_SERVER"
+    find "$DATA" -mindepth 1 -delete             # what a failed attempt left
     mkdir -p "$DATA/etc"
     samba-tool domain join "${REALM,,}" "$JOIN_ROLE" --server="$JOIN_SERVER" -A /run/secrets/join.auth \
         --targetdir="$DATA" --dns-backend=BIND9_DLZ --option="netbios name = $HOST_NAME" "${OPTS[@]}" \
         > /tmp/join.log 2>&1 || { show_log /tmp/join.log; exit 1; }
     rm -f /tmp/join.log
+    touch "$DONE"
     echo "joined"
 else
     echo "provisioning ${REALM,,}"
+    find "$DATA" -mindepth 1 -delete             # what a failed attempt left
     # no --adminpass: provisioning makes a random one (and prints it: the log is discarded), replaced from the
     # secret file at once
     samba-tool domain provision --targetdir="$DATA" --server-role=dc --use-rfc2307 --dns-backend=BIND9_DLZ \
@@ -45,6 +51,7 @@ else
         > /tmp/provision.log 2>&1 || { show_log /tmp/provision.log; exit 1; }
     rm -f /tmp/provision.log
     python3 /usr/local/bin/set_password.py "$CONF" Administrator /run/secrets/admin_password
+    touch "$DONE"
     echo "provisioned"
 fi
 

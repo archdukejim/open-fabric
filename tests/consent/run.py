@@ -154,6 +154,16 @@ check("one line per rule fabric adds, plus the default policy and the DOCKER-USE
       rules[0].startswith("ufw: deny incoming") and "ufw: allow 22/tcp (SSH) from 10.0.0.0/24" in rules
       and rules[-1].startswith("iptables DOCKER-USER"), rules)
 check("security.firewall false asks nothing", plan_firewall({**v, "security": {"firewall": False}}, cfg) == [])
+check("no domain controller rule without Samba", not any("domain controller" in r for r in rules), rules)
+dc_rules = plan_firewall({**v, "ntp_serve": False, "install_samba": True, "ad_rpc_ports": "49152-49251"}, cfg)
+dc_lines = [r for r in dc_rules if "domain controller" in r]
+check("with Samba: the DC's TCP ports (RPC range included) and UDP ports, from the LAN and fabric_net",
+      f"ufw: allow 88,135,389,445,464,636,3268,3269,49152:49251/tcp (the Windows domain controller) from "
+      f"{v['lan_cidr']}" in dc_lines
+      and f"ufw: allow 88,389,464/udp (the Windows domain controller) from {v['fabric_subnet']}" in dc_lines
+      and len(dc_lines) == 4, dc_lines)
+check("the DC's ufw rule round-trips through its record form",
+      ufw_rule("ad", "tcp@10.0.0.0/24@88,445") == ["from", "10.0.0.0/24", "to", "any", "port", "88,445", "proto", "tcp"])
 final, _ = render_vars(jinja_env(JINJA), {}, {"domain": "lan.test", "hostname": "h", "host_ip": "10.0.0.5",
                                               "lan_cidr": "10.0.0.0/24", "lan_gateway": "10.0.0.1"})
 check("the settings render without secrets (a fresh install plans before anything exists)",

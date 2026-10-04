@@ -72,6 +72,7 @@ file	fabriclib-core|src/fabriclib/cli.py	1
 file	fabriclib-deploy|src/fabriclib/deploy/apply_deployment.py	1	
 file	fabriclib-deploy|src/fabriclib/deploy/archive_vars.py	2	
 file	fabriclib-deploy|src/fabriclib/deploy/check_fixed_identity.py	3	
+file	fabriclib-deploy|src/fabriclib/deploy/check_samba_settings.py	28	
 file	fabriclib-deploy|src/fabriclib/deploy/check_settings.py	4	
 file	fabriclib-deploy|src/fabriclib/deploy/compose_builds.py	26	
 file	fabriclib-deploy|src/fabriclib/deploy/deploy_optional_parts.py	5	
@@ -318,11 +319,13 @@ file	fabriclib-radius|src/fabriclib/radius/windows_lan_profile.py	13
 file	fabriclib-radius|src/fabriclib/radius/windows_setup_script.py	14	
 file	fabriclib-rbac|src/fabriclib/rbac/required_permission.py	1	
 file	fabriclib-rbac|src/fabriclib/rbac/user_permissions.py	2	
+file	fabriclib-samba|src/fabriclib/samba/deploy_samba.py	1	
 file	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py	1	
 file	fabriclib-secrets|src/fabriclib/secrets/common/write_vault_secrets.py	2	
 file	fabriclib-secrets|src/fabriclib/secrets/export_secrets.py	3	
 file	fabriclib-secrets|src/fabriclib/secrets/import_secrets.py	4	
 file	fabriclib-secrets|src/fabriclib/secrets/load_secrets.py	5	
+file	fabriclib-secrets|src/fabriclib/secrets/random_password.py	10	
 file	fabriclib-secrets|src/fabriclib/secrets/random_secret.py	6	
 file	fabriclib-secrets|src/fabriclib/secrets/run_secrets_command.py	7	
 file	fabriclib-secrets|src/fabriclib/secrets/save_secrets.py	8	
@@ -331,6 +334,7 @@ file	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py	1
 file	fabriclib-security|src/fabriclib/security/firewall_rules.py	2	
 file	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py	3	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
+file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	
 file	fabriclib-setup|src/fabriclib/setup/backup_install.py	1	
 file	fabriclib-setup|src/fabriclib/setup/check_export_dir.py	2	
 file	fabriclib-setup|src/fabriclib/setup/choose_plan.py	3	
@@ -678,6 +682,7 @@ function	fabriclib-deploy|src/fabriclib/deploy/apply_deployment.py|_prepare	1
 function	fabriclib-deploy|src/fabriclib/deploy/apply_deployment.py|apply_deployment	3	
 function	fabriclib-deploy|src/fabriclib/deploy/archive_vars.py|archive_vars	1	
 function	fabriclib-deploy|src/fabriclib/deploy/check_fixed_identity.py|check_fixed_identity	1	
+function	fabriclib-deploy|src/fabriclib/deploy/check_samba_settings.py|check_samba_settings	1	
 function	fabriclib-deploy|src/fabriclib/deploy/check_settings.py|check_settings	1	
 function	fabriclib-deploy|src/fabriclib/deploy/compose_builds.py|compose_builds	1	
 function	fabriclib-deploy|src/fabriclib/deploy/deploy_optional_parts.py|deploy_optional_parts	1	
@@ -991,12 +996,14 @@ function	fabriclib-radius|src/fabriclib/radius/windows_lan_profile.py|windows_la
 function	fabriclib-radius|src/fabriclib/radius/windows_setup_script.py|windows_setup_script	1	
 function	fabriclib-rbac|src/fabriclib/rbac/required_permission.py|required_permission	1	
 function	fabriclib-rbac|src/fabriclib/rbac/user_permissions.py|user_permissions	1	
+function	fabriclib-samba|src/fabriclib/samba/deploy_samba.py|deploy_samba	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py|read_vault_secrets	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/write_vault_secrets.py|write_vault_secrets	1	
 function	fabriclib-secrets|src/fabriclib/secrets/export_secrets.py|export_secrets	1	
 function	fabriclib-secrets|src/fabriclib/secrets/import_secrets.py|_shred	1	
 function	fabriclib-secrets|src/fabriclib/secrets/import_secrets.py|import_secrets	2	
 function	fabriclib-secrets|src/fabriclib/secrets/load_secrets.py|load_secrets	1	
+function	fabriclib-secrets|src/fabriclib/secrets/random_password.py|random_password	1	
 function	fabriclib-secrets|src/fabriclib/secrets/random_secret.py|random_secret	1	
 function	fabriclib-secrets|src/fabriclib/secrets/run_secrets_command.py|_flat	1	
 function	fabriclib-secrets|src/fabriclib/secrets/run_secrets_command.py|run_secrets_command	2	
@@ -1007,6 +1014,8 @@ function	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py|appl
 function	fabriclib-security|src/fabriclib/security/firewall_rules.py|firewall_rules	1	
 function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|hardened_daemon_settings	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
 function	fabriclib-setup|src/fabriclib/setup/check_export_dir.py|check_export_dir	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	
@@ -1372,6 +1381,7 @@ page	fabriclib-ntp	18
 page	fabriclib-pki	19	
 page	fabriclib-radius	20	
 page	fabriclib-rbac	21	
+page	fabriclib-samba	30	
 page	fabriclib-secrets	22	
 page	fabriclib-security	23	
 page	fabriclib-setup	24	

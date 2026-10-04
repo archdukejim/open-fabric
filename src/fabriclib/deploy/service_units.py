@@ -25,6 +25,9 @@ def service_units(base, v):
         {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
         # optional 802.1X (design §6): asks 389-DS about every device
         {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': ['ldap']},
+        # optional Windows domain (manual 2.11.2): the Samba AD DC on the host network; no requires: BIND reads its
+        # database for the AD zone, but a DC restart must not take DNS down, nor a BIND restart the DC
+        {'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []},
         # optional DNS filter (manual 2.4.1): AdGuard Home on host_ip:53 in front of BIND, oauth2-proxy for its UI;
         # no requires: a BIND restart (every DNS apply) must not take the clients' DNS down with it
         {'service': 'adguard', 'compose': 'adguardhome', 'folder': 'adguard', 'requires': []},
@@ -33,7 +36,8 @@ def service_units(base, v):
     ]
     flag = {"keycloak": "install_keycloak", "postgres": "install_keycloak", "dirsrv": "install_ldap",
             "webui": "install_webui", "fluentbit": "install_fluentbit", "kea": "install_kea",
-            "freeradius": "install_freeradius", "adguard": "install_adguard", "adguard-auth": "install_adguard"}
+            "freeradius": "install_freeradius", "samba": "install_samba", "adguard": "install_adguard",
+            "adguard-auth": "install_adguard"}
     for u in units:
         u["enabled"] = bool(v.get(flag[u["folder"]])) if u["folder"] in flag else True
     return units

@@ -22,6 +22,7 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `fluentbit` | [fluentbit/](fluentbit/) | Log forwarding to TLS syslog and Elasticsearch receivers |
 | `kea` | [kea/](kea/) | Kea DHCP with DDNS into BIND, real DHCP clients |
 | `freeradius` | [freeradius/](freeradius/) | 802.1X against a real 389-DS: EAP-TLS, EAP-TTLS, MAB, refusals |
+| `samba` | [samba/](samba/) | The Windows domain controller: settings (D87, D89), the rendered container, what changes around it; real containers from S1.3 |
 | `dirsrv` | [dirsrv/](dirsrv/) | 389 Directory Server: seed, TLS, ACIs, the admin user, device RBAC |
 | `keycloak` | [keycloak/](keycloak/) | Keycloak bootstrap against the dirsrv suite's directory |
 | `hardening` | [hardening/](hardening/) | The core services and OpenBao started from their real compose files work and are hardened |

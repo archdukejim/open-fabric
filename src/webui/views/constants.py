@@ -41,7 +41,8 @@ SERVICES = {
     "nginx": ("Reverse proxy", None), "bind9": ("DNS", "bind9"), "stepca": ("Certificate authority", "stepca"),
     "ldap": ("389-DS directory", "dirsrv"), "postgres": ("Keycloak database", None),
     "keycloak": ("Single sign-on", None), "openbao": ("Secrets", "openbao"), "kea": ("DHCP", "kea"),
-    "freeradius": ("802.1X", "freeradius"), "fabric-web": ("This web UI", None), "fabric-agent": ("Host API", None),
+    "freeradius": ("802.1X", "freeradius"), "samba": ("Windows domain (Samba AD)", None),
+    "fabric-web": ("This web UI", None), "fabric-agent": ("Host API", None),
 }
 # every permission a page asks about (the dev preview's fallback when it runs without fabriclib)
 PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:read", "dhcp:write", "pki:read",
