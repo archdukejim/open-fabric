@@ -31,6 +31,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 - [1.3.6 PKI chain and certificate relay](1.3.6-pki-chain.md)
 - [1.3.7 Templates](1.3.7-templates.md)
 - [1.3.8 Targets and hardening](1.3.8-targets-and-hardening.md)
+- [1.3.9 Privileges inventory (D49)](1.3.9-container-inventory.md)
 
 ## 1.4 fabricctl and fabric-agent
 
@@ -49,6 +50,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 
 - [1.6.1 389 Directory Server](1.6.1-directory.md)
 - [1.6.2 Keycloak](1.6.2-keycloak.md)
+- [1.6.3 The directory on Samba AD (design)](1.6.3-samba-directory.md)
 
 ## 1.7 Secrets: OpenBao
 
@@ -63,6 +65,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 - [1.8.5 Attachment: flat, relay, nested](1.8.5-attachment.md)
 - [1.8.6 What changes in fabric](1.8.6-changes.md)
 - [1.8.7 Phases and milestones](1.8.7-milestones.md)
+- [1.8.8 Federation on Samba AD (design)](1.8.8-federation-on-ad.md)
 
 ## 1.9 Security defaults
 

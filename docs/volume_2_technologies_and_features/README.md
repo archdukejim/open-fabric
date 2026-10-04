@@ -53,10 +53,12 @@ Technologies, hardware, vendors and integrations.
 ## 2.10 Joining Linux machines
 
 - [2.10.1 Joining Linux machines to the domain](2.10.1-domain-join.md)
+- [2.10.2 Joining Linux machines to AD (design)](2.10.2-linux-join-ad.md)
 
 ## 2.11 Windows domain: Samba AD
 
-- [2.11.1 Samba AD beside fabric's directory](2.11.1-samba-ad.md)
+- [2.11.1 [DEPRECATED] Samba AD beside fabric's directory](2.11.1-samba-ad.md)
+- [2.11.2 Samba AD: the domain controller (design)](2.11.2-samba-dc.md)
 
 ## 2.12 Third-party licences
 
