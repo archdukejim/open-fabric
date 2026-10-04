@@ -34,6 +34,7 @@ start_dc() {
     docker run -d --name s0-dc --hostname dc1.ad.lan.test --network s0net --ip "$DC_IP" --dns "$DC_IP" \
         --cap-drop ALL "${add[@]}" --security-opt no-new-privileges:true --read-only \
         --tmpfs /run:size=16m --tmpfs /tmp:size=64m --tmpfs /var/log/samba:size=16m --memory 512m \
+        -v "$W/winbindd:/run/samba/winbindd" \
         -e REALM="$REALM" -e DOMAIN="$DOMAIN" -e HOST_IP="$DC_IP" ${SAMBA_DEBUG:+-e SAMBA_DEBUG=$SAMBA_DEBUG} \
         -v "$W/data:/data" -v "$W/secrets/admin_password:/run/secrets/admin_password:ro" s0/dc >/dev/null
     for _ in $(seq 1 60); do docker logs s0-dc 2>&1 | grep -q "Starting process" && break; sleep 2; done

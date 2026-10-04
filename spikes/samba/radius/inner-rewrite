@@ -1,0 +1,5 @@
+	if (&User-Name =~ /^host\/([^.]+)\./) {
+		update request {
+			&Stripped-User-Name := "%{1}$"
+		}
+	}

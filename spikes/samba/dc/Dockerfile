@@ -8,6 +8,8 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/* \
  && rm -f /etc/samba/smb.conf /etc/krb5.conf \
  # fabric's BIND runs as gid 600: provisioning gives the "bind" group read access to the DLZ database and keytab
- && groupadd -g 600 bind
+ && groupadd -g 600 bind \
+ # FreeRADIUS (gid 610) reaches winbind's privileged pipe for ntlm_auth (PEAP-MSCHAPv2) through this group
+ && groupmod -g 610 winbindd_priv
 COPY entrypoint.sh setpass.py /usr/local/bin/
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

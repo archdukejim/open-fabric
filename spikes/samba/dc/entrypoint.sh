@@ -26,6 +26,13 @@ else
     python3 /usr/local/bin/setpass.py "$CONF" Administrator /run/secrets/admin_password
     echo "provisioned"
 fi
+# settings every Samba process must see (winbindd reads smb.conf, not the master's --option): converge them
+set_global() {  # name value — replace or add the line under [global]
+    if grep -qiE "^\s*$1\s*=" "$CONF"; then sed -i -E "s|^\s*$1\s*=.*|\t$1 = $2|I" "$CONF"
+    else sed -i "/^\[global\]/a\\	$1 = $2" "$CONF"; fi
+}
+# PEAP uses MS-CHAPv2, which Samba refuses by default (ntlmv2-only)
+set_global "ntlm auth" "mschapv2-and-ntlmv2-only"
 # runtime sockets live on the /run tmpfs: the root filesystem is read-only
 mkdir -p /run/samba/ntp_signd && chmod 750 /run/samba/ntp_signd
 exec samba -s "$CONF" --foreground --no-process-group --debug-stdout ${SAMBA_DEBUG:+--debuglevel=$SAMBA_DEBUG} \
