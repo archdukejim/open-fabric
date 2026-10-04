@@ -123,6 +123,8 @@ check("exactly the six capabilities of the inventory (1.3.9)",
 check("bound to loopback and the host's address only", dc["environment"]["INTERFACES"] == "127.0.0.1 192.168.7.53")
 check("no secret in its environment (the Administrator's password comes as a file)",
       not any(k.endswith(("PASSWORD", "SECRET", "PASS")) for k in dc["environment"]), sorted(dc["environment"]))
+check("its resolver is fabric's file (the host's address), not the host's resolver",
+      "/opt/samba/resolv.conf:/etc/resolv.conf:ro" in dc["volumes"])
 check("its secrets, certificate and converge code are mounted read-only",
       all(any(m.endswith(f":{target}:ro") for m in dc["volumes"]) for target in ("/run/secrets", "/tls", "/fabric")))
 check("a memory limit", dc["mem_limit"] == "512m")

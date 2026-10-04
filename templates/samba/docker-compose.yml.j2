@@ -52,6 +52,8 @@ services:
       - {{ deploy_base_dir }}/samba/secrets:/run/secrets:ro
       - {{ deploy_base_dir }}/samba/tls:/tls:ro
       - {{ deploy_base_dir }}/samba/converge:/fabric:ro
+      # its resolver: the host's address, which knows the AD zone (the host's own resolver may not)
+      - {{ deploy_base_dir }}/samba/resolv.conf:/etc/resolv.conf:ro
     mem_limit: {{ samba_mem_limit }}
     healthcheck:
       # the rootDSE over LDAP on loopback: the DC is up and answering

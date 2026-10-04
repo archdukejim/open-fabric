@@ -43,7 +43,7 @@ docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b52
 docs/volume_1_systems_and_services/1.11.28-installers.md	12802f7241c875662a6f6895defdfcd1e1ffe0d7	2026-10-03	
 docs/volume_1_systems_and_services/1.11.29-webui.md	9a9aa6fa70d04f3b0b4914f0148dadc1b3558b8e	2026-10-04	
 docs/volume_1_systems_and_services/1.11.3-fabricctl-jinja.md	955557597e26809be1be76b48042b91018f088f2	2026-10-04	
-docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	9abb37d07f51e43f0a79bde8f4fce77a7169467a	2026-10-04	
+docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	6ec4622c562acfe459b9f5b1fee822d8c8aef4ef	2026-10-04	
 docs/volume_1_systems_and_services/1.11.4-fabricctl-lib.md	f87125b7cc4c2afdf5f8f7812f325344ab40fd33	2026-10-03	
 docs/volume_1_systems_and_services/1.11.5-fabriclib-common.md	8205addb2de6412acae5e7b49d22a7be8d449814	2026-10-04	
 docs/volume_1_systems_and_services/1.11.6-fabriclib-consent.md	424b9927b5c2538a3fce969715af6fd51180c061	2026-10-03	
@@ -100,7 +100,7 @@ docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	0c5cc4691f1ae67f
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	103a4ee9a4f8184323c1060cf66f0436f3c17bc3	2026-10-04	
 docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	f745f2711a47bb65f7e5b9d0772a3d59464f23e4	2026-10-04	
 docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	72f82eaf4d59314ace1c5c09f2226a63a9dd9c56	2026-10-04	
-docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	9eea818bdd90574c33a7939e4b53cb6ee3c7e1db	2026-10-04	
+docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	91543652e089bdd9faf2b8b5c9ec9f15a88707fd	2026-10-04	
 docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	301d3b76db26fdfbb7f6cda69696841db43c30ef	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.1-kea-design.md	da4655d3733b7fdf899606642209a7e0288d12ab	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	a7ccd826f29ae9c8f312d36f93eb5228bd7a9538	2026-10-04	
@@ -173,7 +173,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	960bdd49373f336b92a8bd047e7a6176995b83bd	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	cc9bc311578dffe776b8760b957dda0d5440f75c	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	d083a4a1da2b04eb5f2070c9d9f60b4217f7d2bb	2026-10-04	
@@ -369,7 +369,7 @@ src/fabriclib/deploy/check_fixed_identity.py	35cc05d2938150eeee1fc248702cbfecfc8
 src/fabriclib/deploy/check_samba_settings.py	58eebec5690fe20ada6fbbfbbe1eb6dd34ee4021	2026-10-04	
 src/fabriclib/deploy/check_settings.py	ad10534ece640fd8d62b6b940321d87ae5d388b0	2026-10-04	
 src/fabriclib/deploy/compose_builds.py	b9216391412415e425319fefc5e8e75b380bdd5a	2026-10-04	
-src/fabriclib/deploy/deploy_optional_parts.py	964d57d1cbc5889c547e2fc4ed8b94e6dc629a3b	2026-10-04	
+src/fabriclib/deploy/deploy_optional_parts.py	0ab8e895f8e6bef97b5837d21b6ec5be04718e54	2026-10-04	
 src/fabriclib/deploy/deploy_paths.py	856d4713906ce9b96b7f28ab0cee1c674b050dcf	2026-10-03	
 src/fabriclib/deploy/finish_without_start.py	cc97a0565ca78ddb375b376c9b1809c8b1f77e07	2026-10-04	
 src/fabriclib/deploy/generate_missing_secrets.py	1204d834c0e2c677a5295f1ce5bb6b657b12b26e	2026-10-04	
@@ -656,7 +656,7 @@ src/fabriclib/rbac/user_permissions.py	529aa7a9683268c6fc5f80212fa0d8ecb1b8eb8a	
 src/fabriclib/samba/README.md	9c5f54fd8017afd66923f2531b00768217f343b8	2026-10-04	
 src/fabriclib/samba/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-04	
 src/fabriclib/samba/converge_domain.py	cb9eeb0907309c8788deaf716c67a632c2696ba1	2026-10-04	
-src/fabriclib/samba/deploy_samba.py	8c40959f968bf549a27db715ab389b776d536800	2026-10-04	
+src/fabriclib/samba/deploy_samba.py	bf7d34629a4993c64b4a2fa4d9bc8296586de011	2026-10-04	
 src/fabriclib/samba/domain_status.py	15084fd017becdd0abe1f8679eb3736d577f3cfc	2026-10-04	
 src/fabriclib/samba/run_domain_command.py	1b8ca28e1c520da4ecef91900eb943a6c87c8613	2026-10-04	
 src/fabriclib/samba/set_domain_password_policy.py	656cb2beaf7d4dbb5b9d0408a524d67f2cb3248e	2026-10-04	
@@ -1037,7 +1037,7 @@ templates/openbao/openbao.hcl.j2	9d6dfd3f2e93efc1500710a21df29df58d30af8c	2026-0
 templates/postgres/README.md	5cede3f8ca1ec148c4b90fbdb2fe17ce98969af6	2026-09-30	
 templates/postgres/docker-compose.yml.j2	db9f4180d1d6e05aacb17d4a66f338747c62b345	2026-09-30	
 templates/samba/README.md	ea97eeafccd2bf48cefa6b8660f70c212a135739	2026-10-04	
-templates/samba/docker-compose.yml.j2	e6cf5d3a2d29cb182bb0613c639d06bd19a3de43	2026-10-04	
+templates/samba/docker-compose.yml.j2	5f880a1f17c8c3579ca23942fa6ff77ef9ab1708	2026-10-04	
 templates/stepca/README.md	a816b72c88d33610890fe7f26bc61cd831574845	2026-10-03	
 templates/stepca/docker-compose.yml.j2	fb472debda0b9dc6498bebcaa755b9e756dc76cb	2026-10-04	
 templates/stepca/leaf.tpl.j2	8ba7aa319b481c583789859e8248f045c94bab7c	2026-09-30	
@@ -1127,8 +1127,8 @@ tests/pki/site_ca.py	ee12f9ac4e2b4d0fbfbcd5163b26200b95120181	2026-10-03
 tests/render.py	a2d65966e45d6a28ab1995a6f8e0af275e3d1b8b	2026-10-04	
 tests/run-all.sh	ddd4774dba494f5cf8a4d60acbaa63d248265ca9	2026-10-04	
 tests/samba/README.md	a4824504d00ed9b6ff46caacea20cde28717d792	2026-10-04	
-tests/samba/dc.py	8a34fe4495ab54d39f7d24885de080248f4144af	2026-10-04	
-tests/samba/run.py	49ee97eefa4f5dea4bb079956f0f0fb755d2a8e3	2026-10-04	
+tests/samba/dc.py	96495556d72194f7293f0a83806983c3874ae04d	2026-10-04	
+tests/samba/run.py	6c5a634b4dbf2b064ef19455e9f37feefca4eedb	2026-10-04	
 tests/sandbox/Dockerfile	46a7ff3893744a092bf54127ef8debbc66bd9091	2026-09-30	
 tests/sandbox/README.md	cd9a9766a87b582251cd9a36e1c5246ead576551	2026-10-03	
 tests/sandbox/certs_page_test.sh	f9d69252199bc570f30f920ab52ee6800cf0e728	2026-09-30	

@@ -105,6 +105,8 @@ sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{tl
     f"{tls}/fullchain.pem", "-days", "2", "-subj", f"/CN={v['hostname_dc']}"])
 os.chmod(f"{tls}/privkey.pem", 0o600)
 admin_pw = open(os.path.join(W, "samba", "secrets", "admin_password")).read().strip()
+check("deploy_samba: the DC's resolver is the host's address",
+      open(os.path.join(W, "samba", "resolv.conf")).read().startswith(f"nameserver {IP}\n"))
 check("deploy_samba: root-only folders, the password file 0600, the converge code copied",
       all(os.stat(os.path.join(W, "samba", d)).st_mode & 0o077 == 0 for d in ("data", "secrets", "converge"))
       and os.stat(os.path.join(W, "samba", "secrets", "admin_password")).st_mode & 0o777 == 0o600
@@ -112,7 +114,7 @@ check("deploy_samba: root-only folders, the password file 0600, the converge cod
 
 # run it as the compose file says, on the test network
 sh(["docker", "network", "create", "--subnet", SUBNET, NET])
-run = ["docker", "run", "-d", "--name", DC, "--hostname", "dc1", "--network", NET, "--ip", IP, "--dns", BIND_IP,
+run = ["docker", "run", "-d", "--name", DC, "--hostname", "dc1", "--network", NET, "--ip", IP,
        "--read-only", "--memory", compose["mem_limit"], "--cap-drop", "ALL"]
 run += [x for c in compose["cap_add"] for x in ("--cap-add", c)]
 run += [x for o in compose["security_opt"] for x in ("--security-opt", o)]
