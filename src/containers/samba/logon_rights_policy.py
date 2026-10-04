@@ -6,8 +6,8 @@ def logon_rights_policy(sids):
     """Purpose: who may log on to a site's machines (D90, manual 1.6.3.10): the GptTmpl.inf granting interactive and
              remote interactive log-on to exactly these SIDs, written as Windows writes it (UTF-16 with its byte-order
              mark, CRLF); Windows applies it, and Linux members through SSSD's GPO access control (Q16).
-    Inputs:  sids — list of SID str (the site's people and admins, fabric-admins, fabric-break-glass, grants), in a
-             stable order.
+    Inputs:  sids — list of SID str (the site's people and admins, fabric-admins, fabric-break-glass, grants, and
+             each machine's local Administrators), in a stable order.
     Returns: bytes.
     Fails:   ValueError for an empty list (nobody could log on).
     Feeds:   converge (the site's logon GPO)."""

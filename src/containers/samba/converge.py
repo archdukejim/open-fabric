@@ -20,6 +20,7 @@ from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
 from set_password_policy import set_password_policy
 
 CONF = "/data/etc/smb.conf"
+BUILTIN_ADMINISTRATORS = "S-1-5-32-544"        # each machine's own local Administrators
 
 
 def _sid(samdb, name):
@@ -54,7 +55,10 @@ def converge(state):
     if root:
         changed += ensure_gpo(samdb, lp, "fabric: trust in fabric's root CA", base, TRUST_EXTENSIONS,
                               {"Machine/Registry.pol": root_ca_policy(state["root_ca_pem"])})
+    # a machine's own local Administrators keep log-on too: the policy replaces Windows' local lists, and its owners
+    # must never be locked out of it
     sids = [_sid(samdb, g) for g in (f"{site}-users", f"{site}-admins", "fabric-admins", "fabric-break-glass")]
+    sids.append(BUILTIN_ADMINISTRATORS)
     changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", f"OU={site},OU=sites,{base}", LOGON_EXTENSIONS,
                           {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids)})
     return changed

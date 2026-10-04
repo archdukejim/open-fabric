@@ -156,6 +156,10 @@ check("the trust GPO and the site's log-on GPO exist", "fabric: trust in fabric'
       and "fabric: lan log-on rights" in gpos, gpos)
 files = dc("find", "/data/state/sysvol", "-name", "Registry.pol", "-o", "-name", "GptTmpl.inf").stdout
 check("their files are in SYSVOL (Registry.pol, GptTmpl.inf)", "Registry.pol" in files and "GptTmpl.inf" in files)
+inf_path = next(x for x in files.splitlines() if x.endswith("GptTmpl.inf"))
+inf = subprocess.run(["docker", "exec", DC, "cat", inf_path], capture_output=True).stdout     # UTF-16: bytes
+check("the log-on policy names the site's groups and each machine's local Administrators (never lock out)",
+      "S-1-5-32-544".encode("utf-16-le") in inf and "SeInteractiveLogonRight".encode("utf-16-le") in inf)
 
 # BIND serves the AD zone from the DC's database through DLZ (manual 2.11.2.6, Q2): fabric's BIND image with the
 # files write_bind_dlz makes, mounted as the rendered compose file mounts them; a minimal named.conf around them
