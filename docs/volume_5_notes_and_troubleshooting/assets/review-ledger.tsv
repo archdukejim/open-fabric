@@ -100,7 +100,7 @@ docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	89e60e01fa08b33
 docs/volume_2_technologies_and_features/2.3.1-freeradius-design.md	342b9d9d07a9ea0dec421b86732ad5084d28832f	2026-10-03	
 docs/volume_2_technologies_and_features/2.4.1-adguard.md	c55dac7193bba66a04c883437d233cf70b87e231	2026-10-03	
 docs/volume_2_technologies_and_features/2.5.1-chrony.md	f5ab5c790a87e74fc708fc9bee953e977ba2f384	2026-10-03	
-docs/volume_2_technologies_and_features/2.6.1-image-channels.md	93ec099d3e90831d1e9c2837a1b829d9884184e8	2026-10-03	
+docs/volume_2_technologies_and_features/2.6.1-image-channels.md	f6359b0286194760662748b8d6080f66ea039dba	2026-10-04	
 docs/volume_2_technologies_and_features/2.6.2-image-updates.md	6a92f1f32439e95add277c00b68c89db574fcd32	2026-10-04	
 docs/volume_2_technologies_and_features/2.6.3-published-images-on-hosts.md	bda61c8e237dd8d487dc0c328bbb348c147598fc	2026-10-04	
 docs/volume_2_technologies_and_features/2.7.1-host-consent.md	721577c5fe99304181203cfda67c76463257bca9	2026-10-03	
@@ -150,7 +150,7 @@ docs/volume_4_infrequent_ops/4.8.2-automated-tests.md	011d11a97f102beb64bf315d32
 docs/volume_4_infrequent_ops/4.9.1-dev-preview.md	8721440c08affc04abe0f2603c5a4ac239b236be	2026-10-03	
 docs/volume_4_infrequent_ops/4.9.2-working-on-fabric.md	e99d9c1fdc3e7fd9d8b75b854ed71fcdb56eeef8	2026-10-03	
 docs/volume_4_infrequent_ops/README.md	eb139fcb69bee5480ef9a028550f0bdc2788a9bc	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.1.1-alignment-plan.md	e735297984827a1866a4a0a75f74f565c6cd6a1b	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.1.1-alignment-plan.md	6a6a7db4be5692cc33e53d58893ef4d84ecf3a89	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.1.2-section-map.md	db4dad173fb53a38e38514b01721aee0f1a98751	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.1.3-repository-layout-proposal.md	779764199e3c0e96ac7858b65ab26f6b405b77e8	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.1.4-image-publishing-proposal.md	79f14a6b9059c5894e5deb7382dbed45bec0c9d5	2026-10-04	
