@@ -8,5 +8,8 @@
 # from images.lock.yaml (image_adguard), so an upstream push never changes what runs.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
+# the base it was built FROM: images/needs_rebuild compares it with the pinned one
+LABEL org.fabric.base="${BASE_IMAGE}"
 USER root
 RUN cp /opt/adguardhome/AdGuardHome /tmp/AdGuardHome && mv /tmp/AdGuardHome /opt/adguardhome/AdGuardHome

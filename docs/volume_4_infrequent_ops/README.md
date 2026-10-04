@@ -32,6 +32,10 @@ Installation, upgrades, builds and host maintenance.
 
 - [4.6.1 Docker from the Ubuntu archive](4.6.1-docker-from-ubuntu.md)
 
+## 4.7 Building and packaging
+
+- [4.7.1 Building fabric's images](4.7.1-building-images.md)
+
 ## 4.8 Testing
 
 - [4.8.1 Manual test plan](4.8.1-manual-test-plan.md)

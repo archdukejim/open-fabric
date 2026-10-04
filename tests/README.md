@@ -25,6 +25,7 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `dirsrv` | [dirsrv/](dirsrv/) | 389 Directory Server: seed, TLS, ACIs, the admin user, device RBAC |
 | `keycloak` | [keycloak/](keycloak/) | Keycloak bootstrap against the dirsrv suite's directory |
 | `hardening` | [hardening/](hardening/) | The core services and OpenBao started from their real compose files work and are hardened |
+| `images` | [images/](images/) | fabric's own images build from `packaging/docker-bake.hcl` with a default host's build inputs and pass the smoke test CI runs before publishing (decision D41) |
 | `sandbox` | [sandbox/](sandbox/) | A full install from the .deb in a disposable systemd + Docker container (about 30 min; not in the default list) |
 
 Not in `run-all.sh`: [host/](host/) (a subset of the sandbox checks on a real machine over SSH).

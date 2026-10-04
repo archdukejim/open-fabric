@@ -2,7 +2,7 @@
 # -----------------------------------------------------------------------
 # Run fabric's test suites against real containers.
 #
-#   sudo tests/run-all.sh [suite ...]      suites: docs lint consent render nginx zone webui pki federation adguard ntp openbao fluentbit kea freeradius dirsrv keycloak hardening
+#   sudo tests/run-all.sh [suite ...]      suites: docs lint consent render nginx zone webui pki federation adguard ntp openbao fluentbit kea freeradius dirsrv keycloak hardening images
 #   sudo tests/run-all.sh sandbox          opt-in: full install in a systemd + Docker sandbox (about 30 min)
 #
 # Needs: Linux (amd64 or arm64), Docker with buildx, python3 with yaml +
@@ -14,7 +14,7 @@ set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 export FABRIC_TEST_OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 SUITES=("$@")
-[ ${#SUITES[@]} -eq 0 ] && SUITES=(docs lint consent render nginx zone webui pki federation adguard ntp openbao fluentbit kea freeradius dirsrv keycloak hardening)
+[ ${#SUITES[@]} -eq 0 ] && SUITES=(docs lint consent render nginx zone webui pki federation adguard ntp openbao fluentbit kea freeradius dirsrv keycloak hardening images)
 
 [ "$(id -u)" -eq 0 ] || { echo "Run as root (sudo)." >&2; exit 2; }
 rm -rf "$FABRIC_TEST_OUT"; mkdir -p "$FABRIC_TEST_OUT"
@@ -50,6 +50,7 @@ for s in "${SUITES[@]}"; do
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
         keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
         hardening) run hardening bash "$HERE/hardening/run.sh" ;;
+        images)   run images   bash "$HERE/images/run.sh" ;;
         sandbox)  run sandbox  bash "$HERE/sandbox/run.sh" ;;
         *) echo "unknown suite: $s" >&2; exit 2 ;;
     esac

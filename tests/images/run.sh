@@ -1,0 +1,80 @@
+#!/bin/bash
+# -----------------------------------------------------------------------
+# The images suite (decision D41, manual 4.7.1): fabric's own images build
+# from packaging/docker-bake.hcl the way CI publishes them, with the same
+# build inputs a host with the default ids uses (its rendered compose
+# files), and each passes the smoke test CI runs before publishing. Builds
+# for this machine's platform only (CI builds both on native runners).
+#   sudo tests/run-all.sh images
+# -----------------------------------------------------------------------
+set -uo pipefail
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
+W="$OUT/images"
+IMAGES=(adguard bind9 dirsrv freeradius kea keycloak stepca webui)
+PASS=0; FAIL=0
+check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
+rm -rf "$W"; mkdir -p "$W"
+cd "$REPO" || exit 1
+
+set -a
+# shellcheck disable=SC1090  # the lock's build inputs, generated
+. <(python3 packaging/images/bake_env.py)
+CONTEXTS="$W/contexts"; REGISTRY=fabric-test/images; TAG="test"
+set +a
+# the contexts are staged outside the checkout: bake reads them only when allowed
+BAKE=(docker buildx bake -f packaging/docker-bake.hcl "--allow=fs.read=$CONTEXTS")
+
+check "the build contexts stage from the assembled tree" "bash packaging/images/stage-contexts.sh \"\$CONTEXTS\" >/dev/null"
+"${BAKE[@]}" --print >"$W/plan.json" 2>/dev/null
+check "the build plan has the eight images" \
+    "python3 -c 'import json,sys; t=json.load(open(sys.argv[1]))[\"target\"]; sys.exit(sorted(t) != sys.argv[2:])' \
+     \"\$W/plan.json\" ${IMAGES[*]}"
+
+# the bake inputs against the rendered compose files of a host with the default ids: the same base, the same
+# pinned package and build revision, and ids that are the Dockerfiles' defaults
+python3 tests/render.py "$W/rendered" >/dev/null || echo "FAIL render"
+parity() {
+    python3 - "$W/plan.json" "$W/rendered" "$CONTEXTS" <<'PY'
+import json, os, re, sys
+import yaml
+plan, rendered, contexts = json.load(open(sys.argv[1]))["target"], sys.argv[2], sys.argv[3]
+bad = []
+for name, target in plan.items():
+    compose = yaml.safe_load(open(os.path.join(rendered, name, "docker-compose.yml")))
+    want = next(s["build"]["args"] for s in compose["services"].values() if "build" in s)
+    dockerfile = open(os.path.join(contexts, name, "Dockerfile")).read()
+    defaults = dict(re.findall(r"^ARG (\w+)=(\S+)$", dockerfile, re.M))
+    got = {**{k: v for k, v in defaults.items() if k.endswith(("_UID", "_GID"))}, **target.get("args", {})}
+    if {k: str(v) for k, v in want.items()} != got:
+        bad.append(f"{name}: compose {want} != bake {got}")
+    if "@sha256:" not in got.get("BASE_IMAGE", ""):
+        bad.append(f"{name}: base not pinned by digest")
+print("; ".join(bad) or "ok")
+sys.exit(1 if bad else 0)
+PY
+}
+check "every image's build inputs match a default host's compose file: $(parity | tr -d '\n')" "parity >/dev/null"
+
+check "an empty base refuses to build (nothing unpinned)" \
+    "! BASE_DEBIAN= \"\${BAKE[@]}\" bind9 >\"\$W/unpinned.log\" 2>&1 && grep -q 'should not be blank' \"\$W/unpinned.log\""
+
+check "the eight images build" "\"\${BAKE[@]}\" --load >\"\$W/build.log\" 2>&1 || { tail -20 \"\$W/build.log\"; false; }"
+for name in "${IMAGES[@]}"; do
+    check "$name passes the smoke test" "bash packaging/images/smoke-test.sh $name $REGISTRY/$name:$TAG"
+done
+check "the web UI image carries this checkout's app" \
+    "[ \"\$(docker run --rm --entrypoint sha256sum $REGISTRY/webui:$TAG /app/webui/server.py | cut -d' ' -f1)\" = \
+       \"\$(sha256sum src/ux/web/server.py | cut -d' ' -f1)\" ]"
+
+# the smoke test must catch what it is for: the upstream step-ca binary carries a file capability, which a
+# container with none and no-new-privileges refuses to run
+stepca_upstream="$(python3 -c "import sys; sys.path.insert(0, 'src')
+from fabriclib.common.read_images_lock import read_images_lock; print(read_images_lock('config')['stepca']['ref'])")"
+check "the smoke test refuses the upstream step-ca (file capability, no fabric labels)" \
+    "! bash packaging/images/smoke-test.sh stepca $stepca_upstream >\"\$W/upstream.log\" 2>&1"
+
+for name in "${IMAGES[@]}"; do docker image rm "$REGISTRY/$name:$TAG" >/dev/null 2>&1; done
+echo
+echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

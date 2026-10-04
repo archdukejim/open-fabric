@@ -12,7 +12,9 @@ file	fabricctl-agent|src/agent/read_fields.py	10
 file	fabricctl-agent|src/agent/read_strings.py	11	
 file	fabricctl-agent|src/agent/read_text.py	12	
 file	fabricctl-agent|src/agent/server.py	13	
+file	fabricctl-jinja|packaging/images/bake_env.py	9	
 file	fabricctl-jinja|packaging/images/dirsrv/dscontainer-launch.py	1	
+file	fabricctl-jinja|packaging/images/smoke-test.sh	10	
 file	fabricctl-jinja|src/containers/dirsrv/seed.py	2	
 file	fabricctl-jinja|src/containers/freeradius/check_person.py	3	
 file	fabricctl-jinja|src/containers/freeradius/directory.py	4	
@@ -555,7 +557,10 @@ function	fabricctl-agent|src/agent/read_fields.py|read_fields	1
 function	fabricctl-agent|src/agent/read_strings.py|read_strings	1	
 function	fabricctl-agent|src/agent/read_text.py|read_text	1	
 function	fabricctl-agent|src/agent/server.py|main	1	
+function	fabricctl-jinja|packaging/images/bake_env.py|bake_env	1	
 function	fabricctl-jinja|packaging/images/dirsrv/dscontainer-launch.py|_signal	1	
+function	fabricctl-jinja|packaging/images/smoke-test.sh|label	2	
+function	fabricctl-jinja|packaging/images/smoke-test.sh|report	1	
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|bind_dm	1	
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|current_values	3	
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|main	7	

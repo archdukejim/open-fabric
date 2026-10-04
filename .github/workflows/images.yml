@@ -1,0 +1,115 @@
+# fabric's own images (decision D41, manual 4.7.1): build the eight images on native amd64 and arm64 runners
+# (P3, D82) and smoke test each one. Publishing — push to GHCR as one multi-arch image per name, then sign it
+# keyless with cosign (P2, D81) — happens only when run by hand on main with `publish` ticked; the digests then
+# go into config/images.lock.yaml through a reviewed commit (D40).
+name: images
+
+on:
+  push:
+    paths:
+      - packaging/images/**
+      - packaging/docker-bake.hcl
+      - packaging/deb/assemble-tree.sh
+      - src/containers/**
+      - src/webui/**
+      - src/ux/web/**
+      - templates/webui-app/**
+      - static/webui-app/**
+      - config/images.lock.yaml
+      - .github/workflows/images.yml
+  pull_request:
+    paths:
+      - packaging/images/**
+      - packaging/docker-bake.hcl
+      - packaging/deb/assemble-tree.sh
+      - src/containers/**
+      - src/webui/**
+      - src/ux/web/**
+      - templates/webui-app/**
+      - static/webui-app/**
+      - config/images.lock.yaml
+      - .github/workflows/images.yml
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to GHCR and sign (main only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main' }}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Inputs from the lock
+        run: |
+          sudo apt-get install -y --no-install-recommends python3-yaml
+          python3 packaging/images/bake_env.py >> "$GITHUB_ENV"
+          {
+            echo "TAG=$(tr -d ' \n' < config/VERSION)"
+            echo "REVISION=$GITHUB_SHA"
+            echo "REGISTRY=ghcr.io/${GITHUB_REPOSITORY,,}"
+            echo "CONTEXTS=$RUNNER_TEMP/contexts"
+          } >> "$GITHUB_ENV"
+      - name: Stage the build contexts
+        run: bash packaging/images/stage-contexts.sh "$CONTEXTS"
+      - name: Build
+        run: docker buildx bake -f packaging/docker-bake.hcl --load "--allow=fs.read=$CONTEXTS"
+      - name: Smoke test
+        run: |
+          fail=0
+          for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
+            bash packaging/images/smoke-test.sh "$name" "$REGISTRY/$name:$TAG" || fail=1
+          done
+          exit "$fail"
+      - name: Push this architecture
+        if: env.PUBLISH == 'true'
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
+            docker tag "$REGISTRY/$name:$TAG" "$REGISTRY/$name:$TAG-${{ matrix.arch }}"
+            docker push "$REGISTRY/$name:$TAG-${{ matrix.arch }}"
+          done
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write       # keyless signing: GitHub's OIDC identity is the signer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6  # v4.1.2 (cosign 3.0.6)
+      - name: One multi-arch image per name, signed
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          REGISTRY="ghcr.io/${GITHUB_REPOSITORY,,}"
+          TAG="$(tr -d ' \n' < config/VERSION)"
+          echo "| image | digest |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
+            docker buildx imagetools create -t "$REGISTRY/$name:$TAG" \
+              "$REGISTRY/$name:$TAG-amd64" "$REGISTRY/$name:$TAG-arm64"
+            digest="$(docker buildx imagetools inspect "$REGISTRY/$name:$TAG" --format '{{json .Manifest}}' \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])')"
+            cosign sign --yes "$REGISTRY/$name@$digest"
+            echo "| $name | \`$digest\` |" >> "$GITHUB_STEP_SUMMARY"
+          done
