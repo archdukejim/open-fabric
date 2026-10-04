@@ -74,6 +74,10 @@ check("refused: a minimum length over 64 (the Administrator's generated password
       refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_length": 65}}, "minimum_length"))
 check("refused: a minimum age not below the maximum",
       refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_age_days": 365}}, "below maximum_age_days"))
+check("refused: a lockout shorter than its reset window (AD refuses it)",
+      refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 5}}, "lockout_window_minutes"))
+check("accepted: locked until an admin unlocks (lockout 0) with any window",
+      not refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 0}}, ""))
 check("accepted: passwords that never expire (maximum 0) with any minimum age",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "maximum_age_days": 0}}, ""))
 check("refused: an RPC range at or below 1024", refused({**GOOD, "ad_rpc_ports": "100-200"}, "ad_rpc_ports"))

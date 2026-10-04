@@ -47,7 +47,7 @@ for s in "${SUITES[@]}"; do
         fluentbit) run fluentbit python3 "$HERE/fluentbit/run.py" ;;
         kea) run kea python3 "$HERE/kea/run.py" ;;
         freeradius) run freeradius python3 "$HERE/freeradius/run.py" ;;
-        samba)    run samba    python3 "$HERE/samba/run.py" ;;
+        samba)    run samba    bash -c "python3 \"$HERE/samba/run.py\" && python3 \"$HERE/samba/dc.py\"" ;;
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
         keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
         hardening) run hardening bash "$HERE/hardening/run.sh" ;;

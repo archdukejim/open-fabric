@@ -67,3 +67,7 @@ Operator workflows and end-user procedures.
 - [3.14.1 Resource use](3.14.1-resources.md)
 - [3.14.2 Lifecycle commands](3.14.2-lifecycle.md)
 - [3.14.3 Service ports](3.14.3-ports.md)
+
+## 3.15 The Windows domain
+
+- [3.15.1 The Windows domain (optional: Samba AD)](3.15.1-windows-domain.md)

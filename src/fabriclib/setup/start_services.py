@@ -10,6 +10,7 @@ from fabriclib.federation.configure_directory_links import configure_directory_l
 from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities
 from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.ldap.seed_directory import seed_directory
+from fabriclib.samba.converge_domain import converge_domain
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
@@ -24,7 +25,8 @@ ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("samba", "samba
 
 
 def run(ctx):
-    """Purpose: start the stack in dependency order (ORDER), seed 389-DS, configure Keycloak, move an older
+    """Purpose: start the stack in dependency order (ORDER), converge the Windows domain, seed 389-DS, configure
+             Keycloak, move an older
              directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate
              fabric.target.
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
@@ -36,7 +38,8 @@ def run(ctx):
              container healthy; 389-DS seeded and default device roles present; Keycloak configured (up to 6
              tries, 15 s apart); devices and service accounts in the local suffix; fabric-agent and fabric-web
              running when the web UI is on; fabric-federation running when federation_endpoint is on.
-    Fails:   SetupError when a container is not healthy (start_unit), seeding fails or Keycloak configuration
+    Fails:   SetupError when a container is not healthy (start_unit), the Windows domain cannot be converged,
+             seeding fails or Keycloak configuration
              still fails after 6 tries; CalledProcessError from systemctl; ValidationError from
              ensure_default_device_roles or migrate_local_suffix (propagates).
     Feeds:   setup step `start`, run by run_setup via STEPS."""
@@ -50,6 +53,13 @@ def run(ctx):
             continue
         info(f"{unit}…")
         ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
+
+    if v.get("install_samba"):
+        try:
+            done = converge_domain(v, os.path.join(ctx.config_dir, "federation.yaml"))
+        except ValidationError as e:
+            raise SetupError(str(e))
+        ok(f"Windows domain {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
 
     if v.get("install_ldap", True):
         registry = os.path.join(ctx.config_dir, "federation.yaml")

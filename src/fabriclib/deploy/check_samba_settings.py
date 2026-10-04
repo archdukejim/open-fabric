@@ -19,7 +19,8 @@ def check_samba_settings(v):
     Fails:   ValidationError naming the first problem: no or an invalid ad_domain; ad_domain equal to fabric's domain
              (same-domain mode, refused until build step S1.6) or a parent of it; a NetBIOS domain name or host name
              Windows cannot use (more than 15 characters); a missing, unknown or out-of-range password-policy key;
-             a policy whose minimum age is not below its maximum; an invalid old-password window or RPC range.
+             a policy whose minimum age is not below its maximum, or whose lockout is shorter than its window; an
+             invalid old-password window or RPC range.
     Feeds:   deploy/check_settings."""
     if not v.get("install_samba"):
         return
@@ -57,6 +58,9 @@ def check_samba_settings(v):
             raise ValidationError(f"ad_password_policy.{key} must be a whole number from {low} to {high}")
     if policy["maximum_age_days"] and policy["minimum_age_days"] >= policy["maximum_age_days"]:
         raise ValidationError("ad_password_policy.minimum_age_days must be below maximum_age_days")
+    if policy["lockout_minutes"] and policy["lockout_minutes"] < policy["lockout_window_minutes"]:
+        raise ValidationError("ad_password_policy.lockout_minutes (0: until an admin unlocks) must be at least "
+                              "lockout_window_minutes, as AD requires")
     if not 0 <= int(v.get("ad_old_password_minutes", 0)) <= 99999:
         raise ValidationError("ad_old_password_minutes must be from 0 to 99999")
     m = re.fullmatch(r"(\d+)-(\d+)", str(v.get("ad_rpc_ports") or ""))

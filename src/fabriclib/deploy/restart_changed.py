@@ -9,6 +9,7 @@ from fabriclib.dns.rndc import rndc
 from fabriclib.federation.configure_directory_links import configure_directory_links
 from fabriclib.ldap.people_written_here import people_written_here
 from fabriclib.ldap.seed_directory import seed_directory
+from fabriclib.samba.converge_domain import converge_domain
 
 TIMEOUT = {"keycloak": 90, "postgres": 60, "samba": 300}   # seconds per restart (others 30); the DC provisions once
 
@@ -38,14 +39,15 @@ def _enabled(unit):
 
 def restart_changed(paths, final_vars, secrets, state, bind_ids):
     """Purpose: the end of an apply on a running install: build changed images, restart what changed, reload BIND's
-             configuration and zones and nginx live, re-seed 389-DS, and restart fabric-agent, the federation
-             endpoint and the web UI last without blocking.
+             configuration and zones and nginx live, converge the Windows domain, re-seed 389-DS, and restart
+             fabric-agent, the federation endpoint and the web UI last without blocking.
     Inputs:  paths — deploy_paths() (base, target, federation); final_vars — rendered settings (federation_endpoint,
-             install_ldap, ldap_base_dn, ldap_local_dn); secrets — fabric's secrets (the directory links); state —
-             what the install steps found (see finish_without_start, plus ldap_seed); bind_ids — the bind user's ids.
+             install_ldap, ldap_base_dn, ldap_local_dn, install_samba and what converge_domain reads); secrets —
+             fabric's secrets (the directory links); state — what the install steps found (see finish_without_start,
+             plus ldap_seed); bind_ids — the bind user's ids.
     Returns: the set of units restarted (fabric-web included when it was queued).
     Fails:   ValidationError when BIND refuses `rndc reconfig` (a silent failure would leave a removed TSIG key
-             working). Timeouts of systemctl/docker are reported, not raised.
+             working). Timeouts of systemctl/docker and a domain that cannot be converged are reported, not raised.
     Feeds:   apply_deployment (start_services=True: `fabricctl --apply`, the web UI's Apply).
     Notes:   BIND down or about to restart reads its zone files on start, so they are installed first. The web UI is
              restarted last with --no-block: this apply may have come from it. No --pull on image builds."""
@@ -86,6 +88,12 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
     if "nginx" in running and "nginx" not in restart and state["nginx"]:
         print("Reloading NGINX...")
         _quiet(["docker", "exec", "nginx", "nginx", "-s", "reload"], "Reloading NGINX", 15)
+    if final_vars.get("install_samba") and ("samba" in running or "samba" in restart):
+        try:                                      # idempotent: the domain as fabric wants it (manual 2.11.2.15)
+            done = converge_domain(final_vars, paths["federation"])
+            print("Windows domain: " + ("; ".join(done) if done else "as wanted"))
+        except ValidationError as e:              # reported: the rest of the apply still has to happen
+            print(f"Warning: {e}")
     org_here = people_written_here(paths["federation"])
     if state["ldap_seed"] and ("dirsrv" in running or "ldap" in restart):
         print("Applying 389-DS seed data...")

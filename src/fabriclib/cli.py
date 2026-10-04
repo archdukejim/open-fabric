@@ -13,6 +13,8 @@
                                  DHCP (optional Kea): subnets, leases, reservations, options, client classes
   fabricctl radius status|log|add-client|rotate-secret|remove-client
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
+  fabricctl domain status|password-policy
+                                 the Windows domain (optional Samba AD): its DC, roles, password policy
   fabricctl federation status|enable|disable|invite|invitations|revoke|networks
                                  sites joining this install (setup --join on the new site)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
@@ -55,6 +57,7 @@ from fabriclib.consent.show_consent_status import show_consent_status  # noqa: E
 from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
+from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.federation.run_federation_command import run_federation_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
@@ -184,6 +187,8 @@ def main(argv):
         return run_logs_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "radius":
         return run_radius_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "domain":
+        return run_domain_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "federation":
         return run_federation_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "dhcp":
