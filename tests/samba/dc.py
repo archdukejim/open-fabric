@@ -78,8 +78,12 @@ cleanup()
 shutil.rmtree(W, ignore_errors=True)
 os.makedirs(os.path.join(W, "stepca", "data", "certs"))
 DEBIAN = read_images_lock(os.path.join(REPO, "config"))["debian"]["ref"]
-build = sh(["docker", "build", "-q", "-t", IMAGE, "--build-arg", f"BASE_IMAGE={DEBIAN}",
-            f"{REPO}/packaging/images/samba"], ok=False)
+# the build folder as a host has it: install_service_units copies it with plain modes (files 0644)
+context = os.path.join(W, "build")
+shutil.copytree(f"{REPO}/packaging/images/samba", context)
+for name in os.listdir(context):
+    os.chmod(os.path.join(context, name), 0o644)
+build = sh(["docker", "build", "-q", "-t", IMAGE, "--build-arg", f"BASE_IMAGE={DEBIAN}", context], ok=False)
 check("the DC image builds from Debian's packages on the pinned base", build.returncode == 0, build.stderr)
 if build.returncode:
     sys.exit(1)

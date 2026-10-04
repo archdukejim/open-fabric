@@ -28,4 +28,6 @@ RUN apt-get update \
  && groupmod -o -g "$RADIUS_GID" winbindd_priv
 
 COPY entrypoint.sh set_password.py /usr/local/bin/
+# a host copies build folders with plain file modes (0644): make the entrypoint executable here
+RUN chmod 0755 /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]

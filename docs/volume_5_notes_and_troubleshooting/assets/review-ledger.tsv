@@ -205,7 +205,7 @@ packaging/images/kea/README.md	d43733467cb816199735ca4e3bd6535018664941	2026-09-
 packaging/images/keycloak/.dockerignore	76683618065e127abc520ec990844339e7677973	2026-09-30	
 packaging/images/keycloak/Dockerfile	35354739386d0efad9665ba05a6ea698376205f3	2026-09-30	
 packaging/images/keycloak/README.md	378c2bf8bac4af9bde130e2c6be22250d0b0dba3	2026-09-30	
-packaging/images/samba/Dockerfile	e21fcc369da66d9a51e4b9ffcd3bd97836fd0946	2026-10-04	
+packaging/images/samba/Dockerfile	8dc2dd89c585e4c395f49de6221d9e4432a55080	2026-10-04	
 packaging/images/samba/README.md	6b635be84beb20dec1f3b7dc42186cd0b2bbfdb2	2026-10-04	
 packaging/images/samba/entrypoint.sh	0e3d9dff0c7da98d86701401d726f0db840d022b	2026-10-04	
 packaging/images/samba/set_password.py	dc870d8bef5155ea355962bb8b907a96e828d4bb	2026-10-04	
@@ -1126,7 +1126,7 @@ tests/pki/site_ca.py	ee12f9ac4e2b4d0fbfbcd5163b26200b95120181	2026-10-03
 tests/render.py	a2d65966e45d6a28ab1995a6f8e0af275e3d1b8b	2026-10-04	
 tests/run-all.sh	ddd4774dba494f5cf8a4d60acbaa63d248265ca9	2026-10-04	
 tests/samba/README.md	a4824504d00ed9b6ff46caacea20cde28717d792	2026-10-04	
-tests/samba/dc.py	7a4b3ff19b37e14111922083938fd54eb8e3c4c6	2026-10-04	
+tests/samba/dc.py	ba62d613ab05371b6aa351f5b3ebf31831edb3e4	2026-10-04	
 tests/samba/run.py	765b763fc9453f21d6ba99496e367ef14e84ed5c	2026-10-04	
 tests/sandbox/Dockerfile	46a7ff3893744a092bf54127ef8debbc66bd9091	2026-09-30	
 tests/sandbox/README.md	cd9a9766a87b582251cd9a36e1c5246ead576551	2026-10-03	
