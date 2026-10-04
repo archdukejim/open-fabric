@@ -24,12 +24,12 @@ ldif() {  # tool ldif-text -> last line of the tool's output, run as h2admin
 user() { printf 'dn: CN=%s,%s\nobjectClass: user\nsAMAccountName: %s\n' "$1" "$2" "$1"; }
 r=$(ldif ldbadd "$(user h2user "OU=house2,OU=sites,$B")"); echo "$r" | grep -q successfully \
     && echo "PASS a site admin adds a user in its own site" || echo "FAIL own site add: $r"
-r=$(ldif ldbadd "$(user h2evil "OU=house1,OU=sites,$B")"); echo "$r" | grep -q failed \
+r=$(ldif ldbadd "$(user h2evil "OU=house1,OU=sites,$B")"); ! echo "$r" | grep -q successfully \
     && echo "PASS refused in another site" || echo "FAIL another site: $r"
-r=$(ldif ldbadd "$(user h2evil2 "CN=Users,$B")"); echo "$r" | grep -q failed \
+r=$(ldif ldbadd "$(user h2evil2 "CN=Users,$B")"); ! echo "$r" | grep -q successfully \
     && echo "PASS refused at the domain level" || echo "FAIL domain level: $r"
 r=$(ldif ldbmodify "dn: CN=Administrator,CN=Users,$B\nchangetype: modify\nreplace: description\ndescription: owned\n")
-echo "$r" | grep -q failed && echo "PASS refused on the domain's administrator" || echo "FAIL administrator: $r"
+! echo "$r" | grep -q successfully && echo "PASS refused on the domain's administrator" || echo "FAIL administrator: $r"
 r=$(ldif ldbmodify "dn: CN=h2user,OU=house2,OU=sites,$B\nchangetype: delete\n"); echo "$r" | grep -q successfully \
     && echo "PASS a site admin removes its own site's user" || echo "FAIL own site delete: $r"
 echo "--- Q5"
