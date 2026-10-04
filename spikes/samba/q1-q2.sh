@@ -12,9 +12,9 @@ client -v "$W/admin.auth:/auth:ro" -- smbclient //"$DC_IP"/netlogon -A /auth -c 
     && echo "PASS SMB sign-in as the administrator (password from a file)" || echo "FAIL SMB sign-in"
 client -v "$W/admin.auth:/auth:ro" -- ldbsearch -H "ldap://$DC_IP" -A /auth -b "$B" "(sAMAccountName=Administrator)" dn \
     2>/dev/null | grep -q "^dn: CN=Administrator" && echo "PASS LDAP lookup" || echo "FAIL LDAP lookup"
-CAPS="SETGID" start_dc
+CAPS="SETGID SETUID" start_dc
 client -v "$W/admin.auth:/auth:ro" -- smbclient //"$DC_IP"/netlogon -A /auth -c ls >/dev/null 2>&1 \
-    && echo "PASS restarted on the same domain with only SETGID (re-run converges)" || echo "FAIL restart with SETGID only"
+    && echo "PASS restarted on the same domain with only SETGID and SETUID (re-run converges)" || echo "FAIL restart with SETGID and SETUID"
 start_bind
 echo "--- Q2"
 client -- dig +short @"$DC_IP" SRV _ldap._tcp.ad.lan.test | grep -q "389 dc1.ad.lan.test" \
