@@ -166,7 +166,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	a015d9e67fce35a4f8946cd2591c0a240f138868	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e75a50ebc2a14f6d8a6c7c942810aa8de91ae139	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	6f801809246dd6ccf23e3d42c4e2677452043c89	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	47cc21f6dbf1c085df9919538e1a55accddb2ebc	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
@@ -218,8 +218,12 @@ scripts/images/README.md	c16836e4bd5966e65ac173da026d82e7eab4afc4	2026-10-04
 scripts/images/pin_published.py	93b95080ff435f976f63cf7c3a25f879a9f7e011	2026-10-04	
 scripts/install-from-checkout.sh	b03b6b30bb230d09753b070af8f196285dfe788a	2026-10-03	
 spikes/README.md	e7f26894734f8305edb7c43d85ac5425fc0b86c6	2026-10-04	
-spikes/samba/README.md	9325ad10e121f3c16c3a9f4142bc04ee1639b062	2026-10-04	
+spikes/samba/README.md	245bbd4d612a167b4d82cebfe2603bdedb0bc262	2026-10-04	
 spikes/samba/ad-schema.py	49a45325cdcc6ca7dc41d3b7f54906d4eb40d6d4	2026-10-04	
+spikes/samba/admx.py	0e591faf5a6c40c3230f7d66f705aeb583e26989	2026-10-04	
+spikes/samba/bind-same/README.md	a5f8765ed3e62738db287aee2a6f26087ccad873	2026-10-04	
+spikes/samba/bind-same/db.acme	78bed6486a1eeee80b372ccca6c8e8c2cc7a0e53	2026-10-04	
+spikes/samba/bind-same/named.conf	6a075efa94e4c768d75a8322dde84d8f54b3befc	2026-10-04	
 spikes/samba/bind/Dockerfile	83ef852c7793ad610f1ddea405094230ac2a8978	2026-10-04	
 spikes/samba/bind/README.md	d2a879df21df1c15c82ef4a1f798550432dd0e19	2026-10-04	
 spikes/samba/bind/db.lan.test	2a43b85b8bdeb43d1652564dfa14bc59dc7f5fbe	2026-10-04	
@@ -238,7 +242,10 @@ spikes/samba/q11-migrate.py	bfaa1b8480adaa8c82524ca5cc9cf549764ede0d	2026-10-04
 spikes/samba/q11-populate.py	d1ae64b0e7fad958f0fcdf828b46473be1691176	2026-10-04	
 spikes/samba/q11.sh	6f926adbab7ee1ad6b6338a56b16468fb7586a4d	2026-10-04	
 spikes/samba/q12.sh	3a14cbb67a81e1c3d3d3420dc1fff989157dff15	2026-10-04	
+spikes/samba/q13.sh	7fb602b9caef6c981db39a7320072804a79e364d	2026-10-04	
+spikes/samba/q14.sh	73e646459123a6b9567ffee02bb98b8bb74bc84c	2026-10-04	
 spikes/samba/q15.sh	46d565924600289cf6829f50c2acf003fac197c2	2026-10-04	
+spikes/samba/q16.sh	fa6996727d77533719e6fa5c2e56a80454bf0685	2026-10-04	
 spikes/samba/q3-q6.sh	5f28674913b0fa393862f242055d256df9eb478d	2026-10-04	
 spikes/samba/q4.sh	c62a7a63e73db085426dd56334fe88217fbb77eb	2026-10-04	
 spikes/samba/q7.sh	f14461ae1315c96f74baad8d1daa536ed18080a4	2026-10-04	

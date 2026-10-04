@@ -22,6 +22,9 @@ network `s0net`, images `s0/*`) and kept in `/var/tmp/s0`; nothing else is touch
 | `q11-populate.py`, `q11-migrate.py`, `q11.sh` | Q11 (a real 389-DS filled the way fabric fills it, migrated into AD and compared) |
 | `q12.sh` | Q12 (a writable site DC cut off, changes on both sides, a conflict, reconnecting and converging) |
 | `q15.sh` | Q15 (a site DC writable -> read-only -> writable under the same name) |
+| `q14.sh`, `bind-same/` | Q14 (same-domain mode: fabric's records in AD's zone, TSIG refused there, ACME through a CNAME into BIND's own zone) |
+| `q16.sh` | Q16 (per-site log-on rights from a GPO, enforced by SSSD; explicit and blanket overrides) |
+| `admx.py`, `q13.sh` | Q13 (an ADMX/ADML parser and Registry.pol writer; a member applies the policy) |
 | `q3-q6.sh` | Q3 (fabric's schema, a device and a network in AD) and Q6 (an RODC: replication, cached sign-in with the root DC down, refusals) |
 
 ```bash

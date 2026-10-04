@@ -1,0 +1,3 @@
+$TTL 60
+@       IN SOA ns.lan.test. hostmaster.lan.test. (1 3600 900 604800 60)
+@       IN NS  ns.lan.test.
