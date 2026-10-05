@@ -2,6 +2,7 @@ import ldb
 
 from alloc_id import alloc_id
 import paths
+from site_roles import ROLES, role_group
 
 DOMAIN_USERS_RID = 513          # AD's Domain Users: fabric's everyone-group `users` (Q11)
 
@@ -45,7 +46,8 @@ def _ensure(samdb, name, ou, gid, description, done):
 
 def ensure_groups(samdb, site, root, org_groups):
     """Purpose: the groups access is built on (manual 1.6.3.6, 1.6.3.10), with their gid numbers (1.6.3.9): the site's
-             people and admins (gids from the site's block), and at the root site the organisation's groups — fabric's
+             people and admins, and its five role groups with `<site>-admins` in each (D103) (gids from the site's
+             block), and at the root site the organisation's groups — fabric's
              `ldap_groups` (the web UI's admin group, the RBAC bundle groups, the 802.1X groups) with their own gids,
              `users` as AD's Domain Users, and `fabric-break-glass` (in every site's log-on policy).
     Inputs:  samdb — SamDB; site — str; root — bool; org_groups — list of {name, gidNumber, description?} (fabric's
@@ -56,8 +58,17 @@ def ensure_groups(samdb, site, root, org_groups):
     base = str(samdb.domain_dn())
     site_dn = paths.site_dn(samdb, site)
     done = []
+    groups = paths.relative(samdb, f"OU=groups,{site_dn}")
     for name in (f"{site}-users", f"{site}-admins"):
-        _ensure(samdb, name, paths.relative(samdb, f"OU=groups,{site_dn}"), lambda: alloc_id(samdb, site_dn), "", done)
+        _ensure(samdb, name, groups, lambda: alloc_id(samdb, site_dn), "", done)
+    admins = str(_group(samdb, f"{site}-admins").dn)
+    for role, description in ROLES.items():      # the site's roles, <site>-admins in each (D103)
+        name = role_group(site, role)
+        _ensure(samdb, name, groups, lambda: alloc_id(samdb, site_dn), description, done)
+        members = samdb.search(base=str(_group(samdb, name).dn), scope=ldb.SCOPE_BASE, attrs=["member"])[0]
+        if admins.lower() not in [str(m).lower() for m in members.get("member", [])]:
+            samdb.add_remove_group_members(name, [f"{site}-admins"], add_members_operation=True)
+            done.append(f"group {name}: {site}-admins a member")
     if root:
         org = paths.relative(samdb, f"OU=groups,{paths.organisation_dn(samdb)}")
         for g in org_groups:

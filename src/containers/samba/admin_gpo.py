@@ -7,8 +7,11 @@ import ldb
 from samba.dcerpc import preg
 from samba.ndr import ndr_pack, ndr_unpack
 
+from acl_entries import ensure_aces, sid_of
 from ensure_gpo import ensure_gpo
 import paths
+from set_gpo_acl import set_gpo_acl
+from site_roles import role_group
 
 REGISTRY_MACHINE = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{0F6B957D-509E-11D1-A7CC-0000F87571E3}]"
 REGISTRY_USER = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{0F6B957E-509E-11D1-A7CC-0000F87571E3}]"
@@ -69,8 +72,30 @@ def save_admin_settings(samdb, lp, site, settings, control=False):
     Returns: list of str, what changed.
     Fails:   ldb.LdbError; OSError; CalledProcessError (ensure_gpo).
     Feeds:   gpo_tool (ops "set", "clear")."""
-    return ensure_gpo(samdb, lp, _name(site, control), paths.site_dn(samdb, site),
+    done = ensure_gpo(samdb, lp, _name(site, control), paths.site_dn(samdb, site),
                       REGISTRY_MACHINE if settings["machine"] else "",
                       {"Machine/Registry.pol": _pack(settings["machine"]),
                        "User/Registry.pol": _pack(settings["user"])},
                       user_extensions=REGISTRY_USER if settings["user"] else "", enforced=control)
+    return done + ensure_gpo_admins(samdb, lp, site)
+
+
+def ensure_gpo_admins(samdb, lp, site):
+    """Purpose: the site's GPO admins (D103) edit its two admin GPOs with Windows' own tools too: full control of each
+             GPO object (never its permissions), and so of its SYSVOL folder (its file ACLs follow the object's).
+    Inputs:  samdb — SamDB (as the system); lp — LoadParm; site — str.
+    Returns: list of str, the access entries added (none for a GPO not made yet).
+    Fails:   ldb.LdbError; NTSTATUSError from set_gpo_acl.
+    Feeds:   save_admin_settings, converge."""
+    sid = sid_of(samdb, role_group(site, "gpo-admins"))
+    done = []
+    for control in (False, True):
+        found = samdb.search(base=f"CN=Policies,CN=System,{samdb.domain_dn()}", scope=ldb.SCOPE_ONELEVEL,
+                             expression=f"(displayName={ldb.binary_encode(_name(site, control))})", attrs=["cn"])
+        if not found:
+            continue
+        added = ensure_aces(samdb, [(str(found[0].dn), f"(A;CI;RPWPCRCCDCLCLORCSDDTSW;;;{sid})")])
+        if added:
+            set_gpo_acl(samdb, lp, str(found[0]["cn"][0]))
+        done += added
+    return done

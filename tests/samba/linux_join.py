@@ -62,9 +62,9 @@ V, SECRETS = dc["v"], dc["secrets"]
 check("a converged DC (its site's sudo rule included)", dc_healthy())
 sudo_rule = sh(["docker", "exec", DC, "ldbsearch", "-H", "/data/private/sam.ldb", "(objectClass=sudoRole)",
                 "sudoUser", "sudoHost", "sudoCommand"], ok=False).stdout
-check("the site's sudo rule: lan-admins and the admin group may run anything (D103)",
-      "sudoUser: %lan-admins" in sudo_rule and "sudoUser: %admins" in sudo_rule and "sudoCommand: ALL" in sudo_rule,
-      sudo_rule)
+check("the site's sudo rule: its linux-sudo role (lan-admins is in it) and, at the root, the admin group may run "
+      "anything (D103)", "sudoUser: %lan-linux-sudo" in sudo_rule and "sudoUser: %admins" in sudo_rule
+      and "sudoCommand: ALL" in sudo_rule and "%lan-admins" not in sudo_rule, sudo_rule)
 
 # people: alice (a person of lan), adam (a lan admin), lara (a person of another site, lab)
 lab = {"site": "lab", "root": False, "parent": "lan", "password_policy": POLICY, "networks": [],

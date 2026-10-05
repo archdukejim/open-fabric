@@ -176,7 +176,7 @@ if "lab" in joined:
           made)
     # AD's KCC builds the return path from the site link within its 5-minute round
     check("lab -> root: the person reaches the root's DC (AD replication over the site link)",
-          until(lambda: "sAMAccountName: labby" in search(ROOT, "(sAMAccountName=labby)", ["sAMAccountName"]), 420))
+          until(lambda: "sAMAccountName: labby" in search(ROOT, "(sAMAccountName=labby)", ["sAMAccountName"]), 900))
     run_op(RV, RS, "create_person", {"uid": "rooty", "first": "Root", "last": "Y", "email": "rooty@lan.test",
                                      "password": "Ot-" + random_password(20), "gid": 5000, "home_base": "/home",
                                      "shell": "/bin/bash"}, ROOT)
@@ -186,8 +186,9 @@ if "lab" in joined:
 # ---- a site nested under a site that is not the root (D105, manual 1.8.8.14)
 if "lab2" in joined:
     container, v, secrets = joined["lab2"]
-    check("lab2: its OU sits in lab's, which sits in the root's",
-          f"OU=lab2,OU=lab,OU=lan,OU=sites,{BASE}" in search(ROOT, "(&(objectClass=fabricSiteInfo)(ou=lab2))", ["dn"]))
+    check("lab2: its OU sits in lab's, which sits in the root's (as the root sees it, once replicated)",
+          until(lambda: f"OU=lab2,OU=lab,OU=lan,OU=sites,{BASE}" in search(
+              ROOT, "(&(objectClass=fabricSiteInfo)(ou=lab2))", ["dn"]), 900))
     others = [registry["sites"][s]["id_range"] for s in ("lab", "edge")] + [RV.get("posix_id_range") or "5001-105000"]
     mine = registry["sites"]["lab2"]["id_range"]
     check("lab2: its id block, handed out by lab with no registry of the others, comes after every block in the domain",

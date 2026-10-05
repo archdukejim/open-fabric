@@ -223,6 +223,14 @@ inf_path = next(x for x in files.splitlines() if x.endswith("GptTmpl.inf"))
 inf = subprocess.run(["docker", "exec", DC, "cat", inf_path], capture_output=True).stdout     # UTF-16: bytes
 check("the log-on policy names the site's groups and each machine's local Administrators (never lock out)",
       "S-1-5-32-544".encode("utf-16-le") in inf and "SeInteractiveLogonRight".encode("utf-16-le") in inf)
+check("...and makes the site's windows-admins role a member of each machine's Administrators (added, D103)",
+      "__Memberof = *S-1-5-32-544".encode("utf-16-le") in inf and "[Group Membership]".encode("utf-16-le") in inf)
+roles = dc("ldbsearch", "-H", "/data/private/sam.ldb", "(&(objectClass=group)(sAMAccountName=lan-*))",
+           "sAMAccountName", "member").stdout
+check("the site's five role groups, lan-admins a member of each (D103)",
+      all(f"sAMAccountName: lan-{r}" in roles for r in ("ou-admins", "machine-admins", "gpo-admins", "linux-sudo",
+                                                      "windows-admins"))
+      and roles.count("member: CN=lan-admins,") == 5, roles[-600:])
 
 # BIND serves the AD zone from the DC's database through DLZ (manual 2.11.2.6, Q2): fabric's BIND image with the
 # files write_bind_dlz makes, mounted as the rendered compose file mounts them; a minimal named.conf around them
@@ -404,6 +412,26 @@ check("refused: a site admin adding to its site's service accounts", "successful
 domain = as_user("labadmin", lab_pw, "ldbmodify",
                  f"dn: CN=Administrator,CN=Users,{BASE}\nchangetype: modify\nreplace: description\ndescription: x\n")
 check("refused: a site admin changing the domain's Administrator", "successfully" not in domain.stdout + domain.stderr)
+# roles given apart (D103): a machine admin of lab who is not a lab admin
+mach_pw = random_password(20)
+dc("samba-tool", "user", "create", "macky", mach_pw, f"--userou=OU=people,{LAB_OU}", "-s", "/data/etc/smb.conf")
+dc("samba-tool", "group", "addmembers", "lab-machine-admins", "macky", "-s", "/data/etc/smb.conf")
+computer = (f"dn: CN=LABPC1,OU=machines,{LAB_OU},{BASE}\nobjectClass: computer\nsAMAccountName: LABPC1$\n"
+            "userAccountControl: 4096\n")
+m_pc = as_user("macky", mach_pw, "ldbadd", computer)
+check("lab's machine-admins role adds a machine to lab", "successfully" in m_pc.stdout + m_pc.stderr,
+      m_pc.stderr[-200:])
+m_person = as_user("macky", mach_pw, "ldbadd", user.format("byrole", LAB_OU))
+check("refused: the machine-admins role adding a person (that is ou-admins')",
+      "successfully" not in m_person.stdout + m_person.stderr)
+lab_policies = dc("ldbsearch", "-H", "/data/private/sam.ldb", "-b", f"{LAB_OU},{BASE}", "-s", "base",
+                  "nTSecurityDescriptor").stdout.replace("\n ", "")      # LDIF folds long lines
+gpo_sid = dc("ldbsearch", "-H", "/data/private/sam.ldb", "(sAMAccountName=lab-gpo-admins)", "objectSid").stdout
+gpo_sid = gpo_sid.split("objectSid: ")[1].split()[0] if "objectSid: " in gpo_sid else "?"
+check("lab's gpo-admins role may write its OU's GPO links and blocked inheritance, and nothing else there",
+      f"(OA;;RPWP;f30e3bbe-9ff0-11d1-b603-0000f80367c1;;{gpo_sid})" in lab_policies
+      and f"(OA;;RPWP;f30e3bbf-9ff0-11d1-b603-0000f80367c1;;{gpo_sid})" in lab_policies
+      and f"(A;CI;RPWPCRCCDCLCLORCSDDTSW;;;{gpo_sid})" not in lab_policies, lab_policies[-500:])
 short = dc("samba-tool", "user", "create", "shorty", "Ab1shortpw", "-s", "/data/etc/smb.conf")
 check("refused: a password shorter than the policy's minimum", short.returncode != 0)
 wrong = as_user("labadmin", lab_pw + "x", "ldbsearch")
@@ -465,13 +493,13 @@ first = alice["uidNumber"]
 dc("samba-tool", "user", "delete", "alice", "-s", "/data/etc/smb.conf")
 carol = mk("carol")
 check("ids are never reused: after alice is deleted, carol gets a higher number", carol["uidNumber"] > first, carol)
-# a tiny site whose block is used up
-tiny = {**lab, "site": "tiny", "id_range": "900-902", "networks": [],
+# a tiny site whose block is used up: its 7 groups (users, admins, the five roles) take 900-906, one person 907
+tiny = {**lab, "site": "tiny", "id_range": "900-907", "networks": [],
         "accounts": {f"fabric-{k}-tiny": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
 dc("python3", "/fabric/converge.py", stdin=json.dumps(tiny))
 tiny_v, tiny_s = {**v, "site_name": "tiny"}, {**SECRETS, "ad_agent_password": tiny["accounts"]["fabric-agent-tiny"]}
 first_tiny = mk("tina", site_v=tiny_v, sec=tiny_s)
-check("a site's people take numbers from that site's own block", first_tiny["uidNumber"] == 902, first_tiny)
+check("a site's people take numbers from that site's own block", first_tiny["uidNumber"] == 907, first_tiny)
 try:
     mk("tim", site_v=tiny_v, sec=tiny_s)
     check("refused: a person when the site's block is full", False)

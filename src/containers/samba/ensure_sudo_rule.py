@@ -1,33 +1,46 @@
 import ldb
 
 import paths
+from site_roles import role_group
 
-MARK = "fabric: the site's admins (D103)"
+MARK = "fabric: the site's linux-sudo role (D103)"
+OLD_MARK = "fabric: the site's admins (D103)"      # the rule before the roles: named <site>-admins
 
 
-def ensure_sudo_rule(samdb, site, admin_group):
-    """Purpose: the site's default sudo rule (manual 2.11.2.19, S6.3; D103): `<site>-admins` and the organisation's
-             admin group may run any command as root on the site's joined Linux machines. Kept to match; other rules
-             in OU=sudoers are the admins' and never touched.
-    Inputs:  samdb — SamDB (as the system); site — str; admin_group — the web UI's admin group (sAMAccountName).
+def ensure_sudo_rule(samdb, site, admin_group, root=False):
+    """Purpose: the site's default sudo rule (manual 2.11.2.19, S6.3; D103): members of `<site>-linux-sudo` (and, at
+             the root site, the organisation's admin group) may run any command as root on the site's joined Linux
+             machines, and on those of every site below it (their installer reads the rules of each site above,
+             2.10.2.4). Kept to match; other rules in OU=sudoers are the admins' and never touched, except fabric's
+             own rule from before the roles, which it removes.
+    Inputs:  samdb — SamDB (as the system); site — str; admin_group — the web UI's admin group (sAMAccountName);
+             root — bool, the root site.
     Returns: list of str, what changed.
     Fails:   ldb.LdbError for a change AD refuses (OU=sudoers missing: ensure_layout makes it first).
     Feeds:   converge."""
-    dn = f"CN={site}-admins,OU=sudoers,{paths.site_dn(samdb, site)}"
-    want = {"sudoUser": sorted({f"%{site}-admins", f"%{admin_group}"}), "sudoHost": ["ALL"], "sudoCommand": ["ALL"],
-            "sudoRunAsUser": ["ALL"], "description": [MARK]}
+    sudoers = f"OU=sudoers,{paths.site_dn(samdb, site)}"
+    done = []
+    old = f"CN={site}-admins,{sudoers}"
+    if _exists(samdb, old) and str(samdb.search(base=old, scope=ldb.SCOPE_BASE, attrs=["description"])[0]
+                                   .get("description", [""])[0]) == OLD_MARK:
+        samdb.delete(old)
+        done.append(f"sudo rule {site}-admins removed (the role {role_group(site, 'linux-sudo')} replaces it)")
+    dn = f"CN={role_group(site, 'linux-sudo')},{sudoers}"
+    users = {f"%{role_group(site, 'linux-sudo')}"} | ({f"%{admin_group}"} if root else set())
+    want = {"sudoUser": sorted(users), "sudoHost": ["ALL"], "sudoCommand": ["ALL"], "sudoRunAsUser": ["ALL"],
+            "description": [MARK]}
     found = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=list(want)) if _exists(samdb, dn) else []
     if not found:
         samdb.add({"dn": dn, "objectClass": "sudoRole", **want})
-        return [f"sudo rule {site}-admins added"]
+        return done + [f"sudo rule {role_group(site, 'linux-sudo')} added"]
     msg = ldb.Message(found[0].dn)
     for attr, val in want.items():
         if sorted(str(x) for x in found[0].get(attr, [])) != sorted(val):
             msg[attr] = ldb.MessageElement(val, ldb.FLAG_MOD_REPLACE, attr)
     if len(msg) == 0:
-        return []
+        return done
     samdb.modify(msg)
-    return [f"sudo rule {site}-admins changed"]
+    return done + [f"sudo rule {role_group(site, 'linux-sudo')} changed"]
 
 
 def _exists(samdb, dn):

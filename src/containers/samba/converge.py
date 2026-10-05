@@ -9,8 +9,8 @@ with the error on stderr."""
 import json
 import sys
 
-import ldb
-
+from acl_entries import sid_of
+from admin_gpo import ensure_gpo_admins
 from ensure_ad_site import ensure_ad_site
 from ensure_gpo import ensure_gpo
 from ensure_groups import ensure_groups
@@ -23,27 +23,16 @@ from ensure_site_acl import ensure_site_acl
 from ensure_site_info import ensure_site_info
 from ensure_site_link import ensure_site_link
 from ensure_sudo_rule import ensure_sudo_rule
-from logon_rights_policy import EXTENSIONS as LOGON_EXTENSIONS, logon_rights_policy
+from logon_rights_policy import BUILTIN_ADMINISTRATORS, EXTENSIONS as LOGON_EXTENSIONS, logon_rights_policy
 from open_samdb import open_samdb
 from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
 from set_password_policy import set_password_policy
 from share_winbind import share_winbind
+from site_roles import role_group
 from windows_baseline_policy import windows_baseline_policy
 import paths
 
 CONF = "/data/etc/smb.conf"
-BUILTIN_ADMINISTRATORS = "S-1-5-32-544"        # each machine's own local Administrators
-
-
-def _sid(samdb, name):
-    """Purpose: a group's SID by its name.
-    Inputs:  samdb — SamDB; name — sAMAccountName.
-    Returns: str, the SID.
-    Fails:   IndexError if there is no such group; ldb.LdbError from the search.
-    Feeds:   converge."""
-    res = samdb.search(base=str(samdb.domain_dn()), scope=ldb.SCOPE_SUBTREE,
-                       expression=f"(sAMAccountName={ldb.binary_encode(name)})", attrs=["objectSid"])
-    return str(samdb.schema_format_value("objectSid", res[0]["objectSid"][0]), "utf-8")
 
 
 def converge(state):
@@ -76,7 +65,7 @@ def converge(state):
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
     changed += ensure_site_acl(samdb, site, root)
     changed += ensure_networks(samdb, site, state["networks"])
-    changed += ensure_sudo_rule(samdb, site, state["admin_group"])
+    changed += ensure_sudo_rule(samdb, site, state["admin_group"], root)
     changed += ensure_ad_site(samdb, site, [n["cidr"] for n in state["networks"]])
     if state.get("parent"):               # a site: its AD site linked to its parent's (manual 1.8.8.5)
         changed += ensure_site_link(samdb, site, state["parent"])
@@ -86,11 +75,16 @@ def converge(state):
         changed += ensure_gpo(samdb, lp, "fabric: trust in fabric's root CA", base, TRUST_EXTENSIONS,
                               {"Machine/Registry.pol": root_ca_policy(state["root_ca_pem"])})
     # a machine's own local Administrators keep log-on too: the policy replaces Windows' local lists, and its owners
-    # must never be locked out of it
-    sids = [_sid(samdb, g) for g in (f"{site}-users", f"{site}-admins", state["admin_group"], "fabric-break-glass")]
-    sids.append(BUILTIN_ADMINISTRATORS)
+    # must never be locked out of it; the roles of this site and of every site above it log on to administer (D103)
+    owners = [site] + paths.ancestors(samdb, site)
+    names = [f"{site}-users", f"{site}-admins", state["admin_group"], "fabric-break-glass"]
+    names += [role_group(o, r) for o in owners for r in ("linux-sudo", "windows-admins")]
+    names += [f"{o}-admins" for o in owners[1:]]
+    sids = [sid_of(samdb, g) for g in names] + [BUILTIN_ADMINISTRATORS]
+    local_admins = [sid_of(samdb, role_group(o, "windows-admins")) for o in owners]
     changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", site_dn, LOGON_EXTENSIONS,
-                          {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids)})
+                          {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids, local_admins)})
+    changed += ensure_gpo_admins(samdb, lp, site)
     extensions, files = windows_baseline_policy(state.get("lan_profile") or "")
     changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", site_dn, extensions,
                           files)
