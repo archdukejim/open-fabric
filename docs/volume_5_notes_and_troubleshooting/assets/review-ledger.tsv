@@ -58,7 +58,7 @@ docs/volume_1_systems_and_services/1.2.2-checklist-answers.md	62f07f8564f90899d1
 docs/volume_1_systems_and_services/1.2.3-deviations.md	667736491286116d373eb476a6978f6ba148ee84	2026-10-03	
 docs/volume_1_systems_and_services/1.2.4-federation-decisions.md	ea933f3f76d1ce85f29c23449a87e32f59668e9a	2026-10-03	
 docs/volume_1_systems_and_services/1.2.5-domain-join-decisions.md	6b9f95082bf7f6ff57f92a4073f95d0397233346	2026-10-03	
-docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	9451fc1e4efbda3bac9a65206766e82c2e7ab0e5	2026-10-05	
+docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	b8ec1bb9969d3200746581aaac140abfd345bbfa	2026-10-05	
 docs/volume_1_systems_and_services/1.2.7-alignment-decisions.md	6b5c02487f1a696981d818a4b95df9f389bde396	2026-10-04	
 docs/volume_1_systems_and_services/1.3.1-topology.md	607e867ab88c7b9da780e05b46899c3d63a5baa7	2026-10-05	
 docs/volume_1_systems_and_services/1.3.2-repository-layout.md	2ca9243da4fca415e584c476949e76f770eb74c4	2026-10-05	
@@ -87,7 +87,7 @@ docs/volume_1_systems_and_services/1.8.4-joining.md	60bec0292c8d771053827188f01c
 docs/volume_1_systems_and_services/1.8.5-attachment.md	59a3693e8eb488fe17c7370abfeffa3dc3cffa75	2026-10-05	
 docs/volume_1_systems_and_services/1.8.6-changes.md	795f341188e97db14bbacf980bd6014209d5555e	2026-10-05	
 docs/volume_1_systems_and_services/1.8.7-milestones.md	9f224584b781bb9adfb1d13dc42a4c0c2c3ce208	2026-10-05	
-docs/volume_1_systems_and_services/1.8.8-federation-on-ad.md	c30f5089fa2deac6a162172cd087247862fc572a	2026-10-05	
+docs/volume_1_systems_and_services/1.8.8-federation-on-ad.md	971e44f0feff7c5f71ece9defd3bfef25901d71e	2026-10-05	
 docs/volume_1_systems_and_services/1.9.1-security-defaults.md	e299efc1f11dc528fd23949e503e1db1ba4ed468	2026-10-04	
 docs/volume_1_systems_and_services/README.md	a8cabd95f8592542a9d7176970a5f51df3233925	2026-10-05	
 docs/volume_2_technologies_and_features/2.1.1-about-settings.md	217838baae8569b20211e5b704463b720b8af374	2026-10-03	
@@ -179,7 +179,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	180e78ebad625276448523d240d1e75d31c6535b	2026-10-05	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	56b03b8ddbe9470992bf2537f40a75c181b46c78	2026-10-05	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -235,7 +235,9 @@ scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-0
 scripts/images/README.md	c16836e4bd5966e65ac173da026d82e7eab4afc4	2026-10-04	
 scripts/images/pin_published.py	bf16049b870d703cec87a8af2b4394ecade12225	2026-10-04	
 scripts/install-from-checkout.sh	b03b6b30bb230d09753b070af8f196285dfe788a	2026-10-03	
-spikes/README.md	e7f26894734f8305edb7c43d85ac5425fc0b86c6	2026-10-04	
+spikes/README.md	b75f2469a199f9dd034a9803f4b537f8d3b659b9	2026-10-05	
+spikes/postgres-nginx/README.md	997417a10f49762c37503650c49e8d6d9fca7207	2026-10-05	
+spikes/postgres-nginx/run.sh	30519ce643e4be24eb9d2c9b814953caa9766837	2026-10-05	
 spikes/samba/README.md	245bbd4d612a167b4d82cebfe2603bdedb0bc262	2026-10-04	
 spikes/samba/ad-schema.py	49a45325cdcc6ca7dc41d3b7f54906d4eb40d6d4	2026-10-04	
 spikes/samba/admx.py	0e591faf5a6c40c3230f7d66f705aeb583e26989	2026-10-04	
