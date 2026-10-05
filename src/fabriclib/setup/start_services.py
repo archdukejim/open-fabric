@@ -7,7 +7,9 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.directory.ensure_default_device_roles import ensure_default_device_roles
 from fabriclib.federation.common.is_root_site import is_root_site
 from fabriclib.samba.converge_domain import converge_domain
+from fabriclib.samba.finish_join import finish_join
 from fabriclib.samba.write_bind_dlz import write_bind_dlz
+from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
@@ -49,6 +51,13 @@ def run(ctx):
     except ValidationError as e:
         raise SetupError(str(e))
     ok(f"directory {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
+    if (ctx.secrets or {}).get("ad_join"):        # a site whose DC just joined: its join account goes (1.8.8.4)
+        try:
+            ok(finish_join(v, ctx.secrets))
+            save_secrets({"ad_join": None}, ctx.secrets_file)
+            ctx.secrets = None
+        except ValidationError as e:
+            raise SetupError(str(e))
     if write_bind_dlz(v):                         # the first provisioning: BIND now serves the AD zone
         ok(f"bind9: {start_unit('bind9', 'bind9', True)} (the AD zone through DLZ)")
     if is_root_site(os.path.join(ctx.config_dir, "federation.yaml")):    # the root site: fabric's defaults

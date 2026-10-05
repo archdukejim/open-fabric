@@ -20,7 +20,10 @@ def run(ctx):
              ldap_base_dn and the organisation's cert_* settings (friendly_name only when unset); the deploy
              step saves them. The
              site CA key and certificates are kept in <base>/fabric/config/site-ca (0700); the DNS link's
-             TSIG secret goes to fabric's secrets (federation_tsig.upstream).
+             TSIG secret goes to fabric's secrets (federation_tsig.upstream). When the root prepared this site in
+             its domain: the service accounts' passwords (ad_*_password) and the temporary join account (ad_join)
+             go to fabric's secrets, and ctx.vars gains ad_domain, ad_dc_type, ad_join_server, ad_join_server_name
+             and posix_id_range (manual 1.8.8.4).
     Fails:   SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or
              unreachable, the root not the pinned one, a certificate that does not fit).
     Feeds:   setup STEPS, after `docker` (the key is made with the pinned Step-CA image) and before `deploy`.
@@ -47,12 +50,21 @@ def run(ctx):
                             dns_port=int(ctx.vars.get("bind_dns_port") or 53))
     except ValidationError as e:
         raise SetupError(f"joining the upstream failed: {e}") from None
-    if res.get("dns_secret"):
+    dom = res.get("domain") or {}
+    if res.get("dns_secret") or dom:
+        update = {"federation_tsig": {"upstream": res["dns_secret"]}} if res.get("dns_secret") else {}
+        if dom:                                  # the domain this site's DC joins (manual 1.8.8.4)
+            update.update({f"ad_{kind}_password": dom["accounts"][kind] for kind in ("agent", "keycloak", "radius")})
+            update["ad_join"] = {"user": dom["join_user"], "password": dom["join_password"]}
         try:
-            save_secrets({"federation_tsig": {"upstream": res["dns_secret"]}}, ctx.secrets_file)
+            save_secrets(update, ctx.secrets_file)
         except ValidationError as e:
             raise SetupError(str(e)) from None
         ctx.secrets = None
+    if dom:
+        ctx.vars.update({"ad_domain": dom["ad_domain"], "ad_dc_type": dom["dc_type"],
+                         "ad_join_server": dom["dc_address"], "ad_join_server_name": dom["dc_host"],
+                         "posix_id_range": dom["id_range"]})
     joined = dict(res["vars"])
     if ctx.vars.get("friendly_name"):
         joined.pop("friendly_name", None)

@@ -42,11 +42,22 @@ def deploy_samba(v, secrets, jinja_env):
     if not os.path.exists(os.path.join(base, "bind", "dlz.conf")):
         write_bind_dlz(v)
     write_file_if_changed(os.path.join(base, "secrets", "admin_password"), secrets["ad_admin_password"] + "\n", 0o600)
+    # a site joining the root's domain (manual 1.8.8.4): the temporary join account as a credentials file, kept until
+    # the account is deleted after the join (finish_join)
+    join, auth = secrets.get("ad_join") or {}, os.path.join(base, "secrets", "join.auth")
+    if join.get("user"):
+        write_file_if_changed(auth, f"username={join['user']}\npassword={join['password']}\n"
+                                    f"domain={v['ad_netbios']}\n", 0o600)
+    elif os.path.exists(auth):
+        os.remove(auth)
+    joining = bool(v.get("ad_join_server")) and not os.path.exists(os.path.join(base, "data", ".fabric-provisioned"))
     # the DC's own resolver: the host's address (BIND, or the DNS filter in front of it), which knows the AD zone —
     # in the host network it would otherwise use the host's resolver, which may not (use_host_dns), and then cannot
-    # find its own KDC or send its signed updates
+    # find its own KDC or send its signed updates. Until a site's DC has joined, this host's BIND has no AD zone:
+    # the root's address answers for it
+    resolver = v["ad_join_server"] if joining else v["host_ip"]
     restart = write_file_if_changed(os.path.join(base, "resolv.conf"),
-                                    f"nameserver {v['host_ip']}\nsearch {v['ad_domain']}\n", 0o644)
+                                    f"nameserver {resolver}\nsearch {v['ad_domain']}\n", 0o644)
     src = os.path.join(jinja_env.loader.searchpath[0], "samba", "converge")
     if not os.path.isdir(src):              # a checkout: the converge code lives in src/containers/ (manual 1.3.2)
         src = os.path.join(os.path.dirname(jinja_env.loader.searchpath[0]), "src", "containers", "samba")

@@ -22,6 +22,10 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.load_vars import load_vars  # noqa: E402
 from fabriclib.federation.common.signing_capacity import signing_capacity  # noqa: E402
 from fabriclib.federation.create_invitation import create_invitation  # noqa: E402
+import fabriclib.federation.accept_join as m_accept  # noqa: E402
+
+# no DC in these tests: the root's domain step of a join is skipped (the real one: tests/samba/site_join.py)
+m_accept.prepare_site = lambda *a, **k: []
 
 action = sys.argv[2]
 if action == "invite":

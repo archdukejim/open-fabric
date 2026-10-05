@@ -3,8 +3,9 @@ database: no credentials, no network. Run after every start and apply by fabricl
     docker exec -i samba python3 /fabric/converge.py < state.json
 The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [site_networks
 items], "root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name:
-password}, "radius_gid", "lan_profile"} (stdin, never a command line: it holds the service accounts' passwords).
-Prints one JSON object: {"changed": [what changed, …]}. Exits 1 with the error on stderr."""
+password}, "radius_gid", "lan_profile", optional "parent", "rodc" and "join_account"} (stdin, never a command
+line: it holds the service accounts' passwords). Prints one JSON object: {"changed": [what changed, …]}. Exits 1
+with the error on stderr."""
 import json
 import sys
 
@@ -13,12 +14,14 @@ import ldb
 from ensure_ad_site import ensure_ad_site
 from ensure_gpo import ensure_gpo
 from ensure_groups import ensure_groups
+from ensure_join_account import ensure_join_account
 from ensure_layout import ensure_layout
 from ensure_networks import ensure_networks
 from ensure_schema import ensure_schema
 from ensure_service_accounts import ensure_service_accounts
 from ensure_site_acl import ensure_site_acl
 from ensure_site_info import ensure_site_info
+from ensure_site_link import ensure_site_link
 from ensure_sudo_rule import ensure_sudo_rule
 from logon_rights_policy import EXTENSIONS as LOGON_EXTENSIONS, logon_rights_policy
 from open_samdb import open_samdb
@@ -52,12 +55,18 @@ def converge(state):
              domain-wide trust GPO), password_policy (dict, every key), networks (site_networks' list), root_ca_pem
              (str), id_range ("first-last"), groups (fabric's ldap_groups), admin_group (the web UI's admin group, in
              the log-on policy), accounts ({sAMAccountName: password}: the site's service accounts), radius_gid (int:
-             FreeRADIUS's group, given winbind's privileged pipe), lan_profile (str: the Windows wired 802.1X profile
+             FreeRADIUS's group, given winbind's privileged pipe), parent (str, optional: a site's parent site,
+             for the AD site link), rodc (bool, optional: a read-only DC, where
+             only winbind's pipe is converged), join_account ({name, password}, optional: at the root, the
+             temporary account a new site's DC joins with), lan_profile (str: the Windows wired 802.1X profile
              the baseline installs, "" without one).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
     Feeds:   this script's main."""
     site, root = state["site"], bool(state["root"])
+    if state.get("rodc"):                 # a read-only DC holds the domain's copy: only what is local to it
+        _, lp = open_samdb(CONF)
+        return share_winbind(lp, int(state["radius_gid"]))
     changed = [f"schema: {name} added" for name in ensure_schema(CONF)]
     samdb, lp = open_samdb(CONF)
     changed += ensure_layout(samdb, site, root)
@@ -68,9 +77,11 @@ def converge(state):
     changed += ensure_networks(samdb, site, state["networks"])
     changed += ensure_sudo_rule(samdb, site, state["admin_group"])
     changed += ensure_ad_site(samdb, site, [n["cidr"] for n in state["networks"]])
-    changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
+    if state.get("parent"):               # a site: its AD site linked to its parent's (manual 1.8.8.5)
+        changed += ensure_site_link(samdb, site, state["parent"])
     base = str(samdb.domain_dn())
-    if root:
+    if root:                              # the domain's own settings are the root's (manual 1.8.8.3)
+        changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
         changed += ensure_gpo(samdb, lp, "fabric: trust in fabric's root CA", base, TRUST_EXTENSIONS,
                               {"Machine/Registry.pol": root_ca_policy(state["root_ca_pem"])})
     # a machine's own local Administrators keep log-on too: the policy replaces Windows' local lists, and its owners
@@ -82,6 +93,8 @@ def converge(state):
     extensions, files = windows_baseline_policy(state.get("lan_profile") or "")
     changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", f"OU={site},OU=sites,{base}", extensions,
                           files)
+    if state.get("join_account"):         # at the root, preparing a new site's DC join (manual 1.8.8.4)
+        changed += ensure_join_account(samdb, state["join_account"]["name"], state["join_account"]["password"])
     changed += share_winbind(lp, int(state["radius_gid"]))
     return changed
 

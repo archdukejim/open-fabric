@@ -14,10 +14,13 @@ from fabriclib.federation.common.save_registry import save_registry
 from fabriclib.federation.common.signing_capacity import signing_capacity
 from fabriclib.federation.constants import DOMAIN_RE, SITE_NAME_RE
 from fabriclib.federation.network_conflicts import network_conflicts
+from fabriclib.federation.next_id_block import next_id_block
 from fabriclib.federation.read_address_plan import read_address_plan
 from fabriclib.federation.site_networks import site_networks
 from fabriclib.pki.sign_site_ca import sign_site_ca
+from fabriclib.samba.prepare_site import prepare_site
 from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.secrets.random_password import random_password
 from fabriclib.secrets.save_secrets import save_secrets
 
 _ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou")
@@ -79,7 +82,9 @@ def accept_join(v, req, client_ip="", now=None):
              "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this
              site's published DNS port) (kept here in fabric's
              secrets as federation_tsig[site]; manual 1.8 M4), "org": {"org_domain", "ldap_base_dn",
-             friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
+             friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}} and, for an invitation
+             that names a DC type (made on the root), "domain": {"ad_domain", "dc_type", "dc_host", "dc_address",
+             "id_range", "join_user", "join_password", "accounts" {agent, keycloak, radius}} (_prepare_domain).
     Fails:   ValidationError "the join request is incomplete"; overlapping networks (_check_networks, before
              anything is signed or recorded); "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
@@ -116,6 +121,7 @@ def accept_join(v, req, client_ip="", now=None):
         if site in registry["sites"]:
             raise ValidationError(f"site {site} has joined already")
         _check_networks(v, site, req.get("networks") or [])     # invitation verified first: no probing the plan
+        domain_answer = _prepare_domain(v, site, entry.get("dc") or "", req.get("networks") or [], registry)
         cap = signing_capacity(v)
         signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation",
                               nest=int(entry.get("nest") or 0), as_parent=cap["as_parent"])
@@ -131,6 +137,8 @@ def accept_join(v, req, client_ip="", now=None):
             "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0),
             "via": entry.get("via") or "", "dns_port": _port(req.get("dns_port")),
             "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}"}
+        if domain_answer:
+            registry["sites"][site].update({"dc": domain_answer["dc_type"], "id_range": domain_answer["id_range"]})
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
                                             f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")
@@ -140,4 +148,25 @@ def accept_join(v, req, client_ip="", now=None):
             "dns": {"key": f"fed-{site}", "algorithm": "hmac-sha256", "secret": tsig,
                     "port": int(v.get("bind_dns_port") or 53)},
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
-                         "address": v["host_ip"]}}
+                         "address": v["host_ip"]},
+            **({"domain": domain_answer} if domain_answer else {})}
+
+def _prepare_domain(v, site, dc_type, networks, registry):
+    """Purpose: at the root, the domain part of a join (manual 1.8.8.4, S8.1): converge the new site in the domain
+             (prepare_site) with fresh service-account passwords and the next id block, and a temporary join account.
+    Inputs:  v — the root's vars (ad_domain, hostname_dc, host_ip and what prepare_site reads); site — the new site;
+             dc_type — the invitation's ("writable", "rodc"; "" for none: nothing is prepared); networks — the join
+             request's; registry — load_registry()'s dict (the blocks handed out so far).
+    Returns: {"ad_domain", "dc_type", "dc_host", "dc_address", "id_range", "join_user", "join_password",
+             "accounts" {agent, keycloak, radius}}, or {} without a DC type.
+    Fails:   ValidationError from prepare_site (the root's DC not running or refusing): the invitation is kept.
+    Feeds:   accept_join."""
+    if not dc_type:
+        return {}
+    accounts = {kind: random_password() for kind in ("agent", "keycloak", "radius")}
+    join_password = random_password()
+    block = next_id_block(v, registry)
+    prepare_site(v, site, networks, block, accounts, join_password)
+    return {"ad_domain": v["ad_domain"], "dc_type": dc_type, "dc_host": v["hostname_dc"], "dc_address": v["host_ip"],
+            "id_range": block, "join_user": f"fabric-join-{site}", "join_password": join_password,
+            "accounts": accounts}

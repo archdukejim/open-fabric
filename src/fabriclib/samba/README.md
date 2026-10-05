@@ -21,3 +21,6 @@ itself is a container (`templates/samba`, `packaging/images/samba`); what conver
 | `gpo_overview.py` | The Group Policy section: templates, the admin settings GPO, a policy search |
 | `set_gpo_policy.py` | Set a policy in the site's admin settings GPO (audited; CLI and web UI) |
 | `clear_gpo_policy.py` | Put a policy back to Not configured (audited; CLI and web UI) |
+| `run_converge.py` | Hand a wanted state to the converge code inside a DC (stdin) |
+| `prepare_site.py` | At the root, before answering a join: the new site converged in the domain, and its join account |
+| `finish_join.py` | After this site's DC joined: its join account deleted at the root |

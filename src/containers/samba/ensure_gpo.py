@@ -1,8 +1,9 @@
 import os
-import subprocess
 import uuid
 
 import ldb
+
+from set_gpo_acl import set_gpo_acl
 
 
 def _gpo(samdb, name):
@@ -28,7 +29,7 @@ def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None
              files — {path under the GPO folder, e.g. "Machine/Registry.pol": bytes}; user_extensions —
              gPCUserExtensionNames for user policies (None: left as it is; "": none).
     Returns: list of str, what was created or changed.
-    Fails:   ldb.LdbError from AD; OSError writing SYSVOL; CalledProcessError from `samba-tool ntacl sysvolreset`.
+    Fails:   ldb.LdbError from AD; OSError writing SYSVOL; NTSTATUSError from set_gpo_acl.
     Feeds:   converge.
     Notes:   made locally on the DC's own database and SYSVOL (no SMB, no credentials), as samba-tool's GPO commands
              make them over the network."""
@@ -78,6 +79,6 @@ def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None
     if dn.lower() not in current.lower():
         samdb.modify(ldb.Message.from_dict(samdb, {"dn": link_dn, "gPLink": current + link}, ldb.FLAG_MOD_REPLACE))
         done.append(f"GPO {name} linked to {link_dn}")
-    if done:
-        subprocess.run(["samba-tool", "ntacl", "sysvolreset", "-s", lp.configfile], check=True, capture_output=True)
+    if done:                              # this GPO's folder only: a site's DC lacks the domain's other folders
+        set_gpo_acl(samdb, lp, guid)
     return done

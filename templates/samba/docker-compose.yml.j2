@@ -43,6 +43,12 @@ services:
       INTERFACES: "127.0.0.1 {{ host_ip }}"
       RPC_PORTS: "{{ ad_rpc_ports }}"
       OLD_PASSWORD_MINUTES: "{{ ad_old_password_minutes }}"
+{% if ad_join_server %}
+      # a site's DC joins the root's domain instead of provisioning one (manual 1.8.8.4); once joined, unused
+      JOIN_ROLE: "{{ 'RODC' if ad_dc_type == 'rodc' else 'DC' }}"
+      JOIN_SERVER: "{{ ad_join_server_name or ad_join_server }}"
+      JOIN_SITE: "{{ site_name }}"
+{% endif %}
     tmpfs:
       - /tmp:noexec,nosuid,size=64m
       - /run:size=16m

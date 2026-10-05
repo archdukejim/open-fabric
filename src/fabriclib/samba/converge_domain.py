@@ -1,14 +1,13 @@
 import hashlib
-import json
 import os
 import ssl
-import subprocess
 
-from fabriclib.common.errors import ValidationError
 from fabriclib.federation.site_networks import site_networks
 from fabriclib.federation.common.is_root_site import is_root_site
+from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.radius.windows_lan_profile import windows_lan_profile
 from fabriclib.samba.id_range import id_range
+from fabriclib.samba.run_converge import run_converge
 
 
 def converge_domain(v, federation_file, secrets, container="samba"):
@@ -38,13 +37,10 @@ def converge_domain(v, federation_file, secrets, container="samba"):
              "accounts": {f"fabric-{kind}-{v['site_name']}": secrets[f"ad_{kind}_password"]
                           for kind in ("agent", "keycloak", "radius")},
              "radius_gid": v["service_users"]["freeradius"]["gid"], "lan_profile": _lan_profile(v, root_ca)}
-    res = subprocess.run(["docker", "exec", "-i", "-e", "PYTHONDONTWRITEBYTECODE=1", container,
-                          "python3", "/fabric/converge.py"],
-                         input=json.dumps(state), capture_output=True, text=True, timeout=600)
-    if res.returncode != 0:
-        raise ValidationError("the Windows domain could not be converged: "
-                              + ((res.stderr or res.stdout).strip().splitlines() or ["the DC is not running"])[-1])
-    return json.loads(res.stdout)["changed"]
+    state["rodc"] = not state["root"] and v.get("ad_dc_type") == "rodc"
+    if not state["root"]:                 # the AD site link to the parent (manual 1.8.8.5)
+        state["parent"] = (load_registry(federation_file).get("upstream") or {}).get("site_name") or ""
+    return run_converge(state, container)
 
 
 def _lan_profile(v, root_ca):

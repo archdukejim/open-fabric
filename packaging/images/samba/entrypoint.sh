@@ -9,7 +9,7 @@
 # a join's credentials (/run/secrets/join.auth).
 #
 # env: REALM, NETBIOS, HOST_NAME (short), HOST_IP, INTERFACES, RPC_PORTS,
-#      OLD_PASSWORD_MINUTES; optional JOIN_ROLE (DC|RODC), JOIN_SERVER,
+#      OLD_PASSWORD_MINUTES; optional JOIN_ROLE (DC|RODC), JOIN_SERVER, JOIN_SITE (its AD site),
 #      SAMBA_DEBUG
 # -----------------------------------------------------------------------
 set -euo pipefail
@@ -47,7 +47,7 @@ elif [ -n "${JOIN_ROLE:-}" ]; then
     clear_data
     mkdir -p "$DATA/etc"
     samba-tool domain join "${REALM,,}" "$JOIN_ROLE" --server="$JOIN_SERVER" -A /run/secrets/join.auth \
-        --targetdir="$DATA" --dns-backend=BIND9_DLZ --option="netbios name = $HOST_NAME" "${OPTS[@]}" \
+        --targetdir="$DATA" --dns-backend=BIND9_DLZ --option="netbios name = $HOST_NAME" ${JOIN_SITE:+--site="$JOIN_SITE"} "${OPTS[@]}" \
         > /tmp/join.log 2>&1 || { show_log /tmp/join.log; exit 1; }
     rm -f /tmp/join.log
     touch "$DONE"

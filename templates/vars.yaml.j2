@@ -164,6 +164,12 @@ ad_old_password_minutes: {{ ad_old_password_minutes | default(0) | int }}
    Ubuntu's AppArmor profile for chronyd allows (manual 2.11.2.8) #}
 ad_ntp_signd_dir: {{ ad_ntp_signd_dir | default('/var/lib/samba/ntp_signd', true) }}
 ad_rpc_ports: "{{ ad_rpc_ports | default('49152-49251', true) }}"
+{# A site's DC (manual 1.8.8.3-1.8.8.4): writable or read-only; the root's is always writable. A site joining the root's
+   domain gets from the join the root DC's address and name and its id block (setup's join step writes them). #}
+ad_dc_type: {{ ad_dc_type | default('writable', true) }}
+ad_join_server: "{{ ad_join_server | default('', true) }}"
+ad_join_server_name: "{{ ad_join_server_name | default('', true) }}"
+posix_id_range: "{{ posix_id_range | default('', true) }}"
 posix_id_block: {{ posix_id_block | default(100000) | int }}
 samba_mem_limit: {{ samba_mem_limit | default('384m' if (host_ram_capacity | default(0) | int) == 3 else '512m', true) }}
 # 802.1X (optional, design §6): FreeRADIUS 3.2 checks each device against the site's DC

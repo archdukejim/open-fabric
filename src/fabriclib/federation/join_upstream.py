@@ -42,7 +42,9 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              friendly_name / cert_* —, "upstream": {"site_name",
              "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had,
              "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller
-             keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry)}.
+             keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry), "domain": the domain
+             this site's DC joins ({} when the invitation named none; manual 1.8.8.4: the caller keeps its passwords
+             in fabric's secrets and its settings in the vars)}.
     Fails:   ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the
              upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered
              with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError.
@@ -100,7 +102,8 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
                 path=audit_path or AUDIT_FILE)
     return {"vars": _vars(inv, up, work_dir), "upstream": {k: up.get(k) for k in ("site_name", "domain", "host",
                                                                                   "address")},
-            "joined": True, "dns_secret": (answer.get("dns") or {}).get("secret")}
+            "joined": True, "dns_secret": (answer.get("dns") or {}).get("secret"),
+            "domain": answer.get("domain") or {}}
 
 
 def _vars(inv, up, work_dir):

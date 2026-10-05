@@ -1,0 +1,30 @@
+import os
+
+from fabriclib.samba.run_converge import run_converge
+
+
+def prepare_site(v, site, networks, id_block, accounts, join_password, container="samba"):
+    """Purpose: at the root, before answering a join (manual 1.8.8.4, S8.1): converge the new site in the domain —
+             its OU and the OUs under it, its groups (`<site>-users`, `<site>-admins`), its service accounts with
+             the passwords it is given, its ACLs, its id block, its networks and AD site, its sudo rule and GPOs — and
+             make the temporary account its DC joins with (expiring in an hour).
+    Inputs:  v — the root's vars (ad_password_policy, deploy_base_dir (the root CA), webui_admin_group,
+             service_users); site — the new site's name; networks — its networks as the join request gives them
+             ([{name, cidr, allow_overlap}]); id_block — "first-last" (next_id_block); accounts — {kind: password} for
+             agent, keycloak, radius; join_password — the join account's password; container — the root's DC.
+    Returns: list of str, what changed.
+    Fails:   ValidationError from run_converge (the DC not running, AD refusing); OSError reading the root CA;
+             KeyError for a missing var.
+    Feeds:   federation/accept_join."""
+    root_ca = os.path.join(v["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
+    nets = [{"name": n.get("name") or n["cidr"], "cidr": n["cidr"], "kind": n.get("kind") or "lan",
+             "vlan": n.get("vlan"), "notes": n.get("notes") or "", "allow_overlap": n.get("allow_overlap") or ""}
+            for n in networks]
+    state = {"site": site, "root": False, "password_policy": v["ad_password_policy"], "networks": nets,
+             "root_ca_pem": open(root_ca).read(), "id_range": id_block, "groups": [],
+             "admin_group": v.get("webui_admin_group") or "admins",
+             "accounts": {f"fabric-{kind}-{site}": accounts[kind] for kind in ("agent", "keycloak", "radius")},
+             "radius_gid": v["service_users"]["freeradius"]["gid"], "lan_profile": "",
+             "join_account": {"name": f"fabric-join-{site}", "password": join_password},
+             "parent": v["site_name"]}
+    return run_converge(state, container)

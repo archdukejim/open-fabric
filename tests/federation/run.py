@@ -92,7 +92,8 @@ HQ = {"deploy_base_dir": f"{W}/hq", "image_stepca": IMAGE, "service_users": {"st
       "site_name": "hq", "domain": "hq.test", "org_domain": "hq.test", "ldap_base_dn": "dc=lan", "host_ip": "127.0.0.1",
       "ldap_organizational_units": [{"name": "accounts"}, {"name": "users", "parent": "accounts"}, {"name": "groups"}],
       "hostname_federation": FED_HOST, "federation_endpoint": False, "cert_intermediate_days": 1095,
-      "friendly_name": "Fed Test Org", "cert_org": "Fed Test Org", "cert_country": "US"}
+      "friendly_name": "Fed Test Org", "cert_org": "Fed Test Org", "cert_country": "US",
+      "ad_domain": "ad.hq.test", "hostname_dc": "hq.ad.hq.test", "ad_password_policy": {"minimum_length": 14, "complexity": True, "history": 24, "minimum_age_days": 0, "maximum_age_days": 0, "lockout_threshold": 5, "lockout_minutes": 15, "lockout_window_minutes": 15}}
 
 
 def save_hq(**changes):
@@ -116,6 +117,13 @@ sys.path.insert(0, f"{W}/fabric/lib/federation")
 import server as fed_server  # noqa: E402
 
 fed_server.Handler.after_join = None          # no apply: this is not an install
+
+# the root's domain step of a join (prepare_site: converge the new site in its DC) needs a DC, which these protocol
+# tests do not run: it is recorded instead (the real one: tests/samba/site_join.py)
+import fabriclib.federation.accept_join as m_accept  # noqa: E402
+PREPARED = []
+m_accept.prepare_site = lambda v, site, networks, block, accounts, password, container="samba": \
+    PREPARED.append((site, block, sorted(accounts))) or []
 
 SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
 
@@ -226,6 +234,12 @@ check("join: the site gets the bring-your-own-CA settings and the organisation",
       and jv["ldap_base_dn"] == "dc=lan"
       and jv["cert_org"] == "Fed Test Org" and all(os.path.isfile(jv[k]) for k in ("ca_crt_path", "ica_crt_path",
                                                                                     "ica_key_path")), res)
+dom = res.get("domain") or {}
+check("join: the root prepares the site in its domain and answers with it (a writable DC, the next id block, the "
+      "join account, the service accounts' passwords)",
+      dom.get("ad_domain") == "ad.hq.test" and dom.get("dc_type") == "writable" and dom.get("join_user") == "fabric-join-branch1"
+      and sorted(dom.get("accounts") or {}) == ["agent", "keycloak", "radius"] and PREPARED
+      and PREPARED[0][0] == "branch1" and PREPARED[0][1] == dom.get("id_range") == "105001-205000", (dom, PREPARED))
 site_ca = open(jv["ica_crt_path"]).read()
 check("join: the site's CA is signed by the organisation's root, path length 0",
       sh(["openssl", "verify", "-CAfile", jv["ca_crt_path"], jv["ica_crt_path"]], ok=False).returncode == 0

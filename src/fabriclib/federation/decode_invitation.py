@@ -14,9 +14,9 @@ def decode_invitation(text):
     """Purpose: On a joining node: read and check an invitation made by create_invitation (no network).
     Inputs:  text — the invitation string ("fabric-join-1.<base64url JSON>"); surrounding whitespace ignored.
     Returns: {"id", "secret", "site", "upstream", "org_domain", "ldap_base_dn", "host", "address", "root_sha256",
-             "expires", "via" ("" unless the invitation names a relay)} with every field checked: site SITE_NAME_RE,
-             host and org_domain DNS names, ldap_base_dn
-             BASE_DN_RE, address an IP,
+             "expires", "via" ("" unless the invitation names a relay), "dc", "ad_domain", "ad_password_policy" (the
+             domain the site's DC joins; "", "" and {} in an invitation made on a site)} with every field checked:
+             site SITE_NAME_RE, host and org_domain DNS names, ldap_base_dn BASE_DN_RE, address an IP,
              root_sha256 an upper-case colon-separated SHA-256 fingerprint.
     Fails:   ValidationError "not a fabric invitation"; "the invitation is damaged (...)"; "the invitation has
              a bad <field>".
@@ -47,5 +47,15 @@ def decode_invitation(text):
         raise ValidationError("the invitation has a bad expires")
     if body.get("via") is not None and not (isinstance(body["via"], str) and SITE_NAME_RE.match(body["via"])):
         raise ValidationError("the invitation has a bad via")
+    dc = body.get("dc")
+    if dc is not None:                       # made on the root site: the domain the site's DC joins
+        if dc not in ("writable", "rodc"):
+            raise ValidationError("the invitation has a bad dc")
+        if not (isinstance(body.get("ad_domain"), str) and DOMAIN_RE.match(body["ad_domain"])):
+            raise ValidationError("the invitation has a bad ad_domain")
+        if not isinstance(body.get("ad_password_policy"), dict):
+            raise ValidationError("the invitation has a bad ad_password_policy")
     return {**{k: body[k] for k in ("id", "secret", "site", "upstream", "org_domain", "ldap_base_dn", "host",
-                                    "address", "root_sha256", "expires")}, "via": body.get("via") or ""}
+                                    "address", "root_sha256", "expires")}, "via": body.get("via") or "",
+            "dc": dc or "", "ad_domain": body.get("ad_domain") or "",
+            "ad_password_policy": body.get("ad_password_policy") or {}}

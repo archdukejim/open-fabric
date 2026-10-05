@@ -18,11 +18,12 @@ from fabriclib.setup.read_join_invitation import read_join_invitation
 USAGE = """usage: fabricctl federation status                 this install's place in its fabric: upstream, sites,
                                                    invitations
        fabricctl federation enable | disable       the endpoint sites join through (https://federation.<domain>)
-       fabricctl federation invite <site> [--nest N] [--via NODE]
+       fabricctl federation invite <site> [--nest N] [--via NODE] [--dc writable|rodc]
                                                    a one-time invitation for a new site (good for one hour); on the
                                                    root it attaches flat, on a site nested under it; --nest N lets
                                                    it hold N levels of sites below it; --via NODE: it joins (and
-                                                   talks) through that site, which only relays
+                                                   talks) through that site, which only relays; --dc: the site's
+                                                   domain controller joins writable (default) or read-only
        fabricctl federation relay direct           on a site: stop using its relay node, talk to the upstream
        fabricctl federation invitations            open invitations
        fabricctl federation networks               the address plan: every site's networks, VLANs, notes, overlaps
@@ -80,9 +81,10 @@ def run_federation_command(ctx, argv):
                   + (f": https://{v.get('hostname_federation')}" if cmd == "enable" else " (sites that joined stay)"))
             return 0 if ok else 1
         opts = dict(zip(args[1::2], args[2::2])) if cmd == "invite" and args and len(args) % 2 == 1 else None
-        if cmd == "invite" and opts is not None and set(opts) <= {"--nest", "--via"} \
+        if cmd == "invite" and opts is not None and set(opts) <= {"--nest", "--via", "--dc"} \
                 and opts.get("--nest", "0").isdigit():
-            inv = create_invitation(v, "root", args[0], nest=int(opts.get("--nest", 0)), via=opts.get("--via", ""))
+            inv = create_invitation(v, "root", args[0], nest=int(opts.get("--nest", 0)), via=opts.get("--via", ""),
+                                    dc=opts.get("--dc", "writable"))
             how = (f"nested under {v.get('site_name')}" if inv["nested"] else "flat, under the root site") \
                 + (f", through {inv['via']}" if inv["via"] else "")
             print(f"Invitation for site {inv['site']} ({how}; may hold {inv['nest']} level(s) of sites below it; "
