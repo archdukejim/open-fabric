@@ -1,5 +1,5 @@
 # fabric's 802.1X policy (fabric/jinja/freeradius/python): looks the device up
-# in 389-DS by certificate fingerprint (EAP-TLS) or MAC (MAB), refuses
+# in the site's DC (AD) by certificate fingerprint (EAP-TLS) or MAC (MAB), refuses
 # disabled devices and devices whose roles lack the permission, and returns
 # the VLAN of the lowest-priority role that sets one.
 python3 fabric_policy {

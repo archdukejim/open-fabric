@@ -6,7 +6,7 @@ authorize() runs in three places:
     fabric CA: the device linked to that certificate's fingerprint must be
     enabled and hold network:eap-tls;
   - fabric-inner-tunnel, inside EAP-TTLS: a person's user name and password
-    (PAP), checked by binding to 389-DS; they must be in a group mapped for
+    (PAP), checked by binding to the site's DC; they must be in a group mapped for
     802.1X (radius_people);
   - the main server for anything that is not EAP: MAB, the switch asking
     for a MAC (User-Name = the MAC); the device with that MAC must be

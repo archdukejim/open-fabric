@@ -1,7 +1,7 @@
 # jinja/freeradius
 
 Optional 802.1X (design §6). FreeRADIUS 3.2 from Debian's packages; every
-decision is fabric's policy, which asks 389-DS about the device.
+decision is fabric's policy, which asks the site's domain controller (AD) about the device.
 
 | File | What |
 |---|---|
@@ -9,7 +9,7 @@ decision is fabric's policy, which asks 389-DS about the device.
 | [`packaging/images/freeradius/`](../../packaging/images/freeradius/) | The image: Debian's freeradius + python3 module + python3-ldap on the pinned Debian base; fabric's uid/gid |
 | `config/radiusd.conf.j2` | Main configuration: fabric's own minimal tree, logs to the journal (decisions, never passwords) |
 | `config/clients.conf.j2` | RADIUS clients (switches, APs) with their secrets from OpenBao; Message-Authenticator required unless relaxed |
-| `config/fabric-radius.json.j2` | Where the policy finds 389-DS (LDAPS, verified), its read-only account `cn=radius_reader`, and the groups mapped for password logins |
+| `config/fabric-radius.json.j2` | Where the policy finds the DC (LDAPS to the host's address, verified), its read-only account `fabric-radius-<site>`, and the groups mapped for password logins |
 | `config/mods/always.j2` | `ok` (accounting is acknowledged, not stored) |
 | `config/mods/eap.j2` | EAP-TLS (fabric CA only, no session resumption; the verify step that records each certificate's fingerprint); EAP-TTLS only while a group is mapped; no PEAP/MSCHAPv2 |
 | `config/mods/fabric_policy.j2` | The python3 module that runs `python/fabric_radius.py` |

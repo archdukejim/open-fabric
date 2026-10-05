@@ -152,7 +152,7 @@ def apply_deployment(start_services=True):
              (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them.
     Fails:   sys.exit(1) after an "Error: …" line for every refusal (ValidationError): secrets that cannot be loaded
              (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings,
-             dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or
+             dns_filter; host_ram_capacity 1 or 2; site_name, org_domain or
              ldap_base_dn not valid or not what they were at install; a template that does not render; an image
              build that fails (start_services=False); BIND9 refusing `rndc reconfig`; a published image
              whose signature does not verify (verify_published_images); fabric's own units (the

@@ -1,6 +1,6 @@
 services:
   # 802.1X (design §6): switches and access points ask here; fabric's policy
-  # answers from 389-DS. Non-root, no capabilities, read-only.
+  # answers from the site's DC (AD, LDAPS to the host's address). Non-root, no capabilities, read-only.
   freeradius:
 {% set published = published_ref('freeradius') %}
     # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)

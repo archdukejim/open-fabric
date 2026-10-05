@@ -85,18 +85,15 @@ def _ask_dhcp(ctx):
 
 def _ask_radius(ctx):
     """Purpose: Advanced plan question: 802.1X with FreeRADIUS (off by default).
-    Inputs:  ctx — SetupContext; reads ctx.vars install_freeradius and install_ldap. Interactive.
-    Returns: None; ctx.vars["install_freeradius"] set — forced False when install_ldap is False (802.1X needs
-             389-DS). Switches are added later (`fabricctl radius add-client`).
+    Inputs:  ctx — SetupContext; reads ctx.vars install_freeradius. Interactive.
+    Returns: None; ctx.vars["install_freeradius"] set (it asks the site's DC, part of every install). Switches are
+             added later (`fabricctl radius add-client`).
     Fails:   EOFError from input().
     Feeds:   choose_plan (Advanced)."""
     on = bool(ctx.vars.get("install_freeradius"))
     answer = input(f"\n  Optional: 802.1X with FreeRADIUS (devices join by certificate or MAC, VLAN per role)? "
                    f"[{'Y/n' if on else 'y/N'}] ").strip().lower()
     on = answer.startswith("y") if answer else on
-    if on and ctx.vars.get("install_ldap") is False:
-        print(f"    {YELLOW}802.1X checks every device in the directory: it needs 389-DS (install_ldap).{NC}")
-        on = False
     ctx.vars["install_freeradius"] = on
     if on:
         print("    Add your switches and access points afterwards: sudo fabricctl radius add-client <name> <address>")

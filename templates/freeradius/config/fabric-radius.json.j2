@@ -1,9 +1,9 @@
 {
-  "uri": "ldaps://{{ hostname_ldap }}:3636",
-  "base": "{{ ldap_base_dn }}",
-  "local": "{{ ldap_local_dn }}",
-  "bind_dn": "cn=radius_reader,ou=admins,{{ ldap_local_dn }}",
-  "password_file": "/etc/freeradius/fabric/ldap-password",
+  "uri": "ldaps://{{ host_ip }}:636",
+  "base": "{{ ad_base_dn }}",
+  "site": "{{ site_name }}",
+  "bind_dn": "fabric-radius-{{ site_name }}@{{ ad_domain }}",
+  "password_file": "/etc/freeradius/fabric/ad-password",
   "ca_file": "/etc/freeradius/certs/ca.pem",
   "people": {{ radius_people | default([]) | to_json }}
 }

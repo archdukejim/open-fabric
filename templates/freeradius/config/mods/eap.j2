@@ -2,7 +2,7 @@
 # chain to the fabric CA; which device it belongs to, and whether it may
 # join, is decided by fabric_policy in fabric-check-eap-tls. EAP-TTLS/PAP
 # for people — user name and password inside a TLS tunnel to this server's
-# certificate, checked against 389-DS in fabric-inner-tunnel. No PEAP /
+# certificate, checked against the site's DC in fabric-inner-tunnel. No PEAP /
 # MSCHAPv2: it needs NT hashes, which the directory does not keep.
 eap {
 	default_eap_type = tls

@@ -648,9 +648,11 @@ function	fabricctl-jinja|src/containers/dirsrv/seed.py|oids	6
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|parse_ldif	2	
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|password_ok	4	
 function	fabricctl-jinja|src/containers/freeradius/check_person.py|check_person	1	
+function	fabricctl-jinja|src/containers/freeradius/check_person.py|person_groups	2	
 function	fabricctl-jinja|src/containers/freeradius/directory.py|connect	2	
 function	fabricctl-jinja|src/containers/freeradius/directory.py|load_config	1	
 function	fabricctl-jinja|src/containers/freeradius/directory.py|search	3	
+function	fabricctl-jinja|src/containers/freeradius/directory.py|site_dn	4	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_decide	3	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_decide_person	4	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_log	1	

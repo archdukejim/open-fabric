@@ -368,7 +368,8 @@ assert "ttls {" in eap_p and "virtual_server = fabric-inner-tunnel" in eap_p and
 frj_p = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**{**rv_, "radius_people": people}))
 assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
-assert frj["uri"] == "ldaps://ldap.lan.j-j.family:3636" and frj["bind_dn"].startswith("cn=radius_reader,")
+assert frj["uri"] == f"ldaps://{rv_['host_ip']}:636" and frj["bind_dn"] == f"fabric-radius-{rv_['site_name']}@{rv_['ad_domain']}" \
+    and frj["base"] == rv_["ad_base_dn"] and frj["site"] == rv_["site_name"], frj   # the site's DC (S3.2)
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
 assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "610:610", fc
 assert fc["ports"] == [f"{v2['host_ip']}:1812:1812/udp", f"{v2['host_ip']}:1813:1813/udp"], fc["ports"]

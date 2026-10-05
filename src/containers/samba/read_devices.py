@@ -1,6 +1,6 @@
 import ldb
 
-from paths import devices_dn, sites_dn
+from paths import devices_dn, site_dn, sites_dn
 
 
 def _one(m, name, default=""):
@@ -32,9 +32,13 @@ def read_devices(samdb, lp, site):
                         "certs": [str(x) for x in m.get("fabricCertFingerprint", [])],
                         "roles": sorted(str(x) for x in m.get("fabricRoleName", []))})
     roles = []
+    own = f",OU=device-roles,{site_dn(samdb, site)}".lower()
     for m in samdb.search(base=sites_dn(samdb), scope=ldb.SCOPE_SUBTREE,
                           expression="(&(objectClass=group)(objectClass=fabricRole))",
                           attrs=["cn", "description", "fabricPermission", "fabricVlan", "fabricPriority"]):
+        dn = str(m.dn).lower()
+        if not dn.endswith(own) and ",ou=device-roles,ou=organisation," not in dn:
+            continue                     # another site's own role
         roles.append({"name": _one(m, "cn"), "description": _one(m, "description"),
                       "permissions": [str(x) for x in m.get("fabricPermission", [])],
                       "vlan": int(_one(m, "fabricVlan", "0")) or None,
