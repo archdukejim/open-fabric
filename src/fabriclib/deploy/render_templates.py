@@ -44,7 +44,7 @@ def render_templates(paths, jinja_env, context, final_vars, secrets, tsig_keys, 
         _render(jinja_env, out, src, dest, context, **extra)
 
     for page in ("nginx/nginx.conf", "nginx/www/certs/index.html", "nginx/www/landing/index.html",
-                 "nginx/www/manual/index.html", "nginx/www/ldap/index.html", "nginx/www/ldap/install-ldap.sh"):
+                 "nginx/www/manual/index.html", "nginx/www/certs/join-linux.sh"):
         render(f"{page}.j2", page)
     os.makedirs(os.path.join(out, "nginx/www/shared"), exist_ok=True)
     shutil.copy(os.path.join(jinja, "nginx/www/shared/style.css"), os.path.join(out, "nginx/www/shared/style.css"))

@@ -27,3 +27,4 @@ account, so AD's per-site limits apply to it.
 | `remove_role.py` | Delete a role — refused while devices are in it (audited) |
 | `common/` | Helpers shared by the device and role operations (see its README) |
 | `ensure_default_device_roles.py` | Create fabric's default device roles once, in the organisation's `OU=device-roles` (a marker file keeps a deleted one from coming back) |
+| `add_machine.py` | A machine pre-created in this site with a one-time join password (`fabricctl domain add-machine`) |

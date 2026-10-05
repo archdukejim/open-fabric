@@ -97,6 +97,16 @@ http://{{ hostname_certs }}/install-python-{{ domain_file }}.sh    <span style="
 http://{{ hostname_certs }}/install-firefox-{{ domain_file }}.sh   <span style="color:var(--muted)"># Firefox NSS</span>
 http://{{ hostname_certs }}/install-chrome-{{ domain_file }}.sh    <span style="color:var(--muted)"># Chrome / Chromium / Brave / Edge NSS</span></code></pre>
       </div>
+      <div class="card" id="join-linux">
+        <h2>Join a Linux machine to the domain</h2>
+        <p>Ubuntu 24.04 or 26.04: the machine joins <code>{{ ad_domain }}</code> into a site's machines, trusts this CA
+        (only if the fingerprint below matches the one shown above), and lets the site's people log on with their
+        domain password. Use a site admin's account, or a one-time join password made on the fabric host with
+        <code>sudo fabricctl domain add-machine &lt;name&gt;</code> (the password is asked, never typed on the command line).</p>
+        <pre><code><span class="cmd">wget</span> -nv http://{{ hostname_certs }}/join-linux.sh
+<span class="cmd">sudo bash</span> join-linux.sh &lt;root CA SHA-256 from above&gt; --user &lt;site admin&gt;
+<span class="cmd">sudo bash</span> join-linux.sh &lt;root CA SHA-256 from above&gt; --one-time     <span style="color:var(--muted)"># a pre-created machine</span></code></pre>
+      </div>
     </div>
 
     <div class="tab-content" id="tab-apple">

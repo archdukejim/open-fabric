@@ -19,6 +19,7 @@ from ensure_schema import ensure_schema
 from ensure_service_accounts import ensure_service_accounts
 from ensure_site_acl import ensure_site_acl
 from ensure_site_info import ensure_site_info
+from ensure_sudo_rule import ensure_sudo_rule
 from logon_rights_policy import EXTENSIONS as LOGON_EXTENSIONS, logon_rights_policy
 from open_samdb import open_samdb
 from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
@@ -42,10 +43,10 @@ def _sid(samdb, name):
 
 def converge(state):
     """Purpose: every part of the domain fabric owns, in order: the schema, the layout, the site's id block, the
-             groups, the site's service accounts, its access entries, its networks (the address plan), the AD site
-             and its subnets, the password policy, the domain's trust GPO (fabric's root CA), the site's log-on GPO
-             and winbind's privileged pipe for FreeRADIUS. Each part changes only what differs, so a second run
-             changes nothing.
+             groups, the site's service accounts, its access entries, its networks (the address plan), its default
+             sudo rule, the AD site and its subnets, the password policy, the domain's trust GPO (fabric's root CA),
+             the site's log-on GPO and winbind's privileged pipe for FreeRADIUS. Each part changes only what
+             differs, so a second run changes nothing.
     Inputs:  state — dict: site (str), root (bool: the root site, which also holds the organisation's items and the
              domain-wide trust GPO), password_policy (dict, every key), networks (site_networks' list), root_ca_pem
              (str), id_range ("first-last"), groups (fabric's ldap_groups), admin_group (the web UI's admin group, in
@@ -63,6 +64,7 @@ def converge(state):
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
     changed += ensure_site_acl(samdb, site, root)
     changed += ensure_networks(samdb, site, state["networks"])
+    changed += ensure_sudo_rule(samdb, site, state["admin_group"])
     changed += ensure_ad_site(samdb, site, [n["cidr"] for n in state["networks"]])
     changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
     base = str(samdb.domain_dn())

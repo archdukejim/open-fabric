@@ -1,6 +1,7 @@
 import getpass
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.directory.add_machine import add_machine
 from fabriclib.samba.domain_status import domain_status
 from fabriclib.samba.set_domain_password_policy import set_domain_password_policy
 from fabriclib.system.apply_changes import apply_changes
@@ -9,8 +10,10 @@ USAGE = """usage: fabricctl domain status                    the Windows domain:
        fabricctl domain password-policy [--minimum-length N] [--complexity on|off] [--history N]
            [--minimum-age-days N] [--maximum-age-days N] [--lockout-threshold N] [--lockout-minutes N]
            [--lockout-window-minutes N] [--no-apply]
+       fabricctl domain add-machine <name>         pre-create a machine in this site with a one-time join password
   password-policy without options shows the policy in the settings; with options it changes those values (the whole
-  policy is checked again) and applies them."""
+  policy is checked again) and applies them. add-machine prints the password once: give it to join-linux.sh
+  --one-time on the machine (manual 3.15.2)."""
 
 # option -> (policy key, type)
 OPTIONS = {"--minimum-length": ("minimum_length", int), "--complexity": ("complexity", bool),
@@ -50,9 +53,21 @@ def run_domain_command(v, args):
     Returns: exit status: 0 ok, 1 a refused change or a failed apply, 2 usage.
     Fails:   OSError from the vars file or the audit log (propagates).
     Feeds:   cli.main."""
-    if not args or args[0] not in ("status", "password-policy"):
+    if not args or args[0] not in ("status", "password-policy", "add-machine"):
         print(USAGE)
         return 2
+    if args[0] == "add-machine":
+        if len(args) != 2:
+            print(USAGE)
+            return 2
+        try:
+            password = add_machine(v, getpass.getuser(), args[1])
+        except ValidationError as e:
+            print(f"refused: {e}")
+            return 1
+        print(f"machine {args[1]} created in site {v['site_name']}; its one-time join password (shown once):")
+        print(password)
+        return 0
     if args[0] == "status":
         s = domain_status(v)
         print(f"domain {s['domain']} (realm {s['realm']}, NetBIOS {s['netbios']})")

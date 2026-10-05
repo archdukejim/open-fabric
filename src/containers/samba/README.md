@@ -38,3 +38,5 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `share_winbind.py` | winbind's privileged pipe in FreeRADIUS's group (root, 0750), for PEAP through `ntlm_auth` |
 | `ensure_networks.py` | The site's networks as `fabricNetwork` entries in its OU=networks (the address plan), kept to match |
 | `read_networks.py` | Operation `read_networks`: the address plan, every site's networks in one search |
+| `create_machine.py` | Operation `create_machine`: a machine pre-created in the site's OU=machines with a one-time join password |
+| `ensure_sudo_rule.py` | The site's default sudo rule: its admins and the admin group may run anything on its machines (D103) |

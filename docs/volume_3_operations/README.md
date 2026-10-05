@@ -71,3 +71,4 @@ Operator workflows and end-user procedures.
 ## 3.15 The directory
 
 - [3.15.1 The directory (Samba AD)](3.15.1-windows-domain.md)
+- [3.15.2 Joining Linux machines](3.15.2-linux-join.md)
