@@ -59,6 +59,7 @@ file	fabricctl-jinja|src/containers/samba/paths.py	35
 file	fabricctl-jinja|src/containers/samba/policy_entries.py	52	
 file	fabricctl-jinja|src/containers/samba/read_devices.py	36	
 file	fabricctl-jinja|src/containers/samba/read_networks.py	45	
+file	fabricctl-jinja|src/containers/samba/read_replication.py	60	
 file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
 file	fabricctl-jinja|src/containers/samba/remove_machine.py	55	
 file	fabricctl-jinja|src/containers/samba/remove_role.py	38	
@@ -251,6 +252,7 @@ file	fabriclib-federation|src/fabriclib/federation/deploy_federation_endpoint.py
 file	fabriclib-federation|src/fabriclib/federation/directory_links.py	16	0.5.0 / 2026-10-04
 file	fabriclib-federation|src/fabriclib/federation/dns_links.py	17	
 file	fabriclib-federation|src/fabriclib/federation/drop_relay.py	18	
+file	fabriclib-federation|src/fabriclib/federation/federation_overview.py	36	
 file	fabriclib-federation|src/fabriclib/federation/federation_status.py	19	
 file	fabriclib-federation|src/fabriclib/federation/join_upstream.py	20	
 file	fabriclib-federation|src/fabriclib/federation/list_invitations.py	21	
@@ -404,7 +406,9 @@ file	fabriclib-samba|src/fabriclib/samba/finish_join.py	15
 file	fabriclib-samba|src/fabriclib/samba/gpo_overview.py	13	
 file	fabriclib-samba|src/fabriclib/samba/gpo_request.py	9	
 file	fabriclib-samba|src/fabriclib/samba/id_range.py	8	
+file	fabriclib-samba|src/fabriclib/samba/list_conflicts.py	18	
 file	fabriclib-samba|src/fabriclib/samba/prepare_site.py	16	
+file	fabriclib-samba|src/fabriclib/samba/replication_status.py	19	
 file	fabriclib-samba|src/fabriclib/samba/run_converge.py	17	
 file	fabriclib-samba|src/fabriclib/samba/run_domain_command.py	4	
 file	fabriclib-samba|src/fabriclib/samba/run_gpo_command.py	10	
@@ -546,6 +550,7 @@ file	webui|src/webui/agentclient/describe_csr.py	17
 file	webui|src/webui/agentclient/device_overview.py	18	
 file	webui|src/webui/agentclient/dhcp_overview.py	19	
 file	webui|src/webui/agentclient/domain_overview.py	125	
+file	webui|src/webui/agentclient/federation_overview.py	130	
 file	webui|src/webui/agentclient/gpo_change.py	126	
 file	webui|src/webui/agentclient/gpo_overview.py	127	
 file	webui|src/webui/agentclient/host_changes.py	20	
@@ -641,6 +646,7 @@ file	webui|src/webui/views/css.py	107
 file	webui|src/webui/views/directory.py	123	
 file	webui|src/webui/views/dirsrv.py	108	0.5.0 / 2026-10-05
 file	webui|src/webui/views/error_page.py	109	
+file	webui|src/webui/views/federation.py	131	
 file	webui|src/webui/views/freeradius.py	110	
 file	webui|src/webui/views/kea.py	111	
 file	webui|src/webui/views/machine_result.py	129	
@@ -780,6 +786,8 @@ function	fabricctl-jinja|src/containers/samba/policy_entries.py|policy_targets	4
 function	fabricctl-jinja|src/containers/samba/read_devices.py|_one	1	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|read_devices	2	
 function	fabricctl-jinja|src/containers/samba/read_networks.py|read_networks	1	
+function	fabricctl-jinja|src/containers/samba/read_replication.py|_when	1	
+function	fabricctl-jinja|src/containers/samba/read_replication.py|read_replication	2	
 function	fabricctl-jinja|src/containers/samba/remove_device.py|remove_device	1	
 function	fabricctl-jinja|src/containers/samba/remove_machine.py|remove_machine	1	
 function	fabricctl-jinja|src/containers/samba/remove_role.py|remove_role	1	
@@ -1039,6 +1047,7 @@ function	fabriclib-federation|src/fabriclib/federation/directory_links.py|direct
 function	fabriclib-federation|src/fabriclib/federation/dns_links.py|_link	1	
 function	fabriclib-federation|src/fabriclib/federation/dns_links.py|dns_links	2	
 function	fabriclib-federation|src/fabriclib/federation/drop_relay.py|drop_relay	1	
+function	fabriclib-federation|src/fabriclib/federation/federation_overview.py|federation_overview	1	
 function	fabriclib-federation|src/fabriclib/federation/federation_status.py|federation_status	1	
 function	fabriclib-federation|src/fabriclib/federation/join_upstream.py|_vars	2	
 function	fabriclib-federation|src/fabriclib/federation/join_upstream.py|join_upstream	1	
@@ -1229,7 +1238,9 @@ function	fabriclib-samba|src/fabriclib/samba/finish_join.py|finish_join	1
 function	fabriclib-samba|src/fabriclib/samba/gpo_overview.py|gpo_overview	1	
 function	fabriclib-samba|src/fabriclib/samba/gpo_request.py|gpo_request	1	
 function	fabriclib-samba|src/fabriclib/samba/id_range.py|id_range	1	
+function	fabriclib-samba|src/fabriclib/samba/list_conflicts.py|list_conflicts	1	
 function	fabriclib-samba|src/fabriclib/samba/prepare_site.py|prepare_site	1	
+function	fabriclib-samba|src/fabriclib/samba/replication_status.py|replication_status	1	
 function	fabriclib-samba|src/fabriclib/samba/run_converge.py|run_converge	1	
 function	fabriclib-samba|src/fabriclib/samba/run_domain_command.py|_changes	1	
 function	fabriclib-samba|src/fabriclib/samba/run_domain_command.py|run_domain_command	2	
@@ -1468,6 +1479,7 @@ function	webui|src/webui/agentclient/describe_csr.py|describe_csr	1
 function	webui|src/webui/agentclient/device_overview.py|device_overview	1	
 function	webui|src/webui/agentclient/dhcp_overview.py|dhcp_overview	1	
 function	webui|src/webui/agentclient/domain_overview.py|domain_overview	1	
+function	webui|src/webui/agentclient/federation_overview.py|federation_overview	1	
 function	webui|src/webui/agentclient/gpo_change.py|gpo_change	1	
 function	webui|src/webui/agentclient/gpo_overview.py|gpo_overview	1	
 function	webui|src/webui/agentclient/host_changes.py|host_changes	1	
@@ -1605,6 +1617,7 @@ function	webui|src/webui/views/css.py|css	1
 function	webui|src/webui/views/directory.py|directory	1	
 function	webui|src/webui/views/dirsrv.py|dirsrv	1	0.5.0 / 2026-10-05
 function	webui|src/webui/views/error_page.py|error_page	1	
+function	webui|src/webui/views/federation.py|federation	1	
 function	webui|src/webui/views/freeradius.py|freeradius	1	
 function	webui|src/webui/views/kea.py|kea	1	
 function	webui|src/webui/views/machine_result.py|machine_result	1	

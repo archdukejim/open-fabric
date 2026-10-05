@@ -176,6 +176,22 @@ if "edge" in joined:
         wrote = False
     check("edge: writes at the RODC are refused (they belong to a writable DC)", not wrote)
 
+# ---- the Federation tab's view of it (S8.5): AD's own replication state and conflict objects, at the root
+from fabriclib.samba.list_conflicts import list_conflicts  # noqa: E402
+from fabriclib.samba.replication_status import replication_status  # noqa: E402
+def partners(container):
+    rep = replication_status(container)
+    return rep, {n["from"].split(",")[1].upper() for n in rep["neighbours"] if "," in n["from"] and not n["failures"]}
+
+
+rep, got = partners(ROOT)
+check("the root's replication status: the writable site's DC is an inbound neighbour, every partition succeeding "
+      "(an RODC only pulls)", not rep["error"] and "CN=DC-LAB" in got and "CN=DC-EDGE" not in got
+      and all(n["last_success"] for n in rep["neighbours"]), rep)
+rep, got = partners(SITES["edge"][0])
+check("the RODC's replication status: it pulls from the root", not rep["error"] and "CN=DC1" in got, rep)
+check("no conflict objects in the domain", list_conflicts(ROOT) == [], list_conflicts(ROOT))
+
 if not os.environ.get("FABRIC_TEST_KEEP"):
     cleanup()
 print(f"\n{FAILED and 'FAILED' or 'all passed'} ({FAILED} failures)")

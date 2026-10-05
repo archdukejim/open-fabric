@@ -71,3 +71,4 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `gpo_change.py` | Set or clear a policy in the admin settings GPO. Agent routes: POST /v1/gpo/set, /v1/gpo/clear (gpo:admin). |
 | `add_machine.py` | Pre-create a machine with a one-time join password. Agent route: POST /v1/machines (machines:admin). |
 | `machine_action.py` | Enable, disable or remove a machine. Agent route: POST /v1/machines/<name>/<action> (machines:admin). |
+| `federation_overview.py` | The federation's sites, replication, conflicts, limits and address plan. Agent route: GET /v1/federation (federation:read). |

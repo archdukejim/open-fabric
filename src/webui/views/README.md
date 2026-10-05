@@ -25,3 +25,4 @@ Every page (Jinja2 templates in ../templates, autoescaped, no inline script or s
 | `tsig_result.py` | The page that shows a TSIG key's secret and RFC2136 client settings once. |
 | `__init__.py` | Imports every function of this folder, so callers keep `module.function` |
 | `machine_result.py` | The page that shows a pre-created machine's one-time join password once. |
+| `federation.py` | The Federation tab: sites, replication, conflicts, limits, the address plan. |

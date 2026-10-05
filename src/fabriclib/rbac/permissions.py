@@ -29,6 +29,7 @@ PERMISSIONS = {
     "domain:read": "see the domain: its controller, password policy, machines and Group Policy settings",
     "machines:admin": "pre-create, disable, enable and remove the site's machines",
     "gpo:admin": "set and clear policies in the site's admin settings GPO",
+    "federation:read": "see the federation: sites, DC replication and conflicts, limits, the address plan",
     "vault:status": "see OpenBao's state and unlock methods",
     "vault:unlock": "add, test, remove unlock methods; rotate the vault key",
     "audit:read": "read the audit log",
@@ -36,7 +37,7 @@ PERMISSIONS = {
 }
 
 _READ = ["status:read", "dns:read", "dhcp:read", "pki:read", "devices:read", "radius:read", "people:read",
-         "domain:read", "vault:status",
+         "domain:read", "federation:read", "vault:status",
          "audit:read"]
 
 # bundle -> permissions. "admin" is the web UI admin role (webui_admin_role, default fabric-admin).

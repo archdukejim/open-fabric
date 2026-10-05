@@ -1,6 +1,7 @@
 from webui import views
 from webui.devpreview.sample_data import (RECORD_TYPES, SAMPLE_CA, SAMPLE_DEVICES, SAMPLE_DHCP, SAMPLE_DOMAIN,
-                                          SAMPLE_GPO, SAMPLE_RADIUS, SAMPLE_VAULT)
+                                          SAMPLE_FEDERATION, SAMPLE_GPO, SAMPLE_RADIUS,
+                                          SAMPLE_VAULT)
 from webui.devpreview.sample_radius_guides import sample_radius_guides
 
 
@@ -60,6 +61,8 @@ def dev_get_page(h, path, query):
             kw["role"] = next((r for r in data["roles"] if r["name"] == query.get("name")), None)
             view = view if kw["role"] else "roles"
         return h.send(200, views.directory(ctx, view, data=data, **kw))
+    if path == "/federation":
+        return h.send(200, views.federation(ctx, SAMPLE_FEDERATION))
     if path == "/kea":
         return h.send(200, views.kea(ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
     if path == "/freeradius":

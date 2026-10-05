@@ -10,6 +10,7 @@ from webui.views.continue_page import continue_page  # noqa: F401
 from webui.views.css import css  # noqa: F401
 from webui.views.directory import directory  # noqa: F401
 from webui.views.error_page import error_page  # noqa: F401
+from webui.views.federation import federation  # noqa: F401
 from webui.views.freeradius import freeradius  # noqa: F401
 from webui.views.kea import kea  # noqa: F401
 from webui.views.machine_result import machine_result  # noqa: F401

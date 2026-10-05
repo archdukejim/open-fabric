@@ -143,6 +143,10 @@ try:
     page = req("GET", "/directory?view=gpo&match=example")[3]
     check("Group Policy section (admin): what is set, a search with a set form per policy",
           "ExampleText" in page and "/directory/gpo/set" in page and "Example setting" in page)
+    page = req("GET", "/federation")[3]
+    check("Federation tab: sites with their DC type, replication with a failing neighbour, conflicts, limits, plan",
+          "lab.home.arpa" in page and "read-only" in page and "WERR_BADFILE" in page and "CNF:" in page
+          and "192.168.20.0/24" in page and "fabric-agent-&lt;site&gt;" in page, page[-800:])
     page = req("GET", "/stepca?view=issue&device=printer")[3]
     check("Step-CA generate form offers devices, prefilled from the device page",
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)

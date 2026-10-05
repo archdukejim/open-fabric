@@ -10,7 +10,7 @@ GET = {
     ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read",
     ("devices",): "devices:read",
     ("people",): "people:read",
-    ("domain",): "domain:read", ("gpo",): "domain:read",
+    ("domain",): "domain:read", ("gpo",): "domain:read", ("federation",): "federation:read",
     ("vault",): "vault:status", ("vault", "slots"): "vault:status", ("vault", "devices"): "vault:status",
 }
 POST = {

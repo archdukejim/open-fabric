@@ -145,6 +145,22 @@ SAMPLE_DOMAIN = {"status": {"domain": "ad.home.arpa", "realm": "AD.HOME.ARPA", "
                                "last_logon": "2026-10-05T08:12:00+00:00", "created": "2026-10-04", "dn": ""},
                               {"name": "ws2404", "dns": "ws2404.ad.home.arpa", "os": "", "enabled": False,
                                "last_logon": "", "created": "2026-10-05", "dn": ""}]}
+SAMPLE_FEDERATION = {
+    "site": "lan", "upstream": None,
+    "sites": [{"name": "lab", "domain": "lab.home.arpa", "address": "192.168.20.2", "parent": "lan", "dc": "writable",
+               "id_range": "105001-205000", "joined": "2026-10-05T09:00:00+02:00", "via": ""},
+              {"name": "edge", "domain": "edge.home.arpa", "address": "192.168.30.2", "parent": "lan", "dc": "rodc",
+               "id_range": "205001-305000", "joined": "2026-10-05T09:30:00+02:00", "via": ""}],
+    "replication": {"error": "", "neighbours": [
+        {"partition": "DC=ad,DC=home,DC=arpa", "from": "CN=NTDS Settings,CN=DC-LAB,CN=Servers,CN=lab,CN=Sites",
+         "last_success": "2026-10-05 10:15:02", "failures": 0, "message": ""},
+        {"partition": "DC=ad,DC=home,DC=arpa", "from": "CN=NTDS Settings,CN=DC-EDGE,CN=Servers,CN=edge,CN=Sites",
+         "last_success": "2026-10-05 09:58:40", "failures": 3, "message": "WERR_BADFILE"}]},
+    "conflicts": ["CN=printer\\0ACNF:5f0c,OU=devices,OU=lab,OU=sites,DC=ad,DC=home,DC=arpa"],
+    "limits": [["fabric-agent-<site>, <site>-admins", "its own OU=<site>", "read only"]],
+    "plan": [{"site": "lab", "name": "lan", "cidr": "192.168.20.0/24", "vlan": None, "notes": ""},
+             {"site": "lan", "name": "lan", "cidr": "192.168.1.0/24", "vlan": None, "notes": ""}],
+    "overlaps": [], "plan_error": ""}
 SAMPLE_GPO = {"site": "lan", "templates": ["fabric-starter", "samba"], "match": "",
               "settings": {"machine": [["Software\\Policies\\Example\\Starter", "ExampleText", 1, "hello"]],
                            "user": []},

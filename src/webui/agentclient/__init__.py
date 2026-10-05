@@ -65,3 +65,4 @@ from webui.agentclient.gpo_overview import gpo_overview  # noqa: F401
 from webui.agentclient.gpo_change import gpo_change  # noqa: F401
 from webui.agentclient.add_machine import add_machine  # noqa: F401
 from webui.agentclient.machine_action import machine_action  # noqa: F401
+from webui.agentclient.federation_overview import federation_overview  # noqa: F401
