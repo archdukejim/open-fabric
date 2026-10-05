@@ -153,6 +153,36 @@ check("empty roles removed", list_roles(V) == [])
 check("every change audited", all(a in AUDIT for a in ("ROLE_ADD", "DEVICE_ADD", "DEVICE_UPDATE", "DEVICE_CERT_LINK",
                                                        "DEVICE_REMOVE", "ROLE_REMOVE")), AUDIT)
 
+# ---- machines (S7.4): pre-created, listed, disabled and enabled, removed — as the site's agent
+import fabriclib.directory.add_machine as m_add_machine  # noqa: E402
+import fabriclib.directory.remove_machine as m_remove_machine  # noqa: E402
+import fabriclib.directory.set_machine_enabled as m_set_machine  # noqa: E402
+from fabriclib.directory.list_machines import list_machines  # noqa: E402
+for mod in (m_add_machine, m_remove_machine, m_set_machine):
+    mod.write_audit = lambda actor, event, detail, source: AUDIT.append(event)
+m_add_machine.add_machine(V, "alice", "ws01", secrets=SECRETS, container=DC)
+listed = list_machines(V, SECRETS, DC)
+check("a pre-created machine is listed in the site's machines, enabled",
+      [(m["name"], m["enabled"]) for m in listed] == [("ws01", True)] and "OU=machines,OU=lan" in listed[0]["dn"], listed)
+off = m_set_machine.set_machine_enabled(V, "alice", "ws01", False, secrets=SECRETS, container=DC)
+again = m_set_machine.set_machine_enabled(V, "alice", "ws01", False, secrets=SECRETS, container=DC)
+check("a machine is disabled (once: a second time changes nothing)",
+      off["changed"] and not again["changed"] and not list_machines(V, SECRETS, DC)[0]["enabled"], (off, again))
+m_set_machine.set_machine_enabled(V, "alice", "ws01", True, secrets=SECRETS, container=DC)
+check("...and enabled again", list_machines(V, SECRETS, DC)[0]["enabled"])
+check("refused: a machine name that is not one", refused(m_add_machine.add_machine, V, "alice", "Bad_Name",
+                                                         match="machine name"))
+m_remove_machine.remove_machine(V, "alice", "ws01", secrets=SECRETS, container=DC)
+check("a machine is removed from the domain", list_machines(V, SECRETS, DC) == [])
+try:
+    m_remove_machine.remove_machine(V, "alice", "ws01", secrets=SECRETS, container=DC)
+    gone = False
+except ValidationError as e:
+    gone = "no such" in str(e).lower() or "no machine" in str(e).lower()
+check("refused: removing a machine the site does not have", gone)
+check("machine changes audited", {"MACHINE_CREATE", "MACHINE_DISABLE", "MACHINE_ENABLE", "MACHINE_REMOVE"} <= set(AUDIT),
+      AUDIT)
+
 subprocess.run(["docker", "rm", "-f", DC], capture_output=True)
 subprocess.run(["docker", "network", "rm", NET], capture_output=True)
 sys.exit(1 if FAILED else 0)

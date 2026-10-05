@@ -74,7 +74,7 @@ images:
     digest: sha256:de9c65609e6bde17e6b48de485ee788407c9502fa08b8f4459f595b21f56cd00
     track: "v3.*"
     policy: manual                   # a verifier changes only by a reviewed decision
-  debian:                            # base of fabric/bind9:local, fabric/dirsrv:local, fabric/web:local,
+  debian:                            # base of fabric/bind9:local, fabric/web:local,
                                      # fabric/kea:local and fabric/freeradius:local
     var: image_debian
     repo: debian
@@ -96,8 +96,7 @@ published:
   images:
     adguard:    {var: image_fabric_adguard, tag: "1.5.0-rc.3", digest: "sha256:600da65296ceefdec893d4b5f18497c285bdd472bf1e4185f6c6909c2b0cabd2"}
     bind9:      {var: image_fabric_bind9, tag: "", digest: "", account: bind, ids: "600:600", pending: "rebuilt with Samba's DLZ libraries (S1.1)"}
-    dirsrv:     {var: image_fabric_dirsrv, tag: "1.5.0-rc.3", digest: "sha256:cfe6faa5c2c85b04c84b95a2a4221dc0e4e4a922415b844c6c2624d55a79d397", account: ldap, ids: "601:601"}
-    freeradius: {var: image_fabric_freeradius, tag: "1.5.0-rc.3", digest: "sha256:74319ea634bdb7c67d3c4b9361f984fa6adda95d065e4859c70314bd84de87d8", account: freeradius, ids: "610:610"}
+    freeradius: {var: image_fabric_freeradius, tag: "", digest: "", account: freeradius, ids: "610:610", pending: "winbind's ntlm_auth for PEAP (S3.3)"}
     kea:        {var: image_fabric_kea, tag: "1.5.0-rc.3", digest: "sha256:45c49a2c46f0f2fc6e3ec453ed628a790a85ba3d272f040a14424da7790ea53a", account: kea, ids: "609:609"}
     keycloak:   {var: image_fabric_keycloak, tag: "1.5.0-rc.3", digest: "sha256:f9ff8d0124921b4c43136573fe406e97b086a6bbfde2d6db4ebec33c9119e257"}
     samba:      {var: image_fabric_samba, tag: "", digest: "", groups: "BIND_GID=600,RADIUS_GID=610", pending: "new in S1.1"}

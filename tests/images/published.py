@@ -27,7 +27,7 @@ from fabriclib.images.constants import SERVICES  # noqa: E402
 from fabriclib.images.published_image import GROUP_ACCOUNTS, published_image  # noqa: E402
 from fabriclib.system.relaxed_settings import relaxed_settings  # noqa: E402
 
-IMAGES = ["adguard", "bind9", "dirsrv", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
+IMAGES = ["adguard", "bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
 PASS = FAIL = 0
 
 
@@ -107,7 +107,7 @@ try:
           builds(custom["bind9"]) and images_of(custom["bind9"]) == {"fabric/bind9:local"}
           and custom["bind9"]["bind9"]["build"]["args"]["BIND_UID"] == "700")
     check("custom bind ids leave the images without that account published",
-          images_of(custom["stepca"]) == {refs["stepca"]} and images_of(custom["dirsrv"]) == {refs["dirsrv"]})
+          images_of(custom["stepca"]) == {refs["stepca"]} and images_of(custom["kea"]) == {refs["kea"]})
 
     # the lock's ids are what the Dockerfiles bake in and what vars.yaml.j2 gives by default
     defaults = yaml.safe_load(open(os.path.join(work, "plain", "vars.yaml")))["service_users"]

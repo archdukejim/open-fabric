@@ -29,7 +29,7 @@ SAMPLE_DHCP = {"enabled": True, "interfaces": ["eth0"], "lease_time": 86400, "dd
                                                                    "data": "192.168.1.30"}]}]}
 SAMPLE = {
     "services": [("nginx", "active", "healthy"), ("bind9", "active", "healthy"), ("stepca", "active", "healthy"),
-                 ("ldap", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),
+                 ("samba", "active", "healthy"), ("postgres", "active", "healthy"), ("keycloak", "active", "healthy"),
                  ("openbao", "active", "healthy"), ("fabric-web", "active", "healthy"), ("fabric-agent", "active", "")],
     "host_changes": [
         {"group": g, "title": t, "state": st, "when": "2026-10-03T09:12:40+00:00" if st != "not asked" else "",
@@ -136,3 +136,18 @@ SAMPLE_INFO = {"subject": "CN=device.home.arpa,OU=IT,O=Fabric", "issuer": "CN=Fa
                "sans": ["device.home.arpa", "192.168.1.50"], "key": "RSA 2048", "serial": "0x1A2B3C4D5E",
                "not_before": "Sep 28 00:00:00 2026 GMT", "not_after": "Sep 28 00:00:00 2027 GMT", "sha256": _FP,
                "usage": "TLS Web Server Authentication, TLS Web Client Authentication", "is_ca": False}
+SAMPLE_DOMAIN = {"status": {"domain": "ad.home.arpa", "realm": "AD.HOME.ARPA", "netbios": "AD",
+                            "dc": "pi-core.ad.home.arpa", "running": True,
+                            "roles": ["SchemaMasterRole owner: pi-core"], "policy": []},
+                 "policy": {"minimum_length": 14, "complexity": True, "history": 24, "lockout_threshold": 5},
+                 "site": "lan", "machines_error": "",
+                 "machines": [{"name": "host-1", "dns": "host-1.ad.home.arpa", "os": "Windows 11 Pro", "enabled": True,
+                               "last_logon": "2026-10-05T08:12:00+00:00", "created": "2026-10-04", "dn": ""},
+                              {"name": "ws2404", "dns": "ws2404.ad.home.arpa", "os": "", "enabled": False,
+                               "last_logon": "", "created": "2026-10-05", "dn": ""}]}
+SAMPLE_GPO = {"site": "lan", "templates": ["fabric-starter", "samba"], "match": "",
+              "settings": {"machine": [["Software\\Policies\\Example\\Starter", "ExampleText", 1, "hello"]],
+                           "user": []},
+              "policies": [{"template": "fabric-starter", "name": "ExampleSetting", "display": "Example setting",
+                            "class": "Machine", "elements": ["text:ExampleText"]}], "more": False}
+

@@ -12,8 +12,8 @@ from fabriclib.directory.update_role import update_role
 
 
 def post_directory(route, actor, data):
-    """Purpose: devices and device roles in 389-DS, POST /v1/devices/... and /v1/roles/... (fabriclib.ldap, bound as
-             cn=device_admin).
+    """Purpose: devices and device roles in the domain, POST /v1/devices/... and /v1/roles/... (fabriclib.directory,
+             as the site's agent account).
     Inputs:  route — ["devices"|"roles"] plus [], [<name>], [<name>,"delete"] or (devices only) [<name>,"certs"];
              actor — str; data — body: name, fields (read_fields), sha256, link.
     Returns: {"name": ...} for an add; the result of update_*/remove_* or link_device_cert otherwise ({} when None).

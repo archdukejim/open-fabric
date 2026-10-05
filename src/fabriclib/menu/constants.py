@@ -16,11 +16,11 @@ WARNED_KEYS = {"hostname", "host_ip", "lan_cidr", "lan_gateway", "fabric_subnet"
 
 # the "Docker & Services" screen
 SERVICE_KEYS = [
-    "host_ram_capacity", "compose_file", "project_containers", "nginx_backend_ldap", "nginx_backend_stepca",
-    "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_ldap", "ip_keycloak",
-    "ip_postgres", "image_nginx", "image_debian", "image_stepca", "image_dirsrv", "image_keycloak", "image_postgres",
-    "cname_ca", "landing_page_cname", "cname_dns", "cname_ldap", "cname_sso", "cname_mgr", "hostname_nginx",
-    "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_ldap", "hostname_keycloak", "hostname_mgr",
+    "host_ram_capacity", "compose_file", "project_containers", "nginx_backend_stepca",
+    "keycloak_data_dir", "postgres_data_dir", "ip_nginx", "ip_bind9", "ip_stepca", "ip_keycloak",
+    "ip_postgres", "image_nginx", "image_debian", "image_stepca", "image_keycloak", "image_postgres",
+    "cname_ca", "landing_page_cname", "cname_dns", "cname_sso", "cname_mgr", "hostname_nginx",
+    "hostname_bind9", "hostname_stepca", "hostname_landing", "hostname_keycloak", "hostname_mgr",
 ]
 
 # fields asked for by the list editors

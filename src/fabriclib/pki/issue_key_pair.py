@@ -39,7 +39,7 @@ def issue_key_pair(v, actor, cn, sans=(), key_type="RSA-2048", days=365, device=
              alternative names: ..."; "key type must be one of ..."; valid_days' messages; "no device
              named ..." (require_device); "invalid certificate name: ..." from mint_offline_cert (an IPv6
              or e-mail CN with + or % passes valid_san but not CN_RE); "step-ca refused: ..." (run_step);
-             link_device_cert / run_dirsrv errors (raised after issuing); CalledProcessError from
+             link_device_cert / run_op errors (raised after issuing); CalledProcessError from
              export_p12; OSError.
     Feeds:   agent route POST /v1/pki/issue -> webui agentclient.issue_key_pair -> PKI page.
     Notes:   a module lock serialises minting because artifact file names derive from the CN; the

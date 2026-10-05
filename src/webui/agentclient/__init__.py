@@ -60,3 +60,8 @@ from webui.agentclient.vault_slots import vault_slots  # noqa: F401
 from webui.agentclient.vault_status import vault_status  # noqa: F401
 from webui.agentclient.version_info import version_info  # noqa: F401
 from webui.agentclient.zone_detail import zone_detail  # noqa: F401
+from webui.agentclient.domain_overview import domain_overview  # noqa: F401
+from webui.agentclient.gpo_overview import gpo_overview  # noqa: F401
+from webui.agentclient.gpo_change import gpo_change  # noqa: F401
+from webui.agentclient.add_machine import add_machine  # noqa: F401
+from webui.agentclient.machine_action import machine_action  # noqa: F401

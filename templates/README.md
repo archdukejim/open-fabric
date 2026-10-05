@@ -9,7 +9,6 @@ containers in `src/containers/`.
 |---|---|
 | `vars.yaml.j2` | Every setting with its default; rendered over the admin's `vars.yaml` |
 | [bind9/](bind9/) | Authoritative DNS: named.conf parts, zones |
-| [dirsrv/](dirsrv/) | 389 Directory Server: seed LDIF (server config, schema, tree, accounts, ACIs) |
 | [fluentbit/](fluentbit/) | Optional log forwarding |
 | [adguard/](adguard/) | Optional DNS filter: AdGuard Home in front of BIND, its configuration and oauth2-proxy's |
 | [adguard-auth/](adguard-auth/) | The DNS filter's sign-in (oauth2-proxy), a unit of its own |

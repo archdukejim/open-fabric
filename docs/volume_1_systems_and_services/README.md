@@ -48,7 +48,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 
 ## 1.6 Identity: directory and sign-in
 
-- [1.6.1 389 Directory Server](1.6.1-directory.md)
+- [1.6.1 *[DELETED]* 389 Directory Server](1.6.1-directory.md)
 - [1.6.2 Keycloak](1.6.2-keycloak.md)
 - [1.6.3 The directory on Samba AD (design)](1.6.3-samba-directory.md)
 
@@ -83,7 +83,7 @@ The home chapter for security (5.8).
 
 - [1.11.1 About the function reference](1.11.1-about-the-reference.md)
 - [1.11.2 fabricctl-agent](1.11.2-fabricctl-agent.md) — fabric-agent: the permission-checked host API behind the web UI
-- [1.11.3 fabricctl-jinja](1.11.3-fabricctl-jinja.md) — Code that runs inside service containers (389-DS seeding, FreeRADIUS policy)
+- [1.11.3 fabricctl-jinja](1.11.3-fabricctl-jinja.md) — Code that runs inside service containers (the DC's converge code and operations, FreeRADIUS)
 - [1.11.4 fabricctl-lib](1.11.4-fabricctl-lib.md) — Entry points: the deploy engine, the vars editor, the Keycloak configuration
 - [1.11.5 fabriclib-common](1.11.5-fabriclib-common.md) — Shared helpers: paths, vars file, locking, audit, rendering, console output
 - [1.11.6 fabriclib-consent](1.11.6-fabriclib-consent.md)
@@ -95,7 +95,7 @@ The home chapter for security (5.8).
 - [1.11.12 fabriclib-federation](1.11.12-fabriclib-federation.md)
 - [1.11.13 fabriclib-images](1.11.13-fabriclib-images.md) — Container images: status, update with rollback, prune
 - [1.11.14 fabriclib-keycloak](1.11.14-fabriclib-keycloak.md) — Keycloak: people, roles, sign-in resets, token verification
-- [1.11.15 fabriclib-ldap](1.11.15-fabriclib-ldap.md) — 389-DS: devices, device roles, people, the admin user
+- [1.11.15 [DELETED] fabriclib-ldap](1.11.15-fabriclib-ldap.md)
 - [1.11.16 fabriclib-logs](1.11.16-fabriclib-logs.md) — Optional log forwarding (Fluent Bit)
 - [1.11.17 fabriclib-menu](1.11.17-fabriclib-menu.md) — The vars editor (fabricctl --interactive), --print and --apply
 - [1.11.18 fabriclib-ntp](1.11.18-fabriclib-ntp.md) — Time: chrony on the host, its settings and checks

@@ -9,7 +9,6 @@ PLAN = [
      "Harden the Docker daemon (no-new-privileges, no inter-container traffic on the default bridge, "
      "no userland proxy, live-restore, bounded logs)",
      "containers may gain privileges via setuid binaries; logs can fill the disk"),
-    ("install_ldap", True, "389 Directory Server (LDAP for hosts and Keycloak)", "no central user directory"),
     ("install_keycloak", True, "Keycloak SSO (+ Postgres), required by the web UI", "no SSO and no web UI"),
     ("install_webui", True, "Fabric web UI at https://mgr.<domain> (mTLS client certificate + Keycloak login + TOTP)",
      "manage with fabricctl only"),

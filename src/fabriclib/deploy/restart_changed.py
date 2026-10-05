@@ -6,9 +6,6 @@ from fabriclib.deploy.compose_builds import compose_builds
 from fabriclib.dns.install_zone_file import install_zone_file
 from fabriclib.dns.reload_zone import reload_zone
 from fabriclib.dns.rndc import rndc
-from fabriclib.federation.configure_directory_links import configure_directory_links
-from fabriclib.ldap.people_written_here import people_written_here
-from fabriclib.ldap.seed_directory import seed_directory
 from fabriclib.samba.converge_domain import converge_domain
 from fabriclib.samba.write_bind_dlz import write_bind_dlz
 
@@ -40,12 +37,11 @@ def _enabled(unit):
 
 def restart_changed(paths, final_vars, secrets, state, bind_ids):
     """Purpose: the end of an apply on a running install: build changed images, restart what changed, reload BIND's
-             configuration and zones and nginx live, converge the Windows domain, re-seed 389-DS, and restart
+             configuration and zones and nginx live, converge the domain, and restart
              fabric-agent, the federation endpoint and the web UI last without blocking.
     Inputs:  paths — deploy_paths() (base, target, federation); final_vars — rendered settings (federation_endpoint,
-             install_ldap, ldap_base_dn, ldap_local_dn, and what converge_domain reads); secrets —
-             fabric's secrets (the directory links); state — what the install steps found (see finish_without_start,
-             plus ldap_seed); bind_ids — the bind user's ids.
+             and what converge_domain reads); secrets — fabric's secrets (the domain's service accounts); state —
+             what the install steps found (see finish_without_start); bind_ids — the bind user's ids.
     Returns: the set of units restarted (fabric-web included when it was queued).
     Fails:   ValidationError when BIND refuses `rndc reconfig` (a silent failure would leave a removed TSIG key
              working). Timeouts of systemctl/docker and a domain that cannot be converged are reported, not raised.
@@ -98,20 +94,6 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
                 _quiet(["systemctl", "restart", "bind9"], "Restart of bind9", 60)
         except ValidationError as e:              # reported: the rest of the apply still has to happen
             print(f"Warning: {e}")
-    org_here = people_written_here(paths["federation"])
-    if state["ldap_seed"] and ("dirsrv" in running or "ldap" in restart):
-        print("Applying 389-DS seed data...")
-        try:
-            print(seed_directory(None if org_here else (final_vars["ldap_base_dn"], final_vars["ldap_local_dn"])))
-        except ValidationError as e:              # reported: the rest of the apply still has to happen
-            print(f"Warning: {e}")
-    if final_vars.get("install_ldap", True) and ("dirsrv" in running or "ldap" in restart):
-        try:                                      # the federation's directory links: a site joined or was removed
-            linked = configure_directory_links(final_vars, secrets, paths["federation"])
-            if linked:
-                print("Directory replication: " + ", ".join(linked))
-        except (ValidationError, RuntimeError) as e:
-            print(f"Warning: directory replication: {e}")
     if state["agent"] and _enabled("fabric-agent"):
         print("Restarting fabric-agent (queued)...")            # --no-block: this apply may run inside it
         subprocess.run(["systemctl", "restart", "--no-block", "fabric-agent"], timeout=15)

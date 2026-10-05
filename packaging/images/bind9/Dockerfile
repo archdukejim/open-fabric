@@ -5,7 +5,7 @@
 # chiselled images without a shell or package tools, so no layer can be
 # built on them, and its `latest` is a stale beta on an unsupported Ubuntu.
 # Debian ships BIND 9.20 with security updates; `fabricctl images update`
-# rebuilds this on the validated Debian base (like dirsrv and webui).
+# rebuilds this on the validated Debian base (like webui).
 #
 # Needs no capabilities: Docker sets net.ipv4.ip_unprivileged_port_start=0
 # inside the container's network namespace, so a non-root named can bind 53.

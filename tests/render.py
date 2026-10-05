@@ -15,10 +15,9 @@ from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 # FABRIC_TEST_TEMPLATES: another templates folder (its lock beside it), e.g. one with published digests pinned
 env = jinja_env(os.environ.get('FABRIC_TEST_TEMPLATES') or os.path.join(REPO, 'templates'))
 
-secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
+secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
-               ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
-               ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1', ldap_device_admin_password='Da1', ldap_radius_password='Rr1',
+               ad_radius_password='Rr1',
                radius_secrets={'switch1': 'Sw1tchSecretSw1tchSecret', 'ap-old': 'OldApSecretOldApSecret'},
                webui_oidc_secret='OidcSecret1',
                tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA==',
@@ -80,7 +79,6 @@ diff = {k: (v1.get(k), v2.get(k)) for k in set(v1) | set(v2) if v1.get(k) != v2.
 assert not diff, diff
 print('project_containers', v2['project_containers'])
 print('service_dirs', [d['folder'] for d in v2['service_dirs']])
-print('ldap backends', v2['nginx_backend_ldap'], v2['nginx_backend_ldaps'])
 print('install_webui', v2['install_webui'], v2['hostname_mgr'])
 print('CNAMEs', [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']])
 
@@ -99,7 +97,7 @@ for tpl in sorted(env.list_templates()):
     if tpl.startswith('bind9/data/reverse'):
         extra = dict(reverse_zone_name='7.168.192.in-addr.arpa', ptr_records=rv['zones']['7.168.192.in-addr.arpa'])
     if tpl.startswith('systemd/'):
-        extra = dict(item={'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []})
+        extra = dict(item={'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []})
     if tpl.endswith('.json.j2'):
         json.loads(env.get_template(tpl).render(**full))
     text = env.get_template(tpl).render(**full, **extra)
@@ -155,15 +153,11 @@ assert f"--allow-uid {fed['service_users']['nginx']['uid']}" in unit and 'lib/fe
 site = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'domain': 'branch1.lan.j-j.family',
                                                                   'org_domain': 'lan.j-j.family', 'site_name': 'branch1'}))
 assert site['ldap_base_dn'] == v2['ldap_base_dn'] == 'dc=lan,dc=j-j,dc=family', site['ldap_base_dn']
-assert site['ldap_local_dn'] == 'ou=branch1,dc=lan,dc=j-j,dc=family' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
-# a chosen base DN (the root site's install, e.g. dc=lan): the site part sits under it; the seed's base entry
-# takes its first RDN (domain for dc=, organization for o=)
-for base, oc in (('dc=lan', 'objectClass: domain\ndc: lan'), ('o=acme,dc=lan', 'objectClass: organization\no: acme')):
+assert site['site_name'] == 'branch1' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
+# a chosen base DN (the root site's install, e.g. dc=lan) is kept as given: it names the organisation
+for base in ('dc=lan', 'o=acme,dc=lan'):
     chosen = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'ldap_base_dn': base}))
-    assert chosen['ldap_base_dn'] == base and chosen['ldap_local_dn'] == f'ou=pi-core,{base}', chosen['ldap_local_dn']
-    tree = env.get_template('dirsrv/seed/10-tree.ldif.j2').render(**{**chosen, **secrets})
-    assert f'dn: {base}\nobjectClass: top\n{oc}' in tree, tree[:400]
-    assert f'dn: ou=pi-core,{base}\nobjectClass: top\nobjectClass: organizationalUnit\nou: pi-core' in tree
+    assert chosen['ldap_base_dn'] == base, chosen['ldap_base_dn']
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
 # DNS links (manual 1.8 M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
 plain = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
@@ -227,7 +221,7 @@ for key, val in v2.items():
         # image_fabric_*: "" until the lock pins fabric's published image (manual 2.6.3)
         assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local') or \
             (key.startswith('image_fabric_') and val == ''), f'{key} not pinned: {val}'
-for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
+for svc in ('nginx', 'bind9', 'stepca', 'samba', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     for name, spec in dc['services'].items():
         ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
@@ -251,7 +245,7 @@ assert outs["es"]["host"] == "es.lan" and outs["es"]["port"] == 9200 and outs["e
 assert fb["service"]["storage.path"] == "/buffer" and any(i["name"] == "systemd" for i in fb["pipeline"]["inputs"])
 none = yaml.safe_load(env.get_template('fluentbit/fluent-bit.yaml.j2').render(**{**v2, "hostname": "h"}))
 assert [o["name"] for o in none["pipeline"]["outputs"]] == ["null"], none
-for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao'):
+for svc in ('nginx', 'bind9', 'stepca', 'samba', 'keycloak', 'postgres', 'webui', 'openbao'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     assert all(sp.get("logging", {}).get("driver") == "journald" for sp in dc["services"].values()), svc
 print('Fluent Bit: verified TLS to syslog and Elasticsearch, password from the environment; containers log to the journal')
@@ -380,14 +374,11 @@ assert {f"{base_}/samba/winbindd:/run/samba/winbindd:ro",
         f"{base_}/samba/data/state/winbindd_privileged:/data/state/winbindd_privileged:ro",
         f"{base_}/samba/data/etc:/etc/samba:ro"} <= set(fc["volumes"]), fc["volumes"]   # PEAP through the DC's winbind
 assert fc["ports"] == [f"{v2['host_ip']}:1812:1812/udp", f"{v2['host_ip']}:1813:1813/udp"], fc["ports"]
-accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
-assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts
 assert v2["radius_people"] == [{"group": "network-staff", "vlan": None, "priority": 50},
                                {"group": "network-guests", "vlan": None, "priority": 100}], v2["radius_people"]
 kept_empty = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1, "radius_people": []}))
 assert kept_empty["radius_people"] == [], "an empty mapping must stay empty (no defaults brought back)"
-tree = env.get_template("dirsrv/seed/10-tree.ldif.j2").render(**{**v2, **secrets})
-assert "dn: cn=network-staff,ou=groups," in tree and "dn: cn=network-guests,ou=groups," in tree
+assert {"network-staff", "network-guests"} <= {g["name"] for g in v2["ldap_groups"]}
 assert not any(g.get("bundle") for g in v2["ldap_groups"] if g["name"] in ("network-staff", "network-guests")),     "the network groups grant no fabric web access"
 print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS, EAP-TTLS only for mapped groups, policy lookup, no capabilities")
 

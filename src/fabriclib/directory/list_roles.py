@@ -7,9 +7,7 @@ def list_roles(v, directory=None):
              result, default a fresh read.
     Returns: read_directory's role dicts sorted by (priority, name).
     Fails:   read_directory's /
-             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
-             entry", "that name is already taken", "the directory refused the change ...", "directory
-             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired) when it reads.
+             run_op's errors (ValidationError: the domain controller not reachable, or refusing) when it reads.
     Feeds:   device_overview.
     """
     directory = directory or read_directory(v)

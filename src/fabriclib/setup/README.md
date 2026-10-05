@@ -27,11 +27,11 @@
 | `start_bootstrap.py` | Start bind9 + step-ca; validate every zone |
 | `mint_service_certs.py` | Issue/renew service certificates (only what is missing, expiring or wrong); web UI and FreeRADIUS CA bundles |
 | `mint_extra_certs.py` | `extra_certs` entries, when missing or due (part of the `certs` step) |
-| `start_services.py` | Retire renamed units; start the stack in order; seed 389-DS; configure Keycloak; fabric-agent + web UI; activate `fabric.target` |
+| `start_services.py` | Retire renamed units; start the stack in order; converge the domain; configure Keycloak; fabric-agent + web UI; activate `fabric.target` |
 | `start_unit.py` | Enable, start or restart one unit and wait until its container is healthy |
 | `setup_openbao.py` | `vault` step: vault key and unlock, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration, move fabric's secrets file into OpenBao |
-| `create_admin.py` | First web UI admin: LDAP user in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
-| `verify_install.py` | End-to-end checks (DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services) |
+| `create_admin.py` | First web UI admin: a person in the domain, in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
+| `verify_install.py` | End-to-end checks (DNS, HTTPS chains, web UI gates, time, services) |
 | `retire_renamed_units.py` | Upgrade: stop and remove units/containers that were renamed (`webui` → `fabric-web`) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
 | `run_restore_command.py` | `fabricctl restore <export>`: put an export back and run setup on it (refused while installed) |

@@ -1,4 +1,4 @@
-NAMES = {"bind": "fabric-dns", "ldap": "fabric-ldap", "nginx": "fabric-proxy", "step": "fabric-ca",
+NAMES = {"bind": "fabric-dns", "nginx": "fabric-proxy", "step": "fabric-ca",
          "keycloak": "fabric-sso", "postgres": "fabric-db", "webui": "fabric-webui", "openbao": "fabric-vault",
          "fluentbit": "fabric-logs", "kea": "fabric-dhcp", "freeradius": "fabric-radius",
          "adguard": "fabric-dnsfilter", "oauth2proxy": "fabric-auth"}

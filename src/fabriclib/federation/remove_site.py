@@ -12,9 +12,9 @@ def remove_site(actor, site, source="cli", v=None):
              a disposable lab torn down, or one moved elsewhere (manual 1.8.5.1).
     Inputs:  actor — str (audit); site — its name; source — default "cli"; v — fabric vars for OpenBao
              (default: read from vars.yaml).
-    Returns: the removed record (dict); its DNS link key (federation_tsig[site]) and directory link secret
-             (federation_replication[site]) are deleted too. The caller applies, so the delegation, the secondary
-             zone and the replication agreement go.
+    Returns: the removed record (dict); its DNS link key (federation_tsig[site]) is deleted too (and an older
+             install's directory link secret, federation_replication[site]). The caller applies, so the
+             delegation and the secondary zone go.
     Fails:   ValidationError "no site <x> joined here"; OSError / yaml errors from the registry.
     Feeds:   run_federation_command (remove).
     Notes:   the site's CA stays valid until it expires: revocation (a CRL, design F7) is not built yet, so a
@@ -28,7 +28,7 @@ def remove_site(actor, site, source="cli", v=None):
         save_registry(registry)
         stored = load_secrets(v=v)
         update = {}
-        for name in ("federation_tsig", "federation_replication"):     # the DNS and directory links
+        for name in ("federation_tsig", "federation_replication"):     # the DNS link (an older install: its directory)
             keys = dict(stored.get(name) or {})
             if keys.pop(site, None) is not None:
                 update[name] = keys

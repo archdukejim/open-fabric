@@ -4,7 +4,7 @@ The dev preview (`devserver.py`): the real pages over in-memory sample data; no 
 
 | File | What |
 |---|---|
-| `dev_get_page.py` | Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao, /dirsrv, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks like). No sign-in, no client certificate, no fabric-agent. |
+| `dev_get_page.py` | Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao, /directory, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks like). No sign-in, no client certificate, no fabric-agent. |
 | `dev_handler.py` | One dev-preview request: the real pages over in-memory sample data; no sign-in, nothing saved. |
 | `dev_post_action.py` | Act out every form post in memory only (DNS records, TSIG keys, apply, PKI, vault, devices, roles, people, DHCP reservations, subnets, options and classes, RADIUS clients and groups) and show the same result page or redirect as production. Nothing is saved, signed or applied; secrets and passwords shown are fake or throwaway. |
 | `dev_post_directory.py` | People, devices and roles acted out in memory, with the real fabriclib rules when available. |

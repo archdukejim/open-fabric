@@ -8,9 +8,7 @@ def require_device(v, name):
     Inputs:  v — fabric vars; name — device name.
     Returns: None.
     Fails:   ValidationError "no device named ..."; read_directory's /
-             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
-             entry", "that name is already taken", "the directory refused the change ...", "directory
-             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+             run_op's errors (ValidationError: the domain controller not reachable, or refusing).
     Feeds:   pki/issue_key_pair, pki/sign_csr.
     """
     if not any(d["name"] == name for d in read_directory(v)["devices"]):

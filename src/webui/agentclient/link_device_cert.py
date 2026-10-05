@@ -11,7 +11,7 @@ def link_device_cert(actor, name, sha256, link=True):
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for an unknown device or bad fingerprint.
-    Feeds:   src/webui/routes/dirsrv_post (devices, certs — always link=False).
+    Feeds:   src/webui/routes/directory_post (devices, certs — always link=False).
     """
     return call_agent("POST", f"/v1/devices/{quote_segment(name)}/certs", {"actor": actor, "sha256": sha256,
                                                                            "link": link})

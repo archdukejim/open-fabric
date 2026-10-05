@@ -9,6 +9,6 @@ def create_person(uid, first, last, email):
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for bad or duplicate values; KeyError if a 200 reply had no "password".
-    Feeds:   src/webui/routes/dirsrv_post (people/_new -> views.person_result).
+    Feeds:   src/webui/routes/directory_post (people/_new -> views.person_result).
     """
     return call_agent("POST", "/v1/people", {"uid": uid, "first": first, "last": last, "email": email})["password"]

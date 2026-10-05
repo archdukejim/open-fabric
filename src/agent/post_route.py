@@ -1,5 +1,6 @@
 from agent.post_directory import post_directory
 from agent.post_dhcp import post_dhcp
+from agent.post_domain import post_domain
 from agent.post_dns import post_dns
 from agent.post_network import post_network
 from agent.post_pki import post_pki
@@ -39,6 +40,8 @@ def post_route(route, actor, data, perms):
         return post_vault(route[1:], actor, data)
     if area in (["devices"], ["roles"]):
         return post_directory(route, actor, data)
+    if area in (["machines"], ["gpo"]):
+        return post_domain(route, actor, data)
     if route == ["apply"]:
         ok, output = apply_changes(actor, source="web")
         return {"ok": ok, "output": output}

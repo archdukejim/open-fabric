@@ -8,6 +8,6 @@ def list_people():
     Returns: dict from fabriclib.directory.list_people, e.g. {"users": [...], "groups": [...], "keycloak_url": str}.
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403).
-    Feeds:   src/webui/routes/dirsrv_page (view "people").
+    Feeds:   src/webui/routes/directory_page (view "people").
     """
     return call_agent("GET", "/v1/people")

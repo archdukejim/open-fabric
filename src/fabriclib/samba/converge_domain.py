@@ -6,7 +6,7 @@ import subprocess
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.federation.site_networks import site_networks
-from fabriclib.ldap.people_written_here import people_written_here
+from fabriclib.federation.common.is_root_site import is_root_site
 from fabriclib.radius.windows_lan_profile import windows_lan_profile
 from fabriclib.samba.id_range import id_range
 
@@ -28,7 +28,7 @@ def converge_domain(v, federation_file, secrets, container="samba"):
              OSError reading the root CA; subprocess.TimeoutExpired after 10 minutes.
     Feeds:   setup/start_services (after the DC starts), deploy/restart_changed (every apply), tests/samba."""
     root_ca = os.path.join(v["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
-    state = {"site": v["site_name"], "root": people_written_here(federation_file),
+    state = {"site": v["site_name"], "root": is_root_site(federation_file),
              "password_policy": v["ad_password_policy"],
              "networks": site_networks(v),
              "root_ca_pem": open(root_ca).read(), "id_range": id_range(v),

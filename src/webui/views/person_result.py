@@ -6,6 +6,6 @@ def person_result(ctx, uid, what, password):
     Inputs:  ctx — page context; uid — user name; what — 'created' or 'reset'; password — the one-time password str.
     Returns: HTML str.
     Fails:   never in practice (plain values).
-    Feeds:   src/webui/routes/dirsrv_post; devserver.
+    Feeds:   src/webui/routes/directory_post; devserver.
     """
-    return render_page("person_result", ctx=ctx, tab="dirsrv", uid=uid, what=what, password=password)
+    return render_page("person_result", ctx=ctx, tab="directory", uid=uid, what=what, password=password)

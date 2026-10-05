@@ -17,3 +17,7 @@ itself is a container (`templates/samba`, `packaging/images/samba`); what conver
 | `run_domain_command.py` | `fabricctl domain status` and `password-policy` (routing only) |
 | `gpo_request.py` | One ADMX-editor operation inside the DC (`gpo_tool.py`), the request on stdin |
 | `run_gpo_command.py` | `fabricctl gpo load / templates / list / show / set / clear / starter` |
+| `domain_overview.py` | The Directory tab's domain section: the DC, the policy, this site's machines |
+| `gpo_overview.py` | The Group Policy section: templates, the admin settings GPO, a policy search |
+| `set_gpo_policy.py` | Set a policy in the site's admin settings GPO (audited; CLI and web UI) |
+| `clear_gpo_policy.py` | Put a policy back to Not configured (audited; CLI and web UI) |

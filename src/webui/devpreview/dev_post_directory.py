@@ -6,20 +6,20 @@ from webui.devpreview.fabric_rules import ValidationError, list_devices
 
 def dev_post_directory(h, path, form):
     """Purpose: People, devices and roles acted out in memory, with the real fabriclib rules when available.
-    Inputs:  h — the dev handler (send, state, ctx); path — /dirsrv/people/<_new|uid>[/reset] or
-             /dirsrv/<devices|roles>/<name|_new>[/delete|/certs/…]; form — dict.
+    Inputs:  h — the dev handler (send, state, ctx); path — /directory/people/<_new|uid>[/reset] or
+             /directory/<devices|roles>/<name|_new>[/delete|/certs/…]; form — dict.
     Returns: True when the path was handled (a result page or a 303 with msg or err was sent); None otherwise (the
              device and role forms need fabriclib).
     Fails:   never for ValidationError (shown as err); other errors propagate.
     Feeds:   dev_post_action."""
     state, ctx = h.state, h.ctx
-    if path.startswith("/dirsrv/people/"):
+    if path.startswith("/directory/people/"):
         name, op = (path.split("/")[3:] + ["", ""])[:2]
         users = state.data["people"]["users"]
         if name == "_new":
             uid = form.get("uid", "")
             if not uid or any(u["uid"] == uid for u in users):
-                h.send(303, b"", location="/dirsrv?view=people&err=" + urllib.parse.quote(
+                h.send(303, b"", location="/directory?view=people&err=" + urllib.parse.quote(
                     f"{uid or 'a user name'} is missing or already exists"))
                 return True
             users.append({"uid": uid, "name": f"{form.get('first', '')} {form.get('last', '')}".strip(),
@@ -32,13 +32,13 @@ def dev_post_directory(h, path, form):
             h.send(404, views.error_page(404, "Not found."))
             return True
         if set(target["groups"]) - {"users"} and "system:admin" not in ctx["perms"]:
-            h.send(303, b"", location="/dirsrv?view=people&err=" + urllib.parse.quote(
+            h.send(303, b"", location="/directory?view=people&err=" + urllib.parse.quote(
                 f"{name} is in a fabric group: only an admin can reset their sign-in"))
             return True
         state.log("PERSON_RESET", f"user={name} (dev preview)")
         h.send(200, views.person_result(ctx, name, "reset", "dev-preview-not-real"))
         return True
-    if not (path.startswith("/dirsrv/") and list_devices):
+    if not (path.startswith("/directory/") and list_devices):
         return None
     kind, name, op = (path.split("/")[2:] + ["", "", ""])[:3]
     d = state.data["directory"]
@@ -64,8 +64,8 @@ def dev_post_directory(h, path, form):
         else:
             state.save(kind, name, form)
             back, msg = {"view": kind[:-1], "name": name}, "Saved (in memory)."
-        h.send(303, b"", location="/dirsrv?" + urllib.parse.urlencode({**back, "msg": msg}))
+        h.send(303, b"", location="/directory?" + urllib.parse.urlencode({**back, "msg": msg}))
     except ValidationError as exc:
         back = {"view": kind} if name == "_new" or op == "delete" else {"view": kind[:-1], "name": name}
-        h.send(303, b"", location="/dirsrv?" + urllib.parse.urlencode({**back, "err": str(exc)}))
+        h.send(303, b"", location="/directory?" + urllib.parse.urlencode({**back, "err": str(exc)}))
     return True

@@ -7,7 +7,7 @@ from fabriclib.secrets.export_secrets import export_secrets
 from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
 
 KEEP = ["fabric/config", "stepca/data", "nginx/certs", "bind9/ssl", "keycloak/certs", "postgres/certs",
-        "dirsrv/data/tls", "openbao/data", "openbao/certs"]
+        "openbao/data", "openbao/certs"]
 ROOT_DIR = "@root"          # absolute paths outside the install root (the OpenBao seal key)
 
 
@@ -21,8 +21,8 @@ def backup_install(ctx):
     Fails:   FileExistsError if the folder exists (same second); CalledProcessError from cp -a; ValidationError
              from export_secrets when OpenBao is unreachable.
     Feeds:   cli main (`reinstall`), then restore_install.
-    Notes:   OpenBao's data and its key go together: one is useless without the other. The directory
-             (389-DS data) and Keycloak's database are not kept."""
+    Notes:   OpenBao's data and its key go together: one is useless without the other. The domain
+             (samba/data) and Keycloak's database are not kept."""
     dest = f"/root/fabric-reinstall-{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(dest, mode=0o700)
     for rel in KEEP:

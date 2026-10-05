@@ -27,6 +27,9 @@ SMB = "Software\\Policies\\Samba\\smb_conf"
 FAILED = 0
 AUDIT = []
 m_cmd.write_audit = lambda actor, event, detail, source: AUDIT.append(event)
+import fabriclib.samba.set_gpo_policy as m_set  # noqa: E402
+import fabriclib.samba.clear_gpo_policy as m_clear  # noqa: E402
+m_set.write_audit = m_clear.write_audit = m_cmd.write_audit
 
 
 def check(name, cond, detail=""):

@@ -6,7 +6,9 @@ import shutil
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
 from fabriclib.deploy.deploy_paths import deploy_paths
+from fabriclib.samba.clear_gpo_policy import clear_gpo_policy
 from fabriclib.samba.gpo_request import gpo_request
+from fabriclib.samba.set_gpo_policy import set_gpo_policy
 
 USAGE = """usage: fabricctl gpo load <folder>                 templates (.admx, <lang>/.adml) into the central store
        fabricctl gpo templates                     the templates in the central store
@@ -89,10 +91,10 @@ def run_gpo_command(v, args, container="samba"):
                     raise ValidationError(f"{item}: give <element>=<value>")
                 key, value = item.split("=", 1)
                 values[key] = value
-            req = {"op": op, "site": site, "policy": rest[0], "values": values, "enabled": enabled}
-            done = gpo_request(req, container)
-            write_audit(getpass.getuser(), f"GPO_{op.upper()}", f"site={site} policy={rest[0]}"
-                        + ("" if enabled else " disabled"), "cli")
+            if op == "set":
+                done = set_gpo_policy(v, getpass.getuser(), rest[0], values, enabled, container=container)
+            else:
+                done = clear_gpo_policy(v, getpass.getuser(), rest[0], container=container)
             print("; ".join(done) or "already so")
     except ValidationError as e:
         print(f"refused: {e}")

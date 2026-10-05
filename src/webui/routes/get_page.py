@@ -1,7 +1,7 @@
 from webui import agentclient as actions
 from webui import views
 from webui.routes.bind9_page import bind9_page
-from webui.routes.dirsrv_page import dirsrv_page
+from webui.routes.directory_page import directory_page
 from webui.routes.openbao_page import openbao_page
 from webui.routes.stepca_page import stepca_page
 from webui.session.page_context import page_context
@@ -10,7 +10,7 @@ from webui.session.page_context import page_context
 def get_page(h, sess, path, query):
     """Purpose: Route a signed-in GET to its page.
     Inputs:  h — the request handler (send, deny); sess — dict from find_session; path — str: /, /bind9, /stepca,
-             /dirsrv, /openbao, /kea, /freeradius, /audit; query — dict (view, zone, device, name, slot, msg, err as
+             /directory, /openbao, /kea, /freeradius, /audit; query — dict (view, zone, device, name, slot, msg, err as
              each page uses them).
     Returns: 200 page (overview with the host changes fabric may make, BIND9, Step-CA, directory, OpenBao, Kea,
              FreeRADIUS with its setup guides for view
@@ -26,8 +26,8 @@ def get_page(h, sess, path, query):
         return bind9_page(h, ctx, query)
     if path == "/stepca":
         return stepca_page(h, ctx, query.get("view", "ca"), device=query.get("device", ""))
-    if path == "/dirsrv":
-        return dirsrv_page(h, ctx, query)
+    if path == "/directory":
+        return directory_page(h, ctx, query)
     if path == "/openbao":
         return openbao_page(h, ctx, query)
     if path == "/kea":

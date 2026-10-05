@@ -45,3 +45,7 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `admx_store.py` | The domain's central store: templates saved, and every policy they define read as Windows' editor reads them |
 | `policy_entries.py` | What a policy writes to the registry (enabled with its elements, disabled), and which values are its own |
 | `admin_gpo.py` | The site's `fabric: <site> admin settings` GPO: what it sets, and writing it |
+| `list_machines.py` | Operation `list_machines`: the site's computer accounts (Windows and Linux) with state and last logon |
+| `find_machine.py` | A machine of the site by its name (for set_machine and remove_machine) |
+| `set_machine.py` | Operation `set_machine`: disable a machine, or enable it again |
+| `remove_machine.py` | Operation `remove_machine`: a machine removed from the domain |

@@ -1,5 +1,5 @@
 # FreeRADIUS 3.2 (the supported upstream line; Debian trixie ships 3.2.7 with
-# security updates) on the validated Debian base, like bind9 and dirsrv.
+# security updates) on the validated Debian base, like bind9.
 # python3 + python3-ldap: fabric's policy (fabric/jinja/freeradius/python)
 # looks every device up in the site's DC (AD). winbind's ntlm_auth: PEAP's
 # MS-CHAPv2 checked by the DC through its winbind (sockets mounted from the

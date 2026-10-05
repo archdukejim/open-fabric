@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Hardening suite: start bind9, step-ca, postgres, keycloak, dirsrv and
+# Hardening suite: start bind9, step-ca, postgres, keycloak and
 # openbao from the REAL rendered compose files (docker compose up, including
 # the local build layers), prove each one works, and assert from the host
 # that it is hardened: non-root, all capabilities dropped and none added,
@@ -25,7 +25,7 @@ PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 
 down_all() {
-    for s in openbao dirsrv keycloak postgres stepca bind9; do
+    for s in openbao keycloak postgres stepca bind9; do
         [ -f "$W/rendered/$s/docker-compose.yml" ] && docker compose -f "$W/rendered/$s/docker-compose.yml" down -v >/dev/null 2>&1
     done
     docker network rm fabric_net >/dev/null 2>&1
@@ -43,7 +43,7 @@ python3 "$REPO/tests/render.py" "$W/rendered" >/dev/null || { echo "FAIL render"
 R="$W/rendered"
 docker network create --subnet 10.255.0.0/24 fabric_net >/dev/null
 # Build contexts go where deploy.py puts them (/opt/<svc>/build)
-for s in bind9 stepca keycloak dirsrv; do mkdir -p "$BASE/$s"; cp -a "$REPO/packaging/images/$s" "$BASE/$s/build"; done
+for s in bind9 stepca keycloak; do mkdir -p "$BASE/$s"; cp -a "$REPO/packaging/images/$s" "$BASE/$s/build"; done
 
 # ---- PKI: root -> intermediate -> leaves -----------------------------
 cd "$W" || exit 1
@@ -63,7 +63,6 @@ leaf() {  # name san...
 leaf dns "dns.$DOMAIN" "ns.$DOMAIN"
 leaf pg postgres "postgres.$DOMAIN"
 leaf kc "sso.$DOMAIN"
-leaf ldap "ldap.$DOMAIN"
 leaf bao "vault.$DOMAIN" openbao
 
 # ---- assertions ----------------------------------------------------------
@@ -112,6 +111,12 @@ up() { docker compose -f "$R/$1/docker-compose.yml" up -d --build >"$W/$1-up.log
 
 # ---- bind9 -------------------------------------------------------------
 echo "--- bind9"
+# the DC's DLZ includes, as deploy_samba writes them before the domain exists (BIND starts without the AD zone)
+mkdir -p "$BASE/samba/bind"
+printf '# the AD zone: not yet
+' > "$BASE/samba/bind/dlz.conf"
+printf '# the AD zone: not yet
+' > "$BASE/samba/bind/options.conf"
 mkdir -p "$BASE/bind9"/{config,data,log,cache,ssl}
 cp "$R"/bind9/config/* "$BASE/bind9/config/"
 for z in $(grep -o 'db\.[^"]*' "$R/bind9/config/named.conf.zones"); do
@@ -176,26 +181,6 @@ kc_https() { for _ in $(seq 1 30); do curl -sf --cacert root.crt --resolve "sso.
 check "keycloak serves HTTPS with its cert" "kc_https"
 check "keycloak started optimized (no re-augmentation)" "! docker logs keycloak 2>&1 | grep -qi 'Updating the configuration and installing your custom providers'"
 
-# ---- dirsrv -------------------------------------------------------------------
-echo "--- dirsrv"
-mkdir -p "$BASE/dirsrv/data/tls/ca" "$BASE/dirsrv/seed"
-cp ldap.crt "$BASE/dirsrv/data/tls/server.crt"; cp ldap.key "$BASE/dirsrv/data/tls/server.key"
-cp root.crt int.crt "$BASE/dirsrv/data/tls/ca/"
-cp "$R"/dirsrv/seed/*.ldif "$BASE/dirsrv/seed/"; cp "$REPO/src/containers/dirsrv/seed.py" "$BASE/dirsrv/seed/"
-chown -R 601:601 "$BASE/dirsrv/data"; chown -R 0:601 "$BASE/dirsrv/seed"; chmod 750 "$BASE/dirsrv/seed"; chmod 640 "$BASE/dirsrv/seed"/*
-check "dirsrv builds and becomes healthy" "up dirsrv && wait_healthy dirsrv"
-check "dirsrv hardened: $(hardened dirsrv 1 | tr -d '\n')" "hardened dirsrv 1 >/dev/null"
-backends() {
-    docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_SUFFIX_NAME (" || dsconf localhost backend create --suffix "$DS_SUFFIX_NAME" --be-name userroot' >/dev/null &&
-    docker exec dirsrv sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF "$DS_LOCAL_SUFFIX (" || dsconf localhost backend create --suffix "$DS_LOCAL_SUFFIX" --be-name sitelocal --parent-suffix "$DS_SUFFIX_NAME"' >/dev/null
-}
-# as ldap/seed_directory.py: the healthcheck can pass a moment before LDAPI accepts connections
-seed() {
-    for _ in $(seq 1 12); do backends && break; sleep 5; done
-    backends && docker exec dirsrv sh -c 'python3 /seed/seed.py /seed/*.ldif'
-}
-check "dirsrv seeds on a read-only root" "seed | tee '$W/seed.log' | grep -q 'seed: '"
-
 # ---- openbao -------------------------------------------------------------------
 echo "--- openbao"
 mkdir -p "$BASE/openbao"/{config,data,logs,certs}
@@ -215,5 +200,5 @@ check "openbao serves TLS with its cert" \
     "curl -s --cacert root.crt --resolve vault.$DOMAIN:8200:10.255.0.90 https://vault.$DOMAIN:8200/v1/sys/seal-status | grep -q '\"type\":\"static\"'"
 
 echo; echo "$PASS passed, $FAIL failed"
-[ "${KEEP:-0}" = 1 ] || { down_all; docker rmi fabric/bind9:local fabric/stepca:local fabric/keycloak:local fabric/dirsrv:local >/dev/null 2>&1; }
+[ "${KEEP:-0}" = 1 ] || { down_all; docker rmi fabric/bind9:local fabric/stepca:local fabric/keycloak:local >/dev/null 2>&1; }
 exit $FAIL

@@ -418,9 +418,9 @@ st, hd, sc, body = req("POST", "/stepca/issue", POSTH, {"csrf": csrf, "cn": "bad
                                                         "days": "30"}, cookie=session)
 check("invalid request -> form again with the reason (400)", st == 400 and "not a host name" in body, (st, body[:300]))
 
-# ---- 389-DS tab without a directory container: the page says so, nothing breaks
-st, hd, sc, body = req("GET", "/dirsrv", ALICE, cookie=session)
-check("389-DS tab reports an unreachable directory instead of failing", st == 200 and "could not be read" in body, (st, body[:300]))
+# ---- the Directory tab without the domain controller: the page says so, nothing breaks
+st, hd, sc, body = req("GET", "/directory", ALICE, cookie=session)
+check("Directory tab reports an unreachable directory instead of failing", st == 200 and "could not be read" in body, (st, body[:300]))
 st, hd, sc, body = req("GET", "/stepca?view=issue", ALICE, cookie=session)
 check("Step-CA still works without the directory (no device list)", st == 200 and 'select name="device"' not in body, st)
 
@@ -502,7 +502,7 @@ st, _, _, body = req("GET", "/openbao?view=unlock", ALICE, cookie=aud)
 check("auditor: unlock methods listed, no rotate / add / remove", st == 200 and 'action="/openbao/rotate"' not in body
       and "/openbao/slots/add-usb" not in body, body[:300])
 st, hd, _, body = req("GET", "/", ALICE, cookie=aud)
-check("auditor: every tab shown (all read permissions)", all(t in body for t in ("/bind9", "/stepca", "/dirsrv", "/openbao")))
+check("auditor: every tab shown (all read permissions)", all(t in body for t in ("/bind9", "/stepca", "/directory", "/openbao")))
 st, _, _, body = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                      {"csrf": cookie_csrf(aud), "type": "A", "name": "sneaky", "ip": "192.168.7.9"}, cookie=aud)
 check("auditor: a crafted POST is refused by fabric-agent (403, permission named)",
@@ -512,7 +512,7 @@ netops = bundle_roles("fabric-network-operator")
 net = cookie_val(sc, "__Host-webui")
 st, _, _, body = req("GET", "/", ALICE, cookie=net)
 check("network operator: no Directory or 802.1X tab (no device management)",
-      "/dirsrv" not in body and "/freeradius" not in body and "/bind9" in body, body[:300])
+      "/directory" not in body and "/freeradius" not in body and "/bind9" in body, body[:300])
 
 (st, hd, sc, body), _, _ = login(tamper="short")
 short = cookie_val(sc, "__Host-webui")

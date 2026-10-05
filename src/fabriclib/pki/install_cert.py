@@ -10,7 +10,7 @@ def install_cert(crt, key, root_ca, dest_dir, uid, gid, names=("fullchain.pem", 
              default ("fullchain.pem", "privkey.pem", "root_ca.crt"); a None or "" name skips that file.
     Returns: None. Chain and root end up 0644, the key 0600, all owned uid:gid.
     Fails:   OSError (FileNotFoundError, PermissionError) from makedirs / copy / chown / chmod.
-    Feeds:   setup/mint_service_certs.py (run, _install_dirsrv_tls).
+    Feeds:   setup/mint_service_certs.py (run).
     """
     os.makedirs(dest_dir, mode=0o750, exist_ok=True)
     os.chown(dest_dir, uid, gid)

@@ -24,10 +24,8 @@ installs what changed and restarts or reloads what is affected.
 | `install_openbao_config.py` | OpenBao's folders and config |
 | `install_nginx_config.py` | nginx's config and `fabric.target` |
 | `install_bind9_files.py` | BIND's folders and config; the zones whose records changed |
-| `install_dirsrv_seed.py` | 389-DS's seed files |
 | `install_webui_files.py` | The web UI's folders and config; fabric-agent's unit |
 | `install_stepca_templates.py` | Step-CA's certificate templates |
-| `install_directory_sync_timer.py` | The timer giving people created in Keycloak's console their POSIX identity |
 | `install_runtime_dirs.py` | Data folders services write; each TSIG key's `rfc2136.ini` |
 | `deploy_optional_parts.py` | Fluent Bit, the DNS filter, chrony, Kea, FreeRADIUS through their own deploy steps |
 | `finish_without_start.py` | Setup's ending: start nothing, swap zones safely, build images, return what to restart |

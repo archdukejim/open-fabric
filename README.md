@@ -17,10 +17,10 @@ hardware and working offline.
 | Service | Purpose |
 |---|---|
 | BIND 9 | Authoritative DNS with RFC 2136 updates and DNS-over-HTTPS |
-| nginx | HTTPS for every service, the CA certificates page, LDAP passthrough |
+| nginx | HTTPS for every service, the CA certificates page |
 | Step-CA | The internal PKI: root and intermediate CAs, service certificates, ACME |
 | OpenBao | Secrets, unlocked at boot by a key file, USB stick, security key or HSM |
-| 389 Directory Server | The directory of people, groups and devices |
+| Samba AD | The directory: people, groups, machines and devices in one domain; Windows and Linux machines join it |
 | Keycloak | Single sign-on with TOTP, on the directory |
 | Open Fabric | The web control: every action through a fixed, permission-checked host API |
 | Kea, FreeRADIUS, AdGuard Home, Fluent Bit *(optional)* | DHCP, 802.1X, a DNS filter, log forwarding |

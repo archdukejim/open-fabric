@@ -1,7 +1,7 @@
 from fabriclib.setup.common.docker_ready import docker_ready
 from fabriclib.setup.common.missing_packages import missing_packages
 
-# Only what the host itself runs; LDAP tools live in the dirsrv container.
+# Only what the host itself runs; directory tools live in the samba container.
 HOST_PACKAGES = ["openssl", "ca-certificates", "curl", "ufw", "iptables", "dnsutils",
                  "python3-yaml", "python3-jinja2", "python3-bcrypt", "chrony"]
 # Docker from the Ubuntu archive (universe): no extra apt source, updated with the release and carried across

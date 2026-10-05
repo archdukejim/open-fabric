@@ -4,7 +4,7 @@ from fabriclib.directory.constants import PERMISSIONS
 
 def check_role_fields(fields):
     """Purpose: Validate and normalise a device role's settings.
-    Inputs:  fields — dict: permissions (list, each in ldap/constants PERMISSIONS), vlan (empty or
+    Inputs:  fields — dict: permissions (list, each in directory/constants PERMISSIONS), vlan (empty or
              1..4094), priority (0..1000, default 100), description.
     Returns: {"description", "permissions" (sorted, unique), "vlan" (int or None), "priority" (int)}.
     Fails:   ValidationError "unknown permission: ..."; "VLAN must be 1 to 4094 (or empty)"; "priority must

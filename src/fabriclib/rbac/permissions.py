@@ -26,6 +26,9 @@ PERMISSIONS = {
     "people:read": "see realm users",
     "people:create": "create realm users",
     "people:reset": "reset a user's sign-in (password, TOTP)",
+    "domain:read": "see the domain: its controller, password policy, machines and Group Policy settings",
+    "machines:admin": "pre-create, disable, enable and remove the site's machines",
+    "gpo:admin": "set and clear policies in the site's admin settings GPO",
     "vault:status": "see OpenBao's state and unlock methods",
     "vault:unlock": "add, test, remove unlock methods; rotate the vault key",
     "audit:read": "read the audit log",
@@ -33,7 +36,7 @@ PERMISSIONS = {
 }
 
 _READ = ["status:read", "dns:read", "dhcp:read", "pki:read", "devices:read", "radius:read", "people:read",
-         "vault:status",
+         "domain:read", "vault:status",
          "audit:read"]
 
 # bundle -> permissions. "admin" is the web UI admin role (webui_admin_role, default fabric-admin).
@@ -44,8 +47,9 @@ BUNDLES = {
                                 "dhcp:write",
                                 "pki:read", "vault:status"],
     "fabric-equipment-operator": ["status:read", "dns:read", "pki:read", "pki:link-device", "devices:read",
-                                  "devices:enroll", "devices:admin", "roles:admin", "radius:read", "radius:admin"],
+                                  "devices:enroll", "devices:admin", "roles:admin", "radius:read", "radius:admin",
+                                  "domain:read", "machines:admin"],
     "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:link-device", "devices:read"],
     "fabric-helpdesk": ["status:read", "dns:read", "pki:read", "devices:read", "devices:enroll", "people:read",
-                        "people:create", "people:reset"],
+                        "people:create", "people:reset", "domain:read"],
 }

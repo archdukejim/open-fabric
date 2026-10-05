@@ -12,7 +12,7 @@ def save_device(actor, name, fields, new=False):
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for bad fields, a duplicate or unknown device.
-    Feeds:   src/webui/routes/dirsrv_post (devices).
+    Feeds:   src/webui/routes/directory_post (devices).
     """
     if new:
         return call_agent("POST", "/v1/devices", {"actor": actor, "name": name, "fields": fields})

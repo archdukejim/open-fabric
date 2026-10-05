@@ -9,9 +9,7 @@ def list_devices(v, directory=None):
              (names, by priority), "permissions" (union of the roles; [] while disabled), "vlan" (from the
              lowest-priority-number role that sets one; None while disabled), "vlan_from" (that role or "").
     Fails:   read_directory's /
-             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
-             entry", "that name is already taken", "the directory refused the change ...", "directory
-             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired) when it reads.
+             run_op's errors (ValidationError: the domain controller not reachable, or refusing) when it reads.
     Feeds:   device_overview; the web UI's dev preview (src/webui/devpreview).
     """
     directory = directory or read_directory(v)

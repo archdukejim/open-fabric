@@ -6,7 +6,6 @@ from fabriclib.dns.rfc2136_settings import rfc2136_settings
 
 BIND_CONFIG = ("named.conf", "named.conf.acl", "named.conf.logs", "named.conf.options", "named.conf.tls",
                "named.conf.zones", "named.conf.keys", "rndc.key")
-LDAP_SEED = ("00-config.ldif.j2", "05-schema.ldif.j2", "10-tree.ldif.j2", "20-accounts.ldif.j2", "30-aci.ldif.j2")
 CERT_SCRIPTS = ("certs", "firefox-ubuntu", "chrome-ubuntu", "all-ubuntu", "python-ubuntu")
 
 
@@ -33,7 +32,7 @@ def render_templates(paths, jinja_env, context, final_vars, secrets, tsig_keys, 
              federation_links, reverse_zone_names); final_vars — rendered settings; secrets — for the RFC2136
              files; tsig_keys — normalized keys; units — service_units(); reverse — reverse_zones(final_vars).
     Returns: None. <render>/: nginx (config, web pages, certificate install scripts, static assets), each enabled
-             unit's compose file and systemd wrapper, bind9 config and zones (forward and reverse), the 389-DS seed,
+             unit's compose file and systemd wrapper, bind9 config and zones (forward and reverse),
              the web UI config and fabric-agent unit, the federation endpoint unit, OpenBao's config, Step-CA's
              certificate templates, an rfc2136.ini per TSIG key.
     Fails:   ValidationError when a template does not render; OSError copying the static files.
@@ -68,11 +67,6 @@ def render_templates(paths, jinja_env, context, final_vars, secrets, tsig_keys, 
     for zone, ptrs in reverse["zones"].items():
         render("bind9/data/reverse-zone.j2", f"bind9/data/db.{zone}", reverse_zone_name=zone, ptr_records=ptrs)
 
-    if final_vars.get("install_ldap"):
-        render("systemd/fabric-directory-sync.service.j2", "systemd/fabric-directory-sync.service")
-        for ldif in LDAP_SEED:
-            render(f"dirsrv/seed/{ldif}", f"dirsrv/seed/{ldif[:-3]}")
-        shutil.copy(os.path.join(jinja, "dirsrv/seed.py"), os.path.join(out, "dirsrv/seed/seed.py"))
     if final_vars.get("install_webui"):
         render("webui/webui.json.j2", "webui/webui.json")
         render("systemd/fabric-agent.service.j2", "systemd/fabric-agent.service")

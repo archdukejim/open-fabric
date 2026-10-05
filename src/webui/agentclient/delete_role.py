@@ -10,6 +10,6 @@ def delete_role(actor, name):
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for an invalid role name or a role that still has devices.
-    Feeds:   src/webui/routes/dirsrv_post (roles, delete).
+    Feeds:   src/webui/routes/directory_post (roles, delete).
     """
     return call_agent("POST", f"/v1/roles/{quote_segment(name)}/delete", {"actor": actor})

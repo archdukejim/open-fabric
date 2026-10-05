@@ -14,6 +14,8 @@ from fabriclib.directory.list_people import list_people
 from fabriclib.pki.ca_summary import ca_summary
 from fabriclib.pki.list_issued import list_issued
 from fabriclib.radius.radius_guides import radius_guides
+from fabriclib.samba.domain_overview import domain_overview
+from fabriclib.samba.gpo_overview import gpo_overview
 from fabriclib.radius.radius_overview import radius_overview
 from fabriclib.system.service_status import service_status
 from fabriclib.system.version_info import version_info
@@ -36,6 +38,8 @@ READS = {
     ("reverse-zones",): lambda: reverse_zones(load_vars()),
     ("devices",): lambda: device_overview(load_vars()),
     ("people",): lambda: list_people(load_vars()),
+    ("domain",): lambda: domain_overview(load_vars()),
+    ("gpo",): lambda: gpo_overview(load_vars()),
     ("dhcp",): lambda: dhcp_overview(load_vars()),
     ("radius",): lambda: radius_overview(load_vars()),
     ("radius", "guides"): lambda: radius_guides(load_vars()),

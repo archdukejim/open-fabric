@@ -46,7 +46,6 @@ friendly_name: Fabric host test
 ad_domain: ad.$DOMAIN
 ad_password_policy: {minimum_length: 14, complexity: true, history: 24, minimum_age_days: 0, maximum_age_days: 0, lockout_threshold: 10, lockout_minutes: 15, lockout_window_minutes: 15}
 install_keycloak: true
-install_ldap: true
 install_webui: true
 tsig_keys:
 - { name: npm, records: [npm], secret: "$TSIG_SECRET", acls: [npm-updaters] }
@@ -78,24 +77,29 @@ R "bash /tmp/rfc2136_test.sh $HOST_IP $DOMAIN npm '$TSIG_SECRET' npm" > "$OUT/rf
 check "RFC2136 with the embedded TSIG key (npm): allowed name only, wrong keys refused" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
 
 echo "--- restricted sign-in (real Keycloak)"
-BOB_PW=$(openssl rand -base64 18)
 cat > "$OUT/bob.py" <<'PY'
-import os, sys, yaml
+import sys, yaml
 sys.path.insert(0, "/opt/fabric/lib")
-from fabriclib.ldap.ensure_admin_user import ensure_admin_user
+from fabriclib.common.errors import ValidationError
+from fabriclib.directory.create_person import create_person
 v = yaml.safe_load(open("/opt/fabric/config/vars.yaml"))
-print(ensure_admin_user(dict(v, webui_admin_group="users"), "bob", os.environ["BOB_PW"], "bob@example.invalid"))
+try:                                      # a person of the site, not an admin; re-runs find bob there already
+    create_person(v, "test", "bob", "Bob", "Test", "bob@example.invalid", source="test")
+    print("bob created")
+except ValidationError as e:
+    print(f"bob: {e}")
 PY
 put "$OUT/bob.py"
-R "BOB_PW='$BOB_PW' python3 /tmp/bob.py" > "$OUT/bob.log" 2>&1
+R "python3 /tmp/bob.py" > "$OUT/bob.log" 2>&1
 BOB_P12_PW=$(R 'fabricctl client-cert bob' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
 KIT=$(R "getent passwd $LOGIN | cut -d: -f6")/fabric-admin
-# A host signed into before (this suite re-run on the same machine): put the admin and
-# bob back to their first-login state, so the scripted sign-in sees the same flow.
+# The admin and bob at their first sign-in (also on a re-run on the same machine): a new one-time password each,
+# from fabric's own reset; the admin's into the login kit, as setup leaves it
 put "$REPO/tests/host/reset_user.py"
 ADMIN=$(R "awk '/^webui_admin_user:/{print \$2}' /opt/fabric/config/vars.yaml")
-R "PW=\$(cat $KIT/initial-password.txt) python3 /tmp/reset_user.py $ADMIN" > "$OUT/reset.log" 2>&1
-R "PW='$BOB_PW' python3 /tmp/reset_user.py bob" >> "$OUT/reset.log" 2>&1
+R "python3 /tmp/reset_user.py $ADMIN $KIT/initial-password.txt" > "$OUT/reset.log" 2>&1
+R "python3 /tmp/reset_user.py bob /root/fabric-test-bob-password" >> "$OUT/reset.log" 2>&1
+BOB_PW=$(R 'cat /root/fabric-test-bob-password; rm -f /root/fabric-test-bob-password')
 R "FABRIC_KIT=$KIT NEW_PERSON=dave$(date +%s) python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" > "$OUT/login.log" 2>&1
 check "sign-in: admin in; HTTP, missing/foreign certs, non-admin and borrowed certs refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"

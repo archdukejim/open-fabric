@@ -10,6 +10,7 @@ GET = {
     ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read",
     ("devices",): "devices:read",
     ("people",): "people:read",
+    ("domain",): "domain:read", ("gpo",): "domain:read",
     ("vault",): "vault:status", ("vault", "slots"): "vault:status", ("vault", "devices"): "vault:status",
 }
 POST = {
@@ -26,6 +27,9 @@ POST = {
     ("devices", "*", "certs"): "pki:link-device",
     ("roles",): "roles:admin", ("roles", "*"): "roles:admin", ("roles", "*", "delete"): "roles:admin",
     ("people",): "people:create", ("people", "*", "reset"): "people:reset",
+    ("machines",): "machines:admin", ("machines", "*", "enable"): "machines:admin",
+    ("machines", "*", "disable"): "machines:admin", ("machines", "*", "delete"): "machines:admin",
+    ("gpo", "search"): "domain:read", ("gpo", "set"): "gpo:admin", ("gpo", "clear"): "gpo:admin",
     ("dhcp", "reservations"): "dhcp:write", ("dhcp", "reservations", "*", "delete"): "dhcp:write",
     ("dhcp", "subnets"): "dhcp:write", ("dhcp", "subnets", "update"): "dhcp:write",
     ("dhcp", "subnets", "delete"): "dhcp:write", ("dhcp", "options"): "dhcp:write",

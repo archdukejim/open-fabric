@@ -23,7 +23,6 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `kea` | [kea/](kea/) | Kea DHCP with DDNS into BIND, real DHCP clients |
 | `freeradius` | [freeradius/](freeradius/) | 802.1X against a real 389-DS: EAP-TLS, EAP-TTLS, MAB, refusals |
 | `samba` | [samba/](samba/) | The Windows domain controller: settings (D87, D89), the rendered container, what changes around it; a real DC converged twice, the policy, the GPOs, BIND serving the AD zone through DLZ with signed updates, and the refusals (unsigned updates, another site, service accounts, short or wrong passwords) |
-| `dirsrv` | [dirsrv/](dirsrv/) | 389 Directory Server: seed, TLS, ACIs, the admin user, device RBAC |
 | `keycloak` | [keycloak/](keycloak/) | Keycloak on fabric's directory (Samba AD): bootstrap twice, AD federation, a first sign-in through TOTP and a new password that lands in AD, refusals |
 | `hardening` | [hardening/](hardening/) | The core services and OpenBao started from their real compose files work and are hardened |
 | `images` | [images/](images/) | fabric's own images build from `packaging/docker-bake.hcl` with a default host's build inputs and pass the smoke test CI runs before publishing (decision D41) |

@@ -21,7 +21,6 @@ case "$NAME" in
     adguard)    user=611:611; ids="";        run=(/opt/adguardhome/AdGuardHome --version) ;;
     bind9)      user=600:600; ids=600:600;   run=(/usr/sbin/named -v) ;;
     # ns-slapd -v prints its version and exits 1: the version line is the proof
-    dirsrv)     user=601:601; ids=601:601;   run=(sh -c '/usr/sbin/ns-slapd -v | grep 389-Directory/') ;;
     freeradius) user=610:610; ids=610:610;   run=(/usr/sbin/freeradius -v) ;;
     kea)        user=609:609; ids=609:609;   run=(/usr/sbin/kea-dhcp-ddns -V) ;;
     keycloak)   user=604:0;   ids="";        run=(/opt/keycloak/bin/kc.sh --version) ;;

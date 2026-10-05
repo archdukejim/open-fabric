@@ -11,7 +11,7 @@ class Admin:
                  admin credentials from fabric's secrets (never on a command line).
         Returns: None (no request is made yet; token and expiry start empty).
         Fails:   never.
-        Feeds:   configure_keycloak, keycloak_admin, require_password_change, user_has_role; tests/keycloak/verify.py,
+        Feeds:   configure_keycloak, keycloak_admin, user_has_role; tests/keycloak/verify.py,
                  tests/host/reset_user.py."""
         self.tls, self.user, self.password = tls, user, password
         self.token, self.expires = None, 0

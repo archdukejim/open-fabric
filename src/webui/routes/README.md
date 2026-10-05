@@ -5,8 +5,8 @@ Every page (GET) and action (POST) behind the gates; each takes the request hand
 | File | What |
 |---|---|
 | `bind9_page.py` | Render the BIND9 tab: forward zone records, generated reverse zones or TSIG keys. |
-| `dirsrv_page.py` | Render the 389-DS tab: devices, one device, roles, one role, or people. |
-| `dirsrv_post.py` | Devices, device roles and people: each form maps to one fabric-agent call. |
+| `directory_page.py` | Render the Directory tab: devices, one device, roles, one role, or people. |
+| `directory_post.py` | Devices, device roles and people: each form maps to one fabric-agent call. |
 | `get_page.py` | Route a signed-in GET to its page. |
 | `openbao_page.py` | Render the OpenBao tab: status, unlock methods and their add/rotate/remove forms, secrets, disk encryption. |
 | `post_action.py` | Route a signed-in, CSRF-checked POST to its action. |

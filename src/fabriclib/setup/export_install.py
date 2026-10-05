@@ -20,7 +20,7 @@ Everything fabric had on this host, copied with owners and modes kept
   openbao/           OpenBao's data (your apps/ secrets, encrypted)
   @root/…            OpenBao's vault key and unlock methods — with openbao/ this
                      OPENS THE VAULT
-  dirsrv/            389 Directory Server: users, groups, devices, device roles
+  samba/             the domain: people, groups, machines, devices, device roles, policies
   keycloak/, postgres/  Keycloak and its database (TOTP enrolments, sessions)
   bind9/, nginx/, webui/  zones, TSIG material, certificates
 

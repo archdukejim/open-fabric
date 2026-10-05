@@ -16,10 +16,6 @@ their own local network (design [1.8.1](../../../docs/volume_1_systems_and_servi
 | `drop_relay.py` | On a site that joined through a relay: talk to the upstream directly from now on |
 | `remove_site.py` | On a parent: forget a site that joined here (its CA stays valid until it expires: no revocation yet) |
 | `reparent_site.py` | On a site: move under another parent with its invitation — new CA, Step-CA switched, certificates re-issued |
-| `directory_links.py` | What this site's 389-DS replicates (M5): replicas (supplier, hub, consumer), agreements, copies of joined sites' parts |
-| `configure_directory_links.py` | Make 389-DS replicate as the federation says, remove agreements no longer linked (apply, setup, `fabricctl directory sync`) |
-| `configure_replica.py` | One suffix's replica (supplier, hub or read-only consumer that refers writes) and the link accounts allowed to push to it |
-| `configure_agreement.py` | One replication agreement over LDAPS; a first copy that did not complete is started again |
 | `dns_links.py` | The DNS links to the sites next to this one (delegation, secondary zones, TSIG keys) for the BIND templates |
 | `federation_status.py` | Standalone, upstream or site; the endpoint; joined sites; open invitations |
 | `set_federation_endpoint.py` | Turn the federation endpoint on or off (certificate first) and apply |

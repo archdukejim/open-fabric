@@ -41,7 +41,6 @@ host_ip: {{ host_ip }}
 ip_nginx: {{ ip_nginx | default('10.255.0.10') }}
 ip_bind9: {{ ip_bind9 | default('10.255.0.30') }}
 ip_stepca: {{ ip_stepca | default('10.255.0.40') }}
-ip_ldap: {{ ip_ldap | default('10.255.0.50') }}
 ip_keycloak: {{ ip_keycloak | default('10.255.0.60') }}
 ip_postgres: {{ ip_postgres | default('10.255.0.70') }}
 ip_webui: {{ ip_webui | default('10.255.0.80') }}
@@ -53,7 +52,6 @@ ip_openbao: {{ ip_openbao | default('10.255.0.90') }}
 cname_ca: {{ cname_ca | default('ca') }}
 landing_page_cname: {{ landing_page_cname | default('', true) }}
 cname_dns: {{ cname_dns | default('dns') }}
-cname_ldap: {{ cname_ldap | default('ldap') }}
 cname_sso: {{ cname_sso | default('sso') }}
 cname_mgr: {{ cname_mgr | default('fabric') }}
 cname_certs: {{ cname_certs | default('certs') }}
@@ -66,7 +64,6 @@ hostname_nginx: {{ hostname_nginx | default('nginx.' ~ domain) }}
 hostname_bind9: {{ hostname_bind9 | default((cname_dns | default('dns')) ~ '.' ~ domain) }}
 hostname_stepca: {{ hostname_stepca | default((cname_ca | default('ca')) ~ '.' ~ domain) }}
 hostname_landing: {{ hostname_landing | default((landing_page_cname ~ '.' ~ domain) if landing_page_cname | default('', true) else domain) }}
-hostname_ldap: {{ hostname_ldap | default((cname_ldap | default('ldap')) ~ '.' ~ domain) }}
 hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~ '.' ~ domain) }}
 {% set _hostname_mgr = (webui_hostname | default('', true) or ((cname_mgr | default('fabric')) ~ '.' ~ domain)) | lower %}
 hostname_mgr: {{ _hostname_mgr }}
@@ -95,10 +92,9 @@ image_openbao: {{ image_openbao | default(images_lock.openbao) }}
 image_fluentbit: {{ image_fluentbit | default(images_lock.fluentbit) }}
 image_adguard: {{ image_adguard | default(images_lock.adguard) }}
 image_oauth2proxy: {{ image_oauth2proxy | default(images_lock.oauth2proxy) }}
-{# Base of the locally built bind9, dirsrv and webui images (Debian packages). #}
+{# Base of the locally built images (Debian packages). #}
 image_debian: {{ image_debian | default(images_lock.debian) }}
 {# Names of the locally built images (not pulled). #}
-image_dirsrv: {{ image_dirsrv | default('fabric/dirsrv:local') }}
 image_webui: {{ image_webui | default('fabric/web:local') }}
 image_kea: {{ image_kea | default('fabric/kea:local') }}
 image_freeradius: {{ image_freeradius | default('fabric/freeradius:local') }}
@@ -109,7 +105,6 @@ image_samba: {{ image_samba | default('fabric/samba:local') }}
    admin pinned one in image_pins. #}
 image_fabric_adguard: "{{ image_fabric_adguard if 'image_fabric_adguard' in (image_pins | default([], true)) else published_lock.adguard }}"
 image_fabric_bind9: "{{ image_fabric_bind9 if 'image_fabric_bind9' in (image_pins | default([], true)) else published_lock.bind9 }}"
-image_fabric_dirsrv: "{{ image_fabric_dirsrv if 'image_fabric_dirsrv' in (image_pins | default([], true)) else published_lock.dirsrv }}"
 image_fabric_freeradius: "{{ image_fabric_freeradius if 'image_fabric_freeradius' in (image_pins | default([], true)) else published_lock.freeradius }}"
 image_fabric_kea: "{{ image_fabric_kea if 'image_fabric_kea' in (image_pins | default([], true)) else published_lock.kea }}"
 image_fabric_keycloak: "{{ image_fabric_keycloak if 'image_fabric_keycloak' in (image_pins | default([], true)) else published_lock.keycloak }}"
@@ -125,7 +120,6 @@ image_pins: {{ image_pins | default([], true) | to_json }}
 # After `fabricctl images update`: remove old images of fabric's repositories (never the rollback one).
 image_prune: {{ image_prune | default(true) | bool }}
 
-install_ldap: {{ install_ldap | default(true) | bool }}
 # OpenBao (secrets) is core. Its unlock methods (slots.json) and their key files / token PINs, root-only.
 openbao_key_dir: {{ openbao_key_dir | default('/etc/fabric/openbao') }}
 # RAM-only: fabric-unlock puts the vault key here just before OpenBao starts, then wipes it.
@@ -172,7 +166,7 @@ ad_ntp_signd_dir: {{ ad_ntp_signd_dir | default('/var/lib/samba/ntp_signd', true
 ad_rpc_ports: "{{ ad_rpc_ports | default('49152-49251', true) }}"
 posix_id_block: {{ posix_id_block | default(100000) | int }}
 samba_mem_limit: {{ samba_mem_limit | default('384m' if (host_ram_capacity | default(0) | int) == 3 else '512m', true) }}
-# 802.1X (optional, design §6): FreeRADIUS 3.2 checks each device against 389-DS
+# 802.1X (optional, design §6): FreeRADIUS 3.2 checks each device against the site's DC
 # (EAP-TLS by linked certificate, MAB by MAC) and returns its role's VLAN.
 install_freeradius: {{ install_freeradius | default(false) | bool }}
 ip_freeradius: {{ ip_freeradius | default('10.255.0.98') }}
@@ -218,7 +212,7 @@ install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak |
 webui_realm: {{ webui_realm | default(domain) }}
 webui_admin_role: {{ webui_admin_role | default('fabric-admin') }}
 webui_admin_group: {{ webui_admin_group | default('admins') }}
-{# First web UI admin, created by `fabricctl setup` (LDAP user + client certificate). #}
+{# First web UI admin, created by `fabricctl setup` (a person in the domain + client certificate). #}
 webui_admin_user: {{ webui_admin_user | default('fabricadmin', true) }}
 webui_admin_email: {{ webui_admin_email | default('', true) }}
 webui_client_cert_days: {{ webui_client_cert_days | default(365) }}
@@ -243,7 +237,6 @@ postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/o
 {% set _optional_containers = ['dirsrv', 'keycloak', 'postgres', 'webui', 'fabric-web'] %}
 {% set _containers = (project_containers | default(['nginx', 'step-ca', 'bind9', 'openbao'])) | reject('in', _optional_containers) | list %}
 {% if 'openbao' not in _containers %}{% set _ = _containers.append('openbao') %}{% endif %}
-{% if install_ldap | default(true) | bool %}{% set _ = _containers.append('dirsrv') %}{% endif %}
 {% if install_keycloak | default(false) | bool %}{% set _ = _containers.extend(['keycloak', 'postgres']) %}{% endif %}
 {% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) %}{% set _ = _containers.append('fabric-web') %}{% endif %}
 project_containers:
@@ -252,7 +245,6 @@ project_containers:
   { 'folder': 'nginx', 'owner': 'nginx' },
   { 'folder': 'bind9', 'owner': 'bind' },
   { 'folder': 'stepca', 'owner': 'step' },
-  { 'folder': 'dirsrv', 'owner': 'ldap' },
   { 'folder': 'keycloak', 'owner': 'keycloak' },
   { 'folder': 'postgres', 'owner': 'postgres' },
   { 'folder': 'webui', 'owner': 'root' },
@@ -267,7 +259,6 @@ service_dirs:
    useradd/systemd-sysusers from 999 downwards, and 0-99 belong to base-passwd. #}
 {% set default_service_users = {
   'bind': {'uid': 600, 'gid': 600, 'name': 'fabric-dns'},
-  'ldap': {'uid': 601, 'gid': 601, 'name': 'fabric-ldap'},
   'nginx': {'uid': 602, 'gid': 602, 'name': 'fabric-proxy'},
   'step': {'uid': 603, 'gid': 603, 'name': 'fabric-ca'},
   'keycloak': {'uid': 604, 'gid': 0, 'name': 'fabric-sso'},
@@ -365,7 +356,6 @@ bind_acl_policies:
 {% set default_cnames = [
   { 'canonical': hostname, 'name': cname_ca | default('ca') },
   { 'canonical': hostname, 'name': cname_dns | default('dns') },
-  { 'canonical': hostname, 'name': cname_ldap | default('ldap') },
   { 'canonical': hostname, 'name': cname_sso | default('sso') },
   { 'canonical': hostname, 'name': cname_openbao | default('vault') }
 ] %}
@@ -415,13 +405,10 @@ tsig_keys:
 # ============================================================
 # NGINX BACKENDS
 # ============================================================
-{# 389-DS terminates TLS itself; nginx only passes TCP through. #}
-nginx_backend_ldap: {{ nginx_backend_ldap | default('dirsrv:3389', true) }}
-nginx_backend_ldaps: {{ nginx_backend_ldaps | default('dirsrv:3636') }}
 nginx_backend_stepca: {{ nginx_backend_stepca | default('https://step-ca:' ~ (stepca_port | default(9000))) }}
 
 # ============================================================
-# LDAP — the organisation's base DN and this site's part
+# The organisation's name and this site's
 # ============================================================
 {# The organisation's domain: this install's own domain unless it joined an upstream (manual 1.8), whose organisation it then shares. Names the organisation suffix; fixed once
    installed (setup refuses a change). #}
@@ -431,11 +418,9 @@ org_domain: {{ _org_domain }}
    of org_domain; a site gets its upstream's. Fixed once installed (setup refuses a change). #}
 {% set _base_dn = ((ldap_base_dn | default('', true)) or (_org_domain.split('.') | map('regex_replace', '^', 'dc=') | join(','))) | lower %}
 ldap_base_dn: {{ _base_dn }}
-# This install's site (manual 1.8): names its local directory suffix, which holds this
-# install's service accounts and its devices (the organisation suffix above holds people, groups and
-# device roles). Defaults to the host name; fixed once installed (setup refuses a change).
+# This install's site (manual 1.8): names its OU in the domain (OU=<site>,OU=sites), which holds its people,
+# machines, devices and service accounts. Defaults to the host name; fixed once installed (setup refuses a change).
 site_name: {{ (site_name | default(hostname, true)) | lower }}
-ldap_local_dn: ou={{ (site_name | default(hostname, true)) | lower }},{{ _base_dn }}
 
 {# `bundle`: the fabric role bundle Keycloak grants to members (design D19); admins get
    webui_admin_role through webui_admin_group. #}

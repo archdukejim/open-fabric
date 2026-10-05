@@ -57,7 +57,7 @@ check("a joining site whose network overlaps another site's is refused, naming b
 check("a joining site with free networks is accepted; an older fabric that sends none too",
       refused(lambda: aj._check_networks(upstream, "barn2", [{"name": "lan", "cidr": "10.50.0.0/24"}])) == ""
       and refused(lambda: aj._check_networks(upstream, "barn2", [])) == "")
-aj.read_address_plan = lambda v: (_ for _ in ()).throw(ValidationError("389-DS (dirsrv) is not running"))
+aj.read_address_plan = lambda v: (_ for _ in ()).throw(ValidationError("the directory is not reachable"))
 check("with the directory away the upstream still checks against its own networks",
       "of site lan" in refused(lambda: aj._check_networks(upstream, "x", [{"name": "a", "cidr": "192.168.3.0/24"}])))
 check("malformed networks in a join request are refused",

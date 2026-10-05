@@ -20,8 +20,7 @@ def run(ctx):
              ldap_base_dn and the organisation's cert_* settings (friendly_name only when unset); the deploy
              step saves them. The
              site CA key and certificates are kept in <base>/fabric/config/site-ca (0700); the DNS link's
-             TSIG secret goes to fabric's secrets (federation_tsig.upstream), the directory link's secret too
-             (federation_replication.upstream).
+             TSIG secret goes to fabric's secrets (federation_tsig.upstream).
     Fails:   SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or
              unreachable, the root not the pinned one, a certificate that does not fit).
     Feeds:   setup STEPS, after `docker` (the key is made with the pinned Step-CA image) and before `deploy`.
@@ -50,9 +49,7 @@ def run(ctx):
         raise SetupError(f"joining the upstream failed: {e}") from None
     if res.get("dns_secret"):
         try:
-            save_secrets({"federation_tsig": {"upstream": res["dns_secret"]},
-                          **({"federation_replication": {"upstream": res["replication_secret"]}}
-                             if res.get("replication_secret") else {})}, ctx.secrets_file)
+            save_secrets({"federation_tsig": {"upstream": res["dns_secret"]}}, ctx.secrets_file)
         except ValidationError as e:
             raise SetupError(str(e)) from None
         ctx.secrets = None

@@ -12,7 +12,6 @@ def service_units(base, v):
         {'service': 'nginx', 'compose': 'nginx', 'folder': 'nginx', 'requires': []},
         {'service': 'bind9', 'compose': 'bind9', 'folder': 'bind9', 'requires': []},
         {'service': 'stepca', 'compose': 'step-ca', 'folder': 'stepca', 'requires': []},
-        {'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []},
         {'service': 'postgres', 'compose': 'postgres', 'folder': 'postgres', 'requires': []},
         {'service': 'keycloak', 'compose': 'keycloak', 'folder': 'keycloak', 'requires': ['postgres']},
         {'service': 'fabric-web', 'compose': 'fabric-web', 'folder': 'webui', 'requires': ['fabric-agent']},
@@ -23,8 +22,8 @@ def service_units(base, v):
         {'service': 'fluentbit', 'compose': 'fluentbit', 'folder': 'fluentbit', 'requires': []},
         # optional DHCP (design §5): kea-dhcp4 on the host network + kea-ddns
         {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
-        # optional 802.1X (design §6): asks 389-DS about every device
-        {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': ['ldap']},
+        # optional 802.1X (design §6): asks the domain controller about every device
+        {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': []},
         # the directory (manual 2.11.2): the Samba AD DC on the host network, on every install; no requires: BIND
         # reads its database for the AD zone, but a DC restart must not take DNS down, nor a BIND restart the DC
         {'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []},
@@ -34,7 +33,7 @@ def service_units(base, v):
         # its sign-in, a unit of its own: when it or Keycloak is down only AdGuard's UI is, never DNS
         {'service': 'adguard-auth', 'compose': 'oauth2-proxy-adguard', 'folder': 'adguard-auth', 'requires': []},
     ]
-    flag = {"keycloak": "install_keycloak", "postgres": "install_keycloak", "dirsrv": "install_ldap",
+    flag = {"keycloak": "install_keycloak", "postgres": "install_keycloak",
             "webui": "install_webui", "fluentbit": "install_fluentbit", "kea": "install_kea",
             "freeradius": "install_freeradius", "adguard": "install_adguard",
             "adguard-auth": "install_adguard"}

@@ -11,7 +11,7 @@ def save_role(actor, name, fields, new=False):
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for bad fields, a duplicate or unknown role.
-    Feeds:   src/webui/routes/dirsrv_post (roles).
+    Feeds:   src/webui/routes/directory_post (roles).
     """
     if new:
         return call_agent("POST", "/v1/roles", {"actor": actor, "name": name, "fields": fields})

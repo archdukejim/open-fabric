@@ -14,8 +14,8 @@ def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True):
     Inputs:  kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ad_base_dn, host_ip,
              site_name, webui_admin_group); s — secrets (ad_keycloak_password); writable — False makes it READ_ONLY.
     Returns: str, the federation component id. An existing AD provider is updated in place (fabric's settings win,
-             other settings kept); a provider of another kind (389-DS's) is removed first and made anew, so Keycloak
-             creates AD's own mappers (account controls, pwdLastSet) with it.
+             other settings kept); a provider of another kind (an older install's) is removed first and made anew, so
+             Keycloak creates AD's own mappers (account controls, pwdLastSet) with it.
     Fails:   SystemExit from Admin.call; KeyError if a needed var or secret is missing; StopIteration if a created
              provider cannot be found again.
     Feeds:   configure_keycloak (the id is passed to ensure_group_mapper)."""

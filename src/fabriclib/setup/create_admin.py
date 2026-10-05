@@ -5,7 +5,7 @@ import subprocess
 from fabriclib.common.console import info, ok, warn
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.directory.ensure_admin import ensure_admin
-from fabriclib.ldap.people_written_here import people_written_here
+from fabriclib.federation.common.is_root_site import is_root_site
 from fabriclib.pki.issue_client_cert import issue_client_cert
 from fabriclib.pki.needs_renewal import needs_renewal
 
@@ -80,7 +80,7 @@ def run(ctx):
     os.makedirs(folder, mode=0o700, exist_ok=True)
     os.chown(folder, uid, gid)
 
-    if people_written_here(os.path.join(ctx.config_dir, "federation.yaml")):
+    if is_root_site(os.path.join(ctx.config_dir, "federation.yaml")):
         state, password = ensure_admin(v, ctx.secrets, user, v.get("webui_admin_email") or f"{user}@{v['domain']}")
         if state == "created":
             _write(os.path.join(folder, "initial-password.txt"), password + "\n", (uid, gid))

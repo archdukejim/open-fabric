@@ -247,7 +247,7 @@ check("status: unsealed, static seal, raft, KV v2 fabric/ + apps/, approle, key 
       and {"fabric/", "apps/"} <= {m["path"] for m in s["mounts"] if m["version"] == "2"} and "approle/" in s["auth"]
       and s["key"]["ok"], s)
 # ---------------------------------------------------------------- fabric's secrets into OpenBao
-ORIGINAL = {"ca_password": "Ca-pw-1", "rndc_secret": "cm5kYy1zZWNyZXQ=", "ldap_device_admin_password": "Da1",
+ORIGINAL = {"ca_password": "Ca-pw-1", "rndc_secret": "cm5kYy1zZWNyZXQ=", "ad_agent_password": "Da1",
             "tsig_secrets": {"npm": "bnBtLXNlY3JldA=="}}
 with open(SECRETS, "w") as f:
     yaml.safe_dump(ORIGINAL, f)

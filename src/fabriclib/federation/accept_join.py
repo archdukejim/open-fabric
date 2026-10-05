@@ -68,20 +68,17 @@ def accept_join(v, req, client_ip="", now=None):
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
              invitation.
     Inputs:  v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip,
-             hostname_federation, hostname_ldap and
-             the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join
-             request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP),
-             optional "ldap_host" (its LDAPS name, default ldap.<domain>), optional "networks" (its LAN and DHCP
-             subnets: refused when they overlap another site's, _check_networks)};
+             hostname_federation and the organisation settings (friendly_name, cert_*), plus what sign_site_ca
+             reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain),
+             "address" (its IP), optional "networks" (its LAN and DHCP subnets: refused when they overlap another
+             site's, _check_networks)};
              client_ip — str for the audit; now — epoch seconds, default time.time().
     Returns: {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain":
              PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its
              parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>",
              "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this
              site's published DNS port) (kept here in fabric's
-             secrets as federation_tsig[site]; manual 1.8 M4), "directory": {"secret", "ldap_host",
-             "ldap_port"} — the directory link's secret (replication both ways, kept here as
-             federation_replication[site]; §3.2a) and this site's LDAPS name, "org": {"org_domain", "ldap_base_dn",
+             secrets as federation_tsig[site]; manual 1.8 M4), "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
     Fails:   ValidationError "the join request is incomplete"; overlapping networks (_check_networks, before
              anything is signed or recorded); "the site's domain/address is not valid" or
@@ -98,7 +95,6 @@ def accept_join(v, req, client_ip="", now=None):
         raise ValidationError("the join request is incomplete")
     site, domain = req["site"].strip().lower(), req["domain"].strip().lower().rstrip(".")
     fed_host = str(req.get("federation_host") or "").strip().lower()
-    ldap_host = str(req.get("ldap_host") or "").strip().lower()
     if not SITE_NAME_RE.match(site) or not DOMAIN_RE.match(domain):
         raise ValidationError("the site's name or domain is not valid")
     if domain == v["domain"]:
@@ -124,11 +120,9 @@ def accept_join(v, req, client_ip="", now=None):
         signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation",
                               nest=int(entry.get("nest") or 0), as_parent=cap["as_parent"])
         tsig = base64.b64encode(os.urandom(32)).decode()       # the DNS link to this site (zone transfers)
-        repl = base64.b64encode(os.urandom(32)).decode()       # the directory link (replication both ways, M5)
         stored = load_secrets(v=v)
         save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]},
-                      "federation_tsig": dict(stored.get("federation_tsig") or {}, **{site: tsig}),
-                      "federation_replication": dict(stored.get("federation_replication") or {}, **{site: repl})},
+                      "federation_tsig": dict(stored.get("federation_tsig") or {}, **{site: tsig})},
                      v=v)
         registry["sites"][site] = {
             "domain": domain, "address": req["address"],
@@ -136,8 +130,7 @@ def accept_join(v, req, client_ip="", now=None):
             "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
             "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0),
             "via": entry.get("via") or "", "dns_port": _port(req.get("dns_port")),
-            "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}",
-            "ldap_host": ldap_host if DOMAIN_RE.match(ldap_host) else f"ldap.{domain}", "ldap_port": 636}
+            "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}"}
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
                                             f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")
@@ -146,7 +139,5 @@ def accept_join(v, req, client_ip="", now=None):
     return {"root": signed["root"], "cert": signed["cert"], "chain": signed["chain"], "org": org,
             "dns": {"key": f"fed-{site}", "algorithm": "hmac-sha256", "secret": tsig,
                     "port": int(v.get("bind_dns_port") or 53)},
-            "directory": {"secret": repl, "ldap_host": v.get("hostname_ldap") or f"ldap.{v['domain']}",
-                          "ldap_port": 636},
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
                          "address": v["host_ip"]}}
