@@ -54,7 +54,8 @@ def start_dc(work, container, network, subnet, ip, domain="lan.j-j.family", ad_d
     env = jinja_env(os.path.join(REPO, "templates"))
     v = yaml.safe_load(env.get_template("vars.yaml.j2").render(
         domain=domain, hostname=hostname, host_ip=ip, lan_cidr=subnet, lan_gateway=subnet.rsplit(".", 1)[0] + ".1",
-        site_name=site, ad_domain=ad_domain, ad_password_policy=POLICY, deploy_base_dir=work, **(extra_vars or {})))
+        site_name=site, ad_domain=ad_domain, ad_password_policy=POLICY, deploy_base_dir=work,
+        ad_ntp_signd_dir=os.path.join(work, "ntp_signd"), **(extra_vars or {})))       # never the host's own
     compose = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(**v))["services"]["samba"]
     root_ca, root_key = os.path.join(certs, "root_ca.crt"), os.path.join(certs, "root.key")
     _sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", root_key, "-out", root_ca, "-days", "2",

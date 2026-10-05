@@ -3,8 +3,8 @@ database: no credentials, no network. Run after every start and apply by fabricl
     docker exec -i samba python3 /fabric/converge.py < state.json
 The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [site_networks
 items], "root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name:
-password}, "radius_gid"} (stdin, never a command line: it holds the service accounts' passwords). Prints one JSON
-object: {"changed": [what changed, …]}. Exits 1 with the error on stderr."""
+password}, "radius_gid", "lan_profile"} (stdin, never a command line: it holds the service accounts' passwords).
+Prints one JSON object: {"changed": [what changed, …]}. Exits 1 with the error on stderr."""
 import json
 import sys
 
@@ -25,6 +25,7 @@ from open_samdb import open_samdb
 from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
 from set_password_policy import set_password_policy
 from share_winbind import share_winbind
+from windows_baseline_policy import windows_baseline_policy
 
 CONF = "/data/etc/smb.conf"
 BUILTIN_ADMINISTRATORS = "S-1-5-32-544"        # each machine's own local Administrators
@@ -45,13 +46,14 @@ def converge(state):
     """Purpose: every part of the domain fabric owns, in order: the schema, the layout, the site's id block, the
              groups, the site's service accounts, its access entries, its networks (the address plan), its default
              sudo rule, the AD site and its subnets, the password policy, the domain's trust GPO (fabric's root CA),
-             the site's log-on GPO and winbind's privileged pipe for FreeRADIUS. Each part changes only what
-             differs, so a second run changes nothing.
+             the site's log-on GPO, its Windows baseline GPO and winbind's privileged pipe for FreeRADIUS. Each part
+             changes only what differs, so a second run changes nothing.
     Inputs:  state — dict: site (str), root (bool: the root site, which also holds the organisation's items and the
              domain-wide trust GPO), password_policy (dict, every key), networks (site_networks' list), root_ca_pem
              (str), id_range ("first-last"), groups (fabric's ldap_groups), admin_group (the web UI's admin group, in
              the log-on policy), accounts ({sAMAccountName: password}: the site's service accounts), radius_gid (int:
-             FreeRADIUS's group, given winbind's privileged pipe).
+             FreeRADIUS's group, given winbind's privileged pipe), lan_profile (str: the Windows wired 802.1X profile
+             the baseline installs, "" without one).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
     Feeds:   this script's main."""
@@ -77,6 +79,9 @@ def converge(state):
     sids.append(BUILTIN_ADMINISTRATORS)
     changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", f"OU={site},OU=sites,{base}", LOGON_EXTENSIONS,
                           {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids)})
+    extensions, files = windows_baseline_policy(state.get("lan_profile") or "")
+    changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", f"OU={site},OU=sites,{base}", extensions,
+                          files)
     changed += share_winbind(lp, int(state["radius_gid"]))
     return changed
 

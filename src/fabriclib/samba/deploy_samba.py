@@ -1,3 +1,4 @@
+import grp
 import os
 
 from fabriclib.common.ensure_dir import ensure_dir
@@ -34,6 +35,9 @@ def deploy_samba(v, secrets, jinja_env):
         os.makedirs(os.path.join(base, "data", sub), mode=0o755, exist_ok=True)
     # winbind's sockets, on the host so FreeRADIUS can reach them (PEAP through ntlm_auth); winbind makes the pipe
     ensure_dir(os.path.join(base, "winbindd"), 0o755, 0, 0)
+    # its time-signing socket (D100): root and chrony's group, 0750 (Samba checks the owner and the mode), so the
+    # host's chrony signs Windows members' time
+    ensure_dir(v["ad_ntp_signd_dir"], 0o750, 0, _chrony_gid())
     # BIND includes these when it starts: they must exist; turning DLZ on is for after the domain is converged
     if not os.path.exists(os.path.join(base, "bind", "dlz.conf")):
         write_bind_dlz(v)
@@ -52,3 +56,15 @@ def deploy_samba(v, secrets, jinja_env):
             converge |= write_file_if_changed(os.path.join(base, "converge", name),
                                               open(os.path.join(src, name)).read(), 0o600)
     return {"converge": converge, "restart": restart}
+
+
+def _chrony_gid():
+    """Purpose: the host's chrony group, which signs Windows time through the DC's socket.
+    Inputs:  none.
+    Returns: int gid of `_chrony` (Ubuntu's), else 0 (no chrony: nothing to sign for).
+    Fails:   never.
+    Feeds:   deploy_samba."""
+    try:
+        return grp.getgrnam("_chrony").gr_gid
+    except KeyError:
+        return 0

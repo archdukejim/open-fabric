@@ -74,6 +74,12 @@ def uninstall(ctx):
     for path in glob.glob(ctx.path("acme_*")):
         shutil.rmtree(path, ignore_errors=True)
     ok(f"removed fabric directories under {ctx.deploy_base}")
+    signd = v.get("ad_ntp_signd_dir") or "/var/lib/samba/ntp_signd"
+    shutil.rmtree(signd, ignore_errors=True)               # the DC's time-signing socket folder (D100)
+    try:
+        os.rmdir(os.path.dirname(signd))                   # /var/lib/samba, when fabric's folder was all it held
+    except OSError:
+        pass
     shutil.rmtree(v.get("openbao_runtime_dir") or "/run/fabric/openbao", ignore_errors=True)
     shutil.rmtree(v.get("openbao_admin_dir") or "/run/fabric/openbao-admin", ignore_errors=True)
     rules = v.get("openbao_udev_rules") or "/etc/udev/rules.d/90-fabric-unlock.rules"

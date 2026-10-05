@@ -21,6 +21,7 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.directory.run_op import run_op  # noqa: E402
 from fabriclib.federation.network_conflicts import network_conflicts  # noqa: E402
 from fabriclib.federation.read_address_plan import read_address_plan  # noqa: E402
+from fabriclib.radius.windows_lan_profile import windows_lan_profile  # noqa: E402
 from fabriclib.samba.converge_domain import converge_domain  # noqa: E402
 from fabriclib.samba.deploy_samba import deploy_samba  # noqa: E402
 from fabriclib.samba.write_bind_dlz import write_bind_dlz  # noqa: E402
@@ -96,7 +97,8 @@ if build.returncode:
 env = jinja_env(os.path.join(REPO, "templates"))
 v = yaml.safe_load(env.get_template("vars.yaml.j2").render(
     domain="lan.test", hostname="dc1", host_ip=IP, lan_cidr=SUBNET, lan_gateway="10.254.30.1", site_name="lan",
-    ad_domain="ad.lan.test", ad_password_policy=POLICY, deploy_base_dir=W))
+    ad_domain="ad.lan.test", ad_password_policy=POLICY, deploy_base_dir=W,
+    ad_ntp_signd_dir=os.path.join(W, "ntp_signd")))     # never the host's own /var/lib/samba
 compose = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(**v))["services"]["samba"]
 # a stand-in for fabric's Step-CA: the DC's certificate and the root CA the trust GPO carries
 pki = os.path.join(W, "stepca", "data", "certs")
@@ -183,6 +185,10 @@ check("winbind's privileged pipe: FreeRADIUS's group only (root, 0750); its sock
       (priv.st_uid, priv.st_gid, priv.st_mode & 0o7777) == (0, int(v["service_users"]["freeradius"]["gid"]), 0o750)
       and os.path.exists(os.path.join(W, "samba", "winbindd", "pipe")),
       (priv.st_uid, priv.st_gid, oct(priv.st_mode)))
+signd = os.stat(os.path.join(W, "ntp_signd"))
+check("the DC's time-signing socket in the folder the host's chrony reaches (D100): root, 0750",
+      os.path.exists(os.path.join(W, "ntp_signd", "socket")) and signd.st_uid == 0
+      and signd.st_mode & 0o7777 == 0o750, oct(signd.st_mode))
 SECRETS["ad_agent_password"] = random_password()
 healed = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("a changed agent password is set by the next convergence (when the old one no longer signs in)",
@@ -286,10 +292,53 @@ LAB_NETS = [{"name": "lan", "cidr": "10.77.0.0/24", "kind": "lan", "vlan": None,
 lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": LAB_NETS,
        "root_ca_pem": open(f"{pki}/root_ca.crt").read(), "id_range": "200001-300000", "groups": [],
        "admin_group": "admins",
-       "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
+       "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610,
+       "lan_profile": windows_lan_profile("peap", "radius.lab.lan.test", "aa " * 19 + "aa")}
 res = dc("python3", "/fabric/converge.py", stdin=json.dumps(lab))
 check("a second site's OU, groups and access entries", res.returncode == 0 and "group lab-admins created" in res.stdout,
       res.stderr)
+READ_BASELINE = r"""
+import json, os, sys
+import ldb
+from samba.dcerpc import preg
+from samba.ndr import ndr_unpack
+sys.path.insert(0, "/fabric")
+from open_samdb import open_samdb
+samdb, lp = open_samdb("/data/etc/smb.conf")
+out = {}
+for site in ("lan", "lab"):
+    g = samdb.search(base="CN=Policies,CN=System," + str(samdb.domain_dn()), scope=ldb.SCOPE_ONELEVEL,
+                     expression="(displayName=fabric: %s Windows baseline)" % site,
+                     attrs=["cn", "gPCMachineExtensionNames", "versionNumber"])[0]
+    folder = os.path.join(lp.get("path", "sysvol"), lp.get("realm").lower(), "Policies", str(g["cn"]), "Machine")
+    pol = ndr_unpack(preg.file, open(os.path.join(folder, "Registry.pol"), "rb").read())
+    link = samdb.search(base="OU=%s,OU=sites,%s" % (site, samdb.domain_dn()), scope=ldb.SCOPE_BASE, attrs=["gPLink"])
+    scripts = os.path.join(folder, "Scripts")
+    out[site] = {"linked": str(g.dn).lower() in str(link[0].get("gPLink", [""])[0]).lower(),
+                 "ext": str(g["gPCMachineExtensionNames"]), "version": int(str(g["versionNumber"])),
+                 "values": sorted([e.keyname, e.valuename, e.data] for e in pol.entries),
+                 "ini": open(os.path.join(scripts, "scripts.ini"), "rb").read().decode("utf-16")
+                 if os.path.exists(os.path.join(scripts, "scripts.ini")) else None,
+                 "xml": open(os.path.join(scripts, "Startup", "fabric-lan.xml")).read()
+                 if os.path.exists(os.path.join(scripts, "Startup", "fabric-lan.xml")) else None,
+                 "cmd": open(os.path.join(scripts, "Startup", "fabric-8021x.cmd"), "rb").read().decode()
+                 if os.path.exists(os.path.join(scripts, "Startup", "fabric-8021x.cmd")) else None}
+print(json.dumps(out))
+"""
+base_res = dc("python3", "-", stdin=READ_BASELINE)
+baseline = json.loads(base_res.stdout or "{}") if base_res.returncode == 0 else {}
+want_values = [["Software\\Policies\\Microsoft\\W32Time\\Parameters", "Type", "NT5DS"],
+               ["Software\\Policies\\Microsoft\\Windows NT\\CurrentVersion\\Winlogon", "SyncForegroundPolicy", 1]]
+check("each site's Windows baseline GPO is linked to its OU: wait for the network at log-on, the domain's time (NT5DS)",
+      all(baseline.get(s, {}).get("linked") and baseline[s]["values"] == want_values for s in ("lan", "lab")),
+      base_res.stderr[-400:] or baseline)
+lab_b, lan_b = baseline.get("lab", {}), baseline.get("lan", {})
+check("with 802.1X (lab): a start-up script turns on Wired AutoConfig and adds the PEAP profile naming the site's server",
+      lab_b.get("ini") and "0CmdLine=fabric-8021x.cmd" in lab_b["ini"] and "netsh lan add profile" in lab_b["cmd"]
+      and "<Type>25</Type>" in lab_b["xml"] and "radius.lab.lan.test" in lab_b["xml"]
+      and "{42B5FAAE-6536-11D2-AE5A-0000F87571E3}" in lab_b["ext"], lab_b)
+check("without 802.1X (lan: FreeRADIUS off): no script, the registry settings only",
+      lan_b.get("ini") is None and lan_b.get("xml") is None and "{42B5FAAE" not in lan_b.get("ext", "x{42B5FAAE"), lan_b)
 plan = read_address_plan(v, SECRETS, DC)
 check("the address plan, read as lan's agent, holds every site's networks with VLAN and notes (nothing gathered)",
       [(n["site"], n["name"], n["cidr"], n["vlan"], n["notes"]) for n in plan]

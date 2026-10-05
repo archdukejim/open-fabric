@@ -166,6 +166,9 @@ hostname_dc: "{{ (hostname ~ '.' ~ _ad) | lower if _ad else '' }}"
 # lockout_minutes, lockout_window_minutes: every key required
 ad_password_policy: {{ ad_password_policy | default({}, true) | to_json }}
 ad_old_password_minutes: {{ ad_old_password_minutes | default(0) | int }}
+{# the DC's signing socket for Windows members' time (D100), where the host's chrony reaches it: the one path
+   Ubuntu's AppArmor profile for chronyd allows (manual 2.11.2.8) #}
+ad_ntp_signd_dir: {{ ad_ntp_signd_dir | default('/var/lib/samba/ntp_signd', true) }}
 ad_rpc_ports: "{{ ad_rpc_ports | default('49152-49251', true) }}"
 posix_id_block: {{ posix_id_block | default(100000) | int }}
 samba_mem_limit: {{ samba_mem_limit | default('384m' if (host_ram_capacity | default(0) | int) == 3 else '512m', true) }}

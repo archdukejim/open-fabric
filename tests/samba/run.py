@@ -123,6 +123,8 @@ check("no secret in its environment (the Administrator's password comes as a fil
       not any(k.endswith(("PASSWORD", "SECRET", "PASS")) for k in dc["environment"]), sorted(dc["environment"]))
 check("its resolver is fabric's file (the host's address), not the host's resolver",
       "/opt/samba/resolv.conf:/etc/resolv.conf:ro" in dc["volumes"])
+check("the DC's time-signing socket in the one folder chrony's AppArmor profile allows (D100)",
+      "/var/lib/samba/ntp_signd:/run/samba/ntp_signd" in dc["volumes"], dc["volumes"])
 check("its secrets, certificate and converge code are mounted read-only",
       all(any(m.endswith(f":{target}:ro") for m in dc["volumes"]) for target in ("/run/secrets", "/tls", "/fabric")))
 check("a memory limit", dc["mem_limit"] == "512m")

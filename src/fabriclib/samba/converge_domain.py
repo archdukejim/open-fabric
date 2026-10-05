@@ -1,10 +1,13 @@
+import hashlib
 import json
 import os
+import ssl
 import subprocess
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.federation.site_networks import site_networks
 from fabriclib.ldap.people_written_here import people_written_here
+from fabriclib.radius.windows_lan_profile import windows_lan_profile
 from fabriclib.samba.id_range import id_range
 
 
@@ -14,7 +17,8 @@ def converge_domain(v, federation_file, secrets, container="samba"):
              idempotent, so it runs after every start and apply.
     Inputs:  v — rendered vars: site_name, ad_password_policy, deploy_base_dir (the root CA under
              stepca/data/certs), lan_cidr and the DHCP subnets (site_networks), ldap_groups, webui_admin_group,
-             service_users (FreeRADIUS's gid), the id block (posix_id_block from the users OU's uid_range start);
+             service_users (FreeRADIUS's gid), install_freeradius, radius_people and hostname_radius (the Windows
+             baseline's 802.1X profile), the id block (posix_id_block from the users OU's uid_range start);
              federation_file — the federation registry (whether this is the root site); secrets — fabric's secrets
              (the service accounts' passwords: ad_agent_password, ad_keycloak_password, ad_radius_password);
              container — the DC's container.
@@ -33,7 +37,7 @@ def converge_domain(v, federation_file, secrets, container="samba"):
              "admin_group": v.get("webui_admin_group") or "admins",
              "accounts": {f"fabric-{kind}-{v['site_name']}": secrets[f"ad_{kind}_password"]
                           for kind in ("agent", "keycloak", "radius")},
-             "radius_gid": v["service_users"]["freeradius"]["gid"]}
+             "radius_gid": v["service_users"]["freeradius"]["gid"], "lan_profile": _lan_profile(v, root_ca)}
     res = subprocess.run(["docker", "exec", "-i", "-e", "PYTHONDONTWRITEBYTECODE=1", container,
                           "python3", "/fabric/converge.py"],
                          input=json.dumps(state), capture_output=True, text=True, timeout=600)
@@ -41,3 +45,17 @@ def converge_domain(v, federation_file, secrets, container="samba"):
         raise ValidationError("the Windows domain could not be converged: "
                               + ((res.stderr or res.stdout).strip().splitlines() or ["the DC is not running"])[-1])
     return json.loads(res.stdout)["changed"]
+
+
+def _lan_profile(v, root_ca):
+    """Purpose: the wired 802.1X profile the site's Windows baseline installs (manual 2.11.2.20): PEAP to this site's
+             FreeRADIUS, checked against fabric's root CA.
+    Inputs:  v — rendered vars (install_freeradius, radius_people, hostname_radius); root_ca — path of the root CA.
+    Returns: str, the profile XML; "" while FreeRADIUS is off or no group is mapped (no password method on).
+    Fails:   OSError reading the root CA; ValueError for a file that is not a PEM certificate.
+    Feeds:   converge_domain."""
+    if not v.get("install_freeradius") or not v.get("radius_people"):
+        return ""
+    sha1 = hashlib.sha1(ssl.PEM_cert_to_DER_cert(open(root_ca).read())).hexdigest()
+    return windows_lan_profile("peap", v["hostname_radius"], " ".join(sha1[i:i + 2] for i in range(0, 40, 2)))
+
