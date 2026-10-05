@@ -1,5 +1,6 @@
-"""The site's `fabric: <site> admin settings` GPO (manual 2.11.2.20, S5.4): the policies an admin sets with
-`fabricctl gpo` (the web UI's editor in S7), kept apart from fabric's own GPOs, which convergence rewrites."""
+"""The site's admin GPOs (manual 2.11.2.20, S5.4; 1.8.8.14): the policies an admin sets with `fabricctl gpo` and the
+web UI's editor, kept apart from fabric's own GPOs, which convergence rewrites. `fabric: <site> admin settings` holds
+defaults the sites below may override; `fabric: <site> controls` is linked enforced, so they cannot (D105)."""
 import os
 
 import ldb
@@ -13,24 +14,24 @@ REGISTRY_MACHINE = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{0F6B957D-509E-11D1-A
 REGISTRY_USER = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{0F6B957E-509E-11D1-A7CC-0000F87571E3}]"
 
 
-def _name(site):
-    """Purpose: the site's admin GPO's display name.
-    Inputs:  site — str.
-    Returns: str "fabric: <site> admin settings".
+def _name(site, control=False):
+    """Purpose: the display name of one of the site's admin GPOs.
+    Inputs:  site — str; control — bool, the enforced one.
+    Returns: str "fabric: <site> admin settings" or "fabric: <site> controls".
     Fails:   never.
     Feeds:   admin_settings, save_admin_settings."""
-    return f"fabric: {site} admin settings"
+    return f"fabric: {site} controls" if control else f"fabric: {site} admin settings"
 
 
-def admin_settings(samdb, lp, site):
-    """Purpose: what the site's admin GPO sets today.
-    Inputs:  samdb — SamDB (as the system); lp — LoadParm; site — str.
+def admin_settings(samdb, lp, site, control=False):
+    """Purpose: what one of the site's admin GPOs sets today.
+    Inputs:  samdb — SamDB (as the system); lp — LoadParm; site — str; control — bool, the enforced one.
     Returns: {"machine": [[key, value name, type, data]], "user": [...]}; both empty before anything was set.
     Fails:   ldb.LdbError; OSError reading SYSVOL.
     Feeds:   gpo_tool (ops "show", "set", "clear")."""
     out = {"machine": [], "user": []}
     found = samdb.search(base=f"CN=Policies,CN=System,{samdb.domain_dn()}", scope=ldb.SCOPE_ONELEVEL,
-                         expression=f"(displayName={ldb.binary_encode(_name(site))})", attrs=["cn"])
+                         expression=f"(displayName={ldb.binary_encode(_name(site, control))})", attrs=["cn"])
     if not found:
         return out
     folder = os.path.join(lp.get("path", "sysvol"), lp.get("realm").lower(), "Policies", str(found[0]["cn"]))
@@ -60,14 +61,16 @@ def _pack(entries):
     return ndr_pack(f)
 
 
-def save_admin_settings(samdb, lp, site, settings):
-    """Purpose: write the site's admin GPO (created and linked to the site's OU when missing), its version bumped.
-    Inputs:  samdb — SamDB (as the system); lp — LoadParm; site — str; settings — admin_settings' shape.
+def save_admin_settings(samdb, lp, site, settings, control=False):
+    """Purpose: write one of the site's admin GPOs (created and linked to the site's OU when missing, the controls
+             enforced), its version bumped.
+    Inputs:  samdb — SamDB (as the system); lp — LoadParm; site — str; settings — admin_settings' shape; control —
+             bool, the enforced one.
     Returns: list of str, what changed.
     Fails:   ldb.LdbError; OSError; CalledProcessError (ensure_gpo).
     Feeds:   gpo_tool (ops "set", "clear")."""
-    return ensure_gpo(samdb, lp, _name(site), paths.site_dn(samdb, site),
+    return ensure_gpo(samdb, lp, _name(site, control), paths.site_dn(samdb, site),
                       REGISTRY_MACHINE if settings["machine"] else "",
                       {"Machine/Registry.pol": _pack(settings["machine"]),
                        "User/Registry.pol": _pack(settings["user"])},
-                      user_extensions=REGISTRY_USER if settings["user"] else "")
+                      user_extensions=REGISTRY_USER if settings["user"] else "", enforced=control)

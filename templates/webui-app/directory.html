@@ -155,13 +155,16 @@
 </section>{% endif %}
 
 {% elif view == 'gpo' %}
-<section class="card"><h2>Group Policy <span class="muted">fabric: {{ gpo.site }} admin settings</span></h2>
-<p class="muted">Your policies for this site's machines and people. fabric's own (the CA trust, log-on rights, the Windows baseline) are kept by fabric. Templates are loaded on the fabric host: <code>sudo fabricctl gpo load &lt;folder&gt;</code> (manual 3.15.4).</p>
-{% if gpo.settings.machine or gpo.settings.user %}
+{% for kind, title, about in (('settings', 'admin settings', "Defaults for this site's machines and people, and for the sites below it, which may override them."), ('controls', 'controls', "Linked enforced: the sites below this one cannot override or block these.")) %}
+<section class="card"><h2>Group Policy <span class="muted">fabric: {{ gpo.site }} {{ title }}</span></h2>
+<p class="muted">{{ about }}{% if kind == 'settings' %} fabric's own (the CA trust, log-on rights, the Windows baseline) are kept by fabric. Templates are loaded on the fabric host: <code>sudo fabricctl gpo load &lt;folder&gt;</code> (manual 3.15.4).{% endif %}</p>
+{% set g = gpo[kind] or {'machine': [], 'user': []} %}
+{% if g.machine or g.user %}
 <table><thead><tr><th>Applies to</th><th>Key</th><th>Value</th><th>Data</th></tr></thead><tbody>
-{% for scope in ('machine', 'user') %}{% for key, name, kind, data in gpo.settings[scope] %}<tr><td>{{ scope }}</td><td><code class="small">{{ key }}</code></td><td>{{ name }}</td><td>{{ data }}</td></tr>{% endfor %}{% endfor %}
+{% for scope in ('machine', 'user') %}{% for key, name, vkind, data in g[scope] %}<tr><td>{{ scope }}</td><td><code class="small">{{ key }}</code></td><td>{{ name }}</td><td>{{ data }}</td></tr>{% endfor %}{% endfor %}
 </tbody></table>{% else %}<p class="blank">Nothing set yet.</p>{% endif %}
 </section>
+{% endfor %}
 <section class="card"><h2>Find a policy <span class="muted">{{ gpo.templates | join(', ') or 'no templates loaded' }}</span></h2>
 <form method="get" action="/directory" class="grid"><input type="hidden" name="view" value="gpo">
 <label>Name or title contains<input name="match" value="{{ gpo.match }}" maxlength="100"></label><div><button>Search</button></div></form>
@@ -170,8 +173,9 @@
 {% for p in gpo.policies %}<tr><td><strong>{{ p.display }}</strong><div class="muted small">{{ p.name }} · {{ p.template }}</div></td><td>{{ p.class }}</td><td><code class="small">{{ p.elements | join(' ') or '—' }}</code></td>
 <td>{% if can('gpo:admin') %}<form method="post" action="/directory/gpo/set" class="grid"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="policy" value="{{ p.name }}">
 {% for e in p.elements %}{% set eid = e.split(':', 1)[1] %}<label class="small">{{ eid }}<input name="el_{{ eid }}"></label>{% endfor %}
-<label class="check"><input type="checkbox" name="disabled" value="1"> Disabled</label><div><button>Set</button></div></form>
-<form method="post" action="/directory/gpo/clear"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="policy" value="{{ p.name }}"><button class="ghost">Not configured</button></form>{% endif %}</td></tr>{% endfor %}
+<label class="check"><input type="checkbox" name="disabled" value="1"> Disabled</label><label class="check"><input type="checkbox" name="control" value="1"> As a control (enforced)</label><div><button>Set</button></div></form>
+<form method="post" action="/directory/gpo/clear"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="policy" value="{{ p.name }}"><button class="ghost">Not configured</button></form>
+<form method="post" action="/directory/gpo/clear"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="policy" value="{{ p.name }}"><input type="hidden" name="control" value="1"><button class="ghost">Not configured (control)</button></form>{% endif %}</td></tr>{% endfor %}
 </tbody></table>{% if gpo.more %}<p class="muted small">More match: narrow the search.</p>{% endif %}
 {% else %}<p class="blank">No policy matches.</p>{% endif %}
 {% endif %}

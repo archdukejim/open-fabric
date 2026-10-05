@@ -13,12 +13,14 @@ from fabriclib.samba.set_gpo_policy import set_gpo_policy
 USAGE = """usage: fabricctl gpo load <folder>                 templates (.admx, <lang>/.adml) into the central store
        fabricctl gpo templates                     the templates in the central store
        fabricctl gpo list [<text>]                 policies whose name or title contains <text>, with their elements
-       fabricctl gpo show                          what this site's admin settings GPO sets
-       fabricctl gpo set <policy> [<element>=<value> …] [--disabled]
-       fabricctl gpo clear <policy>                back to "not configured"
+       fabricctl gpo show [--control]              what this site's admin settings (or controls) GPO sets
+       fabricctl gpo set <policy> [<element>=<value> …] [--disabled] [--control]
+       fabricctl gpo clear <policy> [--control]    back to "not configured"
        fabricctl gpo starter <folder>              copy fabric's blank starter template (.admx and en-US/.adml) there
   Policies apply to this site's machines (or people, for user policies) through its "fabric: <site> admin settings"
-  GPO. Values: a number, text, on/off, an option's name or number, or a list as a;b;c (manual 3.15.4)."""
+  GPO, which the sites below may override; with --control through its "fabric: <site> controls" GPO, linked
+  enforced, which they may not. Values: a number, text, on/off, an option's name or number, or a list as a;b;c
+  (manual 3.15.4)."""
 
 
 def _files(folder):
@@ -51,6 +53,8 @@ def run_gpo_command(v, args, container="samba"):
         print(USAGE)
         return 2
     op, rest, site = args[0], args[1:], v["site_name"]
+    control = "--control" in rest
+    rest = [a for a in rest if a != "--control"]
     try:
         if op == "starter":
             if len(rest) != 1:
@@ -75,12 +79,12 @@ def run_gpo_command(v, args, container="samba"):
                 if p["elements"]:
                     print("    " + "  ".join(p["elements"]))
         elif op == "show":
-            s = gpo_request({"op": "show", "site": site}, container)
+            s = gpo_request({"op": "show", "site": site, "control": control}, container)
             for scope in ("machine", "user"):
                 for key, name, _, data in s[scope]:
                     print(f"{scope}: {key}\\{name} = {data}")
             if not s["machine"] and not s["user"]:
-                print(f"fabric: {site} admin settings sets nothing")
+                print(f"fabric: {site} {'controls' if control else 'admin settings'} sets nothing")
         else:
             if not rest:
                 print(USAGE)
@@ -92,9 +96,10 @@ def run_gpo_command(v, args, container="samba"):
                 key, value = item.split("=", 1)
                 values[key] = value
             if op == "set":
-                done = set_gpo_policy(v, getpass.getuser(), rest[0], values, enabled, container=container)
+                done = set_gpo_policy(v, getpass.getuser(), rest[0], values, enabled, container=container,
+                                      control=control)
             else:
-                done = clear_gpo_policy(v, getpass.getuser(), rest[0], container=container)
+                done = clear_gpo_policy(v, getpass.getuser(), rest[0], container=container, control=control)
             print("; ".join(done) or "already so")
     except ValidationError as e:
         print(f"refused: {e}")

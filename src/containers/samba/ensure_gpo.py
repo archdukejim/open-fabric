@@ -20,14 +20,15 @@ def _gpo(samdb, name):
     return str(res[0].dn), str(res[0]["cn"]), int(str(res[0].get("versionNumber", ["0"])[0]))
 
 
-def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None):
+def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None, enforced=False):
     """Purpose: one of fabric's Group Policy objects as wanted (manual 2.11.2.9): created when missing, linked to its
              target, its files in SYSVOL exactly `files`; a change bumps its version in AD and in GPT.INI so members
              apply it, and SYSVOL's ACLs are reset after writing (Q13, Q16).
     Inputs:  samdb — SamDB; lp — LoadParm (realm, the SYSVOL path); name — display name; link_dn — str, the domain or
              an OU; extensions — gPCMachineExtensionNames value ("[{CSE}{tool}]…", sorted as Windows writes them);
              files — {path under the GPO folder, e.g. "Machine/Registry.pol": bytes}; user_extensions —
-             gPCUserExtensionNames for user policies (None: left as it is; "": none).
+             gPCUserExtensionNames for user policies (None: left as it is; "": none); enforced — link it enforced
+             (a parent's control: wins over the GPOs of the sites below, and passes a blocked inheritance, D105).
     Returns: list of str, what was created or changed.
     Fails:   ldb.LdbError from AD; OSError writing SYSVOL; NTSTATUSError from set_gpo_acl.
     Feeds:   converge.
@@ -73,12 +74,15 @@ def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None
         with open(os.path.join(folder, "GPT.INI"), "wb") as f:
             f.write(f"[General]\r\nVersion={version}\r\n".encode())
         done.append(f"GPO {name}: version {version}")
-    link = f"[LDAP://{dn};0]"
+    link = f"[LDAP://{dn};{2 if enforced else 0}]"
     target = samdb.search(base=link_dn, scope=ldb.SCOPE_BASE, attrs=["gPLink"])[0]
     current = str(target.get("gPLink", [""])[0])
-    if dn.lower() not in current.lower():
-        samdb.modify(ldb.Message.from_dict(samdb, {"dn": link_dn, "gPLink": current + link}, ldb.FLAG_MOD_REPLACE))
-        done.append(f"GPO {name} linked to {link_dn}")
+    if link.lower() not in current.lower():
+        # this GPO's link with another option (enforced or not) is replaced; the others' links are kept
+        kept = "".join(f"[{part}]" for part in current.strip("[]").split("][")
+                       if part and not part.lower().startswith(f"ldap://{dn.lower()};"))
+        samdb.modify(ldb.Message.from_dict(samdb, {"dn": link_dn, "gPLink": kept + link}, ldb.FLAG_MOD_REPLACE))
+        done.append(f"GPO {name} linked to {link_dn}" + (" (enforced)" if enforced else ""))
     if done:                              # this GPO's folder only: a site's DC lacks the domain's other folders
         set_gpo_acl(samdb, lp, guid)
     return done

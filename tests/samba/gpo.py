@@ -138,6 +138,32 @@ check("the GPO is linked to OU=lan, its version bumped in AD and GPT.INI, Regist
       and "{35378EAC-683F-11D2-A89A-00C04FBBCFA2}" in g.get("ext", "") and g.get("entries") == 5,
       res.stderr[-300:] or g)
 
+code, out = gpo("set", "ExampleSetting", "ExampleText=locked", "--control")
+controls = gpo_request({"op": "show", "site": "lan", "control": True}, DC)["machine"]
+LINKS = r"""
+import sys
+import ldb
+sys.path.insert(0, "/fabric")
+from open_samdb import open_samdb
+samdb, lp = open_samdb("/data/etc/smb.conf")
+for name in ("admin settings", "controls"):
+    g = samdb.search(base="CN=Policies,CN=System," + str(samdb.domain_dn()), scope=ldb.SCOPE_ONELEVEL,
+                     expression="(displayName=fabric: lan %s)" % name, attrs=["cn"])[0]
+    link = str(samdb.search(base="OU=lan,OU=sites," + str(samdb.domain_dn()), scope=ldb.SCOPE_BASE,
+                            attrs=["gPLink"])[0]["gPLink"][0]).lower()
+    print(name, link.split(str(g.dn).lower() + ";")[1][0] if str(g.dn).lower() + ";" in link else "-")
+"""
+links = subprocess.run(["docker", "exec", "-i", DC, "python3", "-"], input=LINKS, capture_output=True, text=True).stdout
+check("a policy set as a control goes to lan's controls GPO, linked enforced (2), the admin settings GPO not "
+      "(0), and the admin settings keep their own value (D105)",
+      code == 0 and ["Software\\Policies\\Example\\Starter", "ExampleText", 1, "locked"] in controls
+      and "admin settings 0" in links and "controls 2" in links
+      and ["Software\\Policies\\Example\\Starter", "ExampleText", 1, "hello"] in machine(), (out, links, controls))
+code, out = gpo("clear", "ExampleSetting", "--control")
+check("clearing it as a control empties the controls GPO only",
+      code == 0 and gpo_request({"op": "show", "site": "lan", "control": True}, DC)["machine"] == []
+      and ["Software\\Policies\\Example\\Starter", "ExampleText", 1, "hello"] in machine(), out)
+
 check("refused: an unknown policy", refused({"op": "set", "site": "lan", "policy": "NoSuchPolicy"}, "no policy"))
 check("refused: an element the policy does not have",
       refused({"op": "set", "site": "lan", "policy": TEXT_POL, "values": {"nope": "x"}}, "has no element"))

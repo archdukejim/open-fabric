@@ -79,7 +79,8 @@ def directory_post(h, sess, parts, form):
         policy = form.get("policy", "")
         values = {k[3:]: val for k, val in form.items() if k.startswith("el_") and val != ""}
         try:
-            done = actions.gpo_change(name, policy, values, enabled=not form.get("disabled"))
+            done = actions.gpo_change(name, policy, values, enabled=not form.get("disabled"),
+                                      control=bool(form.get("control")))
         except actions.ValidationError as exc:
             return h.redirect("/directory?" + urllib.parse.urlencode({"view": "gpo", "err": str(exc)}))
         return h.redirect("/directory?" + urllib.parse.urlencode(

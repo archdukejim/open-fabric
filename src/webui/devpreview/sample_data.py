@@ -164,6 +164,7 @@ SAMPLE_FEDERATION = {
 SAMPLE_GPO = {"site": "lan", "templates": ["fabric-starter", "samba"], "match": "",
               "settings": {"machine": [["Software\\Policies\\Example\\Starter", "ExampleText", 1, "hello"]],
                            "user": []},
+              "controls": {"machine": [["Software\\Policies\\Example\\Starter", "ExampleLocked", 4, 1]], "user": []},
               "policies": [{"template": "fabric-starter", "name": "ExampleSetting", "display": "Example setting",
                             "class": "Machine", "elements": ["text:ExampleText"]}], "more": False}
 

@@ -13,7 +13,8 @@ def post_domain(route, actor, data):
     """Purpose: the domain section of the Directory tab (manual 2.11.2.21 S7.4): the site's machines, POST
              /v1/machines/..., and its admin settings GPO, POST /v1/gpo/....
     Inputs:  route — ["machines"] (body: name), ["machines", <name>, "enable"|"disable"|"delete"], ["gpo", "search"]
-             (body: match), ["gpo", "set"] (body: policy, values {element: text}, enabled), ["gpo", "clear"] (body:
+             (body: match), ["gpo", "set"] (body: policy, values {element: text}, enabled, control), ["gpo",
+             "clear"] (body:
              policy); actor — str; data — the JSON body.
     Returns: machines: {"password"} (the one-time join password, shown once); enable/disable: {"name", "enabled",
              "changed"}; delete: {"name"}; gpo/search: gpo_overview with the matching policies; gpo/set and
@@ -36,7 +37,9 @@ def post_domain(route, actor, data):
                                                    for k, x in values.items()):
             raise ValidationError("values: an object of element: text")
         return {"changed": set_gpo_policy(v, actor, read_text(data, "policy"), values,
-                                          data.get("enabled", True) is not False, source="web")}
+                                          data.get("enabled", True) is not False, source="web",
+                                          control=data.get("control") is True)}
     if route == ["gpo", "clear"]:
-        return {"changed": clear_gpo_policy(v, actor, read_text(data, "policy"), source="web")}
+        return {"changed": clear_gpo_policy(v, actor, read_text(data, "policy"), source="web",
+                                            control=data.get("control") is True)}
     raise ValidationError("unknown operation")

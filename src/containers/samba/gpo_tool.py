@@ -41,7 +41,8 @@ def _without(entries, policy):
 def run(req):
     """Purpose: one editor operation.
     Inputs:  req — {"op", "site", and per op: "files" {name: base64} (load); "match" (policies); "policy", "values"
-             {element id: text}, "enabled" bool (set); "policy" (clear)}.
+             {element id: text}, "enabled" bool (set); "policy" (clear); "control" bool (show, set, clear: the
+             site's enforced controls GPO instead of its admin settings)}.
     Returns: load: the files written; templates: the store's templates; policies: the matching policies (name,
              display, class, template, elements); show: the admin GPO's values; set/clear: what changed.
     Fails:   ValueError for a request the editor refuses (its message is shown); ldb.LdbError, OSError.
@@ -59,16 +60,17 @@ def run(req):
         return [{k: p[k] for k in ("template", "name", "display", "class")}
                 | {"elements": [f"{e['type']}:{e['id']}" for e in p["elements"]]}
                 for p in read_policies(lp) if match in (p["name"] + " " + p["display"]).lower()]
+    control = bool(req.get("control"))
     if op == "show":
-        return admin_settings(samdb, lp, site)
+        return admin_settings(samdb, lp, site, control)
     if op in ("set", "clear"):
         policy = _policy(lp, req["policy"])
-        settings = admin_settings(samdb, lp, site)
+        settings = admin_settings(samdb, lp, site, control)
         scope = "user" if policy["class"] == "User" else "machine"
         settings[scope] = _without(settings[scope], policy)
         if op == "set":
             settings[scope] += policy_entries(policy, req.get("values") or {}, bool(req.get("enabled", True)))
-        return save_admin_settings(samdb, lp, site, settings)
+        return save_admin_settings(samdb, lp, site, settings, control)
     raise ValueError(f"unknown operation {op}")
 
 
