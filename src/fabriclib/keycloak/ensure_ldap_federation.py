@@ -11,8 +11,9 @@ def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True):
              fabric-keycloak account; people searched under OU=sites, admitted when they are in this site's
              `<site>-users` or the organisation's admin group (D90); writable, so a password changed at sign-in lands
              in AD. fabric creates people itself (directory/create_person): Keycloak does not.
-    Inputs:  kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ad_base_dn, host_ip,
-             site_name, webui_admin_group); s — secrets (ad_keycloak_password); writable — False makes it READ_ONLY.
+    Inputs:  kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ad_base_dn, ad_site_ou,
+             ad_org_ou, host_ip, site_name, webui_admin_group); s — secrets (ad_keycloak_password); writable —
+             False makes it READ_ONLY.
     Returns: str, the federation component id. An existing AD provider is updated in place (fabric's settings win,
              other settings kept); a provider of another kind (an older install's) is removed first and made anew, so
              Keycloak creates AD's own mappers (account controls, pwdLastSet) with it.
@@ -21,8 +22,9 @@ def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True):
     Feeds:   configure_keycloak (the id is passed to ensure_group_mapper)."""
     base, site = v["ad_base_dn"], v["site_name"]
     admins = v.get("webui_admin_group") or "admins"
-    admitted = (f"(|(memberOf=CN={site}-users,OU=groups,OU={site},OU=sites,{base})"
-                f"(memberOf=CN={admins},OU=groups,OU=organisation,OU={site},OU=sites,{base}))")
+    site_ou, org_ou = f"{v['ad_site_ou']},{base}", f"{v['ad_org_ou']},{base}"
+    admitted = (f"(|(memberOf=CN={site}-users,OU=groups,{site_ou})"
+                f"(memberOf=CN={admins},OU=groups,{org_ou}))")
     config = {
         "enabled": ["true"],
         "vendor": ["ad"],
@@ -38,7 +40,7 @@ def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True):
         "searchScope": ["2"],
         "customUserSearchFilter": [admitted],
         "authType": ["simple"],
-        "bindDn": [f"CN=fabric-keycloak-{site},OU=service-accounts,OU={site},OU=sites,{base}"],
+        "bindDn": [f"CN=fabric-keycloak-{site},OU=service-accounts,{site_ou}"],
         "bindCredential": [s["ad_keycloak_password"]],
         "useTruststoreSpi": ["always"],
         "startTls": ["false"],

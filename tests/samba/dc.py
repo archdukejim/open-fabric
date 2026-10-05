@@ -289,7 +289,7 @@ check("BIND still runs as its own user with no capabilities", bind_info["Config"
 # refusals: a site's admin writes its own site only (Q4), the policy is enforced
 LAB_NETS = [{"name": "lan", "cidr": "10.77.0.0/24", "kind": "lan", "vlan": None, "notes": "", "allow_overlap": ""},
             {"name": "iot", "cidr": "10.78.0.0/24", "kind": "dhcp", "vlan": 21, "notes": "cameras", "allow_overlap": ""}]
-lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": LAB_NETS,
+lab = {"site": "lab", "root": False, "parent": "lan", "password_policy": POLICY, "networks": LAB_NETS,
        "root_ca_pem": open(f"{pki}/root_ca.crt").read(), "id_range": "200001-300000", "groups": [],
        "admin_group": "admins",
        "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610,
@@ -297,6 +297,8 @@ lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": LAB_
 res = dc("python3", "/fabric/converge.py", stdin=json.dumps(lab))
 check("a second site's OU, groups and access entries", res.returncode == 0 and "group lab-admins created" in res.stdout,
       res.stderr)
+check("...its OU nested in its parent's (D105), marked as a site OU",
+      "dn: OU=lab,OU=lan,OU=sites," in dc("ldbsearch", "-H", "/data/private/sam.ldb", "(&(objectClass=fabricSiteInfo)(ou=lab))", "dn").stdout)
 READ_BASELINE = r"""
 import json, os, sys
 import ldb
@@ -312,7 +314,8 @@ for site in ("lan", "lab"):
                      attrs=["cn", "gPCMachineExtensionNames", "versionNumber"])[0]
     folder = os.path.join(lp.get("path", "sysvol"), lp.get("realm").lower(), "Policies", str(g["cn"]), "Machine")
     pol = ndr_unpack(preg.file, open(os.path.join(folder, "Registry.pol"), "rb").read())
-    link = samdb.search(base="OU=%s,OU=sites,%s" % (site, samdb.domain_dn()), scope=ldb.SCOPE_BASE, attrs=["gPLink"])
+    ou = "OU=lan,OU=sites" if site == "lan" else "OU=lab,OU=lan,OU=sites"
+    link = samdb.search(base="%s,%s" % (ou, samdb.domain_dn()), scope=ldb.SCOPE_BASE, attrs=["gPLink"])
     scripts = os.path.join(folder, "Scripts")
     out[site] = {"linked": str(g.dn).lower() in str(link[0].get("gPLink", [""])[0]).lower(),
                  "ext": str(g["gPCMachineExtensionNames"]), "version": int(str(g["versionNumber"])),
@@ -352,32 +355,51 @@ check("a network a site no longer has leaves the plan (and its AD subnet)",
       "network iot removed" in lab_less.stdout and [n["name"] for n in read_address_plan(v, SECRETS, DC)
                                                     if n["site"] == "lab"] == ["lan"], lab_less.stdout[-400:])
 lab_pw = random_password(20)
-made = dc("samba-tool", "user", "create", "labadmin", lab_pw, "--userou=OU=people,OU=lab,OU=sites",
+made = dc("samba-tool", "user", "create", "labadmin", lab_pw, "--userou=OU=people,OU=lab,OU=lan,OU=sites",
           "-s", "/data/etc/smb.conf")
 dc("samba-tool", "group", "addmembers", "lab-admins", "labadmin", "-s", "/data/etc/smb.conf")
 check("a lab admin is created", made.returncode == 0, made.stderr)
-user = "dn: CN={0},OU=people,OU={1},OU=sites,%s\nobjectClass: user\nsAMAccountName: {0}\n" % BASE
-own = as_user("labadmin", lab_pw, "ldbadd", user.format("labuser", "lab"))
+user = "dn: CN={0},OU=people,{1},%s\nobjectClass: user\nsAMAccountName: {0}\n" % BASE
+LAN_OU, LAB_OU = "OU=lan,OU=sites", "OU=lab,OU=lan,OU=sites"
+own = as_user("labadmin", lab_pw, "ldbadd", user.format("labuser", LAB_OU))
 check("a site admin adds a person in its own site", "successfully" in own.stdout + own.stderr, own.stderr)
-other = as_user("labadmin", lab_pw, "ldbadd", user.format("intruder", "lan"))
+other = as_user("labadmin", lab_pw, "ldbadd", user.format("intruder", LAN_OU))
 share = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/labadmin.auth:/auth:ro", "--entrypoint",
             "smbclient", IMAGE, f"//{IP}/sysvol", "-A", "/auth", "-c",
             "ls ad.lan.test/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/*"], ok=False)
 check("an ordinary domain user reads SYSVOL (Group Policy reads it as the machine; found on host-1, S1.7)",
       share.returncode == 0 and "GPT.INI" in share.stdout.upper(), (share.stdout + share.stderr)[-300:])
-agent_own = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentmade", "lan"))
+agent_own = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentmade", LAN_OU))
 check("the site's agent adds a person in its own site", "successfully" in agent_own.stdout + agent_own.stderr,
       agent_own.stderr[-200:])
-agent_other = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentevil", "lab"))
-check("refused: the site's agent adding a person in another site",
-      "successfully" not in agent_other.stdout + agent_other.stderr)
+agent_child = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentkid", LAB_OU))
+check("the parent's agent adds a person in the site nested below it (inherited, D105)",
+      "successfully" in agent_child.stdout + agent_child.stderr, agent_child.stderr[-200:])
+lab_agent = lab["accounts"]["fabric-agent-lab"]
+agent_up = as_user("fabric-agent-lab", lab_agent, "ldbadd", user.format("agentevil", LAN_OU))
+check("refused: a nested site's agent adding a person in its parent",
+      "successfully" not in agent_up.stdout + agent_up.stderr)
+kid_svc = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd",
+                  f"dn: CN=svc3,OU=service-accounts,{LAB_OU},{BASE}\nobjectClass: user\nsAMAccountName: svc3\n")
+check("refused: the parent's agent adding to a nested site's service accounts",
+      "successfully" not in kid_svc.stdout + kid_svc.stderr)
+protect = as_user("labadmin", lab_pw, "ldbmodify",
+                  f"dn: {LAB_OU},{BASE}\nchangetype: modify\nreplace: nTSecurityDescriptor\n"
+                  "nTSecurityDescriptor: O:DAG:DAD:P(A;;GA;;;DA)\n")
+as_user("Administrator", admin_pw, "ldbadd", f"dn: OU=sdtest,{BASE}\nobjectClass: organizationalUnit\n")
+control = as_user("Administrator", admin_pw, "ldbmodify",
+                  f"dn: OU=sdtest,{BASE}\nchangetype: modify\nreplace: nTSecurityDescriptor\n"
+                  "nTSecurityDescriptor: O:DAG:DAD:P(A;;GA;;;DA)\n")
+check("refused: a nested site's admin changing its OU's permissions (it cannot shut its parents out; the same "
+      "change by the domain's Administrator works)", "successfully" in control.stdout + control.stderr
+      and "successfully" not in protect.stdout + protect.stderr, (control.stderr + protect.stderr)[-300:])
 agent_svc = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd",
                     f"dn: CN=svc2,OU=service-accounts,OU=lan,OU=sites,{BASE}\nobjectClass: user\nsAMAccountName: svc2\n")
 check("refused: the site's agent adding to its own site's service accounts",
       "successfully" not in agent_svc.stdout + agent_svc.stderr)
 check("refused: a site admin adding a person in another site", "successfully" not in other.stdout + other.stderr)
 svc = as_user("labadmin", lab_pw, "ldbadd",
-              f"dn: CN=svc,OU=service-accounts,OU=lab,OU=sites,{BASE}\nobjectClass: user\nsAMAccountName: svc\n")
+              f"dn: CN=svc,OU=service-accounts,OU=lab,OU=lan,OU=sites,{BASE}\nobjectClass: user\nsAMAccountName: svc\n")
 check("refused: a site admin adding to its site's service accounts", "successfully" not in svc.stdout + svc.stderr)
 domain = as_user("labadmin", lab_pw, "ldbmodify",
                  f"dn: CN=Administrator,CN=Users,{BASE}\nchangetype: modify\nreplace: description\ndescription: x\n")
@@ -433,10 +455,12 @@ run_op(v, SECRETS, "reset_password", {"uid": "alice", "password": new_otp}, cont
 check("a reset sets a new one-time password (it must be changed: AD refuses it for a sign-in until then)",
       attr("(sAMAccountName=alice)", "pwdLastSet") == ["0"])
 try:
-    run_op(v, SECRETS, "reset_password", {"uid": "labadmin", "password": new_otp}, container=DC)
-    check("refused: the site's agent resetting another site's person", False)
+    run_op({**v, "site_name": "lab"}, {**SECRETS, "ad_agent_password": lab["accounts"]["fabric-agent-lab"]},
+           "reset_password", {"uid": "alice", "password": new_otp}, container=DC)
+    check("refused: a nested site's agent resetting a person of its parent", False)
 except ValidationError as e:
-    check("refused: the site's agent resetting another site's person", "refused" in str(e) or "not permitted" in str(e), e)
+    check("refused: a nested site's agent resetting a person of its parent",
+          "refused" in str(e) or "not permitted" in str(e), e)
 first = alice["uidNumber"]
 dc("samba-tool", "user", "delete", "alice", "-s", "/data/etc/smb.conf")
 carol = mk("carol")
@@ -505,7 +529,7 @@ def ntlm_at_rodc(user, password):
 check("NTLM at the RODC for an account it does not cache is forwarded to the writable DC (Q6 follow-up)",
       ntlm_at_rodc("labadmin", lab_pw))
 cached_pw = random_password(20)
-dc("samba-tool", "user", "create", "cachy", cached_pw, "--userou=OU=people,OU=lab,OU=sites", "-s", "/data/etc/smb.conf")
+dc("samba-tool", "user", "create", "cachy", cached_pw, "--userou=OU=people,OU=lab,OU=lan,OU=sites", "-s", "/data/etc/smb.conf")
 dc("samba-tool", "group", "addmembers", "Allowed RODC Password Replication Group", "cachy", "-s", "/data/etc/smb.conf")
 pre = sh(["docker", "exec", RODC, "samba-tool", "rodc", "preload", "cachy", "-s", "/data/etc/smb.conf",
           "--server=dc1.ad.lan.test"], ok=False)
@@ -516,7 +540,7 @@ check("with the writable DC down: refused, the Administrator (never cached)", no
                                                                                                admin_pw))
 check("with the writable DC down: refused, a person the RODC does not cache", not ntlm_at_rodc("labadmin", lab_pw))
 with open(os.path.join(W, "op.ldif"), "w") as f:
-    f.write(f"dn: CN=cachy,OU=people,OU=lab,OU=sites,{BASE}\nchangetype: modify\nreplace: description\n"
+    f.write(f"dn: CN=cachy,OU=people,OU=lab,OU=lan,OU=sites,{BASE}\nchangetype: modify\nreplace: description\n"
             "description: written at the RODC\n")
 wr = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/cachy-ntlm.auth:/auth:ro", "-v",
          f"{W}/op.ldif:/op.ldif:ro", "--entrypoint", "ldbmodify", IMAGE, "-H", f"ldap://{RODC_IP}", "-A", "/auth",

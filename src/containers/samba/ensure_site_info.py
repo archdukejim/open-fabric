@@ -1,5 +1,7 @@
 import ldb
 
+import paths
+
 
 def ensure_site_info(samdb, site, id_range):
     """Purpose: a site's uid/gid block on its OU (D97, manual 1.6.3.9): `fabricIdRange` "first-last" and the
@@ -13,7 +15,7 @@ def ensure_site_info(samdb, site, id_range):
     first, last = (int(x) for x in id_range.split("-"))
     if not 0 < first <= last:
         raise ValueError(f"id range {id_range!r}: first-last, both positive")
-    dn = f"OU={site},OU=sites,{samdb.domain_dn()}"
+    dn = paths.site_dn(samdb, site)
     have = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=["objectClass", "fabricIdRange", "fabricIdNext"])[0]
     changes, done = {}, []
     if "fabricSiteInfo" not in [str(c) for c in have["objectClass"]]:

@@ -70,7 +70,8 @@ install -m 0644 "$tmp/root.crt" /usr/local/share/ca-certificates/fabric-root-ca.
 update-ca-certificates >/dev/null
 echo "trusted fabric's root CA ($FP)"
 
-apt-get install -y -qq adcli sssd-ad sssd-tools libpam-sss libnss-sss libsss-sudo krb5-user >/dev/null
+apt-get install -y -qq adcli sssd-ad sssd-tools libpam-sss libnss-sss libsss-sudo krb5-user ldap-utils \
+    libsasl2-modules-gssapi-mit >/dev/null
 
 # Kerberos: the domain's realm; its KDCs from DNS, the site's DC when DNS has none
 cat > /etc/krb5.conf <<EOF
@@ -91,6 +92,30 @@ cat > /etc/krb5.conf <<EOF
     $AD_DOMAIN = $REALM
 EOF
 
+# where the site sits (sites nest, each in its parent's OU: manual 1.8.8.14): its OU, the sites above it and the
+# organisation's OU, read from the DC as the account that joins (a site admin, or the pre-created machine), signed in
+# with Kerberos, the password on stdin
+if [[ $ONE_TIME -eq 1 ]]; then PRINCIPAL="${MACHINE^^}\$@$REALM"; else PRINCIPAL="$JOIN_USER@$REALM"; fi
+export KRB5CCNAME="FILE:$tmp/ccache"
+printf '%s\n' "$PASSWORD" | kinit "$PRINCIPAL" >/dev/null 2>&1 || die "$PRINCIPAL could not sign in (the password?)"
+lookup() {
+    LDAPSASL_NOCANON=on ldapsearch -LLL -o ldif-wrap=no -Q -Y GSSAPI -H "ldap://$DC" -b "OU=sites,$BASE_DN" \
+        "$1" dn 2>/dev/null | sed -n 's/^dn: //p'
+}
+SITE_DN=$(lookup "(&(objectClass=fabricSiteInfo)(ou=$SITE))")
+[[ -n $SITE_DN && $SITE_DN != *$'\n'* ]] || die "no site $SITE in $AD_DOMAIN"
+ORG_DN=$(lookup "(&(objectClass=organizationalUnit)(ou=organisation))")
+[[ -n $ORG_DN && $ORG_DN != *$'\n'* ]] || die "no organisation OU in $AD_DOMAIN"
+# sudo rules: the site's own, each site's above it (their roles reach the sites below, D103), the organisation's
+SUDO_BASES=""
+dn=$SITE_DN
+while [[ ${dn^^} == OU=* && ${dn^^} != OU=SITES,* ]]; do
+    SUDO_BASES+="OU=sudoers,$dn?onelevel??"
+    dn=${dn#*,}
+done
+SUDO_BASES+="OU=sudoers,$ORG_DN?onelevel?"
+kdestroy >/dev/null 2>&1 || true
+
 # the join (the account's name in upper case, as Windows names them: SSSD looks for NAME$ in the keytab):
 # a computer account in the site's OU=machines (pre-created with --one-time), the password on stdin
 if [[ $ONE_TIME -eq 1 ]]; then
@@ -100,7 +125,7 @@ if [[ $ONE_TIME -eq 1 ]]; then
 else
     printf '%s' "$PASSWORD" | adcli join --domain="$AD_DOMAIN" --domain-realm="$REALM" --domain-controller="$DC" \
         --computer-name="${MACHINE^^}" --login-user="$JOIN_USER" --stdin-password \
-        --domain-ou="OU=machines,OU=$SITE,OU=sites,$BASE_DN" --show-details >/dev/null \
+        --domain-ou="OU=machines,$SITE_DN" --show-details >/dev/null \
         || die "the join was refused (a site admin of $SITE, and the right password?)"
 fi
 unset PASSWORD
@@ -126,7 +151,7 @@ fallback_homedir = /home/%u
 default_shell = /bin/bash
 cache_credentials = true
 enumerate = false
-ldap_sudo_search_base = OU=$SITE,OU=sites,$BASE_DN?subtree?
+ldap_sudo_search_base = $SUDO_BASES
 EOF
 chmod 0600 /etc/sssd/sssd.conf
 pam-auth-update --enable mkhomedir >/dev/null

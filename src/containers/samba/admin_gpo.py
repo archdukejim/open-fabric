@@ -7,6 +7,7 @@ from samba.dcerpc import preg
 from samba.ndr import ndr_pack, ndr_unpack
 
 from ensure_gpo import ensure_gpo
+import paths
 
 REGISTRY_MACHINE = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{0F6B957D-509E-11D1-A7CC-0000F87571E3}]"
 REGISTRY_USER = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{0F6B957E-509E-11D1-A7CC-0000F87571E3}]"
@@ -65,7 +66,7 @@ def save_admin_settings(samdb, lp, site, settings):
     Returns: list of str, what changed.
     Fails:   ldb.LdbError; OSError; CalledProcessError (ensure_gpo).
     Feeds:   gpo_tool (ops "set", "clear")."""
-    return ensure_gpo(samdb, lp, _name(site), f"OU={site},OU=sites,{samdb.domain_dn()}",
+    return ensure_gpo(samdb, lp, _name(site), paths.site_dn(samdb, site),
                       REGISTRY_MACHINE if settings["machine"] else "",
                       {"Machine/Registry.pol": _pack(settings["machine"]),
                        "User/Registry.pol": _pack(settings["user"])},

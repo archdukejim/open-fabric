@@ -1,6 +1,7 @@
 import ldb
 
 from alloc_id import alloc_id
+import paths
 
 DOMAIN_USERS_RID = 513          # AD's Domain Users: fabric's everyone-group `users` (Q11)
 
@@ -53,12 +54,12 @@ def ensure_groups(samdb, site, root, org_groups):
     Fails:   ldb.LdbError from a creation or change; ValueError from alloc_id when the block is full.
     Feeds:   converge."""
     base = str(samdb.domain_dn())
-    site_dn = f"OU={site},OU=sites,{base}"
+    site_dn = paths.site_dn(samdb, site)
     done = []
     for name in (f"{site}-users", f"{site}-admins"):
-        _ensure(samdb, name, f"OU=groups,OU={site},OU=sites", lambda: alloc_id(samdb, site_dn), "", done)
+        _ensure(samdb, name, paths.relative(samdb, f"OU=groups,{site_dn}"), lambda: alloc_id(samdb, site_dn), "", done)
     if root:
-        org = f"OU=groups,OU=organisation,OU={site},OU=sites"
+        org = paths.relative(samdb, f"OU=groups,{paths.organisation_dn(samdb)}")
         for g in org_groups:
             if g["name"] == "users":
                 users = samdb.search(base=base, scope=ldb.SCOPE_SUBTREE,

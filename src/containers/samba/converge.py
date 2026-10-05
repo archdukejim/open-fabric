@@ -29,6 +29,7 @@ from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
 from set_password_policy import set_password_policy
 from share_winbind import share_winbind
 from windows_baseline_policy import windows_baseline_policy
+import paths
 
 CONF = "/data/etc/smb.conf"
 BUILTIN_ADMINISTRATORS = "S-1-5-32-544"        # each machine's own local Administrators
@@ -69,7 +70,7 @@ def converge(state):
         return share_winbind(lp, int(state["radius_gid"]))
     changed = [f"schema: {name} added" for name in ensure_schema(CONF)]
     samdb, lp = open_samdb(CONF)
-    changed += ensure_layout(samdb, site, root)
+    changed += ensure_layout(samdb, site, root, state.get("parent") or "")
     changed += ensure_site_info(samdb, site, state["id_range"])
     changed += ensure_groups(samdb, site, root, state["groups"])
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
@@ -79,7 +80,7 @@ def converge(state):
     changed += ensure_ad_site(samdb, site, [n["cidr"] for n in state["networks"]])
     if state.get("parent"):               # a site: its AD site linked to its parent's (manual 1.8.8.5)
         changed += ensure_site_link(samdb, site, state["parent"])
-    base = str(samdb.domain_dn())
+    base, site_dn = str(samdb.domain_dn()), paths.site_dn(samdb, site)
     if root:                              # the domain's own settings are the root's (manual 1.8.8.3)
         changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
         changed += ensure_gpo(samdb, lp, "fabric: trust in fabric's root CA", base, TRUST_EXTENSIONS,
@@ -88,10 +89,10 @@ def converge(state):
     # must never be locked out of it
     sids = [_sid(samdb, g) for g in (f"{site}-users", f"{site}-admins", state["admin_group"], "fabric-break-glass")]
     sids.append(BUILTIN_ADMINISTRATORS)
-    changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", f"OU={site},OU=sites,{base}", LOGON_EXTENSIONS,
+    changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", site_dn, LOGON_EXTENSIONS,
                           {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids)})
     extensions, files = windows_baseline_policy(state.get("lan_profile") or "")
-    changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", f"OU={site},OU=sites,{base}", extensions,
+    changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", site_dn, extensions,
                           files)
     if state.get("join_account"):         # at the root, preparing a new site's DC join (manual 1.8.8.4)
         changed += ensure_join_account(samdb, state["join_account"]["name"], state["join_account"]["password"])

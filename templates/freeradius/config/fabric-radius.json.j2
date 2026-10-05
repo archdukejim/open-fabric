@@ -2,6 +2,7 @@
   "uri": "ldaps://{{ host_ip }}:636",
   "base": "{{ ad_base_dn }}",
   "site": "{{ site_name }}",
+  "site_dn": "{{ ad_site_ou }},{{ ad_base_dn }}",
   "bind_dn": "fabric-radius-{{ site_name }}@{{ ad_domain }}",
   "password_file": "/etc/freeradius/fabric/ad-password",
   "ca_file": "/etc/freeradius/certs/ca.pem",

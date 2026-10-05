@@ -1,7 +1,7 @@
 import ldb
 from samba.dsdb import GTYPE_DISTRIBUTION_GLOBAL_GROUP
 
-from paths import site_dn
+from paths import organisation_dn, site_dn
 
 
 def save_role(samdb, lp, site, name, description, permissions, vlan, priority, new, organisation=False):
@@ -19,7 +19,7 @@ def save_role(samdb, lp, site, name, description, permissions, vlan, priority, n
     values = {"description": description, "fabricPermission": list(permissions),
               "fabricVlan": str(vlan) if vlan else "", "fabricPriority": str(priority)}
     if new:
-        where = f"OU=device-roles,OU=organisation,{site_dn(samdb, site)}" if organisation \
+        where = f"OU=device-roles,{organisation_dn(samdb)}" if organisation \
             else f"OU=device-roles,{site_dn(samdb, site)}"
         samdb.newgroup(f"role-{name}", groupou=where.replace(f",{samdb.domain_dn()}", ""),
                        grouptype=GTYPE_DISTRIBUTION_GLOBAL_GROUP)

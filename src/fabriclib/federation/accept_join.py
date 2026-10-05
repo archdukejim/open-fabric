@@ -84,7 +84,8 @@ def accept_join(v, req, client_ip="", now=None):
              secrets as federation_tsig[site]; manual 1.8 M4), "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}} and, for an invitation
              that names a DC type (made on the root), "domain": {"ad_domain", "dc_type", "dc_host", "dc_address",
-             "id_range", "join_user", "join_password", "accounts" {agent, keycloak, radius}} (_prepare_domain).
+             "id_range", "join_user", "join_password", "accounts" {agent, keycloak, radius}, "site_ou", "org_ou"}
+             (_prepare_domain).
     Fails:   ValidationError "the join request is incomplete"; overlapping networks (_check_networks, before
              anything is signed or recorded); "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
@@ -158,7 +159,8 @@ def _prepare_domain(v, site, dc_type, networks, registry):
              dc_type — the invitation's ("writable", "rodc"; "" for none: nothing is prepared); networks — the join
              request's; registry — load_registry()'s dict (the blocks handed out so far).
     Returns: {"ad_domain", "dc_type", "dc_host", "dc_address", "id_range", "join_user", "join_password",
-             "accounts" {agent, keycloak, radius}}, or {} without a DC type.
+             "accounts" {agent, keycloak, radius}, "site_ou" (its OU in this site's, D105), "org_ou"}, or {} without a
+             DC type.
     Fails:   ValidationError from prepare_site (the root's DC not running or refusing): the invitation is kept.
     Feeds:   accept_join."""
     if not dc_type:
@@ -167,6 +169,8 @@ def _prepare_domain(v, site, dc_type, networks, registry):
     join_password = random_password()
     block = next_id_block(v, registry)
     prepare_site(v, site, networks, block, accounts, join_password)
+    site_ou = v.get("ad_site_ou") or f"OU={v['site_name']},OU=sites"     # this site's: the new one nests in it
     return {"ad_domain": v["ad_domain"], "dc_type": dc_type, "dc_host": v["hostname_dc"], "dc_address": v["host_ip"],
             "id_range": block, "join_user": f"fabric-join-{site}", "join_password": join_password,
-            "accounts": accounts}
+            "accounts": accounts, "site_ou": f"OU={site},{site_ou}",
+            "org_ou": v.get("ad_org_ou") or f"OU=organisation,{site_ou}"}

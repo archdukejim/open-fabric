@@ -1,6 +1,7 @@
 import ldb
 
 from alloc_id import alloc_id
+import paths
 
 
 def create_person(samdb, lp, site, uid, first, last, email, password, gid, home_base, shell):
@@ -22,9 +23,11 @@ def create_person(samdb, lp, site, uid, first, last, email, password, gid, home_
                          attrs=["dn"])
     if taken:
         raise ldb.LdbError(ldb.ERR_ENTRY_ALREADY_EXISTS, f"{uid} (or that e-mail address) already exists")
-    number = alloc_id(samdb, f"OU={site},OU=sites,{base}")
+    site_dn = paths.site_dn(samdb, site)
+    number = alloc_id(samdb, site_dn)
     samdb.newuser(uid, password, force_password_change_at_next_login_req=True, useusernameascn=True,
-                  userou=f"OU=people,OU={site},OU=sites", givenname=first, surname=last, mailaddress=email,
+                  userou=paths.relative(samdb, f"OU=people,{site_dn}"), givenname=first, surname=last,
+                  mailaddress=email,
                   uidnumber=number, gidnumber=gid, loginshell=shell, unixhome=f"{home_base}/{uid}", uid=uid)
     samdb.add_remove_group_members(f"{site}-users", [uid], add_members_operation=True)
     return {"uid": uid, "uidNumber": number}

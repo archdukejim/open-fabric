@@ -29,10 +29,10 @@ def load_config():
 def site_dn(conf):
     """Purpose: this site's OU, under which its devices, roles and people live (manual 1.6.3.4).
     Inputs:  conf — load_config()'s dict.
-    Returns: str "OU=<site>,OU=sites,<domain>".
-    Fails:   KeyError without "site" or "base".
+    Returns: str, e.g. "OU=lab,OU=lan,OU=sites,<domain>" (sites nest, D105: setup writes it, from the join).
+    Fails:   KeyError without "site_dn".
     Feeds:   check_person, lookup_device."""
-    return f"OU={conf['site']},OU=sites,{conf['base']}"
+    return conf["site_dn"]
 
 
 def connect(dn=None, password=None):

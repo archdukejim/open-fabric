@@ -2,8 +2,11 @@ import ldb
 from samba.dcerpc import security
 from samba.sd_utils import SDUtils
 
-# read, write, create and delete children, list, read and change permissions — inherited below the OU (Q4)
-FULL = "RPWPCRCCDCLCLORCWOWDSDDTSW"
+import paths
+
+# read, write, create and delete children, list, read permissions, delete — inherited below the OU (Q4); never
+# change permissions or owner (WD, WO): a site could otherwise protect its OU from its parents' inherited access (D105)
+FULL = "RPWPCRCCDCLCLORCSDDTSW"
 # what may not be done to a site's service accounts: write, create or delete, change permissions
 SERVICE_DENY = "WPCCDCWDWOSDDT"
 
@@ -32,8 +35,9 @@ def _sid(samdb, name):
 
 def ensure_site_acl(samdb, site, root):
     """Purpose: who may write what in a site (S2, manual 1.6.3.6), checked by every DC, offline too (Q4, Q12): the
-             site's admins and its fabric-agent account have full control below the site's OU, inherited, but not
-             over its service accounts; its Keycloak account has full control of the site's people only (sign-in
+             site's admins and its fabric-agent account have full control below the site's OU, inherited (so into
+             the sites nested below it, D105), but never over permissions, nor over its own or a nested site's
+             service accounts; its Keycloak account has full control of the site's people only (sign-in
              changes passwords and lockouts), and at the root site may change the members of the organisation's
              groups (Keycloak's group mapper).
     Inputs:  samdb — SamDB; site — str (its groups and service accounts exist: ensure_groups,
@@ -41,18 +45,20 @@ def ensure_site_acl(samdb, site, root):
     Returns: list of str, the access entries added.
     Fails:   ldb.LdbError reading a principal or changing a security descriptor; IndexError if one is missing.
     Feeds:   converge."""
-    base = str(samdb.domain_dn())
-    site_dn = f"OU={site},OU=sites,{base}"
+    site_dn = paths.site_dn(samdb, site)
     services = f"OU=service-accounts,{site_dn}"
     people = f"OU=people,{site_dn}"
     entries = []
     for principal in (f"{site}-admins", f"fabric-agent-{site}"):
         sid = _sid(samdb, principal)
         entries += [(site_dn, f"(A;CI;{FULL};;;{sid})"), (services, f"(D;CI;{SERVICE_DENY};;;{sid})")]
+    for above in paths.ancestors(samdb, site):    # a parent's access is inherited, but not to these accounts
+        for principal in (f"{above}-admins", f"fabric-agent-{above}"):
+            entries.append((services, f"(D;CI;{SERVICE_DENY};;;{_sid(samdb, principal)})"))
     keycloak = _sid(samdb, f"fabric-keycloak-{site}")
     entries.append((people, f"(A;CI;{FULL};;;{keycloak})"))
     if root:            # Keycloak's group mapper writes memberships of the organisation's groups (LDAP_ONLY)
-        entries.append((f"OU=groups,OU=organisation,{site_dn}", f"(A;CI;RPWPLCLORC;;;{keycloak})"))
+        entries.append((f"OU=groups,{paths.organisation_dn(samdb)}", f"(A;CI;RPWPLCLORC;;;{keycloak})"))
     domain_sid = security.dom_sid(samdb.get_domain_sid())
     utils, done = SDUtils(samdb), []
     for dn, ace in entries:

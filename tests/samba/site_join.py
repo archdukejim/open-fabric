@@ -101,7 +101,8 @@ for site, (container, ip, dc_type, cidr) in SITES.items():
         domain=f"{site}.lan.j-j.family", hostname=f"dc-{site}", host_ip=ip, lan_cidr=cidr,
         lan_gateway=cidr.rsplit(".", 1)[0] + ".1", site_name=site, ad_domain=RV["ad_domain"],
         ad_password_policy=POLICY, deploy_base_dir=work, ad_ntp_signd_dir=os.path.join(work, "ntp_signd"),
-        ad_dc_type=dc_type, ad_join_server=ROOT_IP, ad_join_server_name=RV["hostname_dc"], posix_id_range=block))
+        ad_dc_type=dc_type, ad_join_server=ROOT_IP, ad_join_server_name=RV["hostname_dc"], posix_id_range=block,
+        ad_site_ou=f"OU={site},OU=lan,OU=sites", ad_org_ou="OU=organisation,OU=lan,OU=sites"))
     secrets = {"ad_admin_password": random_password(), **{f"ad_{k}_password": p for k, p in accounts.items()},
                "ad_join": {"user": f"fabric-join-{site}", "password": join_pw}}
     os.makedirs(os.path.join(work, "stepca", "data", "certs"))
@@ -167,8 +168,8 @@ if "lab" in joined:
 # ---- a read-only site: the domain to read, nothing to write
 if "edge" in joined:
     container, v, secrets = joined["edge"]
-    check("edge: the domain replicated to the RODC (the site's OU and the root's people)",
-          "OU=edge,OU=sites" in search(container, "(ou=edge)", ["dn"]))
+    check("edge: the domain replicated to the RODC (the site's OU, nested in its parent's, and the root's people)",
+          "OU=edge,OU=lan,OU=sites" in search(container, "(ou=edge)", ["dn"]))
     try:
         run_op(v, secrets, "create_person", {"uid": "edgy", "first": "E", "last": "D", "email": "e@edge.test",
                                              "password": "Ot-" + random_password(20), "gid": 5000,

@@ -1,5 +1,7 @@
 import ldb
 
+import paths
+
 # every site's OU holds these (manual 1.6.3.4); the root site's also holds OU=organisation
 SITE_OUS = ("people", "groups", "machines", "devices", "device-roles", "networks", "sudoers", "service-accounts")
 ORGANISATION_OUS = ("groups", "device-roles", "sudoers")
@@ -22,19 +24,37 @@ def _ensure_ou(samdb, dn):
         raise
 
 
-def ensure_layout(samdb, site, root):
-    """Purpose: everything fabric manages under OU=sites, one OU per site (D88, manual 1.6.3.4), and AD's default
-             containers for new users and computers pointed at the root site's OU=people and OU=machines (so nothing
-             Windows' own tools create lands outside OU=sites).
-    Inputs:  samdb — SamDB; site — str, this site's name; root — bool, this is the root site (it also holds
-             OU=organisation, and the defaults point at it).
+def ensure_layout(samdb, site, root, parent=""):
+    """Purpose: everything fabric manages under OU=sites, one OU per site, each site's in its parent's (D88, D105,
+             manual 1.6.3.4), marked as a site OU (fabricSiteInfo) as it is made so it is found wherever it sits; and
+             AD's default containers for new users and computers pointed at the root site's OU=people and
+             OU=machines (so nothing Windows' own tools create lands outside OU=sites).
+    Inputs:  samdb — SamDB; site — str, this site's name; root — bool, this is the root site (its OU is directly
+             under OU=sites, it also holds OU=organisation, and the defaults point at it); parent — str, a site's
+             parent site (whose OU must exist: the parent converges first).
     Returns: list of str, what was created or changed.
-    Fails:   ldb.LdbError from an addition or modification AD refuses.
-    Feeds:   converge."""
+    Fails:   ValueError for a site with neither root nor parent; LookupError when the parent's OU is missing;
+             ldb.LdbError from an addition or modification AD refuses.
+    Feeds:   converge.
+    Notes:   an existing site OU is never moved here (re-parenting moves it: manual 1.8.8.14)."""
     base = str(samdb.domain_dn())
-    site_dn = f"OU={site},OU=sites,{base}"
     done = []
-    wanted = [f"OU=sites,{base}", site_dn] + [f"OU={ou},{site_dn}" for ou in SITE_OUS]
+    if _ensure_ou(samdb, f"OU=sites,{base}"):
+        done.append(f"OU=sites,{base}")
+    try:
+        site_dn = paths.site_dn(samdb, site)
+    except LookupError:
+        if root:
+            site_dn = f"OU={site},OU=sites,{base}"
+        elif parent:
+            site_dn = f"OU={site},{paths.site_dn(samdb, parent)}"
+        else:
+            raise ValueError(f"site {site}: not the root and no parent: its OU has nowhere to go")
+        if _ensure_ou(samdb, site_dn):
+            done.append(site_dn)
+        # the mark first, on its own (the id block comes with ensure_site_info): the OU is found by it from now on
+        samdb.modify(ldb.Message.from_dict(samdb, {"dn": site_dn, "objectClass": "fabricSiteInfo"}, ldb.FLAG_MOD_ADD))
+    wanted = [f"OU={ou},{site_dn}" for ou in SITE_OUS]
     if root:
         wanted += [f"OU=organisation,{site_dn}"] + [f"OU={ou},OU=organisation,{site_dn}" for ou in ORGANISATION_OUS]
     done += [dn for dn in wanted if _ensure_ou(samdb, dn)]

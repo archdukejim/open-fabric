@@ -8,13 +8,13 @@ def ensure_group_mapper(kc, realm, ldap_id, v):
     """Purpose: create or update the LDAP group mapper on fabric's groups in AD (OU=groups of OU=organisation, AD's
              memberOf; LDAP_ONLY: memberships live in AD) and sync them into Keycloak (manual 1.6.3.11).
     Inputs:  kc — Admin; realm — realm name; ldap_id — federation id from ensure_ldap_federation; v — vars
-             (ad_base_dn, site_name).
+             (ad_base_dn, ad_org_ou).
     Returns: None.
     Fails:   SystemExit from Admin.call (including a failed sync); KeyError if a var is missing; StopIteration if
              a created mapper cannot be found again.
     Feeds:   configure_keycloak (the synced groups are what grant_role_to_group looks up)."""
     config = {
-        "groups.dn": [f"OU=groups,OU=organisation,OU={v['site_name']},OU=sites,{v['ad_base_dn']}"],
+        "groups.dn": [f"OU=groups,{v['ad_org_ou']},{v['ad_base_dn']}"],
         "group.name.ldap.attribute": ["cn"],
         "group.object.classes": ["group"],
         "preserve.group.inheritance": ["false"],

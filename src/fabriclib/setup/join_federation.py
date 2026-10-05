@@ -22,8 +22,8 @@ def run(ctx):
              site CA key and certificates are kept in <base>/fabric/config/site-ca (0700); the DNS link's
              TSIG secret goes to fabric's secrets (federation_tsig.upstream). When the root prepared this site in
              its domain: the service accounts' passwords (ad_*_password) and the temporary join account (ad_join)
-             go to fabric's secrets, and ctx.vars gains ad_domain, ad_dc_type, ad_join_server, ad_join_server_name
-             and posix_id_range (manual 1.8.8.4).
+             go to fabric's secrets, and ctx.vars gains ad_domain, ad_dc_type, ad_join_server, ad_join_server_name,
+             posix_id_range, ad_site_ou and ad_org_ou (manual 1.8.8.4, 1.8.8.14).
     Fails:   SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or
              unreachable, the root not the pinned one, a certificate that does not fit).
     Feeds:   setup STEPS, after `docker` (the key is made with the pinned Step-CA image) and before `deploy`.
@@ -64,7 +64,8 @@ def run(ctx):
     if dom:
         ctx.vars.update({"ad_domain": dom["ad_domain"], "ad_dc_type": dom["dc_type"],
                          "ad_join_server": dom["dc_address"], "ad_join_server_name": dom["dc_host"],
-                         "posix_id_range": dom["id_range"]})
+                         "posix_id_range": dom["id_range"], "ad_site_ou": dom["site_ou"],
+                         "ad_org_ou": dom["org_ou"]})
     joined = dict(res["vars"])
     if ctx.vars.get("friendly_name"):
         joined.pop("friendly_name", None)

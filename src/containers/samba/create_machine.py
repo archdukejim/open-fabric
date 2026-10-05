@@ -1,5 +1,7 @@
 import re
 
+import paths
+
 NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,13}[a-z0-9])?$")
 
 
@@ -16,6 +18,7 @@ def create_machine(samdb, lp, site, name, password):
     if not NAME_RE.match(name or ""):
         raise ValueError(f"not a machine name (1-15 letters, digits, dashes): {name}")
     account = name.upper()               # as Windows and adcli name them: Linux clients look for NAME$ in their keytab
-    samdb.newcomputer(account, computerou=f"OU=machines,OU={site},OU=sites")
+    machines = f"OU=machines,{paths.site_dn(samdb, site)}"
+    samdb.newcomputer(account, computerou=paths.relative(samdb, machines))
     samdb.setpassword(f"(sAMAccountName={account}$)", password, force_change_at_next_login=False)
-    return {"name": name, "dn": f"CN={account},OU=machines,OU={site},OU=sites,{samdb.domain_dn()}"}
+    return {"name": name, "dn": f"CN={account},{machines}"}

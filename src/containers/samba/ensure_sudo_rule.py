@@ -1,5 +1,7 @@
 import ldb
 
+import paths
+
 MARK = "fabric: the site's admins (D103)"
 
 
@@ -11,7 +13,7 @@ def ensure_sudo_rule(samdb, site, admin_group):
     Returns: list of str, what changed.
     Fails:   ldb.LdbError for a change AD refuses (OU=sudoers missing: ensure_layout makes it first).
     Feeds:   converge."""
-    dn = f"CN={site}-admins,OU=sudoers,OU={site},OU=sites,{samdb.domain_dn()}"
+    dn = f"CN={site}-admins,OU=sudoers,{paths.site_dn(samdb, site)}"
     want = {"sudoUser": sorted({f"%{site}-admins", f"%{admin_group}"}), "sudoHost": ["ALL"], "sudoCommand": ["ALL"],
             "sudoRunAsUser": ["ALL"], "description": [MARK]}
     found = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=list(want)) if _exists(samdb, dn) else []

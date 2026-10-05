@@ -2,6 +2,8 @@ import ldb
 from samba.credentials import DONT_USE_KERBEROS, Credentials
 from samba.samdb import SamDB
 
+import paths
+
 DONT_EXPIRE_PASSWORD = 0x10000          # userAccountControl: a service account's password does not expire
 
 
@@ -38,8 +40,8 @@ def ensure_service_accounts(samdb, lp, site, accounts):
                              expression=f"(sAMAccountName={ldb.binary_encode(name)})",
                              attrs=["userAccountControl"])
         if not found:
-            samdb.newuser(name, password, userou=f"OU=service-accounts,OU={site},OU=sites",
-                          force_password_change_at_next_login_req=False)
+            services = paths.relative(samdb, f"OU=service-accounts,{paths.site_dn(samdb, site)}")
+            samdb.newuser(name, password, userou=services, force_password_change_at_next_login_req=False)
             done.append(f"service account {name} created")
             found = samdb.search(base=str(samdb.domain_dn()), scope=ldb.SCOPE_SUBTREE,
                                  expression=f"(sAMAccountName={ldb.binary_encode(name)})",

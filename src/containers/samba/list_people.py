@@ -13,16 +13,16 @@ def _cn(dn):
 
 
 def _site(dn):
-    """Purpose: the site a DN lives in (the OU right under OU=sites).
+    """Purpose: the site a person or group lives in: the OU enclosing its container (OU=people, OU=groups), since
+             sites nest (D105); "organisation" for the organisation's groups.
     Inputs:  dn — str.
     Returns: str, or "" outside OU=sites.
     Fails:   never.
     Feeds:   list_people."""
     parts = dn.split(",")
-    for i, part in enumerate(parts[:-1]):
-        if parts[i + 1].upper() == "OU=SITES":
-            return part.split("=", 1)[1]
-    return ""
+    if not any(p.upper() == "OU=SITES" for p in parts) or len(parts) < 3:
+        return ""
+    return parts[2].split("=", 1)[1]
 
 
 def list_people(samdb, lp, site):

@@ -1,5 +1,7 @@
 import ldb
 
+import paths
+
 # what a fabricNetwork entry holds, from a site_networks item (manual 2.2.2.8)
 FIELDS = {"fabricCidr": "cidr", "fabricNetworkKind": "kind", "fabricVlan": "vlan", "description": "notes",
           "fabricAllowOverlap": "allow_overlap"}
@@ -13,7 +15,7 @@ def ensure_networks(samdb, site, networks):
     Returns: list of str, what changed.
     Fails:   ldb.LdbError for a change AD refuses (e.g. OU=networks missing: ensure_layout makes it first).
     Feeds:   converge."""
-    base = f"OU=networks,OU={site},OU=sites,{samdb.domain_dn()}"
+    base = f"OU=networks,{paths.site_dn(samdb, site)}"
     have = {str(m["cn"][0]).lower(): m for m in samdb.search(
         base=base, scope=ldb.SCOPE_ONELEVEL, expression="(objectClass=fabricNetwork)",
         attrs=["cn", "fabricSite", *FIELDS])}

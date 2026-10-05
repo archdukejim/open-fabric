@@ -778,7 +778,10 @@ function	fabricctl-jinja|src/containers/samba/list_people.py|_site	2
 function	fabricctl-jinja|src/containers/samba/list_people.py|list_people	3	
 function	fabricctl-jinja|src/containers/samba/logon_rights_policy.py|logon_rights_policy	1	
 function	fabricctl-jinja|src/containers/samba/open_samdb.py|open_samdb	1	
+function	fabricctl-jinja|src/containers/samba/paths.py|ancestors	5	
 function	fabricctl-jinja|src/containers/samba/paths.py|devices_dn	2	
+function	fabricctl-jinja|src/containers/samba/paths.py|organisation_dn	4	
+function	fabricctl-jinja|src/containers/samba/paths.py|relative	6	
 function	fabricctl-jinja|src/containers/samba/paths.py|site_dn	1	
 function	fabricctl-jinja|src/containers/samba/paths.py|sites_dn	3	
 function	fabricctl-jinja|src/containers/samba/policy_entries.py|_element	2	

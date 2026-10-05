@@ -67,7 +67,7 @@ check("the site's sudo rule: lan-admins and the admin group may run anything (D1
       sudo_rule)
 
 # people: alice (a person of lan), adam (a lan admin), lara (a person of another site, lab)
-lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": [],
+lab = {"site": "lab", "root": False, "parent": "lan", "password_policy": POLICY, "networks": [],
        "root_ca_pem": open(dc["root_ca"]).read(), "id_range": "200001-300000", "groups": [], "admin_group": "admins",
        "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
 sh(["docker", "exec", "-i", DC, "python3", "/fabric/converge.py"], input=json.dumps(lab))
