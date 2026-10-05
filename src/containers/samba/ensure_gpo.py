@@ -19,13 +19,14 @@ def _gpo(samdb, name):
     return str(res[0].dn), str(res[0]["cn"]), int(str(res[0].get("versionNumber", ["0"])[0]))
 
 
-def ensure_gpo(samdb, lp, name, link_dn, extensions, files):
+def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None):
     """Purpose: one of fabric's Group Policy objects as wanted (manual 2.11.2.9): created when missing, linked to its
              target, its files in SYSVOL exactly `files`; a change bumps its version in AD and in GPT.INI so members
              apply it, and SYSVOL's ACLs are reset after writing (Q13, Q16).
     Inputs:  samdb — SamDB; lp — LoadParm (realm, the SYSVOL path); name — display name; link_dn — str, the domain or
              an OU; extensions — gPCMachineExtensionNames value ("[{CSE}{tool}]…", sorted as Windows writes them);
-             files — {path under the GPO folder, e.g. "Machine/Registry.pol": bytes}.
+             files — {path under the GPO folder, e.g. "Machine/Registry.pol": bytes}; user_extensions —
+             gPCUserExtensionNames for user policies (None: left as it is; "": none).
     Returns: list of str, what was created or changed.
     Fails:   ldb.LdbError from AD; OSError writing SYSVOL; CalledProcessError from `samba-tool ntacl sysvolreset`.
     Feeds:   converge.
@@ -55,12 +56,19 @@ def ensure_gpo(samdb, lp, name, link_dn, extensions, files):
             with open(path, "wb") as f:
                 f.write(data)
             changed = True
-    ext = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=["gPCMachineExtensionNames"])[0]
-    if changed or str(ext.get("gPCMachineExtensionNames", [""])[0]) != extensions \
+    names = {"gPCMachineExtensionNames": extensions}
+    if user_extensions is not None:
+        names["gPCUserExtensionNames"] = user_extensions
+    ext = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=list(names))[0]
+    if changed or any(str(ext.get(attr, [""])[0]) != want for attr, want in names.items()) \
             or not os.path.exists(os.path.join(folder, "GPT.INI")):
-        version += 1
-        samdb.modify(ldb.Message.from_dict(samdb, {"dn": dn, "versionNumber": str(version),
-                                                   "gPCMachineExtensionNames": extensions}, ldb.FLAG_MOD_REPLACE))
+        # a GPO's version: user changes in the high 16 bits, machine changes in the low ones (Windows checks each)
+        version += 1 + (0x10000 if user_extensions else 0)
+        msg = ldb.Message(ldb.Dn(samdb, dn))
+        msg["versionNumber"] = ldb.MessageElement([str(version)], ldb.FLAG_MOD_REPLACE, "versionNumber")
+        for attr, want in names.items():         # an empty list removes the attribute: AD keeps no empty values
+            msg[attr] = ldb.MessageElement([want] if want else [], ldb.FLAG_MOD_REPLACE, attr)
+        samdb.modify(msg)
         with open(os.path.join(folder, "GPT.INI"), "wb") as f:
             f.write(f"[General]\r\nVersion={version}\r\n".encode())
         done.append(f"GPO {name}: version {version}")

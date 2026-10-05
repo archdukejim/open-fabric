@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The English texts of fabric-starter.admx (manual 3.15.4). -->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" revision="1.0" schemaVersion="1.0"
+                           xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>Starter template</displayName>
+  <description>A blank template to start your own policies from.</description>
+  <resources>
+    <stringTable>
+      <string id="Starter">Starter</string>
+      <string id="ExampleSetting">Example setting</string>
+      <string id="ExampleSetting_Help">An example: writes the text you give to Software\Policies\Example\Starter\ExampleText. Replace it with your own policies.</string>
+    </stringTable>
+    <presentationTable>
+      <presentation id="ExampleSetting">
+        <textBox refId="ExampleText">
+          <label>Text:</label>
+        </textBox>
+      </presentation>
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

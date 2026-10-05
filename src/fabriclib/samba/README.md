@@ -15,3 +15,5 @@ itself is a container (`templates/samba`, `packaging/images/samba`); what conver
 | `domain_status.py` | What `fabricctl domain status` shows: the DC, whether it runs, its roles, the policy in force |
 | `set_domain_password_policy.py` | Change the password policy in the settings (checked whole, audited); the next apply writes it |
 | `run_domain_command.py` | `fabricctl domain status` and `password-policy` (routing only) |
+| `gpo_request.py` | One ADMX-editor operation inside the DC (`gpo_tool.py`), the request on stdin |
+| `run_gpo_command.py` | `fabricctl gpo load / templates / list / show / set / clear / starter` |

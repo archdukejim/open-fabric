@@ -73,3 +73,4 @@ Operator workflows and end-user procedures.
 - [3.15.1 The directory (Samba AD)](3.15.1-windows-domain.md)
 - [3.15.2 Joining Linux machines](3.15.2-linux-join.md)
 - [3.15.3 Joining Windows machines](3.15.3-windows-join.md)
+- [3.15.4 Group Policy from ADMX templates](3.15.4-group-policy.md)

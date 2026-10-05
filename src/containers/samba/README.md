@@ -41,3 +41,7 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `create_machine.py` | Operation `create_machine`: a machine pre-created in the site's OU=machines with a one-time join password |
 | `ensure_sudo_rule.py` | The site's default sudo rule: its admins and the admin group may run anything on its machines (D103) |
 | `windows_baseline_policy.py` | The site's Windows baseline: wait for the network at log-on, the domain's time, Wired AutoConfig and the 802.1X profile (start-up script) |
+| `gpo_tool.py` | fabric's ADMX editor's entry point: one operation (load, templates, policies, show, set, clear) as JSON |
+| `admx_store.py` | The domain's central store: templates saved, and every policy they define read as Windows' editor reads them |
+| `policy_entries.py` | What a policy writes to the registry (enabled with its elements, disabled), and which values are its own |
+| `admin_gpo.py` | The site's `fabric: <site> admin settings` GPO: what it sets, and writing it |

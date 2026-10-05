@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- fabric's blank starter template (manual 3.15.4): copy it with `fabricctl gpo starter <folder>`, rename the files
+     and the namespace, replace the example policy with your own, then `fabricctl gpo load <folder>`. Every policy
+     writes under a key in Software\Policies\<your organisation>; the texts live in en-US/fabric-starter.adml. -->
+<policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   revision="1.0" schemaVersion="1.0"
+                   xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="starter" namespace="Example.Policies.Starter" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <categories>
+    <category name="Starter" displayName="$(string.Starter)" />
+  </categories>
+  <policies>
+    <policy name="ExampleSetting" class="Machine" displayName="$(string.ExampleSetting)"
+            explainText="$(string.ExampleSetting_Help)" presentation="$(presentation.ExampleSetting)"
+            key="Software\Policies\Example\Starter">
+      <parentCategory ref="Starter" />
+      <supportedOn ref="windows:SUPPORTED_WindowsVista" />
+      <elements>
+        <text id="ExampleText" valueName="ExampleText" />
+      </elements>
+    </policy>
+  </policies>
+</policyDefinitions>
