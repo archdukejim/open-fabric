@@ -124,6 +124,8 @@ import fabriclib.federation.accept_join as m_accept  # noqa: E402
 PREPARED = []
 m_accept.prepare_site = lambda v, site, networks, block, accounts, password, container="samba": \
     PREPARED.append((site, block, sorted(accounts))) or []
+import fabriclib.federation.next_id_block as m_block  # noqa: E402
+m_block.domain_id_blocks = lambda container="samba": []      # the domain's blocks: none beyond the registry's
 
 SECRETS = f"{W}/fabric/config/fabric-secrets.yml"
 

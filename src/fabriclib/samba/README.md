@@ -24,5 +24,6 @@ itself is a container (`templates/samba`, `packaging/images/samba`); what conver
 | `run_converge.py` | Hand a wanted state to the converge code inside a DC (stdin) |
 | `prepare_site.py` | At the root, before answering a join: the new site converged in the domain, and its join account |
 | `finish_join.py` | After this site's DC joined: its join account deleted at the root |
-| `replication_status.py` | This DC's inbound replication per partition (samba-tool drs showrepl) |
+| `replication_status.py` | This DC's inbound replication per partition, read from its own `repsFrom` inside the DC |
+| `domain_id_blocks.py` | Every site's uid/gid block, read inside this site's DC (for the next block a join hands out) |
 | `list_conflicts.py` | AD's `CNF:` objects: names made on two DCs while apart |

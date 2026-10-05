@@ -4,14 +4,15 @@ from fabriclib.samba.run_converge import run_converge
 
 
 def prepare_site(v, site, networks, id_block, accounts, join_password, container="samba"):
-    """Purpose: at the root, before answering a join (manual 1.8.8.4, S8.1): converge the new site in the domain —
+    """Purpose: at the parent (the root, or a site with a writable DC: manual 1.8.8.14), before answering a join
+             (manual 1.8.8.4, S8.1): converge the new site in the domain, in the parent's OU —
              its OU and the OUs under it, its groups (`<site>-users`, `<site>-admins`), its service accounts with
              the passwords it is given, its ACLs, its id block, its networks and AD site, its sudo rule and GPOs — and
              make the temporary account its DC joins with (expiring in an hour).
-    Inputs:  v — the root's vars (ad_password_policy, deploy_base_dir (the root CA), webui_admin_group,
+    Inputs:  v — the parent's vars (ad_password_policy, deploy_base_dir (the root CA), webui_admin_group,
              service_users); site — the new site's name; networks — its networks as the join request gives them
              ([{name, cidr, allow_overlap}]); id_block — "first-last" (next_id_block); accounts — {kind: password} for
-             agent, keycloak, radius; join_password — the join account's password; container — the root's DC.
+             agent, keycloak, radius; join_password — the join account's password; container — the parent's DC.
     Returns: list of str, what changed.
     Fails:   ValidationError from run_converge (the DC not running, AD refusing); OSError reading the root CA;
              KeyError for a missing var.

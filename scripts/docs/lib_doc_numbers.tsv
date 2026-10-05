@@ -59,6 +59,7 @@ file	fabricctl-jinja|src/containers/samba/paths.py	35
 file	fabricctl-jinja|src/containers/samba/policy_entries.py	52	
 file	fabricctl-jinja|src/containers/samba/pull_sysvol.py	61	
 file	fabricctl-jinja|src/containers/samba/read_devices.py	36	
+file	fabricctl-jinja|src/containers/samba/read_id_blocks.py	62	
 file	fabricctl-jinja|src/containers/samba/read_networks.py	45	
 file	fabricctl-jinja|src/containers/samba/read_replication.py	60	
 file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
@@ -401,6 +402,7 @@ file	fabriclib-rbac|src/fabriclib/rbac/user_permissions.py	2
 file	fabriclib-samba|src/fabriclib/samba/clear_gpo_policy.py	11	
 file	fabriclib-samba|src/fabriclib/samba/converge_domain.py	2	
 file	fabriclib-samba|src/fabriclib/samba/deploy_samba.py	1	
+file	fabriclib-samba|src/fabriclib/samba/domain_id_blocks.py	20	
 file	fabriclib-samba|src/fabriclib/samba/domain_overview.py	12	
 file	fabriclib-samba|src/fabriclib/samba/domain_status.py	3	
 file	fabriclib-samba|src/fabriclib/samba/finish_join.py	15	
@@ -795,6 +797,7 @@ function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|_writable_dc	4
 function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|pull_sysvol	5	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|_one	1	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|read_devices	2	
+function	fabricctl-jinja|src/containers/samba/read_id_blocks.py|read_id_blocks	1	
 function	fabricctl-jinja|src/containers/samba/read_networks.py|read_networks	1	
 function	fabricctl-jinja|src/containers/samba/read_replication.py|_when	1	
 function	fabricctl-jinja|src/containers/samba/read_replication.py|read_replication	2	
@@ -1241,6 +1244,7 @@ function	fabriclib-samba|src/fabriclib/samba/converge_domain.py|_lan_profile	2
 function	fabriclib-samba|src/fabriclib/samba/converge_domain.py|converge_domain	1	
 function	fabriclib-samba|src/fabriclib/samba/deploy_samba.py|_chrony_gid	2	
 function	fabriclib-samba|src/fabriclib/samba/deploy_samba.py|deploy_samba	1	
+function	fabriclib-samba|src/fabriclib/samba/domain_id_blocks.py|domain_id_blocks	1	
 function	fabriclib-samba|src/fabriclib/samba/domain_overview.py|domain_overview	1	
 function	fabriclib-samba|src/fabriclib/samba/domain_status.py|_dc	1	
 function	fabriclib-samba|src/fabriclib/samba/domain_status.py|domain_status	2	

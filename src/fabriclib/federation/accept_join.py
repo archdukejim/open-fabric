@@ -153,9 +153,10 @@ def accept_join(v, req, client_ip="", now=None):
             **({"domain": domain_answer} if domain_answer else {})}
 
 def _prepare_domain(v, site, dc_type, networks, registry):
-    """Purpose: at the root, the domain part of a join (manual 1.8.8.4, S8.1): converge the new site in the domain
+    """Purpose: at the parent (the root, or a site with a writable DC), the domain part of a join (manual 1.8.8.4,
+             S8.1, 1.8.8.14): converge the new site in the domain, in this site's OU,
              (prepare_site) with fresh service-account passwords and the next id block, and a temporary join account.
-    Inputs:  v — the root's vars (ad_domain, hostname_dc, host_ip and what prepare_site reads); site — the new site;
+    Inputs:  v — this site's vars (ad_domain, hostname_dc, host_ip and what prepare_site reads); site — the new site;
              dc_type — the invitation's ("writable", "rodc"; "" for none: nothing is prepared); networks — the join
              request's; registry — load_registry()'s dict (the blocks handed out so far).
     Returns: {"ad_domain", "dc_type", "dc_host", "dc_address", "id_range", "join_user", "join_password",

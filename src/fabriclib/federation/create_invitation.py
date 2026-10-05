@@ -42,8 +42,9 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
              root site, the new site attaches flat; made on a site (one that may nest), it is nested under
              that site (manual 1.8.5.1); via — a site that joined this install, through whose
              endpoint the new site joins (a relay: it forwards, signs nothing), default "" (direct); dc — the new
-             site's domain controller, "writable" (default) or "rodc" (manual 1.8.8.3); made on the root site the
-             invitation names the AD domain, its password policy and dc (a site's invitation does not yet: S8.8).
+             site's domain controller, "writable" (default) or "rodc" (manual 1.8.8.3); the invitation names the AD
+             domain, its password policy and dc, and this site prepares the new one in its own DC at the join (a
+             parent that is not the root too: its OU holds the new site's, D105, manual 1.8.8.14).
     Returns: {"invitation": "fabric-join-1.<base64url JSON>", "site", "id", "expires" (epoch), "nest", "nested"
              (True when made on a site: the new site will be nested under it), "via"}. With via, the
              invitation's host and address are the relay's endpoint. The JSON holds
@@ -53,7 +54,8 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
              messages (not one label, or an organisation OU); "<name> is this site's own name"; "site <name> has joined
              already"; "this install
              has no CA yet"; "this site's CA cannot sign sites ..." (a site invited without --nest); "--nest N is more
-             than this install's CA allows ..."; "no site <via> joined here ..."; ValidationError from
+             than this install's CA allows ..."; "no site <via> joined here ..."; "this site's DC is read-only ..."
+             (a read-only DC cannot prepare a new site); ValidationError from
              load_secrets/save_secrets (OpenBao locked);
              OSError.
     Feeds:   run_federation_command (invite).
@@ -80,7 +82,9 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
         raise ValidationError(f"--nest {nest} is more than this install's CA allows (at most {cap['max_nest']})")
     if dc not in DC_TYPES:
         raise ValidationError("--dc is writable or rodc")
-    root_site = is_root_site()
+    if not is_root_site() and v.get("ad_dc_type") == "rodc":
+        raise ValidationError("this site's DC is read-only: it cannot prepare a new site in the domain; invite the "
+                              "new site from a site with a writable DC")
     now = int(now if now is not None else time.time())
     secret, inv_id = secrets.token_urlsafe(32), secrets.token_hex(6)
     expires = now + INVITE_TTL_SECONDS
@@ -95,7 +99,7 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
                         if e.get("expires", 0) > now and e.get("site") != site_name}
         open_invites[inv_id] = {"sha256": hashlib.sha256(secret.encode()).hexdigest(), "site": site_name,
                                 "expires": expires, "actor": actor, "nest": nest, "via": via,
-                                "dc": dc if root_site else ""}
+                                "dc": dc}
         save_secrets({"federation_invitations": open_invites}, v=v)
     body = {"v": 1, "id": inv_id, "secret": secret, "site": site_name, "upstream": v.get("site_name"),
             "org_domain": v.get("org_domain") or v["domain"], "ldap_base_dn": v["ldap_base_dn"],
@@ -105,8 +109,8 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
             "root_sha256": describe_cert(open(root).read())["sha256"], "expires": expires}
     if via:
         body["via"] = via
-    if root_site:                            # the domain the new site's DC joins (manual 1.8.8.4)
-        body.update({"dc": dc, "ad_domain": v["ad_domain"], "ad_password_policy": v["ad_password_policy"]})
+    # the domain the new site's DC joins (manual 1.8.8.4)
+    body.update({"dc": dc, "ad_domain": v["ad_domain"], "ad_password_policy": v["ad_password_policy"]})
     text = INVITE_PREFIX + base64.urlsafe_b64encode(json.dumps(body, separators=(",",
                                                                                  ":")).encode()).decode().rstrip("=")
     write_audit(actor, "FED_INVITE", f"site={site_name} id={inv_id} nest={nest} via={via or '-'} expires={expires}",

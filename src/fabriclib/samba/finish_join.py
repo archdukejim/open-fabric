@@ -5,8 +5,9 @@ from fabriclib.common.errors import ValidationError
 
 def finish_join(v, secrets, container="samba"):
     """Purpose: after this site's DC joined the domain (manual 1.8.8.4, S8.2): delete the temporary join account at
-             the root's DC (it would expire within the hour anyway); the caller then forgets it (secrets ad_join).
-    Inputs:  v — this site's vars (ad_join_server: the root DC's address); secrets — fabric's secrets (ad_join:
+             the DC it joined through, its parent's (it would expire within the hour anyway); the caller then forgets
+             it (secrets ad_join).
+    Inputs:  v — this site's vars (ad_join_server: the parent DC's address); secrets — fabric's secrets (ad_join:
              {user, password}); container — this site's DC (its join credentials file is mounted at
              /run/secrets/join.auth, never on a command line).
     Returns: str, what was done ("" when there was no join account).
@@ -19,6 +20,6 @@ def finish_join(v, secrets, container="samba"):
                           "-H", f"ldap://{v['ad_join_server']}", "-A", "/run/secrets/join.auth"],
                          capture_output=True, text=True, timeout=120)
     if res.returncode != 0 and "Unable to find" not in res.stderr + res.stdout:
-        raise ValidationError("the join account could not be deleted at the root: "
+        raise ValidationError("the join account could not be deleted at the parent's DC: "
                               + ((res.stderr or res.stdout).strip().splitlines() or ["no answer"])[-1])
     return f"join account {join['user']} deleted"

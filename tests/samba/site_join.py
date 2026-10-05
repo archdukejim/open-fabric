@@ -33,8 +33,10 @@ from fabriclib.secrets.random_password import random_password  # noqa: E402
 W = os.path.join(os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests"), "samba-site-join")
 NET, SUBNET = "sitejoin_net", "10.254.35.0/24"
 ROOT, ROOT_IP, ROOT_BIND = "sjroot", "10.254.35.10", "sjroot-bind"
-SITES = {"lab": ("sjlab", "10.254.35.20", "writable", "10.77.0.0/24"),
-         "edge": ("sjedge", "10.254.35.30", "rodc", "10.78.0.0/24")}
+# site: (container, address, DC type, LAN, parent); lab2 is nested under lab, which prepares it in its own DC
+SITES = {"lab": ("sjlab", "10.254.35.20", "writable", "10.77.0.0/24", "lan"),
+         "edge": ("sjedge", "10.254.35.30", "rodc", "10.78.0.0/24", "lan"),
+         "lab2": ("sjlab2", "10.254.35.40", "writable", "10.79.0.0/24", "lab")}
 FAILED = 0
 
 
@@ -69,7 +71,8 @@ def until(pred, timeout=180):
 
 
 def cleanup():
-    sh(["docker", "rm", "-f", ROOT, ROOT_BIND, *[c for c, _, _, _ in SITES.values()]])
+    sh(["docker", "rm", "-f", ROOT, ROOT_BIND, *[c for c, _, _, _, _ in SITES.values()],
+        *[f"{c}-bind" for c, _, _, _, _ in SITES.values()]])
     sh(["docker", "network", "rm", NET])
 
 
@@ -83,17 +86,27 @@ check("the root's DC is up and BIND answers the AD zone", bool(BASE))
 
 registry = {"sites": {}}
 joined = {}
-for site, (container, ip, dc_type, cidr) in SITES.items():
-    # ---- at the root: what accept_join does before it answers
-    block = next_id_block(RV, registry)
+PARENT_OU = {"lan": "OU=lan,OU=sites"}
+for site, (container, ip, dc_type, cidr, parent) in SITES.items():
+    if parent != "lan" and parent not in joined:
+        continue
+    # ---- at the parent (the root, or a site with a writable DC): what accept_join does before it answers
+    if parent == "lan":
+        pv, pcontainer, pip, pname, reg = RV, ROOT, ROOT_IP, RV["hostname_dc"], registry
+    else:       # a nested parent knows only its own registry: the block must come from the domain (AD)
+        pcontainer, pv, _ = joined[parent]
+        pip, pname, reg = SITES[parent][1], pv["hostname_dc"], {"sites": {}}
+    block = next_id_block(pv, reg, container=pcontainer)
     accounts = {kind: random_password() for kind in ("agent", "keycloak", "radius")}
     join_pw = random_password()
-    done = prepare_site(RV, site, [{"name": "lan", "cidr": cidr}], block, accounts, join_pw, container=ROOT)
+    done = prepare_site(pv, site, [{"name": "lan", "cidr": cidr}], block, accounts, join_pw, container=pcontainer)
     registry["sites"][site] = {"id_range": block, "dc": dc_type}
-    expires = search(ROOT, f"(sAMAccountName=fabric-join-{site})", ["accountExpires", "memberOf"])
-    check(f"{site}: the root prepares the site — its OU, groups, service accounts, id block, and a join account that "
-          "expires", f"group {site}-admins created" in " ".join(done) and "Domain Admins" in expires
-          and "accountExpires: 9223372036854775807" not in expires and "accountExpires:" in expires, done)
+    expires = search(pcontainer, f"(sAMAccountName=fabric-join-{site})", ["accountExpires", "memberOf"])
+    check(f"{site}: its parent {parent} prepares the site in its own DC — its OU, groups, service accounts, id block, "
+          "and a join account that expires", f"group {site}-admins created" in " ".join(done)
+          and "Domain Admins" in expires and "accountExpires: 9223372036854775807" not in expires
+          and "accountExpires:" in expires, done)
+    PARENT_OU[site] = f"OU={site},{PARENT_OU[parent]}"
     # ---- at the site: what its setup does with the answer
     work = os.path.join(W, site)
     sh(["rm", "-rf", work])
@@ -101,16 +114,16 @@ for site, (container, ip, dc_type, cidr) in SITES.items():
         domain=f"{site}.lan.j-j.family", hostname=f"dc-{site}", host_ip=ip, lan_cidr=cidr,
         lan_gateway=cidr.rsplit(".", 1)[0] + ".1", site_name=site, ad_domain=RV["ad_domain"],
         ad_password_policy=POLICY, deploy_base_dir=work, ad_ntp_signd_dir=os.path.join(work, "ntp_signd"),
-        ad_dc_type=dc_type, ad_join_server=ROOT_IP, ad_join_server_name=RV["hostname_dc"], posix_id_range=block,
-        ad_site_ou=f"OU={site},OU=lan,OU=sites", ad_org_ou="OU=organisation,OU=lan,OU=sites"))
+        ad_dc_type=dc_type, ad_join_server=pip, ad_join_server_name=pname, posix_id_range=block,
+        ad_site_ou=PARENT_OU[site], ad_org_ou="OU=organisation,OU=lan,OU=sites"))
     secrets = {"ad_admin_password": random_password(), **{f"ad_{k}_password": p for k, p in accounts.items()},
                "ad_join": {"user": f"fabric-join-{site}", "password": join_pw}}
     os.makedirs(os.path.join(work, "stepca", "data", "certs"))
     sh(["cp", root["root_ca"], os.path.join(work, "stepca", "data", "certs", "root_ca.crt")], ok=True)
     deploy_samba(v, secrets, ENV)
-    check(f"{site}: deploy writes the join credentials (0600) and points the DC at the root's DNS until it joined",
+    check(f"{site}: deploy writes the join credentials (0600) and points the DC at its parent's DNS until it joined",
           oct(os.stat(os.path.join(work, "samba", "secrets", "join.auth")).st_mode & 0o777) == "0o600"
-          and f"nameserver {ROOT_IP}" in open(os.path.join(work, "samba", "resolv.conf")).read())
+          and f"nameserver {pip}" in open(os.path.join(work, "samba", "resolv.conf")).read())
     dc_tls(v, root["root_ca"], root["root_key"])
     try:
         run_dc(v, container, NET, ENV, tries=120)
@@ -123,12 +136,12 @@ for site, (container, ip, dc_type, cidr) in SITES.items():
           f"(not a domain of its own)", up and "joined" in logs and "provisioning" not in logs, logs[-800:])
     if not up:
         continue
-    server = search(ROOT, f"(&(objectClass=server)(cn=dc-{site}))", ["distinguishedName"],
+    server = search(pcontainer, f"(&(objectClass=server)(cn=dc-{site}))", ["distinguishedName"],
                     base=f"CN=Sites,CN=Configuration,{BASE}")
     check(f"{site}: the DC sits in its own AD site", f"CN=Servers,CN={site},CN=Sites" in server, server)
     fed = os.path.join(work, "federation.yaml")
     with open(fed, "w") as f:
-        yaml.safe_dump({"sites": {}, "upstream": {"site_name": "lan"}}, f)
+        yaml.safe_dump({"sites": {}, "upstream": {"site_name": parent}}, f)
     try:
         changed = converge_domain(v, fed, secrets, container=container)
         again = converge_domain(v, fed, secrets, container=container)
@@ -139,10 +152,15 @@ for site, (container, ip, dc_type, cidr) in SITES.items():
           f"domain's policy", not conv_err and again == [] and not any("password policy" in c for c in changed),
           conv_err or (changed, again))
     note = finish_join(v, secrets, container)
-    check(f"{site}: the join account is deleted at the root once joined",
+    check(f"{site}: the join account is deleted at its parent's DC once joined",
           "deleted" in note and until(lambda: "sAMAccountName" not in search(
-              ROOT, f"(sAMAccountName=fabric-join-{site})", ["sAMAccountName"]), 60), note)
+              pcontainer, f"(sAMAccountName=fabric-join-{site})", ["sAMAccountName"]), 60), note)
     joined[site] = (container, v, secrets)
+    if any(p == site for *_, p in SITES.values()):    # a parent: its own BIND answers the AD zone, as on an install
+        try:
+            start_bind(v, ENV, container, f"{container}-bind")
+        except RuntimeError as e:
+            check(f"{site}: its BIND answers the AD zone (the sites below join through it)", False, e)
 
 # ---- a writable site: its own writes, both directions of replication, its id block
 if "lab" in joined:
@@ -164,6 +182,40 @@ if "lab" in joined:
                                      "shell": "/bin/bash"}, ROOT)
     check("root -> lab: a person made at the root reaches the site's DC",
           until(lambda: "sAMAccountName: rooty" in search(container, "(sAMAccountName=rooty)", ["sAMAccountName"])))
+
+# ---- a site nested under a site that is not the root (D105, manual 1.8.8.14)
+if "lab2" in joined:
+    container, v, secrets = joined["lab2"]
+    check("lab2: its OU sits in lab's, which sits in the root's",
+          f"OU=lab2,OU=lab,OU=lan,OU=sites,{BASE}" in search(ROOT, "(&(objectClass=fabricSiteInfo)(ou=lab2))", ["dn"]))
+    others = [registry["sites"][s]["id_range"] for s in ("lab", "edge")] + [RV.get("posix_id_range") or "5001-105000"]
+    mine = registry["sites"]["lab2"]["id_range"]
+    check("lab2: its id block, handed out by lab with no registry of the others, comes after every block in the domain",
+          int(mine.split("-")[0]) > max(int(b.split("-")[1]) for b in others), (mine, others))
+
+    def make_deepy():
+        try:
+            run_op(v, secrets, "create_person", {"uid": "deepy", "first": "Deep", "last": "Y", "email": "d@lab2.test",
+                                                 "password": "Ot-" + random_password(20), "gid": 5000,
+                                                 "home_base": "/home", "shell": "/bin/bash"}, container)
+            return True
+        except ValidationError:
+            return False     # a new DC makes accounts only once the root's RID master gave it a pool (5.8.1.23)
+
+    check("lab2: its agent creates a person at its own DC (once the DC has its RID pool)", until(make_deepy, 600))
+    check("lab2 -> lab -> root: a person made two levels down reaches the root's DC",
+          until(lambda: "sAMAccountName: deepy" in search(ROOT, "(sAMAccountName=deepy)", ["sAMAccountName"]), 900))
+    lab_c, lab_v, lab_s = joined["lab"]
+
+    def lab_resets_deepy():
+        try:
+            run_op(lab_v, lab_s, "reset_password", {"uid": "deepy", "password": "Rs-" + random_password(20)}, lab_c)
+            return True
+        except ValidationError:
+            return False     # not replicated to lab's DC yet, or refused
+
+    check("lab's agent resets a person of lab2, the site nested below it (inherited rights, D105)",
+          until(lab_resets_deepy, 600))
 
 # ---- a read-only site: the domain to read, nothing to write
 if "edge" in joined:
@@ -216,7 +268,7 @@ reach = sh([*EXEC, ROOT, "smbclient", "-s", "/data/etc/smb.conf", "-P",
             f"//{RV['hostname_dc']}/sysvol", "-c", "ls"])
 check("...yet SYSVOL is still reached by its path (as Windows reads policy)",
       reach.returncode == 0 and RV["ad_domain"].lower() in reach.stdout.lower(), reach.stdout + reach.stderr)
-dcs = [ROOT, *[joined[s][0] for s in ("lab", "edge") if s in joined]]
+dcs = [ROOT, *[joined[s][0] for s in ("lab", "edge", "lab2") if s in joined]]
 copied = {c: "" for c in dcs}
 
 
