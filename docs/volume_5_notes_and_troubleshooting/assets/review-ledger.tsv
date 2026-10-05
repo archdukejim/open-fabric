@@ -17,7 +17,7 @@ docs/README.md	c6820365c53ca166b66ad683d21d1c15de8d8f61	2026-10-04
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	b799e39e0c5fda71d679c47385fb83ea53ff9e7b	2026-10-04	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	d2de6ee08fd89123cb58b4c9f74b9ab316aea856	2026-10-04	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	3a1d054d956acc60c3a917cbd75158d46f7401cd	2026-10-05	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -100,7 +100,7 @@ docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	0c5cc4691f1ae67f
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	103a4ee9a4f8184323c1060cf66f0436f3c17bc3	2026-10-04	
 docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	f745f2711a47bb65f7e5b9d0772a3d59464f23e4	2026-10-04	
 docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	72f82eaf4d59314ace1c5c09f2226a63a9dd9c56	2026-10-04	
-docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	91543652e089bdd9faf2b8b5c9ec9f15a88707fd	2026-10-04	
+docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	7b0ec069cba32213dda34a2f15fbaa4dd948277d	2026-10-05	
 docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	301d3b76db26fdfbb7f6cda69696841db43c30ef	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.1-kea-design.md	da4655d3733b7fdf899606642209a7e0288d12ab	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	a7ccd826f29ae9c8f312d36f93eb5228bd7a9538	2026-10-04	
@@ -173,7 +173,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	fbefdcb3e45faadc1f58cddb0df6297f35ae527e	2026-10-05	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	25458aa75ef3a2210ce4e339fb5cebc8d3dd7bad	2026-10-05	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	95be84476aa6d809f434c5db76f62f70668a8ff9	2026-10-05	
