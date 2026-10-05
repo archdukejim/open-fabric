@@ -13,11 +13,11 @@ def _targets(ctx):
     """Purpose: the service certificates this install needs and where each one goes.
     Inputs:  ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr,
              radius, federation, adguard, dc), domain, install_ldap (default True), install_keycloak, install_webui,
-             install_freeradius, federation_endpoint, install_adguard, install_samba + ad_domain.
+             install_freeradius, federation_endpoint, install_adguard, ad_domain.
     Returns: list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")],
              services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP,
              Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint, the DNS
-             filter's UI and the domain controller when on.
+             filter's UI when on, and the domain controller.
     Fails:   KeyError for a missing hostname_* var.
     Feeds:   run."""
     v, p = ctx.vars, ctx.path
@@ -43,9 +43,8 @@ def _targets(ctx):
         t.append((v["hostname_federation"], [], [nginx(v["hostname_federation"])], ["nginx"]))
     if v.get("install_adguard"):
         t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
-    if v.get("install_samba"):
-        # the DC's LDAPS/TLS certificate (manual 2.11.2.7): Keycloak, FreeRADIUS and members verify it
-        t.append((v["hostname_dc"], [v["ad_domain"]], [(p("samba", "tls"), "root")], ["samba"]))
+    # the DC's LDAPS/TLS certificate (manual 2.11.2.7): Keycloak, FreeRADIUS and members verify it
+    t.append((v["hostname_dc"], [v["ad_domain"]], [(p("samba", "tls"), "root")], ["samba"]))
     if v.get("install_freeradius"):
         # the EAP-TLS server certificate supplicants check (server.pem, server.key)
         t.append((v["hostname_radius"], [], [(p("freeradius", "certs"), "freeradius:eap")], ["freeradius"]))

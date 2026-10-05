@@ -56,29 +56,6 @@ events {
 stream {
     resolver 127.0.0.11 valid=30s;
 
-{# with the Windows domain on, its DC owns 389 and 636 on the host's address (manual 2.11.2.4) #}
-{% if install_ldap | default(true) | bool and not install_samba | default(false) | bool %}
-    # 389 Directory Server terminates TLS itself, so both listeners are plain
-    # TCP passthrough and the directory's certificate reaches the client.
-    # LDAP (389): 389-DS rejects everything except StartTLS and the rootDSE
-    # until the connection is encrypted (nsslapd-minssf).
-    server {
-        listen 389;
-        set $ldap_backend "{{ nginx_backend_ldap }}";
-        proxy_pass $ldap_backend;
-        proxy_timeout 300s;
-        proxy_connect_timeout 5s;
-    }
-
-    # LDAPS (636)
-    server {
-        listen 636;
-        set $ldaps_backend "{{ nginx_backend_ldaps }}";
-        proxy_pass $ldaps_backend;
-        proxy_timeout 300s;
-        proxy_connect_timeout 5s;
-    }
-{% endif %}
 }
 
 http {

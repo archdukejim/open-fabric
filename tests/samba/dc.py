@@ -92,7 +92,7 @@ if build.returncode:
 env = jinja_env(os.path.join(REPO, "templates"))
 v = yaml.safe_load(env.get_template("vars.yaml.j2").render(
     domain="lan.test", hostname="dc1", host_ip=IP, lan_cidr=SUBNET, lan_gateway="10.254.30.1", site_name="lan",
-    install_samba=True, ad_domain="ad.lan.test", ad_password_policy=POLICY, deploy_base_dir=W))
+    ad_domain="ad.lan.test", ad_password_policy=POLICY, deploy_base_dir=W))
 compose = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(**v))["services"]["samba"]
 # a stand-in for fabric's Step-CA: the DC's certificate and the root CA the trust GPO carries
 pki = os.path.join(W, "stepca", "data", "certs")

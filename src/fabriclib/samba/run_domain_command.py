@@ -55,9 +55,6 @@ def run_domain_command(v, args):
         return 2
     if args[0] == "status":
         s = domain_status(v)
-        if not s["on"]:
-            print("the Windows domain is off (install_samba: false)")
-            return 0
         print(f"domain {s['domain']} (realm {s['realm']}, NetBIOS {s['netbios']})")
         print(f"this DC {s['dc']}: {'running' if s['running'] else 'NOT running'}")
         for line in s["roles"]:

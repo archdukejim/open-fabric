@@ -43,7 +43,7 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
              configuration and zones and nginx live, converge the Windows domain, re-seed 389-DS, and restart
              fabric-agent, the federation endpoint and the web UI last without blocking.
     Inputs:  paths — deploy_paths() (base, target, federation); final_vars — rendered settings (federation_endpoint,
-             install_ldap, ldap_base_dn, ldap_local_dn, install_samba and what converge_domain reads); secrets —
+             install_ldap, ldap_base_dn, ldap_local_dn, and what converge_domain reads); secrets —
              fabric's secrets (the directory links); state — what the install steps found (see finish_without_start,
              plus ldap_seed); bind_ids — the bind user's ids.
     Returns: the set of units restarted (fabric-web included when it was queued).
@@ -89,7 +89,7 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
     if "nginx" in running and "nginx" not in restart and state["nginx"]:
         print("Reloading NGINX...")
         _quiet(["docker", "exec", "nginx", "nginx", "-s", "reload"], "Reloading NGINX", 15)
-    if final_vars.get("install_samba") and ("samba" in running or "samba" in restart):
+    if "samba" in running or "samba" in restart:
         try:                                      # idempotent: the domain as fabric wants it (manual 2.11.2.15)
             done = converge_domain(final_vars, paths["federation"])
             print("Windows domain: " + ("; ".join(done) if done else "as wanted"))

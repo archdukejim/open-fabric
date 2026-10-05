@@ -43,6 +43,8 @@ host_ip: $HOST_IP
 lan_cidr: $LAN_CIDR
 lan_gateway: $GATEWAY
 friendly_name: Fabric host test
+ad_domain: ad.$DOMAIN
+ad_password_policy: {minimum_length: 14, complexity: true, history: 24, minimum_age_days: 0, maximum_age_days: 0, lockout_threshold: 10, lockout_minutes: 15, lockout_window_minutes: 15}
 install_keycloak: true
 install_ldap: true
 install_webui: true

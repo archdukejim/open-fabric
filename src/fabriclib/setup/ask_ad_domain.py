@@ -31,24 +31,16 @@ def _number(prompt, low, high, current):
         print(f"    {YELLOW}a whole number from {low} to {high}{NC}")
 
 
-def ask_windows_domain(ctx):
-    """Purpose: Advanced plan question (manual 2.11.2, 2.1.9.7): the Windows domain — whether to run a Samba AD
-             domain controller, its domain (D87: chosen once, permanent) and the whole password policy (D89: asked,
-             never preselected).
-    Inputs:  ctx — SetupContext; reads and sets ctx.vars install_samba, ad_domain, ad_password_policy; domain for the
-             recommendation. Interactive.
-    Returns: None; ctx.vars set. Turning it on asks the domain and every policy value (an empty answer keeps a value
-             already set, and is refused where none is). A domain cannot change once the DC is provisioned: setup
-             shows the one it has.
+def ask_ad_domain(ctx):
+    """Purpose: the directory's questions (manual 1.6.3, 2.1.9.8), asked by setup when they are not set: the AD domain
+             (D87: chosen once, permanent; a sibling of fabric's domain suggested) and the whole password policy
+             (D89: asked, never preselected). Fabric's directory is a Samba AD domain on every install.
+    Inputs:  ctx — SetupContext; reads and sets ctx.vars ad_domain, ad_password_policy; domain for the suggestion.
+             Interactive.
+    Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is).
     Fails:   EOFError from input().
-    Feeds:   setup/choose_plan (Advanced)."""
-    on = bool(ctx.vars.get("install_samba"))
-    answer = input(f"\n  Optional: a Windows domain (Samba AD: domain-joined Windows and Linux machines, Group Policy, "
-                   f"PEAP)? [{'Y/n' if on else 'y/N'}] ").strip().lower()
-    on = answer.startswith("y") if answer else on
-    ctx.vars["install_samba"] = on
-    if not on:
-        return
+    Feeds:   setup/collect_vars."""
+    print("\n  fabric's directory is a Samba AD domain (people, groups, devices; Windows and Linux machines may join).")
     domain = str(ctx.vars.get("domain") or "").lower()
     current = str(ctx.vars.get("ad_domain") or "").lower()
     print(f"    The AD domain is {BOLD}permanent{NC}: it cannot be changed once the domain exists.")

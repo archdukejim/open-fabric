@@ -47,7 +47,7 @@ The manual is fabric's only source of truth: architecture, decisions, procedures
 - 3.12 Log forwarding
 - 3.13 The web UI
 - 3.14 Lifecycle, status and ports
-- 3.15 The Windows domain
+- 3.15 The directory
 
 ## [Volume 4 — Infrequent operations](volume_4_infrequent_ops/README.md)
 

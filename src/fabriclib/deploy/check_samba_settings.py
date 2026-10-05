@@ -12,23 +12,21 @@ _NETBIOS = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,14}$")
 
 
 def check_samba_settings(v):
-    """Purpose: refuse a Windows-domain configuration fabric cannot provision correctly (manual 2.11.2, 2.1.9.7),
+    """Purpose: refuse a Windows-domain configuration fabric cannot provision correctly (manual 2.11.2, 2.1.9.8),
              before anything is rendered: the domain (D87), the NetBIOS names, the password policy (D89).
-    Inputs:  v — rendered settings: install_samba, ad_domain, domain, hostname, ad_netbios, ad_password_policy,
+    Inputs:  v — rendered settings: ad_domain, domain, hostname, ad_netbios, ad_password_policy,
              ad_old_password_minutes, ad_rpc_ports.
-    Returns: None (nothing is checked while install_samba is off).
+    Returns: None.
     Fails:   ValidationError naming the first problem: no or an invalid ad_domain; ad_domain equal to fabric's domain
              (same-domain mode was dropped, D87) or a parent of it; a NetBIOS domain name or host name
              Windows cannot use (more than 15 characters); a missing, unknown or out-of-range password-policy key;
              a policy whose minimum age is not below its maximum, or whose lockout is shorter than its window; an
              invalid old-password window or RPC range.
     Feeds:   deploy/check_settings."""
-    if not v.get("install_samba"):
-        return
     ad, domain = str(v.get("ad_domain") or ""), str(v.get("domain") or "").lower()
     labels = ad.split(".")
     if not ad:
-        raise ValidationError("install_samba needs ad_domain: the AD domain, chosen once (manual 2.1.9.7; "
+        raise ValidationError("ad_domain is required: the directory's AD domain, chosen once (manual 2.1.9.8; "
                               f"suggested: {suggested_ad_domain(domain) or 'ad.<parent of ' + domain + '>'})")
     if len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253:
         raise ValidationError(f"ad_domain {ad!r} is not a valid DNS domain of two labels or more")

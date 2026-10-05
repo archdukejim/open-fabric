@@ -45,18 +45,16 @@ def refused(v, words):
 
 POLICY = {"minimum_length": 14, "complexity": True, "history": 24, "minimum_age_days": 1, "maximum_age_days": 365,
           "lockout_threshold": 5, "lockout_minutes": 15, "lockout_window_minutes": 15}
-GOOD = {"install_samba": True, "ad_domain": "ad.lan.test", "domain": "lan.test", "hostname": "pi-core",
+GOOD = {"ad_domain": "ad.lan.test", "domain": "lan.test", "hostname": "pi-core",
         "ad_netbios": "AD", "ad_password_policy": POLICY, "ad_old_password_minutes": 0, "ad_rpc_ports": "49152-49251"}
 
 print("--- settings (D87, D89)")
-check_samba_settings({"install_samba": False})
-check("nothing is checked while the Windows domain is off", True)
 try:
     check_samba_settings(copy.deepcopy(GOOD))
     check("a complete configuration passes", True)
 except ValidationError as e:
     check("a complete configuration passes", False, e)
-check("refused: no AD domain (it has no default)", refused({**GOOD, "ad_domain": ""}, "needs ad_domain"))
+check("refused: no AD domain (it has no default)", refused({**GOOD, "ad_domain": ""}, "ad_domain is required"))
 check("refused: an AD domain of one label", refused({**GOOD, "ad_domain": "ad"}, "not a valid DNS domain"))
 check("refused: fabric's own domain (same-domain mode dropped, D87)",
       refused({**GOOD, "ad_domain": "lan.test"}, "cannot be fabric's own domain"))
@@ -103,7 +101,7 @@ check("never the same twice", len(set(pw)) == len(pw))
 print("--- the rendered container (manual 2.11.2.3, 1.3.9)")
 env = jinja_env(os.path.join(REPO, "templates"))
 base = {"domain": "lan.test", "hostname": "pi-core", "host_ip": "192.168.7.53", "lan_cidr": "192.168.7.0/24",
-        "lan_gateway": "192.168.7.1", "install_samba": True, "ad_domain": "AD.lan.test",
+        "lan_gateway": "192.168.7.1", "ad_domain": "AD.lan.test",
         "ad_password_policy": POLICY}
 v = yaml.safe_load(env.get_template("vars.yaml.j2").render(**base))
 check("the domain's names follow from ad_domain (lower-cased; realm, base DN, NetBIOS, the DC's name)",
@@ -132,37 +130,27 @@ check("builds locally with BIND's and FreeRADIUS's gids while it is pending",
       dc["build"]["args"]["BIND_GID"] == "600" and dc["build"]["args"]["RADIUS_GID"] == "610")
 
 print("--- what changes around it")
-ngx_on = env.get_template("nginx/nginx.conf.j2").render(**v)
-ngx_off = env.get_template("nginx/nginx.conf.j2").render(**{**v, "install_samba": False})
-ports_on = yaml.safe_load(env.get_template("nginx/docker-compose.yml.j2").render(**v))["services"]["nginx"]["ports"]
-check("nginx no longer passes 389/636 to 389-DS (the DC owns them)",
-      "listen 389" not in ngx_on and "listen 389" in ngx_off and not any(":389:" in p or ":636:" in p for p in ports_on),
-      ports_on)
-off = {**v, "install_samba": False}
-named_on, named_off = (env.get_template("bind9/config/named.conf.j2").render(**x) for x in (v, off))
-opts_on, opts_off = (env.get_template("bind9/config/named.conf.options.j2").render(**x) for x in (v, off))
-check("BIND includes the AD zone (DLZ) and the keytab option only with the Windows domain (manual 2.11.2.6)",
-      'include "/etc/bind-samba/dlz.conf";' in named_on and "bind-samba" not in named_off
-      and 'include "/etc/bind-samba/options.conf";' in opts_on and "bind-samba" not in opts_off)
-bind_on = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**{**v, "host_ram_capacity": 4}))
-bind_off = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**{**off, "host_ram_capacity": 4}))
-b_on, b_off = bind_on["services"]["bind9"], bind_off["services"]["bind9"]
+ngx = env.get_template("nginx/nginx.conf.j2").render(**v)
+ports = yaml.safe_load(env.get_template("nginx/docker-compose.yml.j2").render(**v))["services"]["nginx"]["ports"]
+check("nginx passes nothing on 389/636 (the DC owns them)",
+      "listen 389" not in ngx and "listen 636" not in ngx and not any(":389:" in p or ":636:" in p for p in ports), ports)
+named = env.get_template("bind9/config/named.conf.j2").render(**v)
+opts = env.get_template("bind9/config/named.conf.options.j2").render(**v)
+check("BIND includes the AD zone (DLZ) and the keytab option (manual 2.11.2.6)",
+      'include "/etc/bind-samba/dlz.conf";' in named and 'include "/etc/bind-samba/options.conf";' in opts)
+b = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**{**v, "host_ram_capacity": 4}))
+b = b["services"]["bind9"]
 check("BIND mounts fabric's DLZ files and the DC's smb.conf read-only, the DNS partition writable",
-      "/opt/samba/bind:/etc/bind-samba:ro" in b_on["volumes"] and "/opt/samba/data/etc:/etc/samba:ro" in b_on["volumes"]
-      and "/opt/samba/data/bind-dns:/data/bind-dns" in b_on["volumes"]
-      and not any("samba" in m for m in b_off["volumes"]), b_on["volumes"])
-check("BIND gets a Kerberos replay cache and 128 MiB at 4 GB with the domain (80 MiB without)",
-      any(t.startswith("/var/tmp:") for t in b_on["tmpfs"])
-      and b_on["deploy"]["resources"]["limits"]["memory"] == "128M"
-      and b_off["deploy"]["resources"]["limits"]["memory"] == "80M")
+      "/opt/samba/bind:/etc/bind-samba:ro" in b["volumes"] and "/opt/samba/data/etc:/etc/samba:ro" in b["volumes"]
+      and "/opt/samba/data/bind-dns:/data/bind-dns" in b["volumes"], b["volumes"])
+check("BIND gets a Kerberos replay cache and 128 MiB at 4 GB (Samba's DLZ libraries)",
+      any(t.startswith("/var/tmp:") for t in b["tmpfs"]) and b["deploy"]["resources"]["limits"]["memory"] == "128M")
 sibling = {**v, "ad_domain": "ad.test"}
 check("the DNS filter forwards the AD zone to BIND, also when it sits beside fabric's domain (ad.<parent>)",
-      "ad.test" in adguard_zones(sibling, {}) and "ad.lan.test" in adguard_zones(v, {})
-      and "ad.lan.test" not in adguard_zones(off, {}))
+      "ad.test" in adguard_zones(sibling, {}) and "ad.lan.test" in adguard_zones(v, {}))
 units = {u["service"]: u for u in service_units("/opt", v)}
-check("a samba unit, enabled with install_samba, requiring nothing",
-      units["samba"]["enabled"] and units["samba"]["requires"] == []
-      and not {u["service"]: u for u in service_units("/opt", {**v, "install_samba": False})}["samba"]["enabled"])
+check("a samba unit on every install, requiring nothing",
+      units["samba"]["enabled"] and units["samba"]["requires"] == [])
 
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)

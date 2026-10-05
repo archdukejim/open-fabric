@@ -1,4 +1,3 @@
-from fabriclib.common.errors import ValidationError
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.save_vars import save_vars
 from fabriclib.common.vars_lock import vars_lock
@@ -13,13 +12,11 @@ def set_domain_password_policy(actor, changes, source="cli"):
              history, minimum_age_days, maximum_age_days, lockout_threshold, lockout_minutes, lockout_window_minutes);
              source — "cli" (default) or "web". Reads and writes vars.yaml under vars_lock.
     Returns: dict, the saved policy.
-    Fails:   ValidationError "the Windows domain is off" or from check_samba_settings (a key unknown, out of range,
+    Fails:   ValidationError from check_samba_settings (a key unknown, out of range,
              or the policy inconsistent); OSError or yaml.YAMLError from the vars file or the audit log.
     Feeds:   run_domain_command (password-policy)."""
     with vars_lock():
         data = load_vars()
-        if not data.get("install_samba"):
-            raise ValidationError("the Windows domain is off (install_samba: false)")
         policy = {**(data.get("ad_password_policy") or {}), **changes}
         # the settings file holds what the admin set: the rendered defaults fill the rest (vars.yaml.j2)
         ad = str(data.get("ad_domain") or "").lower()

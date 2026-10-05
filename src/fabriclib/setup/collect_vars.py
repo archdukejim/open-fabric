@@ -6,11 +6,13 @@ import yaml
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
+from fabriclib.deploy.check_samba_settings import POLICY_KEYS
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.decode_invitation import decode_invitation
 from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
+from fabriclib.setup.ask_ad_domain import ask_ad_domain
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.upgrade_vars import upgrade_vars
 
@@ -111,9 +113,11 @@ def collect_vars(ctx):
              vars.yaml is the base and --file overrides the keys it sets; on a fresh install without --file a
              checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images
              (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required
-             values are asked for (defaults from detect_network); webui_admin_user is chosen once.
+             values are asked for (defaults from detect_network); webui_admin_user is chosen once; the AD domain
+             and the password policy are asked when missing (ask_ad_domain).
              Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
-    Fails:   SetupError for missing/invalid required values with --non-interactive, invalid tsig_keys, or a
+    Fails:   SetupError for missing/invalid required values (the AD domain and policy included) with
+             --non-interactive, invalid tsig_keys, or a
              secrets file that cannot be written (ValidationError converted); OSError/yaml errors on files.
     Feeds:   run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps
              before deploy; deploy_config renders from fabric.yaml."""
@@ -162,6 +166,15 @@ def collect_vars(ctx):
         sudo_user = os.environ.get("SUDO_USER", "")
         default = sudo_user if sudo_user != "root" and _valid("webui_admin_user", sudo_user) else "fabricadmin"
         data["webui_admin_user"] = default if ctx.non_interactive else _ask("webui_admin_user", default)
+
+    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (D87, D89)
+    policy = data.get("ad_password_policy") or {}
+    if not data.get("ad_domain") or not (set(POLICY_KEYS) | {"complexity"}) <= set(policy):
+        if ctx.non_interactive:
+            raise SetupError("missing in the vars file: ad_domain and every key of ad_password_policy (manual "
+                             "2.1.9.7: the directory's domain and password policy have no defaults)")
+        ctx.vars = data
+        ask_ad_domain(ctx)
 
     data["deploy_base_dir"] = ctx.deploy_base
     os.makedirs(ctx.config_dir, mode=0o750, exist_ok=True)

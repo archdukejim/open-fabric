@@ -23,6 +23,14 @@ lan_gateway: 192.168.1.1
 host_ip: 192.168.1.100
 fabric_subnet: 10.255.0.0/24
 
+# ============================================================
+# DIRECTORY (Samba AD, manual 2.1.9.8): required, no defaults
+# ============================================================
+# chosen once, permanent; suggested: a sibling of `domain` (lan.example.com -> ad.example.com); never `domain` itself
+ad_domain: ad.example.com
+# the whole password policy is yours (D89): every key
+ad_password_policy: {minimum_length: 14, complexity: true, history: 24, minimum_age_days: 0, maximum_age_days: 0, lockout_threshold: 10, lockout_minutes: 15, lockout_window_minutes: 15}
+
 dns:
   dynamic_zone_var:
     zone_authority: true

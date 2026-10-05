@@ -15,8 +15,6 @@ include "/etc/bind/named.conf.logs";
 
 // 5. LOCAL ZONES (The actual DNS data)
 include "/etc/bind/named.conf.zones";
-{% if install_samba | default(false) | bool %}
 
 // 6. THE AD ZONE (optional Windows domain, manual 2.11.2.6): Samba's DLZ module, from the DC's database
 include "/etc/bind-samba/dlz.conf";
-{% endif %}

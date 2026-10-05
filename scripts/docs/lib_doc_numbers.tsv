@@ -351,7 +351,8 @@ file	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py	1
 file	fabriclib-security|src/fabriclib/security/firewall_rules.py	2	
 file	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py	3	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
-file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	
+file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
+file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	0.5.0 / 2026-10-04
 file	fabriclib-setup|src/fabriclib/setup/backup_install.py	1	
 file	fabriclib-setup|src/fabriclib/setup/check_export_dir.py	2	
 file	fabriclib-setup|src/fabriclib/setup/choose_plan.py	3	
@@ -1059,8 +1060,10 @@ function	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py|appl
 function	fabriclib-security|src/fabriclib/security/firewall_rules.py|firewall_rules	1	
 function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|hardened_daemon_settings	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	
+function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	0.5.0 / 2026-10-04
+function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
 function	fabriclib-setup|src/fabriclib/setup/check_export_dir.py|check_export_dir	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	

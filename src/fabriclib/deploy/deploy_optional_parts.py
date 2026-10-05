@@ -46,8 +46,8 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
     # FreeRADIUS (optional): config with the client secrets, fabric's policy code, CA bundle
     if final_vars.get("install_freeradius") and deploy_freeradius(final_vars, secrets, jinja_env):
         restart.add("freeradius")
-    # the Windows domain (optional): the Administrator's password file (read only when provisioning), the converge
-    # code, its resolver (a change restarts it)
-    if final_vars.get("install_samba") and deploy_samba(final_vars, secrets, jinja_env)["restart"]:
+    # the directory (Samba AD, every install): the Administrator's password file (read only when provisioning),
+    # the converge code, its resolver (a change restarts it)
+    if deploy_samba(final_vars, secrets, jinja_env)["restart"]:
         restart.add("samba")
     return {"restart": restart, "nginx": nginx}

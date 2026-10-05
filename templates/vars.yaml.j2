@@ -152,10 +152,9 @@ kea_mem_limit: {{ kea_mem_limit | default('128m') }}
 # interfaces: host interfaces to serve; subnets: [{subnet, pools: ["a - b"], routers,
 # reservations: [{mac, ip, hostname}]}]; ddns (true), ddns_subdomain (dhcp), lease_time (s), dns
 dhcp: {{ dhcp | default({}, true) | to_json }}
-# Windows domain (optional, manual 2.11.2, 1.6.3): a Samba AD domain controller on the host's address, beside
-# 389-DS until build step S7. The domain is chosen once and is permanent (D87); the password policy is the
-# admin's, with no defaults (D89): check_settings refuses an install without them.
-install_samba: {{ install_samba | default(false) | bool }}
+# The directory (manual 1.6.3, 2.11.2): a Samba AD domain controller on the host's address, on every install. The
+# domain is chosen once and is permanent (D87); the password policy is the admin's, with no defaults (D89):
+# setup asks both, and check_settings refuses an install without them.
 {% set _ad = (ad_domain | default('', true)) | lower %}
 ad_domain: "{{ _ad }}"
 ad_realm: "{{ _ad | upper }}"
@@ -164,7 +163,7 @@ ad_netbios: "{{ (ad_netbios | default(_ad.split('.')[0], true))[:15] | upper }}"
 {# the DC runs in the host network, where Docker cannot give it a name of its own: it is the host, in AD's domain #}
 hostname_dc: "{{ (hostname ~ '.' ~ _ad) | lower if _ad else '' }}"
 # minimum_length, complexity (bool), history, minimum_age_days, maximum_age_days, lockout_threshold,
-# lockout_minutes, lockout_window_minutes: every key required while install_samba is on
+# lockout_minutes, lockout_window_minutes: every key required
 ad_password_policy: {{ ad_password_policy | default({}, true) | to_json }}
 ad_old_password_minutes: {{ ad_old_password_minutes | default(0) | int }}
 ad_rpc_ports: "{{ ad_rpc_ports | default('49152-49251', true) }}"

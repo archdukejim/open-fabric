@@ -17,7 +17,7 @@ from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.start_unit import start_unit
 
 # (systemd unit, container, enabled-if flag); order = start order
-ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("samba", "samba", "install_samba"),
+ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("samba", "samba", None),
          ("ldap", "dirsrv", "install_ldap"),
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit"),
@@ -31,7 +31,7 @@ def run(ctx):
              directory to the split layout (migrate_local_suffix), then fabric-agent and the web UI, and activate
              fabric.target.
     Inputs:  ctx — SetupContext: vars install_ldap (default True), install_keycloak, install_webui,
-             install_fluentbit, install_kea, install_freeradius, install_samba, install_adguard, federation_endpoint;
+             install_fluentbit, install_kea, install_freeradius, install_adguard, federation_endpoint;
              restart_services
              (units to restart);
              target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file.
@@ -55,14 +55,13 @@ def run(ctx):
         info(f"{unit}…")
         ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
 
-    if v.get("install_samba"):
-        try:
-            done = converge_domain(v, os.path.join(ctx.config_dir, "federation.yaml"))
-        except ValidationError as e:
-            raise SetupError(str(e))
-        ok(f"Windows domain {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
-        if write_bind_dlz(v):                     # the first provisioning: BIND now serves the AD zone
-            ok(f"bind9: {start_unit('bind9', 'bind9', True)} (the AD zone through DLZ)")
+    try:
+        done = converge_domain(v, os.path.join(ctx.config_dir, "federation.yaml"))
+    except ValidationError as e:
+        raise SetupError(str(e))
+    ok(f"directory {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
+    if write_bind_dlz(v):                         # the first provisioning: BIND now serves the AD zone
+        ok(f"bind9: {start_unit('bind9', 'bind9', True)} (the AD zone through DLZ)")
 
     if v.get("install_ldap", True):
         registry = os.path.join(ctx.config_dir, "federation.yaml")

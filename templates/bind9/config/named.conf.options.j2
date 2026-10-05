@@ -8,11 +8,9 @@ options {
 
     // Authoritative only — no recursive resolution
     recursion no;
-{% if install_samba | default(false) | bool %}
 
     // the Windows domain: members sign their updates with Kerberos (GSS-TSIG), verified with the DC's DNS keytab
     include "/etc/bind-samba/options.conf";
-{% endif %}
 
     // DNSSEC — validation disabled; this is an internal authoritative-only
     // server serving private zones with no path to root servers.

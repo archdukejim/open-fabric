@@ -18,18 +18,15 @@ def _dc(args):
 def domain_status(v):
     """Purpose: what `fabricctl domain status` shows (manual 3.15.1): the domain, this DC and whether it runs, the
              domain-wide roles it holds, the password policy in force.
-    Inputs:  v — rendered vars: install_samba, ad_domain, ad_realm, ad_netbios, hostname_dc.
-    Returns: dict {"on" (bool), "domain", "realm", "netbios", "dc", "running" (bool), "roles" [str], "policy" [str]};
-             only {"on": False} while the Windows domain is off.
+    Inputs:  v — rendered vars: ad_domain, ad_realm, ad_netbios, hostname_dc.
+    Returns: dict {"domain", "realm", "netbios", "dc", "running" (bool), "roles" [str], "policy" [str]}.
     Fails:   never (a DC that does not answer shows as not running, with no roles or policy).
     Feeds:   run_domain_command (status)."""
-    if not v.get("install_samba"):
-        return {"on": False}
     try:
         state = subprocess.run(["docker", "inspect", "-f", "{{.State.Health.Status}}", "samba"],
                                capture_output=True, text=True, timeout=10).stdout.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired):
         state = ""
-    return {"on": True, "domain": v.get("ad_domain"), "realm": v.get("ad_realm"), "netbios": v.get("ad_netbios"),
+    return {"domain": v.get("ad_domain"), "realm": v.get("ad_realm"), "netbios": v.get("ad_netbios"),
             "dc": v.get("hostname_dc"), "running": state == "healthy",
             "roles": _dc(["fsmo", "show"]), "policy": _dc(["domain", "passwordsettings", "show"])[1:]}

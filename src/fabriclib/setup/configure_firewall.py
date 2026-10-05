@@ -80,7 +80,7 @@ def run(ctx):
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
              (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123
              from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks
-             removed: config/.firewall-ntp-allowed; DHCP likewise), install_samba (the domain controller's ports,
+             removed: config/.firewall-ntp-allowed; DHCP likewise), the domain controller's ports (
              likewise) — the rules come from security/firewall_rules;
              vars_file,
              target_dir, config_dir. Env SSH_CONNECTION.
