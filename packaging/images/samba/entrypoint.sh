@@ -96,6 +96,31 @@ set_global "tls keyfile" "/tls/privkey.pem"
 set_global "tls cafile" "/tls/root_ca.crt"
 set_global "ntp signd socket directory" "/run/samba/ntp_signd"
 set_global "winbindd socket directory" "/run/samba/winbindd"
+# never advertised (D94, the owner's condition): no mDNS; SYSVOL and NETLOGON left out of share lists (Windows
+# reads policy by its path, which hiding does not change)
+set_global "multicast dns register" "no"
+
+# Purpose: set one option of a share in smb.conf to fabric's value (replaced if present, added if not).
+# Inputs:  $1 — share name as provisioning writes it (sysvol, netlogon); $2 — option name; $3 — value. Changes $CONF.
+# Returns: 0.
+# Fails:   under set -e if sed fails.
+# Feeds:   the share list below.
+set_share() {
+    sed -i -E "/^\[$1\]/,/^\[/{/^\s*$2\s*=/Id}" "$CONF"
+    sed -i "/^\[$1\]/a\\	$2 = $3" "$CONF"
+}
+set_share sysvol browseable no
+set_share netlogon browseable no
+
+# Group Policy between sites (manual 1.8.8.15): every 5 minutes, the GPO folders this DC does not own, from the DC
+# that does (tini reaps it with the DC)
+(
+    sleep 60
+    while true; do
+        PYTHONDONTWRITEBYTECODE=1 python3 /fabric/pull_sysvol.py || true
+        sleep 300
+    done
+) &
 
 # runtime sockets live on /run (a tmpfs, or the host's folders for winbind and ntp_signd)
 mkdir -p /run/samba/ntp_signd && chmod 750 /run/samba/ntp_signd

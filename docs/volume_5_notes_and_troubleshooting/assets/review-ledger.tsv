@@ -43,7 +43,7 @@ docs/volume_1_systems_and_services/1.11.26-fabriclib-undo.md	3f16a36fa4ee38bdc17
 docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b527dab1778bf98f07d5d667a	2026-10-03	
 docs/volume_1_systems_and_services/1.11.28-installers.md	12802f7241c875662a6f6895defdfcd1e1ffe0d7	2026-10-03	
 docs/volume_1_systems_and_services/1.11.29-webui.md	cb217aa0df589543e0b80776f36116c6434eaf7e	2026-10-05	
-docs/volume_1_systems_and_services/1.11.3-fabricctl-jinja.md	f3894bb439fc2147c10209f49c9cef49e552603b	2026-10-05	
+docs/volume_1_systems_and_services/1.11.3-fabricctl-jinja.md	32e309518556ebf13c4a33fe223699a0999fe87a	2026-10-05	
 docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	7cebabc7c6a59583dd93ff9f41b0337dacd75191	2026-10-05	
 docs/volume_1_systems_and_services/1.11.31-fabriclib-directory.md	88f5a1dd9a9064ee6c0454dbf3e5a0d6cc49a5d2	2026-10-05	
 docs/volume_1_systems_and_services/1.11.4-fabricctl-lib.md	f87125b7cc4c2afdf5f8f7812f325344ab40fd33	2026-10-03	
@@ -86,7 +86,7 @@ docs/volume_1_systems_and_services/1.8.4-joining.md	60bec0292c8d771053827188f01c
 docs/volume_1_systems_and_services/1.8.5-attachment.md	59a3693e8eb488fe17c7370abfeffa3dc3cffa75	2026-10-05	
 docs/volume_1_systems_and_services/1.8.6-changes.md	795f341188e97db14bbacf980bd6014209d5555e	2026-10-05	
 docs/volume_1_systems_and_services/1.8.7-milestones.md	9f224584b781bb9adfb1d13dc42a4c0c2c3ce208	2026-10-05	
-docs/volume_1_systems_and_services/1.8.8-federation-on-ad.md	a1642319ef4d4470535f7077c235e7b0b8ead7ce	2026-10-05	
+docs/volume_1_systems_and_services/1.8.8-federation-on-ad.md	d921575759a4a529840f4a1ea111c51fce70d4d6	2026-10-05	
 docs/volume_1_systems_and_services/1.9.1-security-defaults.md	e299efc1f11dc528fd23949e503e1db1ba4ed468	2026-10-04	
 docs/volume_1_systems_and_services/README.md	a8cabd95f8592542a9d7176970a5f51df3233925	2026-10-05	
 docs/volume_2_technologies_and_features/2.1.1-about-settings.md	217838baae8569b20211e5b704463b720b8af374	2026-10-03	
@@ -102,7 +102,7 @@ docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	d577a78ab8f70016
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	7de192a312db784ad93696b8318d138e702f6d5a	2026-10-05	
 docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	0918f019d85f255ee994c4df490a68345dd3bd09	2026-10-05	
 docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	72f82eaf4d59314ace1c5c09f2226a63a9dd9c56	2026-10-04	
-docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	79242cf4fb968f5c39f74b39c76c4245a066fbfe	2026-10-05	
+docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	61fc2acd10254730135bbe2f81b2983388a5ede9	2026-10-05	
 docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	51247e38f304e6b3c52feb6905861e08181be9c3	2026-10-05	
 docs/volume_2_technologies_and_features/2.2.1-kea-design.md	da4655d3733b7fdf899606642209a7e0288d12ab	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	b74a0eddcf47789ecdc45a03735b1f51c112e905	2026-10-05	
@@ -178,7 +178,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	659bfd16089702ed5ce00abca501296f6afbcd3b	2026-10-05	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	48447a8d0d50f9f444f3e3ae1331f6d8bd584761	2026-10-05	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -212,7 +212,7 @@ packaging/images/keycloak/Dockerfile	35354739386d0efad9665ba05a6ea698376205f3	20
 packaging/images/keycloak/README.md	378c2bf8bac4af9bde130e2c6be22250d0b0dba3	2026-09-30	
 packaging/images/samba/Dockerfile	8dc2dd89c585e4c395f49de6221d9e4432a55080	2026-10-04	
 packaging/images/samba/README.md	6b635be84beb20dec1f3b7dc42186cd0b2bbfdb2	2026-10-04	
-packaging/images/samba/entrypoint.sh	d79233ee8289b6526794a735b08af5b52948af75	2026-10-05	
+packaging/images/samba/entrypoint.sh	9a41ca3522a6df249c1e2544bcc86e777d74416a	2026-10-05	
 packaging/images/samba/set_password.py	dc870d8bef5155ea355962bb8b907a96e828d4bb	2026-10-04	
 packaging/images/smoke-test.sh	c76a474387b9680130fa841d748843f2fc8b0534	2026-10-05	
 packaging/images/stage-contexts.sh	c7dab5ed3d7e87d728f507051544741ee18ddc6a	2026-10-05	
@@ -227,7 +227,7 @@ scripts/README.md	e8c39b53ed3db3c4880bf0f5fd678f38ad4fa059	2026-10-04
 scripts/docs/README.md	135dc47f8819d75e217e1865d89d48c256983310	2026-10-03	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	5c811285602805f04add0a71a678dc5cc1c8a9b4	2026-10-05	
-scripts/docs/lib_doc_numbers.tsv	0a06a1d7f4cd7564aaced4658d007a11d777ae18	2026-10-05	
+scripts/docs/lib_doc_numbers.tsv	34f89468bb4cf98528be6a79087603524dbbe5bc	2026-10-05	
 scripts/docs/lib_doc_registry.py	b9ba7c37a7d79fddfb748007b51c784401c1c523	2026-10-03	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-03	
@@ -303,7 +303,7 @@ src/containers/freeradius/lookup_device.py	93105e0d888b214ffa1bffdcdda80010f403b
 src/containers/freeradius/mappings.py	2f49917b6f66e281d1b545c5ca0cc39f72b29bdf	2026-10-05	
 src/containers/freeradius/normalize_mac.py	da91bf150ef1281ccbddbb25da5cbf39b50e9696	2026-09-30	
 src/containers/freeradius/record_fingerprint.py	f28c298252a0734911006b670a3437332dd5a291	2026-09-30	
-src/containers/samba/README.md	97171e0d393071d152711732a6704d54feddf6a5	2026-10-05	
+src/containers/samba/README.md	c0ae40dfa96256b68755bacba33b449de49009f3	2026-10-05	
 src/containers/samba/add_group_member.py	d058d43ae8bc96158938b10c1290d38877ed9640	2026-10-05	
 src/containers/samba/admin_gpo.py	8992d9b75c629be6e8d6407c44dd921b952d6f86	2026-10-05	
 src/containers/samba/admx_store.py	f11d0e6a28b6827b927ba2a9b122e0bd99bb1623	2026-10-05	
@@ -335,6 +335,7 @@ src/containers/samba/logon_rights_policy.py	458459afdd3ebfd0ad40107a8baf43dbff7d
 src/containers/samba/open_samdb.py	1d8df52a1d49724f2ecab96395ff274baf7b386c	2026-10-04	
 src/containers/samba/paths.py	89e3063adf97f24b05062f75305e89fc81d0bc19	2026-10-05	
 src/containers/samba/policy_entries.py	045f2a26409e3324faf8689984a492868aee3e06	2026-10-05	
+src/containers/samba/pull_sysvol.py	79da9700f1833420bb6987eb32e1284c9fff3923	2026-10-05	
 src/containers/samba/read_devices.py	08a75df8d06589d4afcc989311b30ebc0a1473ce	2026-10-05	
 src/containers/samba/read_networks.py	15b33cfae115f0fab004c1f2746245e43aa54002	2026-10-05	
 src/containers/samba/read_replication.py	cecc393dbc8359dc4b6eaee21fad68355da3c788	2026-10-05	
@@ -1245,7 +1246,7 @@ tests/samba/devices.py	8b2d94d6ee0ebec716c8e40e02c2924746d589bc	2026-10-05
 tests/samba/gpo.py	ecde659e1b93b28a46e78a6062c6c15c96d1ff0c	2026-10-05	
 tests/samba/linux_join.py	78bbf0f99a368411778aa79b1fd80409b5676179	2026-10-05	
 tests/samba/run.py	27903d5985f1d7654b737c46f110b51cae99607f	2026-10-05	
-tests/samba/site_join.py	41cb20f69a1b72da43ee559af0eecd7f9b942287	2026-10-05	
+tests/samba/site_join.py	9015c25165d9c4822c45d1ed5fd4e8d7e3d3fd32	2026-10-05	
 tests/samba/start_bind.py	d8c8a1cfc1d8fdb97f865ffd2e55b2747104339f	2026-10-05	
 tests/samba/start_dc.py	7b27f7dd10761bfa496929caf88a53bc7e3f3295	2026-10-05	
 tests/sandbox/Dockerfile	46a7ff3893744a092bf54127ef8debbc66bd9091	2026-09-30	

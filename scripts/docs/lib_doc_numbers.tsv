@@ -57,6 +57,7 @@ file	fabricctl-jinja|src/containers/samba/logon_rights_policy.py	20
 file	fabricctl-jinja|src/containers/samba/open_samdb.py	21	
 file	fabricctl-jinja|src/containers/samba/paths.py	35	
 file	fabricctl-jinja|src/containers/samba/policy_entries.py	52	
+file	fabricctl-jinja|src/containers/samba/pull_sysvol.py	61	
 file	fabricctl-jinja|src/containers/samba/read_devices.py	36	
 file	fabricctl-jinja|src/containers/samba/read_networks.py	45	
 file	fabricctl-jinja|src/containers/samba/read_replication.py	60	
@@ -687,6 +688,7 @@ function	fabricctl-jinja|packaging/images/bake_env.py|bake_env	1
 function	fabricctl-jinja|packaging/images/dirsrv/dscontainer-launch.py|_signal	1	0.5.0 / 2026-10-04
 function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|clear_data	3	
 function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|set_global	2	
+function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|set_share	4	
 function	fabricctl-jinja|packaging/images/samba/entrypoint.sh|show_log	1	
 function	fabricctl-jinja|packaging/images/samba/set_password.py|set_password	1	
 function	fabricctl-jinja|packaging/images/smoke-test.sh|label	2	
@@ -783,6 +785,11 @@ function	fabricctl-jinja|src/containers/samba/policy_entries.py|_element	2
 function	fabricctl-jinja|src/containers/samba/policy_entries.py|_write	1	
 function	fabricctl-jinja|src/containers/samba/policy_entries.py|policy_entries	3	
 function	fabricctl-jinja|src/containers/samba/policy_entries.py|policy_targets	4	
+function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|_owners	3	
+function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|_site_of	2	
+function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|_version	1	
+function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|_writable_dc	4	
+function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|pull_sysvol	5	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|_one	1	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|read_devices	2	
 function	fabricctl-jinja|src/containers/samba/read_networks.py|read_networks	1	

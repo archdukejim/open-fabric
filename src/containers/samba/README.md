@@ -53,3 +53,4 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `ensure_site_link.py` | A site's AD site link to its parent (cost 100, 15 minutes, change notification) |
 | `set_gpo_acl.py` | One GPO folder's file ACLs from its AD object (a site's DC lacks the domain's other GPO folders) |
 | `read_replication.py` | This DC's inbound replication per partition, from its own `repsFrom` (works at a read-only DC too) |
+| `pull_sysvol.py` | The GPO folders this DC does not own, copied over SMB from the DC that owns each (run every 5 minutes by the entrypoint) |

@@ -5,7 +5,9 @@ account that expires), the site's deploy_samba writes the join credentials and i
 provisioning, its convergence then changes only what is the site's (an RODC's only what is local), and finish_join
 deletes the join account. Proves: both join into their AD sites; the domain and the site's objects replicate both
 ways; the site's agent works at its own DC with the id block the root gave; the join account is gone; an RODC's
-convergence writes nothing and refuses writes; the password policy stays the root's.
+convergence writes nothing and refuses writes; the password policy stays the root's; SYSVOL and NETLOGON are not
+advertised yet reachable by path, and every DC copies the GPO folders it does not own from their owners over SMB
+(S8.4), refusing a GPO whose object moved away from its owner's files.
     sudo python3 tests/samba/site_join.py
 """
 import os
@@ -175,6 +177,85 @@ if "edge" in joined:
     except ValidationError:
         wrote = False
     check("edge: writes at the RODC are refused (they belong to a writable DC)", not wrote)
+
+# ---- Group Policy between sites (S8.4, manual 1.8.8.15): hidden shares, folders copied from their owners over SMB
+EXEC = ["docker", "exec", "-e", "PYTHONDONTWRITEBYTECODE=1", "-e", "KRB5_CONFIG=/data/private/krb5.conf"]
+GPO_STATE = ("import os,sys; sys.path.insert(0,'/fabric'); import ldb; from open_samdb import open_samdb; "
+             "s,lp=open_samdb('/data/etc/smb.conf'); r=lp.get('realm').lower(); p=os.path.join(lp.get('path','sysvol'),r,'Policies'); "
+             "[print(str(g['cn'][0]).upper(), str(g.get('versionNumber',['0'])[0]), "
+             "(open(os.path.join(p,str(g['cn'][0]),'GPT.INI')).read().split('Version=')[-1].strip() "
+             "if os.path.exists(os.path.join(p,str(g['cn'][0]),'GPT.INI')) else '-')) "
+             "for g in s.search(base='CN=Policies,CN=System,'+str(s.domain_dn()), scope=ldb.SCOPE_ONELEVEL, "
+             "expression='(objectClass=groupPolicyContainer)', attrs=['cn','versionNumber'])]")
+
+
+def pull(container):
+    return sh([*EXEC, container, "python3", "/fabric/pull_sysvol.py"]).stdout
+
+
+def gpo_state(container):
+    """{guid: (object version, folder version or '-')} at one DC."""
+    out = sh([*EXEC, container, "python3", "-c", GPO_STATE]).stdout.split("\n")
+    return {f[0]: (f[1], f[2]) for f in (line.split() for line in out) if len(f) == 3}
+
+
+def in_step(container):
+    return all(obj == files for obj, files in gpo_state(container).values())
+
+
+hidden = all(sh(["docker", "exec", ROOT, "testparm", "-s", "--section-name", share, "--parameter-name", "browseable",
+                 "/data/etc/smb.conf"]).stdout.strip() == "No" for share in ("sysvol", "netlogon"))
+check("SYSVOL and NETLOGON are not browseable, and mDNS is off (never advertised: D94)",
+      hidden and "multicast dns register = no" in sh(["docker", "exec", ROOT, "cat", "/data/etc/smb.conf"]).stdout)
+listing = sh([*EXEC, ROOT, "smbclient", "-s", "/data/etc/smb.conf", "-P", "-L", f"//{RV['hostname_dc']}"])
+check("...so a share list leaves them out", listing.returncode == 0 and "Sharename" in listing.stdout
+      and "sysvol" not in listing.stdout.lower() and "netlogon" not in listing.stdout.lower(),
+      listing.stdout + listing.stderr)
+reach = sh([*EXEC, ROOT, "smbclient", "-s", "/data/etc/smb.conf", "-P",
+            f"//{RV['hostname_dc']}/sysvol", "-c", "ls"])
+check("...yet SYSVOL is still reached by its path (as Windows reads policy)",
+      reach.returncode == 0 and RV["ad_domain"].lower() in reach.stdout.lower(), reach.stdout + reach.stderr)
+dcs = [ROOT, *[joined[s][0] for s in ("lab", "edge") if s in joined]]
+copied = {c: "" for c in dcs}
+
+
+def all_in_step():
+    for c in dcs:
+        copied[c] += pull(c)
+    return all(in_step(c) for c in dcs)
+
+
+def copies(c):
+    """What a DC copied: by the test's own pulls and by its entrypoint's 5-minute round (in its log)."""
+    return copied[c] + sh(["docker", "logs", c]).stdout
+
+
+check("every DC holds every GPO's folder at its object's version (copied from each owner over SMB, as the DC's "
+      "machine account)", until(all_in_step, 600), {c: gpo_state(c) for c in dcs})
+if "lab" in joined:
+    check("the root copies the writable site's own GPOs from the site's DC", "copied from dc-lab" in copies(ROOT),
+          copied[ROOT])
+if "edge" in joined:
+    check("the RODC copies what it does not hold from their owners, its own site's from the root (who wrote them)",
+          "copied from dc1" in copies(SITES["edge"][0]).lower(), copied[SITES["edge"][0]])
+    # a change away from the owner: the object's version moves, the owner's files do not -> refused, not copied
+    if "lab" in joined:
+        lab_gpo = search(ROOT, "(&(objectClass=groupPolicyContainer)(displayName=*lab*))", ["cn", "versionNumber"])
+        guid = lab_gpo.split("cn: ")[1].split()[0]
+        ver = int(lab_gpo.split("versionNumber: ")[1].split()[0])
+        dn = f"CN={guid},CN=Policies,CN=System,{BASE}"
+        sh(["docker", "exec", "-i", ROOT, "ldbmodify", "-H", "/data/private/sam.ldb"],
+           input=f"dn: {dn}\nchangetype: modify\nreplace: versionNumber\nversionNumber: {ver + 1}\n")
+        refused = ""
+
+        def seen_refusal():
+            global refused
+            refused += pull(SITES["edge"][0])
+            return f"{guid}: not copied" in refused
+
+        check("a GPO whose object changed away from its owner is reported and never copied half",
+              until(seen_refusal, 300) and gpo_state(SITES["edge"][0]).get(guid.upper(), ("", ""))[1] == str(ver),
+              refused)
 
 # ---- the Federation tab's view of it (S8.5): AD's own replication state and conflict objects, at the root
 from fabriclib.samba.list_conflicts import list_conflicts  # noqa: E402
