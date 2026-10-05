@@ -13,6 +13,11 @@ fabric makes them:
   refused: a wrong password, a locked account (the domain's lockout), a
   disabled person, a person still on their one-time password, a person in no
   mapped group, an unknown name, and a password sent outside the tunnel.
+  PEAP-MSCHAPv2 (eapol_test), checked by the DC through its winbind: a
+  person in a mapped group and a machine of this site (host/<name>, by its
+  Domain Computers mapping) accepted on their VLANs; refused: a wrong
+  password, a disabled person, a person in no mapped group, a machine
+  outside the site's OU=machines.
   Refused before any policy: an unknown RADIUS client, a wrong secret, a
   request without Message-Authenticator. The DC down -> refused (fail
   closed), and back -> reconnected. Container hardening.
@@ -177,6 +182,7 @@ for d in ("laptop1", "laptop2", "laptop3", "cam1"):          # printer1's certif
 # Keycloak's first sign-in would; groups as an admin makes them with AD's tools (not `guests`: AD has its own). newbie keeps the one-time password.
 PW = "Correct-Horse-9"
 ONE_TIME = "Ot-" + random_password(20)
+MACHINE_PW = "Mc-" + random_password(30)
 PEOPLE = {"alice": ["staff"], "gina": ["staff", "visitors"], "sam": ["contractors"], "nora": ["sales"],
           "lockme": ["staff"], "dora": ["staff"], "newbie": ["staff"]}
 for uid in PEOPLE:
@@ -194,6 +200,9 @@ for uid in people:
     if uid != "newbie":
         samdb.setpassword("(sAMAccountName=%s)" % uid, {PW!r}, force_change_at_next_login=False)
 samdb.disable_account("(sAMAccountName=dora)")
+for machine, ou in (("ws1", "OU=machines,OU=lan,OU=sites"), ("ws9", "CN=Computers")):   # ws9: not this site's
+    samdb.newcomputer(machine, computerou=ou)
+    samdb.setpassword("(sAMAccountName=%s$)" % machine, {MACHINE_PW!r}, force_change_at_next_login=False)
 for group in sorted({{g for gs in people.values() for g in gs}}):
     samdb.newgroup(group, groupou="OU=groups,OU=lan,OU=sites", grouptype=GTYPE_SECURITY_GLOBAL_GROUP)
     samdb.add_remove_group_members(group, [u for u, gs in people.items() if group in gs], add_members_operation=True)
@@ -206,7 +215,8 @@ check("people and groups in the domain", "seeded" in seeded.stdout, seeded.stder
 clients, embedded = normalize_radius_clients([{"name": "switch1", "address": SWITCH_IP, "secret": SECRET}])
 people_map = normalize_radius_people([{"group": "staff", "vlan": 20, "priority": 50},
                                       {"group": "visitors", "vlan": 50, "priority": 60},
-                                      {"group": "contractors", "priority": 70}])
+                                      {"group": "contractors", "priority": 70},
+                                      {"group": "Domain Computers", "vlan": 40, "priority": 80}])
 rv = {**V, "deploy_base_dir": W, "radius_clients": clients, "radius_people": people_map,
       "service_users": {"freeradius": {"uid": 610, "gid": 610}}}
 deploy_freeradius(rv, {"radius_secrets": embedded, "ad_radius_password": SECRETS["ad_radius_password"]},
@@ -228,7 +238,11 @@ def start_radius():
         "--tmpfs", "/tmp:noexec,nosuid,size=8m", "--tmpfs", "/run/freeradius:uid=610,gid=610,mode=0700,size=8m",
         "-v", f"{W}/freeradius/config:/etc/freeradius/fabric:ro",
         "-v", f"{W}/freeradius/certs:/etc/freeradius/certs:ro",
-        "-v", f"{W}/freeradius/python:/etc/freeradius/python:ro", "fabric/freeradius:test"])
+        "-v", f"{W}/freeradius/python:/etc/freeradius/python:ro",
+        # as the compose file mounts them: the DC's winbind for PEAP
+        "-v", f"{W}/dc/samba/winbindd:/run/samba/winbindd:ro",
+        "-v", f"{W}/dc/samba/data/state/winbindd_privileged:/data/state/winbindd_privileged:ro",
+        "-v", f"{W}/dc/samba/data/etc:/etc/samba:ro", "fabric/freeradius:test"])
     return until(lambda: "Ready to process requests" in logs(), 60)
 
 
@@ -373,6 +387,38 @@ check("EAP-TTLS: after 5 wrong passwords the domain locks the account: the right
 code, _, out = mab("02:00:00:00:30:01", user="alice")
 check("a person's password sent outside the TLS tunnel (plain PAP) is refused", code == "Access-Reject", out[-300:])
 
+# ------------------------------------------------------------------ PEAP-MSCHAPv2 (people and machines)
+def eap_peap(user, password, mac="02:00:00:00:20:02"):
+    """(accepted, VLAN or None, output) for one PEAP-MSCHAPv2 login."""
+    conf = (f'network={{\n key_mgmt=IEEE8021X\n eap=PEAP\n identity="{user}"\n anonymous_identity="anonymous"\n'
+            f' password="{password}"\n phase1="peaplabel=0"\n phase2="auth=MSCHAPV2"\n ca_cert="/pki/root.crt"\n'
+            f' domain_suffix_match="radius.{DOMAIN}"\n eapol_flags=0\n}}\n')
+    res = sh(["docker", "exec", "-i", "rt-switch", "sh", "-c",
+              f"cat > /tmp/peap.conf && eapol_test -c /tmp/peap.conf -a {RADIUS_IP} -s '{SECRET}' -M {mac} -t 10 -r 0"],
+             ok=False, input=conf)
+    text = res.stdout + res.stderr
+    vlan = re.search(r"Attribute 81 \(Tunnel-Private-Group-Id\).*?\n\s*Value: ([0-9a-fA-F]+)", text)
+    return res.returncode == 0 and "SUCCESS" in text, bytes.fromhex(vlan.group(1)).decode() if vlan else None, text
+
+
+ok, vlan, out = eap_peap("alice", PW)
+check("PEAP: a person in a mapped group, checked by the DC's winbind -> accepted on the group's VLAN (20)",
+      ok and vlan == "20" and "ACCEPT method=peap group=staff vlan=20" in logs() and "person=alice" in logs(),
+      out[-800:] + logs()[-800:])
+ok, vlan, out = eap_peap(f"host/ws1.{V['ad_domain']}", MACHINE_PW)
+check("PEAP: a machine of this site (host/ws1 as ws1$) by its Domain Computers mapping -> accepted on VLAN 40",
+      ok and vlan == "40" and "machine=ws1$" in logs().rsplit("method=peap", 1)[-1], out[-800:] + logs()[-800:])
+ok, _, out = eap_peap(f"host/ws9.{V['ad_domain']}", MACHINE_PW)
+check("PEAP: a machine outside this site's OU=machines is refused",
+      not ok and "reason=not_a_machine_of_this_site" in logs(), logs()[-400:])
+ok, _, out = eap_peap("alice", "wrong-password")
+check("PEAP: a wrong password is refused by the domain", not ok, logs()[-400:])
+ok, _, out = eap_peap("nora", PW)
+check("PEAP: a person in no mapped group is refused",
+      not ok and "reason=in_no_group_mapped_for_802.1X" in logs().rsplit("method=peap", 1)[-1], logs()[-400:])
+ok, _, out = eap_peap("dora", PW)
+check("PEAP: a person disabled in the domain is refused", not ok, logs()[-400:])
+
 # ------------------------------------------------------------------ MAB
 code, vlan, out = mab("02-00-00-00-30-01")
 check("MAB: a MAC whose device has network:mab -> Access-Accept on its VLAN (30)",
@@ -411,7 +457,7 @@ check("container: uid 610, no capabilities, read-only, no-new-privileges",
       and h["HostConfig"]["ReadonlyRootfs"] and "no-new-privileges:true" in h["HostConfig"]["SecurityOpt"])
 check("no RADIUS secret and no person's password in the logs",
       SECRET not in logs() and PW not in logs() and ONE_TIME not in logs() and "wrong-password" not in logs()
-      and SECRETS["ad_radius_password"] not in logs())
+      and SECRETS["ad_radius_password"] not in logs() and MACHINE_PW not in logs())
 
 cleanup()
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")

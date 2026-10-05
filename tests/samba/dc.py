@@ -173,6 +173,11 @@ uac = attr("(sAMAccountName=fabric-agent-lan)", "userAccountControl")
 check("the site's service accounts exist in its OU, their passwords never expiring",
       all(attr(f"(sAMAccountName=fabric-{k}-lan)", "distinguishedName")[0].startswith(f"CN=fabric-{k}-lan,OU=service-accounts,")
           for k in ("agent", "keycloak", "radius")) and int(uac[0]) & 0x10000)
+priv = os.stat(os.path.join(W, "samba", "data", "state", "winbindd_privileged"))
+check("winbind's privileged pipe: FreeRADIUS's group only (root, 0750); its socket in the host folder FreeRADIUS mounts",
+      (priv.st_uid, priv.st_gid, priv.st_mode & 0o7777) == (0, int(v["service_users"]["freeradius"]["gid"]), 0o750)
+      and os.path.exists(os.path.join(W, "samba", "winbindd", "pipe")),
+      (priv.st_uid, priv.st_gid, oct(priv.st_mode)))
 SECRETS["ad_agent_password"] = random_password()
 healed = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("a changed agent password is set by the next convergence (when the old one no longer signs in)",
@@ -274,7 +279,7 @@ check("BIND still runs as its own user with no capabilities", bind_info["Config"
 lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": [],
        "root_ca_pem": open(f"{pki}/root_ca.crt").read(), "id_range": "200001-300000", "groups": [],
        "admin_group": "admins",
-       "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}}
+       "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
 res = dc("python3", "/fabric/converge.py", stdin=json.dumps(lab))
 check("a second site's OU, groups and access entries", res.returncode == 0 and "group lab-admins created" in res.stdout,
       res.stderr)
@@ -370,7 +375,7 @@ carol = mk("carol")
 check("ids are never reused: after alice is deleted, carol gets a higher number", carol["uidNumber"] > first, carol)
 # a tiny site whose block is used up
 tiny = {**lab, "site": "tiny", "id_range": "900-902",
-        "accounts": {f"fabric-{k}-tiny": random_password() for k in ("agent", "keycloak", "radius")}}
+        "accounts": {f"fabric-{k}-tiny": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
 dc("python3", "/fabric/converge.py", stdin=json.dumps(tiny))
 tiny_v, tiny_s = {**v, "site_name": "tiny"}, {**SECRETS, "ad_agent_password": tiny["accounts"]["fabric-agent-tiny"]}
 first_tiny = mk("tina", site_v=tiny_v, sec=tiny_s)

@@ -32,6 +32,8 @@ def deploy_samba(v, secrets, jinja_env):
     # BIND mounts these two (its DLZ): made once if missing, never reset — provisioning gives them BIND's group
     for sub in ("etc", "bind-dns"):
         os.makedirs(os.path.join(base, "data", sub), mode=0o755, exist_ok=True)
+    # winbind's sockets, on the host so FreeRADIUS can reach them (PEAP through ntlm_auth); winbind makes the pipe
+    ensure_dir(os.path.join(base, "winbindd"), 0o755, 0, 0)
     # BIND includes these when it starts: they must exist; turning DLZ on is for after the domain is converged
     if not os.path.exists(os.path.join(base, "bind", "dlz.conf")):
         write_bind_dlz(v)

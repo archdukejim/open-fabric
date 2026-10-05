@@ -349,10 +349,10 @@ assert 'secret = "Sw1tchSecretSw1tchSecret"' in clients_conf and "ipaddr = 192.1
 assert clients_conf.count("require_message_authenticator = yes") == 1 and "require_message_authenticator = no" in clients_conf
 eap = env.get_template("freeradius/config/mods/eap.j2").render(**rv_)
 assert "default_eap_type = tls" in eap and "ca_file = ${certdir}/ca.pem" in eap and "enable = no" in eap \
-    and "virtual_server = fabric-check-eap-tls" in eap and not re.search(r"^\s*(peap|mschapv2|md5|leap|gtc)\s*\{", eap, re.M)
+    and "virtual_server = fabric-check-eap-tls" in eap and not re.search(r"^\s*(md5|leap|gtc)\s*\{", eap, re.M)
 assert "ttls {" in eap, "the default network groups are mapped: EAP-TTLS on"
 eap_none = env.get_template("freeradius/config/mods/eap.j2").render(**{**rv_, "radius_people": []})
-assert "ttls {" not in eap_none, "no password logins while no group is mapped"
+assert "ttls {" not in eap_none and "peap {" not in eap_none, "no password logins while no group is mapped"
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
 people = normalize_radius_people([{"group": "guests", "vlan": "50", "priority": 60}, {"group": "staff", "vlan": 20}])
 assert people[0]["group"] == "guests" and people[1] == {"group": "staff", "vlan": 20, "priority": 100}, people
@@ -365,6 +365,9 @@ for bad in ([{"group": "staff", "vlan": 5000}], [{"group": "staff"}, {"group": "
         pass
 eap_p = env.get_template("freeradius/config/mods/eap.j2").render(**{**rv_, "radius_people": people})
 assert "ttls {" in eap_p and "virtual_server = fabric-inner-tunnel" in eap_p and "use_tunneled_reply = yes" in eap_p
+assert "peap {" in eap_p and "default_eap_type = mschapv2" in eap_p and "mschapv2 {" in eap_p, eap_p   # S3.3
+mschap = env.get_template("freeradius/config/mods/mschap.j2").render(**rv_)
+assert "--username=%{mschap:User-Name}" in mschap and "--allow-mschapv2" in mschap and "require_strong = yes" in mschap
 frj_p = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**{**rv_, "radius_people": people}))
 assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
@@ -372,6 +375,10 @@ assert frj["uri"] == f"ldaps://{rv_['host_ip']}:636" and frj["bind_dn"] == f"fab
     and frj["base"] == rv_["ad_base_dn"] and frj["site"] == rv_["site_name"], frj   # the site's DC (S3.2)
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
 assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "610:610", fc
+base_ = rv_["deploy_base_dir"]
+assert {f"{base_}/samba/winbindd:/run/samba/winbindd:ro",
+        f"{base_}/samba/data/state/winbindd_privileged:/data/state/winbindd_privileged:ro",
+        f"{base_}/samba/data/etc:/etc/samba:ro"} <= set(fc["volumes"]), fc["volumes"]   # PEAP through the DC's winbind
 assert fc["ports"] == [f"{v2['host_ip']}:1812:1812/udp", f"{v2['host_ip']}:1813:1813/udp"], fc["ports"]
 accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
 assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts

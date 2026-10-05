@@ -35,3 +35,4 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `link_device_cert.py` | Operation `link_device_cert`: a certificate fingerprint recorded on a device or forgotten |
 | `save_role.py` | Operation `save_role`: a device role (a group with `fabricRole`) in the site's or the organisation's `OU=device-roles` |
 | `remove_role.py` | Operation `remove_role`: a role deleted, refused while devices carry it |
+| `share_winbind.py` | winbind's privileged pipe in FreeRADIUS's group (root, 0750), for PEAP through `ntlm_auth` |

@@ -2,7 +2,8 @@
 database: no credentials, no network. Run after every start and apply by fabriclib/samba/converge_domain:
     docker exec -i samba python3 /fabric/converge.py < state.json
 The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [CIDR…],
-"root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name: password}}
+"root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name: password},
+"radius_gid"}
 (stdin, never a command line: it holds the service accounts' passwords). Prints one JSON object: {"changed": [what
 changed, …]}. Exits 1 with the error on stderr."""
 import json
@@ -22,6 +23,7 @@ from logon_rights_policy import EXTENSIONS as LOGON_EXTENSIONS, logon_rights_pol
 from open_samdb import open_samdb
 from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
 from set_password_policy import set_password_policy
+from share_winbind import share_winbind
 
 CONF = "/data/etc/smb.conf"
 BUILTIN_ADMINISTRATORS = "S-1-5-32-544"        # each machine's own local Administrators
@@ -41,12 +43,13 @@ def _sid(samdb, name):
 def converge(state):
     """Purpose: every part of the domain fabric owns, in order: the schema, the layout, the site's id block, the
              groups, the site's service accounts, its access entries, the AD site and its subnets, the password
-             policy, the domain's trust GPO (fabric's root CA) and the site's log-on GPO. Each part changes only what
-             differs, so a second run changes nothing.
+             policy, the domain's trust GPO (fabric's root CA), the site's log-on GPO and winbind's privileged pipe
+             for FreeRADIUS. Each part changes only what differs, so a second run changes nothing.
     Inputs:  state — dict: site (str), root (bool: the root site, which also holds the organisation's items and the
              domain-wide trust GPO), password_policy (dict, every key), networks (list of CIDR), root_ca_pem (str),
              id_range ("first-last"), groups (fabric's ldap_groups), admin_group (the web UI's admin group, in the
-             log-on policy), accounts ({sAMAccountName: password}: the site's service accounts).
+             log-on policy), accounts ({sAMAccountName: password}: the site's service accounts), radius_gid (int:
+             FreeRADIUS's group, given winbind's privileged pipe).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
     Feeds:   this script's main."""
@@ -70,6 +73,7 @@ def converge(state):
     sids.append(BUILTIN_ADMINISTRATORS)
     changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", f"OU={site},OU=sites,{base}", LOGON_EXTENSIONS,
                           {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids)})
+    changed += share_winbind(lp, int(state["radius_gid"]))
     return changed
 
 

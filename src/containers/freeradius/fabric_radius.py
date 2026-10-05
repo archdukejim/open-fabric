@@ -11,6 +11,9 @@ authorize() runs in three places:
   - the main server for anything that is not EAP: MAB, the switch asking
     for a MAC (User-Name = the MAC); the device with that MAC must be
     enabled and hold network:mab.
+post_auth() runs in fabric-inner-tunnel once the domain accepted a PEAP
+(EAP-MSCHAPv2) answer through ntlm_auth: the person, or the domain machine
+of this site, must be in a group mapped for 802.1X (D102).
 Accepted: the role's VLAN as Tunnel-Private-Group-Id (none: the port's
 default). Refused, or the directory cannot be asked: Access-Reject (fail
 closed). Every decision is logged as one `fabric: ...` line (the auth log
@@ -21,6 +24,7 @@ import re
 
 import radiusd
 
+from check_peap import check_peap
 from check_person import check_person
 from lookup_device import lookup_device
 from normalize_mac import normalize_mac
@@ -91,6 +95,26 @@ def _decide_person(uid, password, where):
     return radiusd.RLM_MODULE_OK, _reply(found["vlan"]), (("Auth-Type", ":=", "Accept"),)
 
 
+def _decide_peap(name, where):
+    """Purpose: decide an account the domain accepted over PEAP (a person, or a machine of this site) and log it;
+             fail closed.
+    Inputs:  name — str, the account's sAMAccountName (a machine's ends in "$"); where — dict of log details.
+    Returns: radiusd.RLM_MODULE_REJECT, or (RLM_MODULE_OK, VLAN reply attributes, ()).
+    Fails:   never raises — any exception from check_peap becomes a logged reject.
+    Feeds:   post_auth."""
+    who = "machine" if name.endswith("$") else "person"
+    try:
+        found = check_peap(name)
+    except Exception as exc:          # directory down: never let anyone in
+        _log("REJECT", "peap", reason="directory_error:" + type(exc).__name__, **{who: name or "-"}, **where)
+        return radiusd.RLM_MODULE_REJECT
+    if not found["allowed"]:
+        _log("REJECT", "peap", reason=found["reason"], **{who: found["account"]}, **where)
+        return radiusd.RLM_MODULE_REJECT
+    _log("ACCEPT", "peap", group=found["group"], vlan=found["vlan"] or "-", **{who: found["account"]}, **where)
+    return radiusd.RLM_MODULE_OK, _reply(found["vlan"]), ()
+
+
 def instantiate(p):
     """Purpose: FreeRADIUS python3 module start hook (func_instantiate in mods/fabric_policy); nothing to set up.
     Inputs:  p — the configuration pairs FreeRADIUS passes (unused).
@@ -146,3 +170,21 @@ def authorize(p):
         _log("REJECT", "mab", reason="user_name_is_not_the_calling_MAC", user=req.get("User-Name", "-"), **where)
         return radiusd.RLM_MODULE_REJECT
     return _decide("mab", "macAddress", mac, "network:mab", dict(where, mac=mac))
+
+
+def post_auth(p):
+    """Purpose: FreeRADIUS post-auth hook: in fabric-inner-tunnel, once the domain accepted a PEAP answer
+             (Tmp-String-0 "fabric-peap", the account in Tmp-String-1 as mschap names it), decide it; anywhere else
+             nothing to do.
+    Inputs:  p — tuple of (attribute, value) request pairs from FreeRADIUS.
+    Returns: radiusd.RLM_MODULE_NOOP, radiusd.RLM_MODULE_REJECT, or (RLM_MODULE_OK, reply attributes, ()).
+    Fails:   never raises for a directory error (logged reject).
+    Feeds:   FreeRADIUS (func_post_auth in mods/fabric_policy; called from sites/inner-tunnel)."""
+    req = {}
+    for attr, value in p or ():
+        req.setdefault(attr, str(value))
+    if req.get("Tmp-String-0") != "fabric-peap":
+        return radiusd.RLM_MODULE_NOOP
+    where = {"mac": normalize_mac(req.get("Calling-Station-Id")) or req.get("Calling-Station-Id", "-"),
+             "nas": req.get("NAS-Identifier") or req.get("NAS-IP-Address") or "-"}
+    return _decide_peap(req.get("Tmp-String-1", ""), where)

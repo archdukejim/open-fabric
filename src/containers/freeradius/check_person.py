@@ -4,25 +4,9 @@ import ldap
 import ldap.filter
 
 from directory import connect, load_config, search
+from mappings import account_groups, best_mapping
 
 UID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
-DOMAIN_USERS_RID = "513"                 # a person's primary group: not listed in memberOf
-
-
-def person_groups(attrs, sites):
-    """Purpose: the names of a person's groups, as radius_people names them (lower case).
-    Inputs:  attrs — dict {attr: [bytes]} with memberOf and primaryGroupID; sites — str, the DN of OU=sites.
-    Returns: set of str: the CN of each group fabric manages (under OU=sites; AD's own groups such as Guests or
-             Administrators never match a mapping), and "domain users" (fabric's `users`, D95) when it is the
-             primary group.
-    Fails:   UnicodeDecodeError for a value that is not UTF-8.
-    Feeds:   check_person."""
-    tail = "," + sites.lower()
-    groups = {dn.split(",", 1)[0][3:].lower() for dn in (v.decode() for v in attrs.get("memberOf") or [])
-              if dn.lower().endswith(tail)}
-    if [v.decode() for v in attrs.get("primaryGroupID") or []] == [DOMAIN_USERS_RID]:
-        groups |= {"domain users", "users"}
-    return groups
 
 
 def check_person(uid, password):
@@ -52,10 +36,7 @@ def check_person(uid, password):
     except (ldap.INVALID_CREDENTIALS, ldap.UNWILLING_TO_PERFORM, ldap.CONSTRAINT_VIOLATION):
         # a wrong password, or the account locked, disabled, expired or still on its one-time password
         return {"person": uid, "allowed": False, "vlan": None, "reason": "wrong password or account locked"}
-    groups = person_groups(attrs, "OU=sites," + conf["base"])
-    mapped = sorted((m for m in conf.get("people") or [] if m["group"].lower() in groups),
-                    key=lambda m: (m.get("priority", 100), m["group"]))
-    if not mapped:
+    best = best_mapping(conf.get("people"), account_groups(attrs, "OU=sites," + conf["base"]))
+    if not best:
         return {"person": uid, "allowed": False, "vlan": None, "reason": "in no group mapped for 802.1X"}
-    vlan = next((m["vlan"] for m in mapped if m.get("vlan")), None)
-    return {"person": uid, "allowed": True, "vlan": vlan, "reason": "", "group": mapped[0]["group"]}
+    return {"person": uid, "allowed": True, "vlan": best[1], "reason": "", "group": best[0]}

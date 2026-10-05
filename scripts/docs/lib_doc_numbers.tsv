@@ -18,10 +18,12 @@ file	fabricctl-jinja|packaging/images/samba/entrypoint.sh	11
 file	fabricctl-jinja|packaging/images/samba/set_password.py	12	
 file	fabricctl-jinja|packaging/images/smoke-test.sh	10	
 file	fabricctl-jinja|src/containers/dirsrv/seed.py	2	
+file	fabricctl-jinja|src/containers/freeradius/check_peap.py	41	
 file	fabricctl-jinja|src/containers/freeradius/check_person.py	3	
 file	fabricctl-jinja|src/containers/freeradius/directory.py	4	
 file	fabricctl-jinja|src/containers/freeradius/fabric_radius.py	5	
 file	fabricctl-jinja|src/containers/freeradius/lookup_device.py	6	
+file	fabricctl-jinja|src/containers/freeradius/mappings.py	42	
 file	fabricctl-jinja|src/containers/freeradius/normalize_mac.py	7	
 file	fabricctl-jinja|src/containers/freeradius/record_fingerprint.py	8	
 file	fabricctl-jinja|src/containers/samba/add_group_member.py	29	
@@ -51,6 +53,7 @@ file	fabricctl-jinja|src/containers/samba/root_ca_policy.py	22
 file	fabricctl-jinja|src/containers/samba/save_device.py	39	
 file	fabricctl-jinja|src/containers/samba/save_role.py	40	
 file	fabricctl-jinja|src/containers/samba/set_password_policy.py	23	
+file	fabricctl-jinja|src/containers/samba/share_winbind.py	43	
 file	fabricctl-jinja|src/containers/samba/site_info.py	28	
 file	fabricctl-lib|src/federation/server.py	1	
 file	fabricctl-lib|src/ux/cli/keycloak_bootstrap.py	2	
@@ -647,20 +650,25 @@ function	fabricctl-jinja|src/containers/dirsrv/seed.py|norm	5
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|oids	6	
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|parse_ldif	2	
 function	fabricctl-jinja|src/containers/dirsrv/seed.py|password_ok	4	
+function	fabricctl-jinja|src/containers/freeradius/check_peap.py|check_peap	1	
 function	fabricctl-jinja|src/containers/freeradius/check_person.py|check_person	1	
-function	fabricctl-jinja|src/containers/freeradius/check_person.py|person_groups	2	
+function	fabricctl-jinja|src/containers/freeradius/check_person.py|person_groups	2	0.5.0 / 2026-10-04
 function	fabricctl-jinja|src/containers/freeradius/directory.py|connect	2	
 function	fabricctl-jinja|src/containers/freeradius/directory.py|load_config	1	
 function	fabricctl-jinja|src/containers/freeradius/directory.py|search	3	
 function	fabricctl-jinja|src/containers/freeradius/directory.py|site_dn	4	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_decide	3	
+function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_decide_peap	7	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_decide_person	4	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_log	1	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|_reply	2	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|authorize	6	
 function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|instantiate	5	
+function	fabricctl-jinja|src/containers/freeradius/fabric_radius.py|post_auth	8	
 function	fabricctl-jinja|src/containers/freeradius/lookup_device.py|_vals	1	
 function	fabricctl-jinja|src/containers/freeradius/lookup_device.py|lookup_device	2	
+function	fabricctl-jinja|src/containers/freeradius/mappings.py|account_groups	1	
+function	fabricctl-jinja|src/containers/freeradius/mappings.py|best_mapping	2	
 function	fabricctl-jinja|src/containers/freeradius/normalize_mac.py|normalize_mac	1	
 function	fabricctl-jinja|src/containers/freeradius/record_fingerprint.py|_tlv	1	
 function	fabricctl-jinja|src/containers/freeradius/record_fingerprint.py|main	3	
@@ -711,6 +719,7 @@ function	fabricctl-jinja|src/containers/samba/save_device.py|save_device	2
 function	fabricctl-jinja|src/containers/samba/save_role.py|save_role	1	
 function	fabricctl-jinja|src/containers/samba/set_password_policy.py|_ticks	1	
 function	fabricctl-jinja|src/containers/samba/set_password_policy.py|set_password_policy	2	
+function	fabricctl-jinja|src/containers/samba/share_winbind.py|share_winbind	1	
 function	fabricctl-jinja|src/containers/samba/site_info.py|site_info	1	
 function	fabricctl-lib|src/federation/server.py|Handler.after_join	1	
 function	fabricctl-lib|src/federation/server.py|Handler.client_ip	3	

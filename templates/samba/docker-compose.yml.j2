@@ -52,6 +52,8 @@ services:
       - {{ deploy_base_dir }}/samba/secrets:/run/secrets:ro
       - {{ deploy_base_dir }}/samba/tls:/tls:ro
       - {{ deploy_base_dir }}/samba/converge:/fabric:ro
+      # winbind's sockets on the host: FreeRADIUS mounts them for PEAP (ntlm_auth); the privileged pipe is in /data
+      - {{ deploy_base_dir }}/samba/winbindd:/run/samba/winbindd
       # its resolver: the host's address, which knows the AD zone (the host's own resolver may not)
       - {{ deploy_base_dir }}/samba/resolv.conf:/etc/resolv.conf:ro
     mem_limit: {{ samba_mem_limit }}

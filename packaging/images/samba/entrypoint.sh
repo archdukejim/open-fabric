@@ -95,6 +95,7 @@ set_global "tls certfile" "/tls/fullchain.pem"
 set_global "tls keyfile" "/tls/privkey.pem"
 set_global "tls cafile" "/tls/root_ca.crt"
 set_global "ntp signd socket directory" "/run/samba/ntp_signd"
+set_global "winbindd socket directory" "/run/samba/winbindd"
 
 # runtime sockets live on /run (a tmpfs, or the host's folders for winbind and ntp_signd)
 mkdir -p /run/samba/ntp_signd && chmod 750 /run/samba/ntp_signd

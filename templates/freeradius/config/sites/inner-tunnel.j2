@@ -1,10 +1,40 @@
-# Inside EAP-TTLS: a person's user name and password (PAP), decided by
-# fabric_policy against the site's DC. Only reachable through the TLS tunnel.
+# Inside the TLS tunnel (EAP-TTLS or PEAP), against the site's DC. Only
+# reachable through the tunnel.
+#   EAP-TTLS/PAP: a person's user name and password, decided by fabric_policy
+#   in authorize (it binds to the DC as the person).
+#   PEAP: EAP-MSCHAPv2, its answer checked by the domain (mschap: ntlm_auth
+#   through the DC's winbind); once accepted, fabric_policy decides in
+#   post-auth — a person, or a machine of this site, in a mapped group (D102).
 server fabric-inner-tunnel {
 	authorize {
-		update request {
-			&Tmp-String-0 := "fabric-people"
+		if (&EAP-Message) {
+			mschap
+			eap {
+				ok = return
+			}
 		}
-		fabric_policy
+		else {
+			update request {
+				&Tmp-String-0 := "fabric-people"
+			}
+			fabric_policy
+		}
+	}
+
+	authenticate {
+		Auth-Type MS-CHAP {
+			mschap
+		}
+		eap
+	}
+
+	post-auth {
+		if (&EAP-Message) {
+			update request {
+				&Tmp-String-0 := "fabric-peap"
+				&Tmp-String-1 := "%{mschap:User-Name}"
+			}
+			fabric_policy
+		}
 	}
 }

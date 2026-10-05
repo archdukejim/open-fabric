@@ -2,8 +2,10 @@
 # chain to the fabric CA; which device it belongs to, and whether it may
 # join, is decided by fabric_policy in fabric-check-eap-tls. EAP-TTLS/PAP
 # for people — user name and password inside a TLS tunnel to this server's
-# certificate, checked against the site's DC in fabric-inner-tunnel. No PEAP /
-# MSCHAPv2: it needs NT hashes, which the directory does not keep.
+# certificate, checked against the site's DC in fabric-inner-tunnel. PEAP
+# (EAP-MSCHAPv2) for people and domain machines — what Windows offers by
+# default — checked by the domain through ntlm_auth (mods/mschap). TTLS and
+# PEAP only while a group is mapped (radius_people).
 eap {
 	default_eap_type = tls
 	timer_expire = 60
@@ -53,6 +55,20 @@ eap {
 		copy_request_to_tunnel = yes
 		require_client_cert = no
 		virtual_server = fabric-inner-tunnel
+	}
+
+	peap {
+		tls = tls-fabric
+		default_eap_type = mschapv2
+		use_tunneled_reply = yes
+		copy_request_to_tunnel = yes
+		require_client_cert = no
+		virtual_server = fabric-inner-tunnel
+	}
+
+	# PEAP's inner method, run in fabric-inner-tunnel; the answer goes to mschap
+	mschapv2 {
+		send_error = no
 	}
 {% endif %}
 }

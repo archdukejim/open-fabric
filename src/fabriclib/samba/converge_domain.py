@@ -13,10 +13,11 @@ def converge_domain(v, federation_file, secrets, container="samba"):
              code inside the running DC (src/containers/samba/converge.py) and return what it changed. Every part is
              idempotent, so it runs after every start and apply.
     Inputs:  v — rendered vars: site_name, ad_password_policy, deploy_base_dir (the root CA under
-             stepca/data/certs), lan_cidr and the DHCP subnets (site_networks), ldap_groups, webui_admin_group, the
-             id block (posix_id_block from the users OU's uid_range start); federation_file — the federation registry
-             (whether this is the root site); secrets — fabric's secrets (the service accounts' passwords:
-             ad_agent_password, ad_keycloak_password, ad_radius_password); container — the DC's container.
+             stepca/data/certs), lan_cidr and the DHCP subnets (site_networks), ldap_groups, webui_admin_group,
+             service_users (FreeRADIUS's gid), the id block (posix_id_block from the users OU's uid_range start);
+             federation_file — the federation registry (whether this is the root site); secrets — fabric's secrets
+             (the service accounts' passwords: ad_agent_password, ad_keycloak_password, ad_radius_password);
+             container — the DC's container.
     Returns: list of str, what changed (empty when the domain already was as wanted).
     Fails:   ValidationError when the DC is not running or the converge code reports an error (its message);
              KeyError for a missing service-account secret;
@@ -31,7 +32,8 @@ def converge_domain(v, federation_file, secrets, container="samba"):
                         for g in v.get("ldap_groups") or []],
              "admin_group": v.get("webui_admin_group") or "admins",
              "accounts": {f"fabric-{kind}-{v['site_name']}": secrets[f"ad_{kind}_password"]
-                          for kind in ("agent", "keycloak", "radius")}}
+                          for kind in ("agent", "keycloak", "radius")},
+             "radius_gid": v["service_users"]["freeradius"]["gid"]}
     res = subprocess.run(["docker", "exec", "-i", "-e", "PYTHONDONTWRITEBYTECODE=1", container,
                           "python3", "/fabric/converge.py"],
                          input=json.dumps(state), capture_output=True, text=True, timeout=600)

@@ -3,7 +3,7 @@ import os
 from fabriclib.common.write_file_if_changed import write_file_if_changed
 
 CONFIG_FILES = ["radiusd.conf", "clients.conf", "fabric-radius.json", "mods/always", "mods/eap", "mods/fabric_policy",
-                "sites/fabric", "sites/check-eap-tls", "sites/inner-tunnel"]
+                "mods/mschap", "sites/fabric", "sites/check-eap-tls", "sites/inner-tunnel"]
 
 
 def deploy_freeradius(v, secrets, jinja_env):
