@@ -1,30 +1,75 @@
 import ldb
 
+from alloc_id import alloc_id
 
-def _ensure_group(samdb, name, ou):
-    """Purpose: a global security group, created when missing.
-    Inputs:  samdb — SamDB; name — sAMAccountName; ou — str, the OU relative to the domain ("OU=groups,OU=lan,...").
-    Returns: True if it was created.
-    Fails:   ldb.LdbError from the creation, or when the name exists elsewhere in the domain (names are unique).
+DOMAIN_USERS_RID = 513          # AD's Domain Users: fabric's everyone-group `users` (Q11)
+
+
+def _group(samdb, name):
+    """Purpose: a group by name, anywhere in the domain.
+    Inputs:  samdb — SamDB; name — sAMAccountName.
+    Returns: the ldb.Message (dn, gidNumber, description), or None.
+    Fails:   ldb.LdbError from the search.
     Feeds:   ensure_groups."""
-    if samdb.search(base=str(samdb.domain_dn()), scope=ldb.SCOPE_SUBTREE,
-                    expression=f"(sAMAccountName={ldb.binary_encode(name)})", attrs=["dn"]):
-        return False
-    samdb.newgroup(name, groupou=ou)
-    return True
+    res = samdb.search(base=str(samdb.domain_dn()), scope=ldb.SCOPE_SUBTREE,
+                       expression=f"(&(objectClass=group)(sAMAccountName={ldb.binary_encode(name)}))",
+                       attrs=["gidNumber", "description"])
+    return res[0] if res else None
 
 
-def ensure_groups(samdb, site, root):
-    """Purpose: the groups access is built on (manual 1.6.3.6, 1.6.3.10): the site's people and admins, and, at the
-             root site, the organisation's admins and its break-glass group (in every site's log-on policy, so a
-             mistake cannot lock everyone out).
-    Inputs:  samdb — SamDB; site — str; root — bool.
-    Returns: list of str, the groups created.
-    Fails:   ldb.LdbError from a creation.
+def _ensure(samdb, name, ou, gid, description, done):
+    """Purpose: one group as wanted: created in its OU when missing; its gid number and description set when they
+             differ (a gid from the site's block is taken only for a group that has none).
+    Inputs:  samdb — SamDB; name — str; ou — str, relative to the domain; gid — int, or a callable giving one when
+             the group has none; description — str or ""; done — list, what changed is appended.
+    Returns: None.
+    Fails:   ldb.LdbError from a creation or change.
+    Feeds:   ensure_groups."""
+    msg = _group(samdb, name)
+    if msg is None:
+        samdb.newgroup(name, groupou=ou, description=description or None)
+        done.append(f"group {name} created")
+        msg = _group(samdb, name)
+    changes = {}
+    have = int(str(msg["gidNumber"][0])) if "gidNumber" in msg else None
+    want = gid if isinstance(gid, int) else (have if have is not None else gid())
+    if have != want:
+        changes["gidNumber"] = str(want)
+    if description and str(msg.get("description", [""])[0]) != description:
+        changes["description"] = description
+    if changes:
+        samdb.modify(ldb.Message.from_dict(samdb, {"dn": str(msg.dn), **changes}, ldb.FLAG_MOD_REPLACE))
+        done += [f"group {name}: {k}" for k in sorted(changes)]
+
+
+def ensure_groups(samdb, site, root, org_groups):
+    """Purpose: the groups access is built on (manual 1.6.3.6, 1.6.3.10), with their gid numbers (1.6.3.9): the site's
+             people and admins (gids from the site's block), and at the root site the organisation's groups — fabric's
+             `ldap_groups` (the web UI's admin group, the RBAC bundle groups, the 802.1X groups) with their own gids,
+             `users` as AD's Domain Users, and `fabric-break-glass` (in every site's log-on policy).
+    Inputs:  samdb — SamDB; site — str; root — bool; org_groups — list of {name, gidNumber, description?} (fabric's
+             ldap_groups).
+    Returns: list of str, what changed.
+    Fails:   ldb.LdbError from a creation or change; ValueError from alloc_id when the block is full.
     Feeds:   converge."""
-    site_groups = f"OU=groups,OU={site},OU=sites"
-    wanted = [(f"{site}-users", site_groups), (f"{site}-admins", site_groups)]
+    base = str(samdb.domain_dn())
+    site_dn = f"OU={site},OU=sites,{base}"
+    done = []
+    for name in (f"{site}-users", f"{site}-admins"):
+        _ensure(samdb, name, f"OU=groups,OU={site},OU=sites", lambda: alloc_id(samdb, site_dn), "", done)
     if root:
         org = f"OU=groups,OU=organisation,OU={site},OU=sites"
-        wanted += [("fabric-admins", org), ("fabric-break-glass", org)]
-    return [name for name, ou in wanted if _ensure_group(samdb, name, ou)]
+        for g in org_groups:
+            if g["name"] == "users":
+                users = samdb.search(base=base, scope=ldb.SCOPE_SUBTREE,
+                                     expression=f"(objectSid={samdb.get_domain_sid()}-{DOMAIN_USERS_RID})",
+                                     attrs=["gidNumber"])[0]
+                if str(users.get("gidNumber", [""])[0]) != str(g["gidNumber"]):
+                    samdb.modify(ldb.Message.from_dict(samdb, {"dn": str(users.dn), "gidNumber": str(g["gidNumber"])},
+                                                       ldb.FLAG_MOD_REPLACE))
+                    done.append(f"Domain Users: gidNumber {g['gidNumber']} (fabric's users)")
+                continue
+            _ensure(samdb, g["name"], org, int(g["gidNumber"]), g.get("description") or "", done)
+        _ensure(samdb, "fabric-break-glass", org, lambda: alloc_id(samdb, site_dn),
+                "May log on to every site's machines: for when everything else fails", done)
+    return done

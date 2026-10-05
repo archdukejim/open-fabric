@@ -111,4 +111,5 @@ The home chapter for security (5.8).
 - [1.11.28 installers](1.11.28-installers.md) — The Debian package wrapper
 - [1.11.29 webui](1.11.29-webui.md) — Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview
 - [1.11.30 fabriclib-samba](1.11.30-fabriclib-samba.md)
+- [1.11.31 fabriclib-directory](1.11.31-fabriclib-directory.md)
 <!-- end of generated 1.11 -->

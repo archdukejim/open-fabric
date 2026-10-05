@@ -91,7 +91,7 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
         _quiet(["docker", "exec", "nginx", "nginx", "-s", "reload"], "Reloading NGINX", 15)
     if "samba" in running or "samba" in restart:
         try:                                      # idempotent: the domain as fabric wants it (manual 2.11.2.15)
-            done = converge_domain(final_vars, paths["federation"])
+            done = converge_domain(final_vars, paths["federation"], secrets)
             print("Windows domain: " + ("; ".join(done) if done else "as wanted"))
             if write_bind_dlz(final_vars):        # the first provisioning: BIND now serves the AD zone
                 print("Restarting bind9 (the AD zone through DLZ)...")

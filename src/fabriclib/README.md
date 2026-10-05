@@ -17,6 +17,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [rbac/](rbac/) | Access control for people: permissions, bundles, what each fabric-agent route needs |
 | [dhcp/](dhcp/) | Optional DHCP (Kea 3.0): `dhcp:` checks, config, DDNS zone, reservations, leases, `fabricctl dhcp` |
 | [radius/](radius/) | Optional 802.1X (FreeRADIUS): RADIUS clients and their secrets, config, decisions log, `fabricctl radius` |
+| [directory/](directory/) | fabric's directory on Samba AD: people, groups and the rest, as the site's agent account (manual 1.6.3) |
 | [samba/](samba/) | Optional Windows domain (Samba AD domain controller, manual 2.11.2): its files and, from S1.3, the domain's convergence |
 | [logs/](logs/) | Optional log forwarding (Fluent Bit): config, credentials, status |
 | [images/](images/) | Container images: status against the validated list, update (health-gated, rollback), prune |

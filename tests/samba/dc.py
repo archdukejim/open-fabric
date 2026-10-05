@@ -17,6 +17,8 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.directory.run_op import run_op  # noqa: E402
 from fabriclib.samba.converge_domain import converge_domain  # noqa: E402
 from fabriclib.samba.deploy_samba import deploy_samba  # noqa: E402
 from fabriclib.samba.write_bind_dlz import write_bind_dlz  # noqa: E402
@@ -98,7 +100,10 @@ compose = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(
 pki = os.path.join(W, "stepca", "data", "certs")
 sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{pki}/root.key", "-out",
     f"{pki}/root_ca.crt", "-days", "2", "-subj", "/CN=Test Root"])
-deploy_samba(v, {"ad_admin_password": random_password()}, env)
+# fabric's secrets for the domain: the Administrator and the site's service accounts
+SECRETS = {name: random_password() for name in ("ad_admin_password", "ad_agent_password", "ad_keycloak_password",
+                                                "ad_radius_password")}
+deploy_samba(v, SECRETS, env)
 tls = os.path.join(W, "samba", "tls")
 shutil.copy(f"{pki}/root_ca.crt", f"{tls}/root_ca.crt")
 sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", f"{tls}/privkey.pem", "-out",
@@ -146,10 +151,43 @@ check("hardened as rendered: exactly the six capabilities, read-only, no-new-pri
       and info["CapDrop"] == ["ALL"] and info["ReadonlyRootfs"] and "no-new-privileges:true" in info["SecurityOpt"]
       and info["Memory"] > 0, info["CapAdd"])
 
-first = converge_domain(v, os.path.join(W, "federation.yaml"), container=DC)
+first = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("converge: schema, layout, groups, access, AD site, policy and GPOs made", len(first) > 30, first)
-again = converge_domain(v, os.path.join(W, "federation.yaml"), container=DC)
+again = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("converge again changes nothing (idempotent)", again == [], again)
+
+# S2.2: the site's service accounts, its id block, fabric's groups with their gids, the agent's own sign-in
+info_ = run_op(v, SECRETS, "site_info", container=DC)
+check("the agent signs in as fabric-agent-lan and reads its site's id block (from 5001, posix_id_block long)",
+      info_["id_range"] == "5001-105000" and 5001 < info_["id_next"] < 5010, info_)
+def attr(filter_, name):
+    out = dc("ldbsearch", "-H", "/data/private/sam.ldb", filter_, name).stdout
+    return [line.split(": ", 1)[1] for line in out.splitlines() if line.startswith(name + ": ")]
+check("fabric's groups carry their gids: admins 1100 in OU=organisation, Domain Users 5000 (fabric's users)",
+      attr("(sAMAccountName=admins)", "gidNumber") == ["1100"]
+      and attr("(sAMAccountName=Domain Users)", "gidNumber") == ["5000"]
+      and "OU=organisation" in attr("(sAMAccountName=admins)", "distinguishedName")[0])
+site_gid = int(attr("(sAMAccountName=lan-users)", "gidNumber")[0])
+check("the site's groups take gids from the site's block", 5001 <= site_gid < info_["id_next"], site_gid)
+uac = attr("(sAMAccountName=fabric-agent-lan)", "userAccountControl")
+check("the site's service accounts exist in its OU, their passwords never expiring",
+      all(attr(f"(sAMAccountName=fabric-{k}-lan)", "distinguishedName")[0].startswith(f"CN=fabric-{k}-lan,OU=service-accounts,")
+          for k in ("agent", "keycloak", "radius")) and int(uac[0]) & 0x10000)
+SECRETS["ad_agent_password"] = random_password()
+healed = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
+check("a changed agent password is set by the next convergence (when the old one no longer signs in)",
+      healed == ["service account fabric-agent-lan: password set"]
+      and run_op(v, SECRETS, "site_info", container=DC)["dn"].startswith("OU=lan"), healed)
+try:
+    run_op(v, {**SECRETS, "ad_agent_password": "wrong"}, "site_info", container=DC)
+    check("refused: the agent with a wrong password", False)
+except ValidationError as e:
+    check("refused: the agent with a wrong password", "refused" in str(e), e)
+try:
+    run_op(v, SECRETS, "no_such_op", container=DC)
+    check("refused: an operation the DC does not know", False)
+except ValidationError as e:
+    check("refused: an operation the DC does not know", "unknown directory operation" in str(e), e)
 ous = dc("ldbsearch", "-H", "/data/private/sam.ldb", "-b", f"OU=sites,{BASE}", "(objectClass=organizationalUnit)",
          "dn").stdout
 check("the site's OU tree under OU=sites, with OU=organisation at the root site",
@@ -234,7 +272,9 @@ check("BIND still runs as its own user with no capabilities", bind_info["Config"
 
 # refusals: a site's admin writes its own site only (Q4), the policy is enforced
 lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": [],
-       "root_ca_pem": open(f"{pki}/root_ca.crt").read()}
+       "root_ca_pem": open(f"{pki}/root_ca.crt").read(), "id_range": "200001-300000", "groups": [],
+       "admin_group": "admins",
+       "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}}
 res = dc("python3", "/fabric/converge.py", stdin=json.dumps(lab))
 check("a second site's OU, groups and access entries", res.returncode == 0 and "group lab-admins created" in res.stdout,
       res.stderr)
@@ -252,6 +292,16 @@ share = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/labadmin.auth
             "ls ad.lan.test/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/*"], ok=False)
 check("an ordinary domain user reads SYSVOL (Group Policy reads it as the machine; found on host-1, S1.7)",
       share.returncode == 0 and "GPT.INI" in share.stdout.upper(), (share.stdout + share.stderr)[-300:])
+agent_own = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentmade", "lan"))
+check("the site's agent adds a person in its own site", "successfully" in agent_own.stdout + agent_own.stderr,
+      agent_own.stderr[-200:])
+agent_other = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentevil", "lab"))
+check("refused: the site's agent adding a person in another site",
+      "successfully" not in agent_other.stdout + agent_other.stderr)
+agent_svc = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd",
+                    f"dn: CN=svc2,OU=service-accounts,OU=lan,OU=sites,{BASE}\nobjectClass: user\nsAMAccountName: svc2\n")
+check("refused: the site's agent adding to its own site's service accounts",
+      "successfully" not in agent_svc.stdout + agent_svc.stderr)
 check("refused: a site admin adding a person in another site", "successfully" not in other.stdout + other.stderr)
 svc = as_user("labadmin", lab_pw, "ldbadd",
               f"dn: CN=svc,OU=service-accounts,OU=lab,OU=sites,{BASE}\nobjectClass: user\nsAMAccountName: svc\n")

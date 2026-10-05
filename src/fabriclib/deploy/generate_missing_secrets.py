@@ -33,6 +33,11 @@ def generate_missing_secrets(secrets):
     if "ad_admin_password" not in secrets:
         secrets["ad_admin_password"] = random_password()
         changed = True
+    # the site's service accounts in the directory (manual 1.6.3.7): fabric-agent, Keycloak, FreeRADIUS
+    for name in ("ad_agent_password", "ad_keycloak_password", "ad_radius_password"):
+        if name not in secrets:
+            secrets[name] = random_password()
+            changed = True
     if "tsig_secrets" not in secrets:
         secrets["tsig_secrets"] = {}
         changed = True

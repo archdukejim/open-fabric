@@ -56,7 +56,7 @@ def run(ctx):
         ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
 
     try:
-        done = converge_domain(v, os.path.join(ctx.config_dir, "federation.yaml"))
+        done = converge_domain(v, os.path.join(ctx.config_dir, "federation.yaml"), ctx.secrets)
     except ValidationError as e:
         raise SetupError(str(e))
     ok(f"directory {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
