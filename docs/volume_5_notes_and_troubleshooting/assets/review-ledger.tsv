@@ -43,7 +43,7 @@ docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b52
 docs/volume_1_systems_and_services/1.11.28-installers.md	12802f7241c875662a6f6895defdfcd1e1ffe0d7	2026-10-03	
 docs/volume_1_systems_and_services/1.11.29-webui.md	9a9aa6fa70d04f3b0b4914f0148dadc1b3558b8e	2026-10-04	
 docs/volume_1_systems_and_services/1.11.3-fabricctl-jinja.md	955557597e26809be1be76b48042b91018f088f2	2026-10-04	
-docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	6ec4622c562acfe459b9f5b1fee822d8c8aef4ef	2026-10-04	
+docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	4964d965d9011de3323a1c9b04a0640ddd635f9b	2026-10-05	
 docs/volume_1_systems_and_services/1.11.4-fabricctl-lib.md	f87125b7cc4c2afdf5f8f7812f325344ab40fd33	2026-10-03	
 docs/volume_1_systems_and_services/1.11.5-fabriclib-common.md	8205addb2de6412acae5e7b49d22a7be8d449814	2026-10-04	
 docs/volume_1_systems_and_services/1.11.6-fabriclib-consent.md	424b9927b5c2538a3fce969715af6fd51180c061	2026-10-03	
@@ -173,10 +173,10 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	cc9bc311578dffe776b8760b957dda0d5440f75c	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	fbefdcb3e45faadc1f58cddb0df6297f35ae527e	2026-10-05	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	d083a4a1da2b04eb5f2070c9d9f60b4217f7d2bb	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	95be84476aa6d809f434c5db76f62f70668a8ff9	2026-10-05	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
 examples/vars.yaml	39af1aca13956f926e29232b774ae828a14329a3	2026-10-03	
 packaging/README.md	955a934ba69442a15d6e694982db7cc26874a317	2026-10-04	
@@ -656,7 +656,7 @@ src/fabriclib/rbac/user_permissions.py	529aa7a9683268c6fc5f80212fa0d8ecb1b8eb8a	
 src/fabriclib/samba/README.md	9c5f54fd8017afd66923f2531b00768217f343b8	2026-10-04	
 src/fabriclib/samba/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-04	
 src/fabriclib/samba/converge_domain.py	cb9eeb0907309c8788deaf716c67a632c2696ba1	2026-10-04	
-src/fabriclib/samba/deploy_samba.py	bf7d34629a4993c64b4a2fa4d9bc8296586de011	2026-10-04	
+src/fabriclib/samba/deploy_samba.py	e481470cb8c35912cbbe0ab4189ab83585191e62	2026-10-05	
 src/fabriclib/samba/domain_status.py	15084fd017becdd0abe1f8679eb3736d577f3cfc	2026-10-04	
 src/fabriclib/samba/run_domain_command.py	1b8ca28e1c520da4ecef91900eb943a6c87c8613	2026-10-04	
 src/fabriclib/samba/set_domain_password_policy.py	656cb2beaf7d4dbb5b9d0408a524d67f2cb3248e	2026-10-04	
@@ -1127,7 +1127,7 @@ tests/pki/site_ca.py	ee12f9ac4e2b4d0fbfbcd5163b26200b95120181	2026-10-03
 tests/render.py	a2d65966e45d6a28ab1995a6f8e0af275e3d1b8b	2026-10-04	
 tests/run-all.sh	ddd4774dba494f5cf8a4d60acbaa63d248265ca9	2026-10-04	
 tests/samba/README.md	a4824504d00ed9b6ff46caacea20cde28717d792	2026-10-04	
-tests/samba/dc.py	96495556d72194f7293f0a83806983c3874ae04d	2026-10-04	
+tests/samba/dc.py	9e3ab32f1219401fc5079396e9e19229362f6333	2026-10-05	
 tests/samba/run.py	6c5a634b4dbf2b064ef19455e9f37feefca4eedb	2026-10-04	
 tests/sandbox/Dockerfile	46a7ff3893744a092bf54127ef8debbc66bd9091	2026-09-30	
 tests/sandbox/README.md	cd9a9766a87b582251cd9a36e1c5246ead576551	2026-10-03	

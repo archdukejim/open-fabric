@@ -18,13 +18,17 @@ def deploy_samba(v, secrets, jinja_env):
              can start; turning DLZ on (and restarting BIND) happens after the domain is converged.
     Fails:   KeyError without ad_admin_password; OSError from creating, owning or writing.
     Feeds:   deploy/deploy_optional_parts (apply); tests/samba.
-    Notes:   every folder is root-only (the DC runs as root in its container): data/ (the domain's database and
-             SYSVOL; its etc/ and bind-dns/ are mounted into BIND), secrets/, tls/ (filled by setup's certificate
-             step), converge/ (read-only in the container); bind/ is BIND's (write_bind_dlz); resolv.conf (the DC's
-             resolver, mounted read-only)."""
+    Notes:   the folders are root's (the DC runs as root in its container): data/ (0755: the DC serves SYSVOL as each
+             user, who must be able to reach it; Samba keeps private/ 0700 and SYSVOL under its own ACLs; etc/ and
+             bind-dns/ are mounted into BIND), secrets/, tls/ (filled by setup's certificate step), converge/ (0700;
+             read-only in the container); bind/ is BIND's (write_bind_dlz); resolv.conf (the DC's resolver, mounted
+             read-only)."""
     base = os.path.join(v["deploy_base_dir"], "samba")
-    for sub in ("data", "secrets", "tls", "converge"):
+    for sub in ("secrets", "tls", "converge"):
         ensure_dir(os.path.join(base, sub), 0o700, 0, 0)
+    # the DC serves SYSVOL and NETLOGON as each user (it switches identity), so its data folder must be traversable;
+    # what is secret inside it has its own modes (private/ 0700) and SYSVOL its own ACLs
+    ensure_dir(os.path.join(base, "data"), 0o755, 0, 0)
     # BIND mounts these two (its DLZ): made once if missing, never reset — provisioning gives them BIND's group
     for sub in ("etc", "bind-dns"):
         os.makedirs(os.path.join(base, "data", sub), mode=0o755, exist_ok=True)

@@ -107,8 +107,10 @@ os.chmod(f"{tls}/privkey.pem", 0o600)
 admin_pw = open(os.path.join(W, "samba", "secrets", "admin_password")).read().strip()
 check("deploy_samba: the DC's resolver is the host's address",
       open(os.path.join(W, "samba", "resolv.conf")).read().startswith(f"nameserver {IP}\n"))
-check("deploy_samba: root-only folders, the password file 0600, the converge code copied",
-      all(os.stat(os.path.join(W, "samba", d)).st_mode & 0o077 == 0 for d in ("data", "secrets", "converge"))
+check("deploy_samba: root-only folders (data traversable: SYSVOL is served as each user), the password file "
+      "0600, the converge code copied",
+      all(os.stat(os.path.join(W, "samba", d)).st_mode & 0o077 == 0 for d in ("secrets", "converge"))
+      and os.stat(os.path.join(W, "samba", "data")).st_mode & 0o777 == 0o755
       and os.stat(os.path.join(W, "samba", "secrets", "admin_password")).st_mode & 0o777 == 0o600
       and os.path.exists(os.path.join(W, "samba", "converge", "converge.py")))
 
@@ -245,6 +247,11 @@ user = "dn: CN={0},OU=people,OU={1},OU=sites,%s\nobjectClass: user\nsAMAccountNa
 own = as_user("labadmin", lab_pw, "ldbadd", user.format("labuser", "lab"))
 check("a site admin adds a person in its own site", "successfully" in own.stdout + own.stderr, own.stderr)
 other = as_user("labadmin", lab_pw, "ldbadd", user.format("intruder", "lan"))
+share = sh(["docker", "run", "--rm", "--network", NET, "-v", f"{W}/labadmin.auth:/auth:ro", "--entrypoint",
+            "smbclient", IMAGE, f"//{IP}/sysvol", "-A", "/auth", "-c",
+            "ls ad.lan.test/Policies/{31B2F340-016D-11D2-945F-00C04FB984F9}/*"], ok=False)
+check("an ordinary domain user reads SYSVOL (Group Policy reads it as the machine; found on host-1, S1.7)",
+      share.returncode == 0 and "GPT.INI" in share.stdout.upper(), (share.stdout + share.stderr)[-300:])
 check("refused: a site admin adding a person in another site", "successfully" not in other.stdout + other.stderr)
 svc = as_user("labadmin", lab_pw, "ldbadd",
               f"dn: CN=svc,OU=service-accounts,OU=lab,OU=sites,{BASE}\nobjectClass: user\nsAMAccountName: svc\n")
