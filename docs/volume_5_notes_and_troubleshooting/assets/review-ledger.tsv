@@ -24,7 +24,7 @@ docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
 docs/volume_1_systems_and_services/1.11.10-fabriclib-dns.md	acecf4d3ae27b57b09e11823bfe6f0c23c526ded	2026-10-03	
 docs/volume_1_systems_and_services/1.11.11-fabriclib-dns_filter.md	d38d0d31cdbe3ab149223cae73309f4658552ce3	2026-10-05	
-docs/volume_1_systems_and_services/1.11.12-fabriclib-federation.md	2f628fb45ac0635c0f84a8eb7d1eaf56d1a9d2fe	2026-10-05	
+docs/volume_1_systems_and_services/1.11.12-fabriclib-federation.md	ce036ab16ca72e493abf0d224d91c30761471ba5	2026-10-05	
 docs/volume_1_systems_and_services/1.11.13-fabriclib-images.md	aa22303de9138a684d1dbbdb68cb00d02ec2878f	2026-10-05	
 docs/volume_1_systems_and_services/1.11.14-fabriclib-keycloak.md	4b5bcc660fb0c513b8f2f1f560e991d2ef420bf9	2026-10-05	
 docs/volume_1_systems_and_services/1.11.15-fabriclib-ldap.md	f1b23822482dde1cbeffd6a8d3626a7f5320cc2b	2026-10-05	
@@ -36,7 +36,7 @@ docs/volume_1_systems_and_services/1.11.2-fabricctl-agent.md	2d8fb3805e5ec688d86
 docs/volume_1_systems_and_services/1.11.20-fabriclib-radius.md	e44023135e6b1c14eb823eee8bad8145caba93f1	2026-10-05	
 docs/volume_1_systems_and_services/1.11.21-fabriclib-rbac.md	dabab7b062a86503a251685eead7b38886b023f1	2026-10-03	
 docs/volume_1_systems_and_services/1.11.22-fabriclib-secrets.md	a6a7d5ac1695019bf909e7285c578d4ac6d9aec7	2026-10-05	
-docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	5acbf53eb840189fc9ad0904eb071ed223054068	2026-10-05	
+docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	13e537f26316f9f872243eeea0e38be5a486a9b0	2026-10-05	
 docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	05bee885a1704063f5a5005bc38b96279505a7cd	2026-10-05	
 docs/volume_1_systems_and_services/1.11.25-fabriclib-system.md	798dfae259010cfcd1b7111e594f44f4635af610	2026-10-04	
 docs/volume_1_systems_and_services/1.11.26-fabriclib-undo.md	3f16a36fa4ee38bdc1776e6d0a054816aaf7edbf	2026-10-03	
@@ -125,7 +125,7 @@ docs/volume_3_operations/3.13.2-device-access.md	b1ec9249df77da70420202dce7254c5
 docs/volume_3_operations/3.13.3-first-sign-in.md	f1c5e4e828f87b41d62542a7cf8edd9f907acb19	2026-10-05	
 docs/volume_3_operations/3.14.1-resources.md	236c07bde74d9f79b380593464fad4138d3b549a	2026-10-05	
 docs/volume_3_operations/3.14.2-lifecycle.md	5e0deb34d0bf9c556bd6ad9b1de713ebb936e52a	2026-10-03	
-docs/volume_3_operations/3.14.3-ports.md	18fa24ce7bdb4fb64170e233d70aca0554d3bb53	2026-10-05	
+docs/volume_3_operations/3.14.3-ports.md	9777eb0ffa1c55ec1921d55c03ebd1a1ec531b4e	2026-10-05	
 docs/volume_3_operations/3.15.1-windows-domain.md	936a79d2216fef6a772d61d38479703d2621c567	2026-10-05	
 docs/volume_3_operations/3.15.2-linux-join.md	b6941212a8630079ec4e69aa498fac52d087ffe7	2026-10-05	
 docs/volume_3_operations/3.15.3-windows-join.md	8ecc4a7e6e07aad37768280cb8a41201f084e489	2026-10-05	
@@ -766,7 +766,7 @@ src/fabriclib/secrets/secrets_in_openbao.py	92c573bf5f48cc9a4a5cc253090190b98589
 src/fabriclib/security/README.md	4a535d7f2dd4c742a01d68d8f7652878348a3dcf	2026-10-03	
 src/fabriclib/security/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
 src/fabriclib/security/apply_docker_firewall.py	4a16c8744364bfeb515f0cfdd2bee5b307106a51	2026-09-30	
-src/fabriclib/security/firewall_rules.py	e0e1726638b3419db65c9b65649bf67c1236d34b	2026-10-05	
+src/fabriclib/security/firewall_rules.py	3a35f7efafebacb8c4dac9d0e4cd484b2c1bdaf6	2026-10-05	
 src/fabriclib/security/hardened_daemon_settings.py	0a8808c4d21b5abcd2d9d6525ecb88df00081be8	2026-10-02	
 src/fabriclib/security/ufw_rule.py	91bbd0971a286a3bb00cb8e25cbae0f55c6fec7b	2026-10-04	
 src/fabriclib/setup/README.md	3b6a6f9a381ce12c8add7be05e9ba2910c54ebb1	2026-10-05	
@@ -1180,7 +1180,7 @@ tests/README.md	03ed50ce7f4bacfe096dfbc71cd6aa32b76dbdb6	2026-10-05
 tests/adguard/README.md	203fc82e8a3eb847f7cae9f340e1aee798349768	2026-10-02	
 tests/adguard/run.py	54e31bf724a443cedb86f330eab8ab42b6773d72	2026-10-03	
 tests/consent/README.md	329a4689f97950afc820b4770f374178dd679db8	2026-10-03	
-tests/consent/run.py	556815ba7bc9275b4c80a1197fcbb756c6e0746f	2026-10-05	
+tests/consent/run.py	a5739ba13c63b6457a5a586bb95dbe6298f8afe1	2026-10-05	
 tests/dirsrv/README.md	571eb24ff05723d1e80a86788e7de18d14cc41f8	2026-10-05	
 tests/dirsrv/admin_user.py	3efa9e47b0ada1e7756492251401a70649bdbfed	2026-10-03	
 tests/dirsrv/devices.py	d2c959b619a5293511178778eb7e5218186c7c70	2026-10-03	

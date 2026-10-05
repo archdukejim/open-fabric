@@ -161,6 +161,14 @@ check("the DC's TCP ports (RPC range included) and UDP ports, from the LAN and f
       f"{v['lan_cidr']}" in dc_lines
       and f"ufw: allow 88,389,464/udp (the Windows domain controller) from {v['fabric_subnet']}" in dc_lines
       and len(dc_lines) == 4, dc_lines)
+peer_cfg = tempfile.mkdtemp()
+with open(os.path.join(peer_cfg, "federation.yaml"), "w") as f:
+    yaml.safe_dump({"upstream": {"site_name": "lan", "address": "192.0.2.10"},
+                    "sites": {"edge": {"address": "198.51.100.7"}}}, f)
+peer_lines = [r for r in plan_firewall({**v, "ntp_serve": False}, peer_cfg) if "domain controller" in r]
+check("the DC's ports also from the federation's peers (its upstream and each joined site: replication, 1.8.8.5)",
+      any("from 192.0.2.10/32" in r and "/tcp" in r for r in peer_lines)
+      and any("from 198.51.100.7/32" in r and "/udp" in r for r in peer_lines) and len(peer_lines) == 8, peer_lines)
 check("the DC's ufw rule round-trips through its record form",
       ufw_rule("ad", "tcp@10.0.0.0/24@88,445") == ["from", "10.0.0.0/24", "to", "any", "port", "88,445", "proto", "tcp"])
 final, _ = render_vars(jinja_env(JINJA), {}, {"domain": "lan.test", "hostname": "h", "host_ip": "10.0.0.5",
