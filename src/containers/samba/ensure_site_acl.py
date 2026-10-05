@@ -30,13 +30,14 @@ def _sid(samdb, name):
     return str(samdb.schema_format_value("objectSid", res[0]["objectSid"][0]), "utf-8")
 
 
-def ensure_site_acl(samdb, site):
+def ensure_site_acl(samdb, site, root):
     """Purpose: who may write what in a site (S2, manual 1.6.3.6), checked by every DC, offline too (Q4, Q12): the
              site's admins and its fabric-agent account have full control below the site's OU, inherited, but not
              over its service accounts; its Keycloak account has full control of the site's people only (sign-in
-             changes passwords and lockouts).
+             changes passwords and lockouts), and at the root site may change the members of the organisation's
+             groups (Keycloak's group mapper).
     Inputs:  samdb — SamDB; site — str (its groups and service accounts exist: ensure_groups,
-             ensure_service_accounts).
+             ensure_service_accounts); root — bool.
     Returns: list of str, the access entries added.
     Fails:   ldb.LdbError reading a principal or changing a security descriptor; IndexError if one is missing.
     Feeds:   converge."""
@@ -48,7 +49,10 @@ def ensure_site_acl(samdb, site):
     for principal in (f"{site}-admins", f"fabric-agent-{site}"):
         sid = _sid(samdb, principal)
         entries += [(site_dn, f"(A;CI;{FULL};;;{sid})"), (services, f"(D;CI;{SERVICE_DENY};;;{sid})")]
-    entries.append((people, f"(A;CI;{FULL};;;{_sid(samdb, f'fabric-keycloak-{site}')})"))
+    keycloak = _sid(samdb, f"fabric-keycloak-{site}")
+    entries.append((people, f"(A;CI;{FULL};;;{keycloak})"))
+    if root:            # Keycloak's group mapper writes memberships of the organisation's groups (LDAP_ONLY)
+        entries.append((f"OU=groups,OU=organisation,{site_dn}", f"(A;CI;RPWPLCLORC;;;{keycloak})"))
     domain_sid = security.dom_sid(samdb.get_domain_sid())
     utils, done = SDUtils(samdb), []
     for dn, ace in entries:

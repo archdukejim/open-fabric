@@ -9,8 +9,8 @@ from agent.route_not_found import RouteNotFound
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.write_audit import write_audit
-from fabriclib.keycloak.create_person import create_person
-from fabriclib.keycloak.reset_sign_in import reset_sign_in
+from fabriclib.directory.create_person import create_person
+from fabriclib.directory.reset_sign_in import reset_sign_in
 from fabriclib.system.apply_changes import apply_changes
 
 EVENT_ACTIONS = {"LOGIN", "LOGOUT", "LOGIN_DENIED"}

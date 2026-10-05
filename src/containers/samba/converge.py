@@ -57,7 +57,7 @@ def converge(state):
     changed += ensure_site_info(samdb, site, state["id_range"])
     changed += ensure_groups(samdb, site, root, state["groups"])
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
-    changed += ensure_site_acl(samdb, site)
+    changed += ensure_site_acl(samdb, site, root)
     changed += ensure_ad_site(samdb, site, list(state["networks"]))
     changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
     base = str(samdb.domain_dn())

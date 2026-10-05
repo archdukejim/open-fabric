@@ -43,8 +43,9 @@ def _targets(ctx):
         t.append((v["hostname_federation"], [], [nginx(v["hostname_federation"])], ["nginx"]))
     if v.get("install_adguard"):
         t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
-    # the DC's LDAPS/TLS certificate (manual 2.11.2.7): Keycloak, FreeRADIUS and members verify it
-    t.append((v["hostname_dc"], [v["ad_domain"]], [(p("samba", "tls"), "root")], ["samba"]))
+    # the DC's LDAPS/TLS certificate (manual 2.11.2.7): Keycloak, FreeRADIUS and members verify it; Keycloak and
+    # FreeRADIUS reach it at the host's address, so it names that too
+    t.append((v["hostname_dc"], [v["ad_domain"], v["host_ip"]], [(p("samba", "tls"), "root")], ["samba"]))
     if v.get("install_freeradius"):
         # the EAP-TLS server certificate supplicants check (server.pem, server.key)
         t.append((v["hostname_radius"], [], [(p("freeradius", "certs"), "freeradius:eap")], ["freeradius"]))

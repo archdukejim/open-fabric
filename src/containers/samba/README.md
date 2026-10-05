@@ -23,3 +23,8 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `ensure_gpo.py` | One of fabric's GPOs created, linked, its SYSVOL files written, its version bumped on change |
 | `root_ca_policy.py` | The Registry.pol that makes fabric's root CA a trusted root on Windows (Q13) |
 | `logon_rights_policy.py` | The GptTmpl.inf granting log-on to a site's machines (D90, Q16) |
+| `list_people.py` | Operation `list_people`: people and groups under OU=sites (service accounts left out) |
+| `create_person.py` | Operation `create_person`: a person in the site's OU=people, a uid from its block, in `<site>-users`, must change their password |
+| `get_person.py` | Operation `get_person`: where a person lives and their groups |
+| `reset_password.py` | Operation `reset_password`: a new one-time password, the account unlocked |
+| `add_group_member.py` | Operation `add_group_member`: a person in a group, once |

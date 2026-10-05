@@ -317,6 +317,70 @@ admin = as_user("Administrator", admin_pw, "ldbsearch")
 check("the Administrator signs in with fabric's generated password", admin.returncode == 0 and BASE in admin.stdout,
       admin.stderr)
 
+# S2.4: people, as the site's agent (manual 1.6.3.4, 1.6.3.9)
+def mk(uid, email=None, pw=None, site_v=None, sec=None):
+    return run_op(site_v or v, sec or SECRETS, "create_person",
+                  {"uid": uid, "first": uid.title(), "last": "Test", "email": email or f"{uid}@lan.test",
+                   "password": pw or ("Pw-" + random_password(20)), "gid": 5000, "home_base": "/home",
+                   "shell": "/bin/bash"}, container=DC)
+
+
+alice = mk("alice")
+check("a person is created with a uid from the site's block", 5001 <= alice["uidNumber"] <= 105000, alice)
+check("their POSIX identity: primary gid 5000 (fabric's users), /home/alice, /bin/bash, in lan-users",
+      attr("(sAMAccountName=alice)", "gidNumber") == ["5000"]
+      and attr("(sAMAccountName=alice)", "unixHomeDirectory") == ["/home/alice"]
+      and attr("(sAMAccountName=alice)", "loginShell") == ["/bin/bash"]
+      and any(m.startswith("CN=lan-users,") for m in attr("(sAMAccountName=alice)", "memberOf")))
+check("they live in the site's OU=people, named by their user name",
+      attr("(sAMAccountName=alice)", "distinguishedName")[0].startswith("CN=alice,OU=people,OU=lan,OU=sites,"))
+for label, args in (("the same user name", ("alice", "other@lan.test")), ("the same e-mail address", ("alice2",
+                                                                                                    "alice@lan.test"))):
+    try:
+        mk(*args)
+        check(f"refused: {label}", False)
+    except ValidationError as e:
+        check(f"refused: {label}", "already taken" in str(e), e)
+try:
+    mk("shortpw", pw="Ab1-short")
+    check("refused: a one-time password the policy refuses", False)
+except ValidationError as e:
+    check("refused: a one-time password the policy refuses", "refused" in str(e), e)
+people = run_op(v, SECRETS, "list_people", container=DC)
+a = next((u for u in people["users"] if u["uid"] == "alice"), {})
+check("the People page lists the person (site, groups, not locked) and no service account",
+      a.get("site") == "lan" and "lan-users" in a.get("groups", []) and a.get("locked") is False
+      and not any(u["uid"].startswith("fabric-") for u in people["users"])
+      and any(g["name"] == "admins" for g in people["groups"]), a)
+check("nothing secret in the list", "password" not in json.dumps(people).lower() and "unicodePwd" not in json.dumps(people))
+person = run_op(v, SECRETS, "get_person", {"uid": "alice"}, container=DC)
+check("a person's groups for the reset guard", "lan-users" in person["groups"], person)
+new_otp = "Rs-" + random_password(20)
+run_op(v, SECRETS, "reset_password", {"uid": "alice", "password": new_otp}, container=DC)
+check("a reset sets a new one-time password (it must be changed: AD refuses it for a sign-in until then)",
+      attr("(sAMAccountName=alice)", "pwdLastSet") == ["0"])
+try:
+    run_op(v, SECRETS, "reset_password", {"uid": "labadmin", "password": new_otp}, container=DC)
+    check("refused: the site's agent resetting another site's person", False)
+except ValidationError as e:
+    check("refused: the site's agent resetting another site's person", "refused" in str(e) or "not permitted" in str(e), e)
+first = alice["uidNumber"]
+dc("samba-tool", "user", "delete", "alice", "-s", "/data/etc/smb.conf")
+carol = mk("carol")
+check("ids are never reused: after alice is deleted, carol gets a higher number", carol["uidNumber"] > first, carol)
+# a tiny site whose block is used up
+tiny = {**lab, "site": "tiny", "id_range": "900-902",
+        "accounts": {f"fabric-{k}-tiny": random_password() for k in ("agent", "keycloak", "radius")}}
+dc("python3", "/fabric/converge.py", stdin=json.dumps(tiny))
+tiny_v, tiny_s = {**v, "site_name": "tiny"}, {**SECRETS, "ad_agent_password": tiny["accounts"]["fabric-agent-tiny"]}
+first_tiny = mk("tina", site_v=tiny_v, sec=tiny_s)
+check("a site's people take numbers from that site's own block", first_tiny["uidNumber"] == 902, first_tiny)
+try:
+    mk("tim", site_v=tiny_v, sec=tiny_s)
+    check("refused: a person when the site's block is full", False)
+except ValidationError as e:
+    check("refused: a person when the site's block is full", "full" in str(e), e)
+
 # a read-only DC joining with fabric's image (its join path), and NTLM at it for an account it does not cache:
 # forwarded to the writable DC while it is up (the Q6 follow-up S1 owes: PEAP at an RODC site relies on it); with the
 # writable DC down, cached accounts only, and no writes (manual 1.8.8.3)

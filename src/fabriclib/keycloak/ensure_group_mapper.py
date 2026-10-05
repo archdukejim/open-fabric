@@ -5,25 +5,25 @@ LDAP_MAPPER = "org.keycloak.storage.ldap.mappers.LDAPStorageMapper"
 
 
 def ensure_group_mapper(kc, realm, ldap_id, v):
-    """Purpose: create or update the LDAP group mapper (groupOfNames under ou=groups, LDAP_ONLY) and sync the
-             directory's groups into Keycloak.
+    """Purpose: create or update the LDAP group mapper on fabric's groups in AD (OU=groups of OU=organisation, AD's
+             memberOf; LDAP_ONLY: memberships live in AD) and sync them into Keycloak (manual 1.6.3.11).
     Inputs:  kc — Admin; realm — realm name; ldap_id — federation id from ensure_ldap_federation; v — vars
-             (ldap_base_dn).
+             (ad_base_dn, site_name).
     Returns: None.
-    Fails:   SystemExit from Admin.call (including a failed sync); KeyError if ldap_base_dn is missing; StopIteration if
+    Fails:   SystemExit from Admin.call (including a failed sync); KeyError if a var is missing; StopIteration if
              a created mapper cannot be found again.
     Feeds:   configure_keycloak (the synced groups are what grant_role_to_group looks up)."""
     config = {
-        "groups.dn": [f"ou=groups,{v['ldap_base_dn']}"],
+        "groups.dn": [f"OU=groups,OU=organisation,OU={v['site_name']},OU=sites,{v['ad_base_dn']}"],
         "group.name.ldap.attribute": ["cn"],
-        "group.object.classes": ["groupOfNames"],
+        "group.object.classes": ["group"],
         "preserve.group.inheritance": ["false"],
         "membership.ldap.attribute": ["member"],
         "membership.attribute.type": ["DN"],
-        "membership.user.ldap.attribute": ["uid"],
+        "membership.user.ldap.attribute": ["sAMAccountName"],
         "memberof.ldap.attribute": ["memberOf"],
         "mode": ["LDAP_ONLY"],
-        "user.roles.retrieve.strategy": ["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],
+        "user.roles.retrieve.strategy": ["GET_GROUPS_FROM_USER_MEMBEROF_ATTRIBUTE"],
         "drop.non.existing.groups.during.sync": ["false"],
     }
     path = f"/{q(realm)}/components?parent={ldap_id}&type={q(LDAP_MAPPER)}"

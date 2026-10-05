@@ -38,9 +38,9 @@ def configure_keycloak(vars_path, secrets_path):
 
     print(f"Configuring Keycloak realm {realm}...")
     realm_id = ensure_realm(kc, realm, v.get("friendly_name") or v["domain"])
-    if v.get("install_ldap", True):
-        writable = people_written_here(os.path.join(v["deploy_base_dir"], "fabric", "config", "federation.yaml"))
-        ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s, writable), v)
+    # fabric's directory, Samba AD (manual 1.6.3.11): people and groups
+    writable = people_written_here(os.path.join(v["deploy_base_dir"], "fabric", "config", "federation.yaml"))
+    ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s, writable), v)
     # The admin role and the TOTP flow serve the web UI, OpenBao's UI and AdGuard's.
     admin_role = v.get("webui_admin_role", "fabric-admin")
     reps = ensure_rbac_roles(kc, realm, admin_role)

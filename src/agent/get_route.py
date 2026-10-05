@@ -10,7 +10,7 @@ from fabriclib.dns.list_zones import list_zones
 from fabriclib.dns.reverse_zones import reverse_zones
 from fabriclib.dns.zone_detail import zone_detail
 from fabriclib.ldap.device_overview import device_overview
-from fabriclib.ldap.list_people import list_people
+from fabriclib.directory.list_people import list_people
 from fabriclib.pki.ca_summary import ca_summary
 from fabriclib.pki.list_issued import list_issued
 from fabriclib.radius.radius_guides import radius_guides

@@ -8,7 +8,7 @@
 # Needs: Linux (amd64 or arm64), Docker with buildx, python3 with yaml +
 # jinja2, openssl, curl, setpriv. Runs as root (chown to service uids,
 # SO_PEERCRED checks). Output and scratch data: $FABRIC_TEST_OUT
-# (default /tmp/fabric-tests). keycloak reuses the dirsrv suite's data.
+# (default /tmp/fabric-tests).
 # -----------------------------------------------------------------------
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -49,7 +49,7 @@ for s in "${SUITES[@]}"; do
         freeradius) run freeradius python3 "$HERE/freeradius/run.py" ;;
         samba)    run samba    bash -c "python3 \"$HERE/samba/run.py\" && python3 \"$HERE/samba/dc.py\"" ;;
         dirsrv)   run dirsrv   bash "$HERE/dirsrv/run.sh" ;;
-        keycloak) run keycloak bash "$HERE/keycloak/run.sh" ;;
+        keycloak) run keycloak python3 "$HERE/keycloak/run.py" ;;
         hardening) run hardening bash "$HERE/hardening/run.sh" ;;
         images)   run images   bash "$HERE/images/run.sh" ;;
         sandbox)  run sandbox  bash "$HERE/sandbox/run.sh" ;;
