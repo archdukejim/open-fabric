@@ -19,6 +19,8 @@ from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.directory.run_op import run_op  # noqa: E402
+from fabriclib.federation.network_conflicts import network_conflicts  # noqa: E402
+from fabriclib.federation.read_address_plan import read_address_plan  # noqa: E402
 from fabriclib.samba.converge_domain import converge_domain  # noqa: E402
 from fabriclib.samba.deploy_samba import deploy_samba  # noqa: E402
 from fabriclib.samba.write_bind_dlz import write_bind_dlz  # noqa: E402
@@ -155,6 +157,9 @@ first = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, containe
 check("converge: schema, layout, groups, access, AD site, policy and GPOs made", len(first) > 30, first)
 again = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("converge again changes nothing (idempotent)", again == [], again)
+check("converge wrote the site's networks into its OU=networks (the address plan, S4.1)",
+      "network lan added" in first and [(n["site"], n["name"], n["cidr"]) for n in read_address_plan(v, SECRETS, DC)]
+      == [("lan", "lan", SUBNET)], first)
 
 # S2.2: the site's service accounts, its id block, fabric's groups with their gids, the agent's own sign-in
 info_ = run_op(v, SECRETS, "site_info", container=DC)
@@ -276,13 +281,27 @@ check("BIND still runs as its own user with no capabilities", bind_info["Config"
       and not bind_info["HostConfig"]["CapAdd"] and bind_info["State"]["Running"])
 
 # refusals: a site's admin writes its own site only (Q4), the policy is enforced
-lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": [],
+LAB_NETS = [{"name": "lan", "cidr": "10.77.0.0/24", "kind": "lan", "vlan": None, "notes": "", "allow_overlap": ""},
+            {"name": "iot", "cidr": "10.78.0.0/24", "kind": "dhcp", "vlan": 21, "notes": "cameras", "allow_overlap": ""}]
+lab = {"site": "lab", "root": False, "password_policy": POLICY, "networks": LAB_NETS,
        "root_ca_pem": open(f"{pki}/root_ca.crt").read(), "id_range": "200001-300000", "groups": [],
        "admin_group": "admins",
        "accounts": {f"fabric-{k}-lab": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
 res = dc("python3", "/fabric/converge.py", stdin=json.dumps(lab))
 check("a second site's OU, groups and access entries", res.returncode == 0 and "group lab-admins created" in res.stdout,
       res.stderr)
+plan = read_address_plan(v, SECRETS, DC)
+check("the address plan, read as lan's agent, holds every site's networks with VLAN and notes (nothing gathered)",
+      [(n["site"], n["name"], n["cidr"], n["vlan"], n["notes"]) for n in plan]
+      == [("lab", "lan", "10.77.0.0/24", None, ""), ("lab", "iot", "10.78.0.0/24", 21, "cameras"),
+          ("lan", "lan", SUBNET, None, "")], plan)
+clash = network_conflicts([{"name": "new", "cidr": "10.78.0.128/25"}], plan, "lan")
+check("a network of this site overlapping another site's is found in the plan",
+      clash and clash[0]["other_site"] == "lab" and not clash[0]["allowed"], clash)
+lab_less = dc("python3", "/fabric/converge.py", stdin=json.dumps({**lab, "networks": LAB_NETS[:1]}))
+check("a network a site no longer has leaves the plan (and its AD subnet)",
+      "network iot removed" in lab_less.stdout and [n["name"] for n in read_address_plan(v, SECRETS, DC)
+                                                    if n["site"] == "lab"] == ["lan"], lab_less.stdout[-400:])
 lab_pw = random_password(20)
 made = dc("samba-tool", "user", "create", "labadmin", lab_pw, "--userou=OU=people,OU=lab,OU=sites",
           "-s", "/data/etc/smb.conf")
@@ -374,7 +393,7 @@ dc("samba-tool", "user", "delete", "alice", "-s", "/data/etc/smb.conf")
 carol = mk("carol")
 check("ids are never reused: after alice is deleted, carol gets a higher number", carol["uidNumber"] > first, carol)
 # a tiny site whose block is used up
-tiny = {**lab, "site": "tiny", "id_range": "900-902",
+tiny = {**lab, "site": "tiny", "id_range": "900-902", "networks": [],
         "accounts": {f"fabric-{k}-tiny": random_password() for k in ("agent", "keycloak", "radius")}, "radius_gid": 610}
 dc("python3", "/fabric/converge.py", stdin=json.dumps(tiny))
 tiny_v, tiny_s = {**v, "site_name": "tiny"}, {**SECRETS, "ad_agent_password": tiny["accounts"]["fabric-agent-tiny"]}

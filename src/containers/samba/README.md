@@ -36,3 +36,5 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `save_role.py` | Operation `save_role`: a device role (a group with `fabricRole`) in the site's or the organisation's `OU=device-roles` |
 | `remove_role.py` | Operation `remove_role`: a role deleted, refused while devices carry it |
 | `share_winbind.py` | winbind's privileged pipe in FreeRADIUS's group (root, 0750), for PEAP through `ntlm_auth` |
+| `ensure_networks.py` | The site's networks as `fabricNetwork` entries in its OU=networks (the address plan), kept to match |
+| `read_networks.py` | Operation `read_networks`: the address plan, every site's networks in one search |

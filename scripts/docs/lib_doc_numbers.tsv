@@ -35,6 +35,7 @@ file	fabricctl-jinja|src/containers/samba/ensure_ad_site.py	14
 file	fabricctl-jinja|src/containers/samba/ensure_gpo.py	15	
 file	fabricctl-jinja|src/containers/samba/ensure_groups.py	16	
 file	fabricctl-jinja|src/containers/samba/ensure_layout.py	17	
+file	fabricctl-jinja|src/containers/samba/ensure_networks.py	44	
 file	fabricctl-jinja|src/containers/samba/ensure_schema.py	18	
 file	fabricctl-jinja|src/containers/samba/ensure_service_accounts.py	26	
 file	fabricctl-jinja|src/containers/samba/ensure_site_acl.py	19	
@@ -46,6 +47,7 @@ file	fabricctl-jinja|src/containers/samba/logon_rights_policy.py	20
 file	fabricctl-jinja|src/containers/samba/open_samdb.py	21	
 file	fabricctl-jinja|src/containers/samba/paths.py	35	
 file	fabricctl-jinja|src/containers/samba/read_devices.py	36	
+file	fabricctl-jinja|src/containers/samba/read_networks.py	45	
 file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
 file	fabricctl-jinja|src/containers/samba/remove_role.py	38	
 file	fabricctl-jinja|src/containers/samba/reset_password.py	33	
@@ -216,7 +218,7 @@ file	fabriclib-federation|src/fabriclib/federation/common/federation_lock.py	2
 file	fabriclib-federation|src/fabriclib/federation/common/fetch_pinned_root.py	3	
 file	fabriclib-federation|src/fabriclib/federation/common/load_registry.py	4	
 file	fabriclib-federation|src/fabriclib/federation/common/post_upstream.py	5	
-file	fabriclib-federation|src/fabriclib/federation/common/run_in_directory.py	6	
+file	fabriclib-federation|src/fabriclib/federation/common/run_in_directory.py	6	0.5.0 / 2026-10-04
 file	fabriclib-federation|src/fabriclib/federation/common/save_registry.py	7	
 file	fabriclib-federation|src/fabriclib/federation/common/signing_capacity.py	8	
 file	fabriclib-federation|src/fabriclib/federation/common/site_name_problem.py	9	
@@ -233,8 +235,8 @@ file	fabriclib-federation|src/fabriclib/federation/federation_status.py	19
 file	fabriclib-federation|src/fabriclib/federation/join_upstream.py	20	
 file	fabriclib-federation|src/fabriclib/federation/list_invitations.py	21	
 file	fabriclib-federation|src/fabriclib/federation/network_conflicts.py	22	
-file	fabriclib-federation|src/fabriclib/federation/publish_address_plan.py	23	
-file	fabriclib-federation|src/fabriclib/federation/publish_site_networks.py	24	
+file	fabriclib-federation|src/fabriclib/federation/publish_address_plan.py	23	0.5.0 / 2026-10-04
+file	fabriclib-federation|src/fabriclib/federation/publish_site_networks.py	24	0.5.0 / 2026-10-04
 file	fabriclib-federation|src/fabriclib/federation/read_address_plan.py	25	
 file	fabriclib-federation|src/fabriclib/federation/relay_join.py	26	
 file	fabriclib-federation|src/fabriclib/federation/remove_site.py	27	
@@ -689,6 +691,7 @@ function	fabricctl-jinja|src/containers/samba/ensure_groups.py|_group	3
 function	fabricctl-jinja|src/containers/samba/ensure_groups.py|ensure_groups	2	
 function	fabricctl-jinja|src/containers/samba/ensure_layout.py|_ensure_ou	1	
 function	fabricctl-jinja|src/containers/samba/ensure_layout.py|ensure_layout	2	
+function	fabricctl-jinja|src/containers/samba/ensure_networks.py|ensure_networks	1	
 function	fabricctl-jinja|src/containers/samba/ensure_schema.py|_cn	1	
 function	fabricctl-jinja|src/containers/samba/ensure_schema.py|_present	2	
 function	fabricctl-jinja|src/containers/samba/ensure_schema.py|ensure_schema	3	
@@ -710,6 +713,7 @@ function	fabricctl-jinja|src/containers/samba/paths.py|site_dn	1
 function	fabricctl-jinja|src/containers/samba/paths.py|sites_dn	3	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|_one	1	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|read_devices	2	
+function	fabricctl-jinja|src/containers/samba/read_networks.py|read_networks	1	
 function	fabricctl-jinja|src/containers/samba/remove_device.py|remove_device	1	
 function	fabricctl-jinja|src/containers/samba/remove_role.py|remove_role	1	
 function	fabricctl-jinja|src/containers/samba/reset_password.py|reset_password	1	
@@ -942,7 +946,7 @@ function	fabriclib-federation|src/fabriclib/federation/common/load_registry.py|l
 function	fabriclib-federation|src/fabriclib/federation/common/post_upstream.py|_PinnedConnection.__init__	1	
 function	fabriclib-federation|src/fabriclib/federation/common/post_upstream.py|_PinnedConnection.connect	2	
 function	fabriclib-federation|src/fabriclib/federation/common/post_upstream.py|post_upstream	3	
-function	fabriclib-federation|src/fabriclib/federation/common/run_in_directory.py|run_in_directory	1	
+function	fabriclib-federation|src/fabriclib/federation/common/run_in_directory.py|run_in_directory	1	0.5.0 / 2026-10-04
 function	fabriclib-federation|src/fabriclib/federation/common/save_registry.py|save_registry	1	
 function	fabriclib-federation|src/fabriclib/federation/common/signing_capacity.py|signing_capacity	1	
 function	fabriclib-federation|src/fabriclib/federation/common/site_name_problem.py|site_name_problem	1	
@@ -963,8 +967,8 @@ function	fabriclib-federation|src/fabriclib/federation/join_upstream.py|_vars	2
 function	fabriclib-federation|src/fabriclib/federation/join_upstream.py|join_upstream	1	
 function	fabriclib-federation|src/fabriclib/federation/list_invitations.py|list_invitations	1	
 function	fabriclib-federation|src/fabriclib/federation/network_conflicts.py|network_conflicts	1	
-function	fabriclib-federation|src/fabriclib/federation/publish_address_plan.py|publish_address_plan	1	
-function	fabriclib-federation|src/fabriclib/federation/publish_site_networks.py|publish_site_networks	1	
+function	fabriclib-federation|src/fabriclib/federation/publish_address_plan.py|publish_address_plan	1	0.5.0 / 2026-10-04
+function	fabriclib-federation|src/fabriclib/federation/publish_site_networks.py|publish_site_networks	1	0.5.0 / 2026-10-04
 function	fabriclib-federation|src/fabriclib/federation/read_address_plan.py|read_address_plan	1	
 function	fabriclib-federation|src/fabriclib/federation/relay_join.py|relay_join	1	
 function	fabriclib-federation|src/fabriclib/federation/remove_site.py|remove_site	1	

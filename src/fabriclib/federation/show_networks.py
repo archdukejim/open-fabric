@@ -7,10 +7,10 @@ def show_networks(v):
     """Purpose: print the address plan across sites for `fabricctl federation networks` (manual 2.2.2.6): site → network
                 → VLAN → kind → notes, then every overlap between sites
              (with the reason when one was given).
-    Inputs:  v — fabric vars: ldap_base_dn, site_name, lan_cidr, dhcp (this site's networks are shown from its
-             settings until the root's plan lists them).
+    Inputs:  v — fabric vars: site_name, lan_cidr, dhcp (this site's networks are shown from its settings until
+             convergence has written them to the domain).
     Returns: the number of overlaps without a reason (0: none).
-    Fails:   ValidationError / RuntimeError from read_address_plan (389-DS not running).
+    Fails:   ValidationError from read_address_plan (the DC not reachable).
     Feeds:   federation/run_federation_command (`networks`)."""
     plan = read_address_plan(v)
     site = v.get("site_name") or ""

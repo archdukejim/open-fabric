@@ -18,11 +18,11 @@ from fabriclib.federation.site_networks import site_networks
 
 def _check_address_plan(before, data):
     """Purpose: refuse a change that makes a subnet overlap another site's network (manual 2.2.2.6), checked against
-                this site's copy of the address plan. Overlaps that were there before the change
-             do not block it (`fabricctl federation networks` lists them). Not federated, or the directory not
-             answering (the sync checks again later): nothing to check.
-    Inputs:  before — the settings before the change; data — with the new dhcp block (site_name, ldap_base_dn,
-             lan_cidr, dhcp).
+                the address plan in the domain (2.2.2.8). Overlaps that were there before the change
+             do not block it (`fabricctl federation networks` lists them). Not federated, or the DC not answering
+             (`fabricctl federation networks` shows any overlap once it is back): nothing to check.
+    Inputs:  before — the settings before the change; data — with the new dhcp block (site_name, lan_cidr,
+             dhcp).
     Returns: None.
     Fails:   ValidationError naming each new overlap without an allow_overlap reason.
     Feeds:   edit_dhcp."""

@@ -53,18 +53,6 @@ objectClass: top
 objectClass: organizationalUnit
 ou: devices
 description: Network devices enrolled at this site (fabric device RBAC)
-
-dn: ou=networks,{{ ldap_local_dn }}
-objectClass: top
-objectClass: organizationalUnit
-ou: networks
-description: This site's networks (LAN, DHCP subnets), replicated up for the address plan
-
-dn: ou=address-plan,{{ ldap_base_dn }}
-objectClass: top
-objectClass: organizationalUnit
-ou: address-plan
-description: Every site's networks, gathered by the root site and copied to every site (overlap checks)
 {% for grp in ldap_groups %}
 
 dn: cn={{ grp.name }},ou=groups,{{ ldap_base_dn }}

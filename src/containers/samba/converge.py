@@ -1,11 +1,10 @@
 """Converge fabric's Samba AD domain to what fabric wants (manual 2.11.2.15, S1.3), inside the DC, as root, on its own
 database: no credentials, no network. Run after every start and apply by fabriclib/samba/converge_domain:
     docker exec -i samba python3 /fabric/converge.py < state.json
-The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [CIDR…],
-"root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name: password},
-"radius_gid"}
-(stdin, never a command line: it holds the service accounts' passwords). Prints one JSON object: {"changed": [what
-changed, …]}. Exits 1 with the error on stderr."""
+The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [site_networks
+items], "root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name:
+password}, "radius_gid"} (stdin, never a command line: it holds the service accounts' passwords). Prints one JSON
+object: {"changed": [what changed, …]}. Exits 1 with the error on stderr."""
 import json
 import sys
 
@@ -15,6 +14,7 @@ from ensure_ad_site import ensure_ad_site
 from ensure_gpo import ensure_gpo
 from ensure_groups import ensure_groups
 from ensure_layout import ensure_layout
+from ensure_networks import ensure_networks
 from ensure_schema import ensure_schema
 from ensure_service_accounts import ensure_service_accounts
 from ensure_site_acl import ensure_site_acl
@@ -42,13 +42,14 @@ def _sid(samdb, name):
 
 def converge(state):
     """Purpose: every part of the domain fabric owns, in order: the schema, the layout, the site's id block, the
-             groups, the site's service accounts, its access entries, the AD site and its subnets, the password
-             policy, the domain's trust GPO (fabric's root CA), the site's log-on GPO and winbind's privileged pipe
-             for FreeRADIUS. Each part changes only what differs, so a second run changes nothing.
+             groups, the site's service accounts, its access entries, its networks (the address plan), the AD site
+             and its subnets, the password policy, the domain's trust GPO (fabric's root CA), the site's log-on GPO
+             and winbind's privileged pipe for FreeRADIUS. Each part changes only what differs, so a second run
+             changes nothing.
     Inputs:  state — dict: site (str), root (bool: the root site, which also holds the organisation's items and the
-             domain-wide trust GPO), password_policy (dict, every key), networks (list of CIDR), root_ca_pem (str),
-             id_range ("first-last"), groups (fabric's ldap_groups), admin_group (the web UI's admin group, in the
-             log-on policy), accounts ({sAMAccountName: password}: the site's service accounts), radius_gid (int:
+             domain-wide trust GPO), password_policy (dict, every key), networks (site_networks' list), root_ca_pem
+             (str), id_range ("first-last"), groups (fabric's ldap_groups), admin_group (the web UI's admin group, in
+             the log-on policy), accounts ({sAMAccountName: password}: the site's service accounts), radius_gid (int:
              FreeRADIUS's group, given winbind's privileged pipe).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
@@ -61,7 +62,8 @@ def converge(state):
     changed += ensure_groups(samdb, site, root, state["groups"])
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
     changed += ensure_site_acl(samdb, site, root)
-    changed += ensure_ad_site(samdb, site, list(state["networks"]))
+    changed += ensure_networks(samdb, site, state["networks"])
+    changed += ensure_ad_site(samdb, site, [n["cidr"] for n in state["networks"]])
     changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
     base = str(samdb.domain_dn())
     if root:

@@ -4,6 +4,7 @@ from get_person import get_person
 from link_device_cert import link_device_cert
 from list_people import list_people
 from read_devices import read_devices
+from read_networks import read_networks
 from remove_device import remove_device
 from remove_role import remove_role
 from reset_password import reset_password
@@ -19,6 +20,7 @@ OPS = {
     "link_device_cert": link_device_cert,
     "list_people": list_people,
     "read_devices": read_devices,
+    "read_networks": read_networks,
     "remove_device": remove_device,
     "remove_role": remove_role,
     "reset_password": reset_password,

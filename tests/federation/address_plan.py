@@ -1,7 +1,7 @@
 """The address plan across sites without containers (manual 2.2.2.6): what a site reports as its
 networks, which overlaps are conflicts, what a joining site with an overlapping network is told, and the local
-checks a DHCP subnet gets (fabric's own container network, the overlap reason). The directory side runs with two
-real 389-DS in replication.sh."""
+checks a DHCP subnet gets (fabric's own container network, the overlap reason). The domain side (networks
+converged into AD, the plan read across sites) runs in tests/samba/dc.py."""
 import os
 import sys
 
@@ -49,7 +49,7 @@ check("an overlap with another site is a conflict; this site's own entry is not;
 c = network_conflicts([{"name": "x", "cidr": "192.168.2.0/24"}], plan, "lab")
 check("a network inside another site's is found", c and c[0]["other_site"] == "lan" and not c[0]["allowed"], c)
 
-aj.read_address_plan = lambda v: plan      # the upstream's copy of the plan (the directory side: replication.sh)
+aj.read_address_plan = lambda v: plan      # the plan as the domain gives it (the domain side: tests/samba/dc.py)
 upstream = {"site_name": "lan", "lan_cidr": "192.168.0.0/22"}
 msg = refused(lambda: aj._check_networks(upstream, "barn2", [{"name": "lan", "cidr": "192.168.1.0/24"}]))
 check("a joining site whose network overlaps another site's is refused, naming both", "192.168.1.0/24 overlaps "

@@ -54,7 +54,7 @@ def _check_networks(v, site, networks):
                      "allow_overlap": str(n.get("allow_overlap") or "")[:200]})
     try:
         plan = read_address_plan(v)
-    except (ValidationError, RuntimeError):      # 389-DS not answering: at least this site's own networks
+    except (ValidationError, RuntimeError):      # the DC not answering: at least this site's own networks
         plan = []
     plan += [{**n, "site": v.get("site_name")} for n in site_networks(v)]
     bad = [c for c in network_conflicts(mine, plan, site) if not c["allowed"]]

@@ -26,7 +26,7 @@ def converge_domain(v, federation_file, secrets, container="samba"):
     root_ca = os.path.join(v["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
     state = {"site": v["site_name"], "root": people_written_here(federation_file),
              "password_policy": v["ad_password_policy"],
-             "networks": [n["cidr"] for n in site_networks(v)],
+             "networks": site_networks(v),
              "root_ca_pem": open(root_ca).read(), "id_range": id_range(v),
              "groups": [{"name": g["name"], "gidNumber": g["gidNumber"], "description": g.get("description", "")}
                         for g in v.get("ldap_groups") or []],
