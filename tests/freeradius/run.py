@@ -41,13 +41,13 @@ from fabriclib.pki.install_cert import install_cert  # noqa: E402
 from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
-from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles  # noqa: E402
-from fabriclib.ldap.list_roles import list_roles  # noqa: E402
-import fabriclib.ldap.add_device as add_device_mod  # noqa: E402
-import fabriclib.ldap.add_role as add_role_mod  # noqa: E402
+from fabriclib.directory.ensure_default_device_roles import ensure_default_device_roles  # noqa: E402
+from fabriclib.directory.list_roles import list_roles  # noqa: E402
+import fabriclib.directory.add_device as add_device_mod  # noqa: E402
+import fabriclib.directory.add_role as add_role_mod  # noqa: E402
 import fabriclib.ldap.common.run_dirsrv as run_dirsrv_mod  # noqa: E402
-import fabriclib.ldap.link_device_cert as link_mod  # noqa: E402
-import fabriclib.ldap.update_device as update_device_mod  # noqa: E402
+import fabriclib.directory.link_device_cert as link_mod  # noqa: E402
+import fabriclib.directory.update_device as update_device_mod  # noqa: E402
 
 # fabric's directory functions, pointed at the test directory; no audit log on this machine
 run_dirsrv_mod.load_secrets = lambda: {"ldap_device_admin_password": "Da1"}

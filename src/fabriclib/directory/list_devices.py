@@ -1,4 +1,4 @@
-from fabriclib.ldap.common.read_directory import read_directory
+from fabriclib.directory.common.read_directory import read_directory
 
 
 def list_devices(v, directory=None):

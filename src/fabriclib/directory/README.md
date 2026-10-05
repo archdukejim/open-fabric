@@ -13,3 +13,17 @@ account, so AD's per-site limits apply to it.
 | `reset_sign_in.py` | A new one-time password in AD; TOTP removed and sessions ended in Keycloak (fabric groups: admins only) |
 | `ensure_admin.py` | Setup's first admin: made once, kept in the web UI's admin group |
 | `people_password.py` | A one-time password the domain's policy accepts |
+| `constants.py` | Device types, the permission vocabulary (what it grants, what enforces it), name rules, the default device roles |
+| `device_overview.py` | Devices (with effective access), roles and the vocabulary from one directory read |
+| `list_devices.py` | Devices with their roles, effective permissions and VLAN |
+| `list_roles.py` | Device roles by priority, with their member devices |
+| `add_device.py` | Add a device naming its roles (audited) |
+| `update_device.py` | Change a device's type, MACs, owner, description, enabled flag and roles (audited) |
+| `remove_device.py` | Delete a device (audited) |
+| `require_device.py` | Refuse unless a device exists (before issuing a certificate for it) |
+| `link_device_cert.py` | Record or forget a certificate fingerprint on a device (audited) |
+| `add_role.py` | Create a device role: permissions, VLAN, priority (audited) |
+| `update_role.py` | Change a role's permissions, VLAN, priority, description (audited) |
+| `remove_role.py` | Delete a role — refused while devices are in it (audited) |
+| `common/` | Helpers shared by the device and role operations (see its README) |
+| `ensure_default_device_roles.py` | Create fabric's default device roles once, in the organisation's `OU=device-roles` (a marker file keeps a deleted one from coming back) |

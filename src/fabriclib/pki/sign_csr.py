@@ -4,8 +4,8 @@ import secrets
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
-from fabriclib.ldap.link_device_cert import link_device_cert
-from fabriclib.ldap.require_device import require_device
+from fabriclib.directory.link_device_cert import link_device_cert
+from fabriclib.directory.require_device import require_device
 from fabriclib.pki.common.artifacts_dir import artifacts_dir
 from fabriclib.pki.common.ca_chain_pem import ca_chain_pem
 from fabriclib.pki.common.describe_cert import describe_cert

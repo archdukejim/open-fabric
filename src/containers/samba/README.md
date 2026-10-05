@@ -28,3 +28,10 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `get_person.py` | Operation `get_person`: where a person lives and their groups |
 | `reset_password.py` | Operation `reset_password`: a new one-time password, the account unlocked |
 | `add_group_member.py` | Operation `add_group_member`: a person in a group, once |
+| `paths.py` | The DNs of `OU=sites`, a site's OU and its `OU=devices` |
+| `read_devices.py` | Operation `read_devices`: the site's devices and the roles it may use (its own and the organisation's) |
+| `save_device.py` | Operation `save_device`: a device created or replaced in the site's `OU=devices`, its roles by name |
+| `remove_device.py` | Operation `remove_device`: a device deleted |
+| `link_device_cert.py` | Operation `link_device_cert`: a certificate fingerprint recorded on a device or forgotten |
+| `save_role.py` | Operation `save_role`: a device role (a group with `fabricRole`) in the site's or the organisation's `OU=device-roles` |
+| `remove_role.py` | Operation `remove_role`: a role deleted, refused while devices carry it |

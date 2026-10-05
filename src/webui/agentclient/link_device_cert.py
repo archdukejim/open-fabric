@@ -7,7 +7,7 @@ def link_device_cert(actor, name, sha256, link=True):
              Agent route: POST /v1/devices/<name>/certs (pki:link-device).
     Inputs:  actor — str user name; name — device name; sha256 — certificate fingerprint; link — bool, True to
              record, False to forget (default True).
-    Returns: fabriclib.ldap.link_device_cert's result, or {} (unused).
+    Returns: fabriclib.directory.link_device_cert's result, or {} (unused).
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for an unknown device or bad fingerprint.

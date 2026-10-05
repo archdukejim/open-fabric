@@ -2,8 +2,10 @@
 site's fabric-agent account — so AD's per-site limits apply to it (1.6.3.6) — never as the system.
     docker exec -i samba python3 /fabric/directory_op.py < request.json
 The request on stdin (never a command line: it holds the account's password): {"op", "args" {…}, "site", "account",
-"password"}. Prints one JSON object: {"result": …} or {"error": message, "kind": refused|exists|missing|invalid|other}
-(exit 0 either way: the caller maps the kind to its own errors)."""
+"password"}. Prints one JSON object: {"result": …} or {"error": message, "kind":
+refused|exists|missing|rejected|invalid|other} (exit 0 either way: the caller maps the kind to its own errors). An
+operation's own refusal (a ValueError: "no such user: …") is kind "invalid", its message meant for the person
+asking."""
 import json
 import sys
 
@@ -17,8 +19,8 @@ from directory_ops import OPS
 CONF = "/data/etc/smb.conf"
 # LDAP result codes -> what the caller is told
 KINDS = {ldb.ERR_INSUFFICIENT_ACCESS_RIGHTS: "refused", ldb.ERR_ENTRY_ALREADY_EXISTS: "exists",
-         ldb.ERR_NO_SUCH_OBJECT: "missing", ldb.ERR_CONSTRAINT_VIOLATION: "invalid",
-         ldb.ERR_OBJECT_CLASS_VIOLATION: "invalid", ldb.ERR_UNWILLING_TO_PERFORM: "refused"}
+         ldb.ERR_NO_SUCH_OBJECT: "missing", ldb.ERR_CONSTRAINT_VIOLATION: "rejected",
+         ldb.ERR_OBJECT_CLASS_VIOLATION: "rejected", ldb.ERR_UNWILLING_TO_PERFORM: "refused"}
 
 
 def connect(site, account, password):

@@ -2,13 +2,13 @@ from agent.read_fields import read_fields
 from agent.read_text import read_text
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.load_vars import load_vars
-from fabriclib.ldap.add_device import add_device
-from fabriclib.ldap.add_role import add_role
-from fabriclib.ldap.link_device_cert import link_device_cert
-from fabriclib.ldap.remove_device import remove_device
-from fabriclib.ldap.remove_role import remove_role
-from fabriclib.ldap.update_device import update_device
-from fabriclib.ldap.update_role import update_role
+from fabriclib.directory.add_device import add_device
+from fabriclib.directory.add_role import add_role
+from fabriclib.directory.link_device_cert import link_device_cert
+from fabriclib.directory.remove_device import remove_device
+from fabriclib.directory.remove_role import remove_role
+from fabriclib.directory.update_device import update_device
+from fabriclib.directory.update_role import update_role
 
 
 def post_directory(route, actor, data):

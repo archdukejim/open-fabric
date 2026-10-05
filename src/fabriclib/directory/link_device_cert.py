@@ -1,17 +1,8 @@
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
-from fabriclib.ldap.common.run_dirsrv import run_dirsrv
-from fabriclib.ldap.constants import DEVICE_NAME_RE, FINGERPRINT_RE
-
-_LINK = r'''
-dn = "cn=%s,%s" % (IN["name"], DEV)
-op = ldap.MOD_ADD if IN["link"] else ldap.MOD_DELETE
-try:
-    c.modify_s(dn, [(op, "fabricCertFingerprint", [IN["fp"].encode()])])
-except (ldap.TYPE_OR_VALUE_EXISTS, ldap.NO_SUCH_ATTRIBUTE):
-    pass
-out({"ok": True})
-'''
+from fabriclib.directory.run_op import run_op
+from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.directory.constants import DEVICE_NAME_RE, FINGERPRINT_RE
 
 
 def link_device_cert(v, actor, name, fingerprint, link=True, source="web"):
@@ -23,9 +14,7 @@ def link_device_cert(v, actor, name, fingerprint, link=True, source="web"):
     Returns: None. Idempotent: adding a present or removing an absent fingerprint is not an error.
     Fails:   ValidationError "invalid device name: ..."; "not a SHA-256 fingerprint"; "no such entry" (no
              such device);
-             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
-             entry", "that name is already taken", "the directory refused the change ...", "directory
-             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+             run_op's errors (the directory unreachable, or refusing: e.g. another site's object).
     Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/devices/<name>/certs) -> webui
              agentclient.link_device_cert;
              pki/issue_key_pair, pki/sign_csr.
@@ -36,5 +25,5 @@ def link_device_cert(v, actor, name, fingerprint, link=True, source="web"):
         raise ValidationError(f"invalid device name: {name!r}")
     if not FINGERPRINT_RE.match(fp):
         raise ValidationError("not a SHA-256 fingerprint")
-    run_dirsrv(v, _LINK, {"name": name, "fp": fp, "link": bool(link)})
+    run_op(v, load_secrets(), "link_device_cert", {"name": name, "fingerprint": fp, "link": bool(link)})
     write_audit(actor, "DEVICE_CERT_LINK" if link else "DEVICE_CERT_UNLINK", f"device={name} sha256={fp}", source)

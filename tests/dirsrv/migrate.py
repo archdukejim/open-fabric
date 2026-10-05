@@ -1,7 +1,7 @@
 """Upgrade from before the directory split (fabriclib/ldap/migrate_local_suffix.py) against the test
 389-DS container (dstest): an old-layout device in a role and an old service account are built as
 Directory Manager, then migrated twice (the second run must change nothing).
-Run by tests/dirsrv/run.sh after devices.py."""
+Run by tests/dirsrv/run.sh after posix.py."""
 import json
 import os
 import shutil

@@ -16,9 +16,9 @@ def run_op(v, secrets, op, args=None, container="samba"):
              of the DC's directory_ops; args — dict of its arguments (JSON-able); container — the DC's container.
     Returns: the operation's result (JSON-decoded).
     Fails:   ValidationError with a message safe to show: "that name is already taken", "no such entry", "the
-             directory refused the change …", the directory's own message for an invalid change (e.g. a password
-             the policy refuses), or "the directory is not reachable" when the DC is not running; KeyError without
-             ad_agent_password; subprocess.TimeoutExpired after 60 s.
+             directory refused the change …", "the directory refused it: …" (e.g. a password the policy refuses),
+             an operation's own refusal word for word (e.g. "no such user: …"), or "the directory is not reachable"
+             when the DC is not running; KeyError without ad_agent_password; subprocess.TimeoutExpired after 60 s.
     Feeds:   fabriclib/directory/* (people, groups, devices, roles, networks)."""
     site = v["site_name"]
     request = {"op": op, "args": args or {}, "site": site, "account": f"fabric-agent-{site}",
@@ -31,5 +31,7 @@ def run_op(v, secrets, op, args=None, container="samba"):
     answer = json.loads(res.stdout.strip().splitlines()[-1])
     if "error" in answer:
         kind = answer.get("kind")
+        if kind == "invalid":                 # the operation's own refusal: its message is meant for the person
+            raise ValidationError(answer["error"])
         raise ValidationError(MESSAGES.get(kind) or f"the directory refused it: {answer['error']}")
     return answer["result"]

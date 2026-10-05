@@ -4,7 +4,7 @@ import time
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
-from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles
+from fabriclib.directory.ensure_default_device_roles import ensure_default_device_roles
 from fabriclib.ldap.migrate_local_suffix import migrate_local_suffix
 from fabriclib.federation.configure_directory_links import configure_directory_links
 from fabriclib.ldap.ensure_posix_identities import ensure_posix_identities
@@ -62,6 +62,13 @@ def run(ctx):
     ok(f"directory {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
     if write_bind_dlz(v):                         # the first provisioning: BIND now serves the AD zone
         ok(f"bind9: {start_unit('bind9', 'bind9', True)} (the AD zone through DLZ)")
+    if people_written_here(os.path.join(ctx.config_dir, "federation.yaml")):    # the root site: fabric's defaults
+        try:
+            added = ensure_default_device_roles(v, ctx.secrets, ctx.path("fabric", "config", ".default-device-roles"))
+        except ValidationError as e:
+            raise SetupError(str(e))
+        if added:
+            ok("default device roles: " + ", ".join(added))
 
     if v.get("install_ldap", True):
         registry = os.path.join(ctx.config_dir, "federation.yaml")
@@ -75,9 +82,6 @@ def run(ctx):
             posix = ensure_posix_identities(v)
             if posix["added"]:
                 ok("POSIX identities: " + ", ".join(posix["added"]))
-            added = ensure_default_device_roles(v, ctx.path("fabric", "config", ".default-device-roles"))
-            if added:
-                ok("default device roles: " + ", ".join(added))
         try:                                            # the federation's directory links (M5)
             linked = configure_directory_links(v, ctx.secrets, registry)
         except (ValidationError, RuntimeError) as e:

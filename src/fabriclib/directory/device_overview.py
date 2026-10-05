@@ -1,7 +1,7 @@
-from fabriclib.ldap.common.read_directory import read_directory
-from fabriclib.ldap.constants import DEVICE_TYPES, PERMISSIONS
-from fabriclib.ldap.list_devices import list_devices
-from fabriclib.ldap.list_roles import list_roles
+from fabriclib.directory.common.read_directory import read_directory
+from fabriclib.directory.constants import DEVICE_TYPES, PERMISSIONS
+from fabriclib.directory.list_devices import list_devices
+from fabriclib.directory.list_roles import list_roles
 
 
 def device_overview(v):

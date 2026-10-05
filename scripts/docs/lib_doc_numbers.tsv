@@ -38,11 +38,18 @@ file	fabricctl-jinja|src/containers/samba/ensure_service_accounts.py	26
 file	fabricctl-jinja|src/containers/samba/ensure_site_acl.py	19	
 file	fabricctl-jinja|src/containers/samba/ensure_site_info.py	27	
 file	fabricctl-jinja|src/containers/samba/get_person.py	31	
+file	fabricctl-jinja|src/containers/samba/link_device_cert.py	34	
 file	fabricctl-jinja|src/containers/samba/list_people.py	32	
 file	fabricctl-jinja|src/containers/samba/logon_rights_policy.py	20	
 file	fabricctl-jinja|src/containers/samba/open_samdb.py	21	
+file	fabricctl-jinja|src/containers/samba/paths.py	35	
+file	fabricctl-jinja|src/containers/samba/read_devices.py	36	
+file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
+file	fabricctl-jinja|src/containers/samba/remove_role.py	38	
 file	fabricctl-jinja|src/containers/samba/reset_password.py	33	
 file	fabricctl-jinja|src/containers/samba/root_ca_policy.py	22	
+file	fabricctl-jinja|src/containers/samba/save_device.py	39	
+file	fabricctl-jinja|src/containers/samba/save_role.py	40	
 file	fabricctl-jinja|src/containers/samba/set_password_policy.py	23	
 file	fabricctl-jinja|src/containers/samba/site_info.py	28	
 file	fabricctl-lib|src/federation/server.py	1	
@@ -145,12 +152,28 @@ file	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py	23
 file	fabriclib-dhcp|src/fabriclib/dhcp/set_option.py	24	
 file	fabriclib-dhcp|src/fabriclib/dhcp/unset_option.py	25	
 file	fabriclib-dhcp|src/fabriclib/dhcp/update_subnet.py	26	
+file	fabriclib-directory|src/fabriclib/directory/add_device.py	7	
+file	fabriclib-directory|src/fabriclib/directory/add_role.py	8	
+file	fabriclib-directory|src/fabriclib/directory/common/check_device_fields.py	9	
+file	fabriclib-directory|src/fabriclib/directory/common/check_role_fields.py	10	
+file	fabriclib-directory|src/fabriclib/directory/common/normalize_mac.py	11	
+file	fabriclib-directory|src/fabriclib/directory/common/read_directory.py	12	
 file	fabriclib-directory|src/fabriclib/directory/create_person.py	2	
+file	fabriclib-directory|src/fabriclib/directory/device_overview.py	13	
 file	fabriclib-directory|src/fabriclib/directory/ensure_admin.py	3	
+file	fabriclib-directory|src/fabriclib/directory/ensure_default_device_roles.py	14	
+file	fabriclib-directory|src/fabriclib/directory/link_device_cert.py	15	
+file	fabriclib-directory|src/fabriclib/directory/list_devices.py	16	
 file	fabriclib-directory|src/fabriclib/directory/list_people.py	4	
+file	fabriclib-directory|src/fabriclib/directory/list_roles.py	17	
 file	fabriclib-directory|src/fabriclib/directory/people_password.py	5	
+file	fabriclib-directory|src/fabriclib/directory/remove_device.py	18	
+file	fabriclib-directory|src/fabriclib/directory/remove_role.py	19	
+file	fabriclib-directory|src/fabriclib/directory/require_device.py	20	
 file	fabriclib-directory|src/fabriclib/directory/reset_sign_in.py	6	
 file	fabriclib-directory|src/fabriclib/directory/run_op.py	1	
+file	fabriclib-directory|src/fabriclib/directory/update_device.py	21	
+file	fabriclib-directory|src/fabriclib/directory/update_role.py	22	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py	1	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py	2	
 file	fabriclib-dns|src/fabriclib/dns/add_acl_entries.py	1	
@@ -251,30 +274,30 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17
 file	fabriclib-keycloak|src/fabriclib/keycloak/step.py	18	
 file	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py	19	
 file	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py	20	
-file	fabriclib-ldap|src/fabriclib/ldap/add_device.py	1	
-file	fabriclib-ldap|src/fabriclib/ldap/add_role.py	2	
-file	fabriclib-ldap|src/fabriclib/ldap/common/check_device_fields.py	3	
-file	fabriclib-ldap|src/fabriclib/ldap/common/check_role_fields.py	4	
-file	fabriclib-ldap|src/fabriclib/ldap/common/normalize_mac.py	5	
-file	fabriclib-ldap|src/fabriclib/ldap/common/read_directory.py	6	
+file	fabriclib-ldap|src/fabriclib/ldap/add_device.py	1	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/add_role.py	2	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/common/check_device_fields.py	3	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/common/check_role_fields.py	4	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/common/normalize_mac.py	5	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/common/read_directory.py	6	0.5.0 / 2026-10-04
 file	fabriclib-ldap|src/fabriclib/ldap/common/run_dirsrv.py	7	
-file	fabriclib-ldap|src/fabriclib/ldap/device_overview.py	8	
+file	fabriclib-ldap|src/fabriclib/ldap/device_overview.py	8	0.5.0 / 2026-10-04
 file	fabriclib-ldap|src/fabriclib/ldap/ensure_admin_user.py	9	
-file	fabriclib-ldap|src/fabriclib/ldap/ensure_default_device_roles.py	10	
+file	fabriclib-ldap|src/fabriclib/ldap/ensure_default_device_roles.py	10	0.5.0 / 2026-10-04
 file	fabriclib-ldap|src/fabriclib/ldap/ensure_posix_identities.py	11	
-file	fabriclib-ldap|src/fabriclib/ldap/link_device_cert.py	12	
-file	fabriclib-ldap|src/fabriclib/ldap/list_devices.py	13	
+file	fabriclib-ldap|src/fabriclib/ldap/link_device_cert.py	12	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/list_devices.py	13	0.5.0 / 2026-10-04
 file	fabriclib-ldap|src/fabriclib/ldap/list_people.py	14	
-file	fabriclib-ldap|src/fabriclib/ldap/list_roles.py	15	
+file	fabriclib-ldap|src/fabriclib/ldap/list_roles.py	15	0.5.0 / 2026-10-04
 file	fabriclib-ldap|src/fabriclib/ldap/migrate_local_suffix.py	16	
 file	fabriclib-ldap|src/fabriclib/ldap/people_written_here.py	17	
-file	fabriclib-ldap|src/fabriclib/ldap/remove_device.py	18	
-file	fabriclib-ldap|src/fabriclib/ldap/remove_role.py	19	
-file	fabriclib-ldap|src/fabriclib/ldap/require_device.py	20	
+file	fabriclib-ldap|src/fabriclib/ldap/remove_device.py	18	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/remove_role.py	19	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/require_device.py	20	0.5.0 / 2026-10-04
 file	fabriclib-ldap|src/fabriclib/ldap/run_directory_command.py	21	
 file	fabriclib-ldap|src/fabriclib/ldap/seed_directory.py	22	
-file	fabriclib-ldap|src/fabriclib/ldap/update_device.py	23	
-file	fabriclib-ldap|src/fabriclib/ldap/update_role.py	24	
+file	fabriclib-ldap|src/fabriclib/ldap/update_device.py	23	0.5.0 / 2026-10-04
+file	fabriclib-ldap|src/fabriclib/ldap/update_role.py	24	0.5.0 / 2026-10-04
 file	fabriclib-logs|src/fabriclib/logs/deploy_fluentbit.py	1	
 file	fabriclib-logs|src/fabriclib/logs/log_status.py	2	
 file	fabriclib-logs|src/fabriclib/logs/run_logs_command.py	3	
@@ -666,13 +689,24 @@ function	fabricctl-jinja|src/containers/samba/ensure_site_acl.py|_sid	3
 function	fabricctl-jinja|src/containers/samba/ensure_site_acl.py|ensure_site_acl	2	
 function	fabricctl-jinja|src/containers/samba/ensure_site_info.py|ensure_site_info	1	
 function	fabricctl-jinja|src/containers/samba/get_person.py|get_person	1	
+function	fabricctl-jinja|src/containers/samba/link_device_cert.py|link_device_cert	1	
 function	fabricctl-jinja|src/containers/samba/list_people.py|_cn	1	
 function	fabricctl-jinja|src/containers/samba/list_people.py|_site	2	
 function	fabricctl-jinja|src/containers/samba/list_people.py|list_people	3	
 function	fabricctl-jinja|src/containers/samba/logon_rights_policy.py|logon_rights_policy	1	
 function	fabricctl-jinja|src/containers/samba/open_samdb.py|open_samdb	1	
+function	fabricctl-jinja|src/containers/samba/paths.py|devices_dn	2	
+function	fabricctl-jinja|src/containers/samba/paths.py|site_dn	1	
+function	fabricctl-jinja|src/containers/samba/paths.py|sites_dn	3	
+function	fabricctl-jinja|src/containers/samba/read_devices.py|_one	1	
+function	fabricctl-jinja|src/containers/samba/read_devices.py|read_devices	2	
+function	fabricctl-jinja|src/containers/samba/remove_device.py|remove_device	1	
+function	fabricctl-jinja|src/containers/samba/remove_role.py|remove_role	1	
 function	fabricctl-jinja|src/containers/samba/reset_password.py|reset_password	1	
 function	fabricctl-jinja|src/containers/samba/root_ca_policy.py|root_ca_policy	1	
+function	fabricctl-jinja|src/containers/samba/save_device.py|_owner_dn	1	
+function	fabricctl-jinja|src/containers/samba/save_device.py|save_device	2	
+function	fabricctl-jinja|src/containers/samba/save_role.py|save_role	1	
 function	fabricctl-jinja|src/containers/samba/set_password_policy.py|_ticks	1	
 function	fabricctl-jinja|src/containers/samba/set_password_policy.py|set_password_policy	2	
 function	fabricctl-jinja|src/containers/samba/site_info.py|site_info	1	
@@ -820,12 +854,28 @@ function	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py|run_dhcp_command	
 function	fabriclib-dhcp|src/fabriclib/dhcp/set_option.py|set_option	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/unset_option.py|unset_option	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/update_subnet.py|update_subnet	1	
+function	fabriclib-directory|src/fabriclib/directory/add_device.py|add_device	1	
+function	fabriclib-directory|src/fabriclib/directory/add_role.py|add_role	1	
+function	fabriclib-directory|src/fabriclib/directory/common/check_device_fields.py|check_device_fields	1	
+function	fabriclib-directory|src/fabriclib/directory/common/check_role_fields.py|check_role_fields	1	
+function	fabriclib-directory|src/fabriclib/directory/common/normalize_mac.py|normalize_mac	1	
+function	fabriclib-directory|src/fabriclib/directory/common/read_directory.py|read_directory	1	
 function	fabriclib-directory|src/fabriclib/directory/create_person.py|create_person	1	
+function	fabriclib-directory|src/fabriclib/directory/device_overview.py|device_overview	1	
 function	fabriclib-directory|src/fabriclib/directory/ensure_admin.py|ensure_admin	1	
+function	fabriclib-directory|src/fabriclib/directory/ensure_default_device_roles.py|ensure_default_device_roles	1	
+function	fabriclib-directory|src/fabriclib/directory/link_device_cert.py|link_device_cert	1	
+function	fabriclib-directory|src/fabriclib/directory/list_devices.py|list_devices	1	
 function	fabriclib-directory|src/fabriclib/directory/list_people.py|list_people	1	
+function	fabriclib-directory|src/fabriclib/directory/list_roles.py|list_roles	1	
 function	fabriclib-directory|src/fabriclib/directory/people_password.py|people_password	1	
+function	fabriclib-directory|src/fabriclib/directory/remove_device.py|remove_device	1	
+function	fabriclib-directory|src/fabriclib/directory/remove_role.py|remove_role	1	
+function	fabriclib-directory|src/fabriclib/directory/require_device.py|require_device	1	
 function	fabriclib-directory|src/fabriclib/directory/reset_sign_in.py|reset_sign_in	1	
 function	fabriclib-directory|src/fabriclib/directory/run_op.py|run_op	1	
+function	fabriclib-directory|src/fabriclib/directory/update_device.py|update_device	1	
+function	fabriclib-directory|src/fabriclib/directory/update_role.py|update_role	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py|build_adguard_config	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py|_domains	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py|deploy_adguard	2	
@@ -961,30 +1011,30 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/step.py|step	1
 function	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py|user_has_role	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py|_client	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py|verify_user_token	2	
-function	fabriclib-ldap|src/fabriclib/ldap/add_device.py|add_device	1	
-function	fabriclib-ldap|src/fabriclib/ldap/add_role.py|add_role	1	
-function	fabriclib-ldap|src/fabriclib/ldap/common/check_device_fields.py|check_device_fields	1	
-function	fabriclib-ldap|src/fabriclib/ldap/common/check_role_fields.py|check_role_fields	1	
-function	fabriclib-ldap|src/fabriclib/ldap/common/normalize_mac.py|normalize_mac	1	
-function	fabriclib-ldap|src/fabriclib/ldap/common/read_directory.py|read_directory	1	
+function	fabriclib-ldap|src/fabriclib/ldap/add_device.py|add_device	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/add_role.py|add_role	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/common/check_device_fields.py|check_device_fields	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/common/check_role_fields.py|check_role_fields	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/common/normalize_mac.py|normalize_mac	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/common/read_directory.py|read_directory	1	0.5.0 / 2026-10-04
 function	fabriclib-ldap|src/fabriclib/ldap/common/run_dirsrv.py|run_dirsrv	1	
-function	fabriclib-ldap|src/fabriclib/ldap/device_overview.py|device_overview	1	
+function	fabriclib-ldap|src/fabriclib/ldap/device_overview.py|device_overview	1	0.5.0 / 2026-10-04
 function	fabriclib-ldap|src/fabriclib/ldap/ensure_admin_user.py|ensure_admin_user	1	
-function	fabriclib-ldap|src/fabriclib/ldap/ensure_default_device_roles.py|ensure_default_device_roles	1	
+function	fabriclib-ldap|src/fabriclib/ldap/ensure_default_device_roles.py|ensure_default_device_roles	1	0.5.0 / 2026-10-04
 function	fabriclib-ldap|src/fabriclib/ldap/ensure_posix_identities.py|ensure_posix_identities	1	
-function	fabriclib-ldap|src/fabriclib/ldap/link_device_cert.py|link_device_cert	1	
-function	fabriclib-ldap|src/fabriclib/ldap/list_devices.py|list_devices	1	
+function	fabriclib-ldap|src/fabriclib/ldap/link_device_cert.py|link_device_cert	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/list_devices.py|list_devices	1	0.5.0 / 2026-10-04
 function	fabriclib-ldap|src/fabriclib/ldap/list_people.py|list_people	1	
-function	fabriclib-ldap|src/fabriclib/ldap/list_roles.py|list_roles	1	
+function	fabriclib-ldap|src/fabriclib/ldap/list_roles.py|list_roles	1	0.5.0 / 2026-10-04
 function	fabriclib-ldap|src/fabriclib/ldap/migrate_local_suffix.py|migrate_local_suffix	1	
 function	fabriclib-ldap|src/fabriclib/ldap/people_written_here.py|people_written_here	1	
-function	fabriclib-ldap|src/fabriclib/ldap/remove_device.py|remove_device	1	
-function	fabriclib-ldap|src/fabriclib/ldap/remove_role.py|remove_role	1	
-function	fabriclib-ldap|src/fabriclib/ldap/require_device.py|require_device	1	
+function	fabriclib-ldap|src/fabriclib/ldap/remove_device.py|remove_device	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/remove_role.py|remove_role	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/require_device.py|require_device	1	0.5.0 / 2026-10-04
 function	fabriclib-ldap|src/fabriclib/ldap/run_directory_command.py|run_directory_command	1	
 function	fabriclib-ldap|src/fabriclib/ldap/seed_directory.py|seed_directory	1	
-function	fabriclib-ldap|src/fabriclib/ldap/update_device.py|update_device	1	
-function	fabriclib-ldap|src/fabriclib/ldap/update_role.py|update_role	1	
+function	fabriclib-ldap|src/fabriclib/ldap/update_device.py|update_device	1	0.5.0 / 2026-10-04
+function	fabriclib-ldap|src/fabriclib/ldap/update_role.py|update_role	1	0.5.0 / 2026-10-04
 function	fabriclib-logs|src/fabriclib/logs/deploy_fluentbit.py|_write	1	
 function	fabriclib-logs|src/fabriclib/logs/deploy_fluentbit.py|deploy_fluentbit	2	
 function	fabriclib-logs|src/fabriclib/logs/log_status.py|log_status	1	

@@ -1,5 +1,5 @@
 from fabriclib.common.errors import ValidationError
-from fabriclib.ldap.common.read_directory import read_directory
+from fabriclib.directory.common.read_directory import read_directory
 
 
 def require_device(v, name):

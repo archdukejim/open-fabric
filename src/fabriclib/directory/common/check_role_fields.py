@@ -1,5 +1,5 @@
 from fabriclib.common.errors import ValidationError
-from fabriclib.ldap.constants import PERMISSIONS
+from fabriclib.directory.constants import PERMISSIONS
 
 
 def check_role_fields(fields):

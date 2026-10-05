@@ -157,11 +157,6 @@ echo "--- POSIX identities"
 REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/posix.py" | tee "$W/posix.log"
 PASS=$((PASS + $(grep -c '^PASS' "$W/posix.log"))); FAIL=$((FAIL + $(grep -c '^FAIL' "$W/posix.log")))
 
-# ---- device RBAC (fabriclib/ldap device + role operations as cn=device_admin)
-echo "--- devices and roles"
-REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/devices.py" | tee "$W/devices.log"
-PASS=$((PASS + $(grep -c '^PASS' "$W/devices.log"))); FAIL=$((FAIL + $(grep -c '^FAIL' "$W/devices.log")))
-
 # ---- upgrade from before the directory split (fabriclib/ldap/migrate_local_suffix.py)
 echo "--- migration to the local suffix"
 REPO="$REPO" BASE="$BASE" python3 "$REPO/tests/dirsrv/migrate.py" | tee "$W/migrate.log"

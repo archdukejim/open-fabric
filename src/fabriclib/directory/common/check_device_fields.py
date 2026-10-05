@@ -1,6 +1,6 @@
 from fabriclib.common.errors import ValidationError
-from fabriclib.ldap.common.normalize_mac import normalize_mac
-from fabriclib.ldap.constants import DEVICE_TYPES, USER_RE
+from fabriclib.directory.common.normalize_mac import normalize_mac
+from fabriclib.directory.constants import DEVICE_TYPES, USER_RE
 
 
 def check_device_fields(fields, directory, name):

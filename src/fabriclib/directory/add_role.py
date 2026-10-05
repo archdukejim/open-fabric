@@ -1,22 +1,9 @@
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
-from fabriclib.ldap.common.check_role_fields import check_role_fields
-from fabriclib.ldap.common.run_dirsrv import run_dirsrv
-from fabriclib.ldap.constants import ROLE_NAME_RE
-
-_ADD = r'''
-r = IN
-attrs = {"objectClass": [b"top", b"groupOfNames", b"fabricRole"], "cn": [r["name"].encode()],
-         "fabricPriority": [str(r["priority"]).encode()]}
-if r["description"]:
-    attrs["description"] = [r["description"].encode()]
-if r["permissions"]:
-    attrs["fabricPermission"] = [p.encode() for p in r["permissions"]]
-if r["vlan"]:
-    attrs["fabricVlan"] = [str(r["vlan"]).encode()]
-c.add_s("cn=%s,%s" % (r["name"], ROLES), list(attrs.items()))
-out({"ok": True})
-'''
+from fabriclib.directory.common.check_role_fields import check_role_fields
+from fabriclib.directory.run_op import run_op
+from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.directory.constants import ROLE_NAME_RE
 
 
 def add_role(v, actor, name, fields, source="web"):
@@ -27,9 +14,7 @@ def add_role(v, actor, name, fields, source="web"):
     Returns: the normalised role name.
     Fails:   ValidationError "role name: lowercase letters, digits, '-' and '_'"; check_role_fields'
              messages; "that name is already taken";
-             run_dirsrv's errors (ValidationError: password missing, dirsrv not running, "no such
-             entry", "that name is already taken", "the directory refused the change ...", "directory
-             error: ..."; RuntimeError "directory operation failed: ..."; subprocess.TimeoutExpired).
+             run_op's errors (the directory unreachable, or refusing: e.g. another site's object).
     Feeds:   agent/ (fabric-agent) Handler.directory (POST /v1/roles) -> webui agentclient.save_role.
     Notes:   audited as ROLE_ADD.
     """
@@ -37,7 +22,7 @@ def add_role(v, actor, name, fields, source="web"):
     if not ROLE_NAME_RE.match(name):
         raise ValidationError("role name: lowercase letters, digits, '-' and '_'")
     f = check_role_fields(fields)
-    run_dirsrv(v, _ADD, {"name": name, **f})
+    run_op(v, load_secrets(), "save_role", {"name": name, **f, "new": True})
     write_audit(actor, "ROLE_ADD", f"role={name} permissions={','.join(f['permissions']) or '-'} "
                                    f"vlan={f['vlan'] or '-'} priority={f['priority']}", source)
     return name
