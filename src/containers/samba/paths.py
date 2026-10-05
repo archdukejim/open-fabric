@@ -19,6 +19,15 @@ def site_dn(samdb, site):
     return _found[site]
 
 
+def forget():
+    """Purpose: drop every site OU found so far: after a site moved, its DN and those of the sites below it changed.
+    Inputs:  none.
+    Returns: None.
+    Fails:   never.
+    Feeds:   ensure_layout (a move)."""
+    _found.clear()
+
+
 def organisation_dn(samdb):
     """Purpose: the organisation's OU, in the root site's OU (manual 1.6.3.4).
     Inputs:  samdb — SamDB.

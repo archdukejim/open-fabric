@@ -3,7 +3,7 @@ database: no credentials, no network. Run after every start and apply by fabricl
     docker exec -i samba python3 /fabric/converge.py < state.json
 The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [site_networks
 items], "root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name:
-password}, "radius_gid", "lan_profile", optional "parent", "rodc" and "join_account"} (stdin, never a command
+password}, "radius_gid", "lan_profile", optional "parent", "rodc", "join_account" and "moving"} (stdin, never a command
 line: it holds the service accounts' passwords). Prints one JSON object: {"changed": [what changed, …]}. Exits 1
 with the error on stderr."""
 import json
@@ -48,8 +48,9 @@ def converge(state):
              FreeRADIUS's group, given winbind's privileged pipe), parent (str, optional: a site's parent site,
              for the AD site link), rodc (bool, optional: a read-only DC, where
              only winbind's pipe is converged), join_account ({name, password}, optional: at the root, the
-             temporary account a new site's DC joins with), lan_profile (str: the Windows wired 802.1X profile
-             the baseline installs, "" without one).
+             temporary account a new site's DC joins with), moving (bool, optional: at a new parent, a site with its
+             own DC moving here: its OU and links only, never its GPOs, which its own DC owns), lan_profile (str:
+             the Windows wired 802.1X profile the baseline installs, "" without one).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
     Feeds:   this script's main."""
@@ -74,6 +75,9 @@ def converge(state):
         changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
         changed += ensure_gpo(samdb, lp, "fabric: trust in fabric's root CA", base, TRUST_EXTENSIONS,
                               {"Machine/Registry.pol": root_ca_policy(state["root_ca_pem"])})
+    if state.get("moving"):               # a site with its own DC moving here: its GPOs are its own to rewrite
+        changed += share_winbind(lp, int(state["radius_gid"]))
+        return changed
     # a machine's own local Administrators keep log-on too: the policy replaces Windows' local lists, and its owners
     # must never be locked out of it; the roles of this site and of every site above it log on to administer (D103)
     owners = [site] + paths.ancestors(samdb, site)

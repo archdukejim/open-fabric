@@ -60,9 +60,10 @@ file	fabricctl-jinja|src/containers/samba/paths.py	35
 file	fabricctl-jinja|src/containers/samba/policy_entries.py	52	
 file	fabricctl-jinja|src/containers/samba/pull_sysvol.py	61	
 file	fabricctl-jinja|src/containers/samba/read_devices.py	36	
-file	fabricctl-jinja|src/containers/samba/read_id_blocks.py	62	
+file	fabricctl-jinja|src/containers/samba/read_id_blocks.py	62	0.5.0 / 2026-10-05
 file	fabricctl-jinja|src/containers/samba/read_networks.py	45	
 file	fabricctl-jinja|src/containers/samba/read_replication.py	60	
+file	fabricctl-jinja|src/containers/samba/read_sites.py	65	
 file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
 file	fabricctl-jinja|src/containers/samba/remove_machine.py	55	
 file	fabricctl-jinja|src/containers/samba/remove_role.py	38	
@@ -404,8 +405,9 @@ file	fabriclib-rbac|src/fabriclib/rbac/user_permissions.py	2
 file	fabriclib-samba|src/fabriclib/samba/clear_gpo_policy.py	11	
 file	fabriclib-samba|src/fabriclib/samba/converge_domain.py	2	
 file	fabriclib-samba|src/fabriclib/samba/deploy_samba.py	1	
-file	fabriclib-samba|src/fabriclib/samba/domain_id_blocks.py	20	
+file	fabriclib-samba|src/fabriclib/samba/domain_id_blocks.py	20	0.5.0 / 2026-10-05
 file	fabriclib-samba|src/fabriclib/samba/domain_overview.py	12	
+file	fabriclib-samba|src/fabriclib/samba/domain_sites.py	21	
 file	fabriclib-samba|src/fabriclib/samba/domain_status.py	3	
 file	fabriclib-samba|src/fabriclib/samba/finish_join.py	15	
 file	fabriclib-samba|src/fabriclib/samba/gpo_overview.py	13	
@@ -788,6 +790,7 @@ function	fabricctl-jinja|src/containers/samba/logon_rights_policy.py|logon_right
 function	fabricctl-jinja|src/containers/samba/open_samdb.py|open_samdb	1	
 function	fabricctl-jinja|src/containers/samba/paths.py|ancestors	5	
 function	fabricctl-jinja|src/containers/samba/paths.py|devices_dn	2	
+function	fabricctl-jinja|src/containers/samba/paths.py|forget	7	
 function	fabricctl-jinja|src/containers/samba/paths.py|organisation_dn	4	
 function	fabricctl-jinja|src/containers/samba/paths.py|relative	6	
 function	fabricctl-jinja|src/containers/samba/paths.py|site_dn	1	
@@ -803,10 +806,11 @@ function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|_writable_dc	4
 function	fabricctl-jinja|src/containers/samba/pull_sysvol.py|pull_sysvol	5	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|_one	1	
 function	fabricctl-jinja|src/containers/samba/read_devices.py|read_devices	2	
-function	fabricctl-jinja|src/containers/samba/read_id_blocks.py|read_id_blocks	1	
+function	fabricctl-jinja|src/containers/samba/read_id_blocks.py|read_id_blocks	1	0.5.0 / 2026-10-05
 function	fabricctl-jinja|src/containers/samba/read_networks.py|read_networks	1	
 function	fabricctl-jinja|src/containers/samba/read_replication.py|_when	1	
 function	fabricctl-jinja|src/containers/samba/read_replication.py|read_replication	2	
+function	fabricctl-jinja|src/containers/samba/read_sites.py|read_sites	1	
 function	fabricctl-jinja|src/containers/samba/remove_device.py|remove_device	1	
 function	fabricctl-jinja|src/containers/samba/remove_machine.py|remove_machine	1	
 function	fabricctl-jinja|src/containers/samba/remove_role.py|remove_role	1	
@@ -1251,8 +1255,9 @@ function	fabriclib-samba|src/fabriclib/samba/converge_domain.py|_lan_profile	2
 function	fabriclib-samba|src/fabriclib/samba/converge_domain.py|converge_domain	1	
 function	fabriclib-samba|src/fabriclib/samba/deploy_samba.py|_chrony_gid	2	
 function	fabriclib-samba|src/fabriclib/samba/deploy_samba.py|deploy_samba	1	
-function	fabriclib-samba|src/fabriclib/samba/domain_id_blocks.py|domain_id_blocks	1	
+function	fabriclib-samba|src/fabriclib/samba/domain_id_blocks.py|domain_id_blocks	1	0.5.0 / 2026-10-05
 function	fabriclib-samba|src/fabriclib/samba/domain_overview.py|domain_overview	1	
+function	fabriclib-samba|src/fabriclib/samba/domain_sites.py|domain_sites	1	
 function	fabriclib-samba|src/fabriclib/samba/domain_status.py|_dc	1	
 function	fabriclib-samba|src/fabriclib/samba/domain_status.py|domain_status	2	
 function	fabriclib-samba|src/fabriclib/samba/finish_join.py|finish_join	1	

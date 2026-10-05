@@ -12,7 +12,9 @@ def prepare_site(v, site, networks, id_block, accounts, join_password, container
     Inputs:  v — the parent's vars (ad_password_policy, deploy_base_dir (the root CA), webui_admin_group,
              service_users); site — the new site's name; networks — its networks as the join request gives them
              ([{name, cidr, allow_overlap}]); id_block — "first-last" (next_id_block); accounts — {kind: password} for
-             agent, keycloak, radius; join_password — the join account's password; container — the parent's DC.
+             agent, keycloak, radius (unused for a site moving here); join_password — the join account's password,
+             or None for a site whose DC is in the domain already (one moving here: its OU moves, no join account,
+             its service accounts untouched); container — the parent's DC.
     Returns: list of str, what changed.
     Fails:   ValidationError from run_converge (the DC not running, AD refusing); OSError reading the root CA;
              KeyError for a missing var.
@@ -24,8 +26,13 @@ def prepare_site(v, site, networks, id_block, accounts, join_password, container
     state = {"site": site, "root": False, "password_policy": v["ad_password_policy"], "networks": nets,
              "root_ca_pem": open(root_ca).read(), "id_range": id_block, "groups": [],
              "admin_group": v.get("webui_admin_group") or "admins",
-             "accounts": {f"fabric-{kind}-{site}": accounts[kind] for kind in ("agent", "keycloak", "radius")},
+             # a site moving here keeps its service accounts and their passwords (convergence would reset them)
+             "accounts": {} if join_password is None else
+                         {f"fabric-{kind}-{site}": accounts[kind] for kind in ("agent", "keycloak", "radius")},
              "radius_gid": v["service_users"]["freeradius"]["gid"], "lan_profile": "",
-             "join_account": {"name": f"fabric-join-{site}", "password": join_password},
              "parent": v["site_name"]}
+    if join_password is not None:
+        state["join_account"] = {"name": f"fabric-join-{site}", "password": join_password}
+    else:                    # its GPOs belong to its own DC (S8.4): it rewrites them when it converges next
+        state["moving"] = True
     return run_converge(state, container)

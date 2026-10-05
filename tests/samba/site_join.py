@@ -218,6 +218,48 @@ if "lab2" in joined:
     check("lab's agent resets a person of lab2, the site nested below it (inherited rights, D105)",
           until(lab_resets_deepy, 600))
 
+    # ---- re-parenting (manual 1.8.8.14): lab2 moves from lab to the root, as the root's accept_join does for a
+    # site already in the domain (no join account; its OU moves with everything in it)
+    nets2 = [{"name": "lan", "cidr": SITES["lab2"][3]}]
+    try:
+        prepare_site({**RV, "site_name": "lab2"}, "lab", nets2, registry["sites"]["lab"]["id_range"], {}, None,
+                     container=ROOT)
+        loop = ""
+    except ValidationError as e:
+        loop = str(e)
+    check("refused: moving lab under lab2, which sits below it", "sits below" in loop, loop)
+    sid_before = search(ROOT, "(sAMAccountName=deepy)", ["objectSid"]).split("objectSid: ")[-1].split()[0]
+    moved = prepare_site(RV, "lab2", nets2, registry["sites"]["lab2"]["id_range"],
+                         {k: random_password() for k in ("agent", "keycloak", "radius")}, None, container=ROOT)
+    deepy = search(ROOT, "(sAMAccountName=deepy)", ["objectSid"])
+    check("the root moves lab2's OU under its own, with its people, who keep their SIDs",
+          any("site lab2 moved" in c for c in moved) and f"OU=people,OU=lab2,OU=lan,OU=sites,{BASE}" in deepy
+          and f"objectSid: {sid_before}" in deepy, (moved, deepy))
+    links = search(ROOT, "(objectClass=siteLink)", ["cn"], base=f"CN=Sites,CN=Configuration,{BASE}")
+    check("lab2's site link now goes to the root, the one to lab is gone",
+          "cn: lan-lab2" in links and "cn: lab-lab2" not in links, links)
+    check("no join account was made for a site already in the domain",
+          "sAMAccountName" not in search(ROOT, "(sAMAccountName=fabric-join-lab2)", ["sAMAccountName"]))
+    check("lab2's agent still signs in at its own DC with its own password (the move kept the service accounts)",
+          until(lambda: run_op(v, secrets, "site_info", container=container)["dn"].startswith("OU=lab2,OU=lan,"), 600))
+    with open(os.path.join(W, "lab2", "federation.yaml"), "w") as f:      # what reparent writes: the new parent
+        yaml.safe_dump({"sites": {}, "upstream": {"site_name": "lan"}}, f)
+    try:
+        after = converge_domain(v, os.path.join(W, "lab2", "federation.yaml"), secrets, container=container)
+    except ValidationError as e:
+        after = [f"error: {e}"]
+    check("lab2's own convergence after the move rewrites its log-on GPO for its new parents (its own DC owns it)",
+          any("log-on rights: version" in c for c in after) and not any(c.startswith("error") for c in after), after)
+
+    def lab_refused_on_deepy():
+        try:
+            run_op(lab_v, lab_s, "reset_password", {"uid": "deepy", "password": "Rs-" + random_password(20)}, lab_c)
+            return False
+        except ValidationError:
+            return True      # lab no longer sits above lab2 (once the move reached lab's DC)
+
+    check("lab's agent no longer reaches lab2's people", until(lab_refused_on_deepy, 600))
+
 # ---- a read-only site: the domain to read, nothing to write
 if "edge" in joined:
     container, v, secrets = joined["edge"]

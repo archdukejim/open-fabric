@@ -36,13 +36,25 @@ def ensure_layout(samdb, site, root, parent=""):
     Fails:   ValueError for a site with neither root nor parent; LookupError when the parent's OU is missing;
              ldb.LdbError from an addition or modification AD refuses.
     Feeds:   converge.
-    Notes:   an existing site OU is never moved here (re-parenting moves it: manual 1.8.8.14)."""
+    Notes:   a site OU that sits under another parent than `parent` is moved under it, with everything in it
+             (re-parenting, manual 1.8.8.14): AD keeps every object's SID and GUID, and the access its new parents
+             give is inherited at once."""
     base = str(samdb.domain_dn())
     done = []
     if _ensure_ou(samdb, f"OU=sites,{base}"):
         done.append(f"OU=sites,{base}")
     try:
         site_dn = paths.site_dn(samdb, site)
+        if parent and not root:
+            above = paths.site_dn(samdb, parent)
+            if site_dn.split(",", 1)[1].lower() != above.lower():
+                if above.lower().endswith("," + site_dn.lower()):
+                    raise ValueError(f"site {site}: {parent} sits below it, so it cannot become its parent")
+                moved = f"OU={site},{above}"
+                samdb.rename(site_dn, moved)
+                paths.forget()
+                done.append(f"site {site} moved: {site_dn} -> {moved}")
+                site_dn = moved
     except LookupError:
         if root:
             site_dn = f"OU={site},OU=sites,{base}"

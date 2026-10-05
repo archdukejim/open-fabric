@@ -18,6 +18,7 @@ from fabriclib.federation.next_id_block import next_id_block
 from fabriclib.federation.read_address_plan import read_address_plan
 from fabriclib.federation.site_networks import site_networks
 from fabriclib.pki.sign_site_ca import sign_site_ca
+from fabriclib.samba.domain_sites import domain_sites
 from fabriclib.samba.prepare_site import prepare_site
 from fabriclib.secrets.load_secrets import load_secrets
 from fabriclib.secrets.random_password import random_password
@@ -160,15 +161,24 @@ def _prepare_domain(v, site, dc_type, networks, registry):
              dc_type — the invitation's ("writable", "rodc"; "" for none: nothing is prepared); networks — the join
              request's; registry — load_registry()'s dict (the blocks handed out so far).
     Returns: {"ad_domain", "dc_type", "dc_host", "dc_address", "id_range", "join_user", "join_password",
-             "accounts" {agent, keycloak, radius}, "site_ou" (its OU in this site's, D105), "org_ou"}, or {} without a
-             DC type.
+             "accounts" {agent, keycloak, radius}, "site_ou" (its OU in this site's, D105), "org_ou"}; for a site
+             already in the domain (moving here) {"ad_domain", "dc_type", "id_range" (its own), "moved": True,
+             "site_ou", "org_ou"} (its OU moved, no join account, its service accounts keep their passwords); {}
+             without a DC type.
     Fails:   ValidationError from prepare_site (the root's DC not running or refusing): the invitation is kept.
     Feeds:   accept_join."""
     if not dc_type:
         return {}
+    held = {s["site"]: s for s in domain_sites()}
     accounts = {kind: random_password() for kind in ("agent", "keycloak", "radius")}
+    if site in held:        # a site of the domain moving here (re-parenting, D105): its OU moves, its DC stays
+        block = held[site]["id_range"] or next_id_block(v, registry, sites=list(held.values()))
+        prepare_site(v, site, networks, block, {}, None)
+        site_ou = v.get("ad_site_ou") or f"OU={v['site_name']},OU=sites"
+        return {"ad_domain": v["ad_domain"], "dc_type": dc_type, "id_range": block, "moved": True,
+                "site_ou": f"OU={site},{site_ou}", "org_ou": v.get("ad_org_ou") or f"OU=organisation,{site_ou}"}
     join_password = random_password()
-    block = next_id_block(v, registry)
+    block = next_id_block(v, registry, sites=list(held.values()))
     prepare_site(v, site, networks, block, accounts, join_password)
     site_ou = v.get("ad_site_ou") or f"OU={v['site_name']},OU=sites"     # this site's: the new one nests in it
     return {"ad_domain": v["ad_domain"], "dc_type": dc_type, "dc_host": v["hostname_dc"], "dc_address": v["host_ip"],
