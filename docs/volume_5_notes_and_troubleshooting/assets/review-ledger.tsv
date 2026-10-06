@@ -1,5 +1,5 @@
 # path	blob (git hash-object of the reviewed content)	reviewed (UTC date)	note
-.claude/launch.json	e33755573889140316642dc95d1c971627e81fd6	2026-10-06	
+.claude/launch.json	d825e04e405e671cdac0ca91a0218281215e42b3	2026-10-06	
 .gitattributes	f273656c60a04a693192b0bdc27eb5465842e911	2026-09-30	
 .github/workflows/images.yml	1481161542f74c31ea481cfcae222afa9dd08362	2026-10-05	
 .github/workflows/lint.yml	73461f942487bc6108f21bbb420ee97584eac928	2026-10-03	
@@ -19,7 +19,7 @@ docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	825d3aee51e3894077adbd21536b7d35266086f5	2026-10-05	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	38831f540d834e557e42b3821154c245f5945a3d	2026-10-06	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	f32ecc9983f67d3a8ed2cd83a0b9c8ac03e9ab99	2026-10-06	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -101,7 +101,7 @@ docs/volume_2_technologies_and_features/2.1.7-directory.md	7069f8b9c35321f91277d
 docs/volume_2_technologies_and_features/2.1.8-landing-links.md	fe90652ee66699bbb24d1e58a45dfc40ff23f01c	2026-10-03	
 docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	5fed10050c95d05abb3d0911b494124991cccdfa	2026-10-05	
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	7de192a312db784ad93696b8318d138e702f6d5a	2026-10-05	
-docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	4af789a46e755a067896503f976c31e37face95a	2026-10-05	
+docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	825139bf5114e8e58cfe4cfeca09a382b6930a0b	2026-10-06	
 docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	72f82eaf4d59314ace1c5c09f2226a63a9dd9c56	2026-10-04	
 docs/volume_2_technologies_and_features/2.11.2-samba-dc.md	7e885ec0c8d4a4233d93f6c12bdd99e257e717e4	2026-10-05	
 docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	51247e38f304e6b3c52feb6905861e08181be9c3	2026-10-05	
@@ -128,7 +128,7 @@ docs/volume_3_operations/3.14.1-resources.md	236c07bde74d9f79b380593464fad4138d3
 docs/volume_3_operations/3.14.2-lifecycle.md	5e0deb34d0bf9c556bd6ad9b1de713ebb936e52a	2026-10-03	
 docs/volume_3_operations/3.14.3-ports.md	9777eb0ffa1c55ec1921d55c03ebd1a1ec531b4e	2026-10-05	
 docs/volume_3_operations/3.15.1-windows-domain.md	936a79d2216fef6a772d61d38479703d2621c567	2026-10-05	
-docs/volume_3_operations/3.15.2-linux-join.md	de2865feaabfb6235cee3ff7743bf389e5cd4242	2026-10-05	
+docs/volume_3_operations/3.15.2-linux-join.md	22f02771f170422d9cd21c897aaf8a655ccecafc	2026-10-06	
 docs/volume_3_operations/3.15.3-windows-join.md	8ecc4a7e6e07aad37768280cb8a41201f084e489	2026-10-05	
 docs/volume_3_operations/3.15.4-group-policy.md	3ff30678352f42c5a4d7e86d121dbe17eb87ed1a	2026-10-05	
 docs/volume_3_operations/3.2.1-records.md	cb85c5bb864a1f5fcb0ddb6269d45afa69ce8876	2026-10-03	
@@ -1129,15 +1129,15 @@ templates/nginx/docker-compose.yml.j2	4b79f5c87781f46112b14ca646aa1d4767278c22	2
 templates/nginx/nginx.conf.j2	e3c952b3563628c317a0be252ed1748acd775bbe	2026-10-05	
 templates/nginx/www/README.md	f25fde1156693652cede612c785ab748faa24ae4	2026-10-05	
 templates/nginx/www/certs/README.md	b23911282982a5e9c2bc17f057051bedf42d0fb7	2026-10-05	
-templates/nginx/www/certs/index.html.j2	47169cd9779c0822c2a5372756620674f826a53a	2026-10-05	
+templates/nginx/www/certs/index.html.j2	bacff63a75c7727f2fe59f0f4f381761b14173f7	2026-10-06	
 templates/nginx/www/certs/install-all-ubuntu.sh.j2	441d6599d30dd51d9b7304e234fdd3c0c476e586	2026-09-30	
 templates/nginx/www/certs/install-certs.sh.j2	8db2ae48cb24cee1be440853a88cec4a4603ebe3	2026-09-30	
 templates/nginx/www/certs/install-chrome-ubuntu.sh.j2	f194bb501190c60b002a07019c58038e7086ca7f	2026-09-30	
 templates/nginx/www/certs/install-firefox-ubuntu.sh.j2	552f6e79216f6185a37f57a10954538f0c4d8cc0	2026-09-30	
 templates/nginx/www/certs/install-python-ubuntu.sh.j2	79adb0592b0e95bf0f334b0e83b943c61dca9538	2026-09-30	
-templates/nginx/www/certs/join-linux.sh.j2	1d744db1c32f4a75f7e27d4ee9bee0642b067f2f	2026-10-05	
+templates/nginx/www/certs/join-linux.sh.j2	f7e08a838ea983b6e03a974a05cd6b7ca84f1f9f	2026-10-06	
 templates/nginx/www/landing/README.md	f6b22867e45e2bea4ff6d29d1287f5608a1607f7	2026-09-30	
-templates/nginx/www/landing/index.html.j2	2e8cc6db1f6e4103684143613c7eaff801fdde42	2026-10-05	
+templates/nginx/www/landing/index.html.j2	643aab24b286e0de370033d66ec14ca892af91d5	2026-10-06	
 templates/nginx/www/ldap/README.md	da3661b64a5707ed2e2f6b924eebd83920428425	2026-09-30	
 templates/nginx/www/ldap/index.html.j2	d6921445d335ca7c354edd4c967d7933174be154	2026-09-30	
 templates/nginx/www/ldap/install-ldap.sh.j2	201f1a57992e0bf55c9d3995a2787d99593570d8	2026-09-30	
@@ -1253,7 +1253,7 @@ tests/samba/README.md	3ca8f166ebc5747f1b1df22f81203cde78719264	2026-10-05
 tests/samba/dc.py	8d932c3a357bed694561f143e3db9b64bbcfc2f2	2026-10-05	
 tests/samba/devices.py	8b2d94d6ee0ebec716c8e40e02c2924746d589bc	2026-10-05	
 tests/samba/gpo.py	ffe2061c46e6c5fade95376baeb298052cd09fc8	2026-10-05	
-tests/samba/linux_join.py	1726024bd4397cc2ac1b20219e1de5c081209fd1	2026-10-05	
+tests/samba/linux_join.py	f24fbc8d4685e96de9fff33d73e4cfe916e71cdb	2026-10-06	
 tests/samba/run.py	27903d5985f1d7654b737c46f110b51cae99607f	2026-10-05	
 tests/samba/site_join.py	4be26d3ad75861aa8811ebc8a389a764c39e9941	2026-10-05	
 tests/samba/start_bind.py	d8c8a1cfc1d8fdb97f865ffd2e55b2747104339f	2026-10-05	

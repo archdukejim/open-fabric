@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Join this Ubuntu machine (24.04 or 26.04) to fabric's domain {{ ad_domain }} (manual 2.10.2, 3.15.2).
+# Join this Linux machine (Ubuntu 24.04 or 26.04, Debian 12 or 13 — Proxmox VE 8 and 9 too) to fabric's domain
+# {{ ad_domain }} (manual 2.10.2, 3.15.2).
 #   sudo bash join-linux.sh <root CA SHA-256 fingerprint> --user <a site admin>   [--site <site>] [--name <name>]
 #   sudo bash join-linux.sh <root CA SHA-256 fingerprint> --one-time              [--site <site>] [--name <name>]
 # The fingerprint is shown on http://{{ hostname_certs }}/. The password - a site admin's, or with --one-time the
@@ -42,8 +43,8 @@ done
 # in a subshell: os-release's own variables (NAME, VERSION, …) must not overwrite this script's
 release=$(. /etc/os-release && echo "${ID:-}-${VERSION_ID:-}")
 case "$release" in
-    ubuntu-24.04|ubuntu-26.04) ;;
-    *) die "Ubuntu 24.04 or 26.04 only (this is $release)" ;;
+    ubuntu-24.04|ubuntu-26.04|debian-12|debian-13) ;;
+    *) die "Ubuntu 24.04 or 26.04, or Debian 12 or 13 (Proxmox VE 8, 9) only (this is $release)" ;;
 esac
 
 # the password first, before anything on this machine changes
@@ -70,7 +71,8 @@ install -m 0644 "$tmp/root.crt" /usr/local/share/ca-certificates/fabric-root-ca.
 update-ca-certificates >/dev/null
 echo "trusted fabric's root CA ($FP)"
 
-apt-get install -y -qq adcli sssd-ad sssd-tools libpam-sss libnss-sss libsss-sudo krb5-user ldap-utils \
+# sudo itself too: Debian and Proxmox VE do not install it
+apt-get install -y -qq adcli sssd-ad sssd-tools libpam-sss libnss-sss libsss-sudo sudo krb5-user ldap-utils \
     libsasl2-modules-gssapi-mit >/dev/null
 
 # Kerberos: the domain's realm; its KDCs from DNS, the site's DC when DNS has none
@@ -168,6 +170,11 @@ if [[ -d /etc/systemd/timesyncd.conf.d || -f /etc/systemd/timesyncd.conf ]]; the
     mkdir -p /etc/systemd/timesyncd.conf.d
     printf '[Time]\nNTP=%s\n' "$NTP" > /etc/systemd/timesyncd.conf.d/fabric.conf
     systemctl restart systemd-timesyncd 2>/dev/null || true
+fi
+# chrony instead (Proxmox VE's default): the site as a source of its own, beside the machine's others
+if [[ -d /etc/chrony/sources.d ]]; then
+    printf 'server %s iburst\n' "$NTP" > /etc/chrony/sources.d/fabric.sources
+    chronyc reload sources >/dev/null 2>&1 || true
 fi
 
 systemctl restart sssd

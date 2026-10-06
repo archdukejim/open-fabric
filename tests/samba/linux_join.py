@@ -22,7 +22,9 @@ from fabriclib.secrets.random_password import random_password  # noqa: E402
 W = os.path.join(os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests"), "samba-linux-join")
 NET, SUBNET, IP, WEB_IP = "linuxjoin_net", "10.254.33.0/24", "10.254.33.10", "10.254.33.20"
 DC, WEB = "ljdc", "lj-certs"
-RELEASES = {"24.04": "ws2404", "26.04": "ws2604"}
+# release -> (container image, machine name): Ubuntu, and Debian (what Proxmox VE 8 and 9 are built on)
+IMAGES = {"24.04": "ubuntu:24.04", "26.04": "ubuntu:26.04", "debian-12": "debian:12", "debian-13": "debian:13"}
+RELEASES = {"24.04": "ws2404", "26.04": "ws2604", "debian-12": "wsdeb12", "debian-13": "wsdeb13"}
 PW = "Correct-Horse-9-" + random_password(8)
 FAILED = 0
 m_add_machine.write_audit = lambda *a, **k: None
@@ -133,7 +135,7 @@ def client(release, name):
     sh(["docker", "run", "-d", "--name", box, "--hostname", name, "--network", NET, *hosts,
         "--cap-add", "DAC_READ_SEARCH",
         "-v", f"{W}/join-linux.sh:/root/join-linux.sh:ro", "-v", f"{W}/systemctl:/usr/local/sbin/systemctl:ro",
-        f"ubuntu:{release}", "sleep", "infinity"])
+        IMAGES[release], "sleep", "infinity"])
     code, out = on(box, "export DEBIAN_FRONTEND=noninteractive; apt-get update -qq && "
                         "apt-get install -y -qq pamtester sudo procps libcap2-bin >/dev/null")
     return box, code == 0
@@ -189,6 +191,16 @@ check("26.04: joins with a one-time join password, no admin password on the mach
       out)
 time.sleep(5)
 checks(box, "26.04")
+
+# Debian 12 and 13 (Proxmox VE 8, 9): joined with a site admin's password
+for release in ("debian-12", "debian-13"):
+    box_d, ok = client(release, RELEASES[release])
+    check(f"{release}: the client container is ready ({IMAGES[release]})", ok)
+    code, out = on(box_d, f"bash /root/join-linux.sh {fp} --user adam", stdin=PW + "\n")
+    check(f"{release}: joins with a site admin's password (sudo installed with it: Debian has none)",
+          code == 0 and "joined" in out and on(box_d, "command -v sudo")[0] == 0, out[-600:])
+    time.sleep(5)
+    checks(box_d, release)
 
 # the DC away: a person who logged on before still can (cached credentials)
 sh(["docker", "stop", DC])
