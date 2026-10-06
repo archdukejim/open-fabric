@@ -101,7 +101,7 @@ published:
     keycloak:   {var: image_fabric_keycloak, tag: "1.5.0-rc.3", digest: "sha256:f9ff8d0124921b4c43136573fe406e97b086a6bbfde2d6db4ebec33c9119e257"}
     samba:      {var: image_fabric_samba, tag: "", digest: "", groups: "BIND_GID=600,RADIUS_GID=610", pending: "new in S1.1"}
     stepca:     {var: image_fabric_stepca, tag: "1.5.0-rc.3", digest: "sha256:0d972a7279fbcd6d65b23b7300c890a2d3c06b3f3f3e7be1405d902882dddbaa"}
-    webui:      {var: image_fabric_webui, tag: "1.5.0-rc.3", digest: "sha256:e925f15216b6a97a20fdfe29dc33b328cf8b3a76a529aad2a14d029317180e24", account: webui, ids: "606:606"}
+    webui:      {var: image_fabric_webui, tag: "", digest: "", account: webui, ids: "606:606", pending: "the Directory and Federation tabs and Group Policy controls (S7, S8.5, S8.8)"}
 
 # Packages installed into fabric's own images from an upstream's signed apt
 # repository (not Debian's): the exact version and the signing key's

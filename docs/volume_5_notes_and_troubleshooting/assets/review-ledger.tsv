@@ -13,7 +13,7 @@ THIRD_PARTY_NOTICES	458e3061e4bf3d43a927cb3cdb4530fb263fd5a3	2026-10-03
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	8ab7d73da2b01a35bbd1bbe4046e53dbf1d37c23	2026-10-03	
 config/VERSION	8f0916f768f0487bcf8d33827ce2c8dcecb645c1	2026-10-04	
-config/images.lock.yaml	a22b91d573ca2ba17f5f4d83667199a986b75611	2026-10-05	
+config/images.lock.yaml	7c9983f9599547ada3739ab9654c20ca1a26a3a7	2026-10-06	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05	
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
@@ -171,7 +171,7 @@ docs/volume_5_notes_and_troubleshooting/5.1.4-image-publishing-proposal.md	79f14
 docs/volume_5_notes_and_troubleshooting/5.2.1-stale-code.md	296dc71d94e1f3ea2b696792141114c4417fa666	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.3.1-review-2026-09-30.md	5d3aa20aa58960bfc232e14c782627ab0558e3bd	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.4.1-deferred-work.md	f073c56fe31ed88c9e4e6559de6ac57d24a766c0	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.4.2-known-gaps.md	06510f68a1c3e3e23a3365f03f0ccb200490238a	2026-10-05	
+docs/volume_5_notes_and_troubleshooting/5.4.2-known-gaps.md	05f15acdd942900f9b0f70ba63dabd5808bec26d	2026-10-06	
 docs/volume_5_notes_and_troubleshooting/5.5.1-checklist-reasoning.md	4e76166c30228f80b9c82bfef49f2ea7df9c09d0	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.5.2-references.md	49e24e286eb08331648dbee81c04edf55de0776c	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.5.3-rejected-options.md	614a28afd980fe9471b235eb98fbd752932e963f	2026-10-03	
@@ -179,7 +179,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	ed8a57d5b83d5637ab84f207c910fbbc6ec0554f	2026-10-06	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	39dc82d81d157bdfe726a35c6fa0672fb21d7aaf	2026-10-06	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -1270,7 +1270,7 @@ tests/sandbox/posix_check.py	4aa85de6fc7fc9b21dc141f19d92bb1f42c60bc8	2026-10-02
 tests/sandbox/radius_device.py	12b3e1127a0cc5966846fe0554dc84da7a2e5449	2026-10-05	
 tests/sandbox/radius_mab.py	c9575e9fd8e3c3d52dbd77b879b9ef9a6bd148d5	2026-09-30	
 tests/sandbox/rfc2136_test.sh	21e1a72cdc0eb36df39f8f49725d5476048d3a28	2026-10-02	
-tests/sandbox/run.sh	e21dc31d1ad74e0a2a8aa34bef83875d6eb9bd87	2026-10-06	
+tests/sandbox/run.sh	84efaed1a62ba06355ecbcfa0fab674775800e87	2026-10-06	
 tests/sandbox/set_lock.py	3f76da2458bc18d18fbf3efb8b176900a0984ae7	2026-09-30	
 tests/webui/README.md	10b270a62e634adc3de38374c88a60447e7b68e3	2026-09-30	
 tests/webui/test_container.py	d0caf4f105d3d904cbadab963f72ccbf8aef362f	2026-10-05	

@@ -118,7 +118,7 @@ if [ "$published" -eq 8 ]; then
 else
     # some published, some still pending (new or rebuilt on this branch, 4.7.1.4): the pending ones are built here
     pending=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
-print(' '.join(f'fabric/{n}:local' for n, e in r('$REPO/config')['images'].items() if not e['ref']))")
+print(' '.join('fabric/' + {'webui': 'web'}.get(n, n) + ':local' for n, e in r('$REPO/config')['images'].items() if not e['ref']))")
     check "$published of 8 published: the pending ones are built here ($pending)" \
         "in_box 'docker image inspect $pending' >/dev/null"
 fi
