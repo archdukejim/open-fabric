@@ -171,6 +171,18 @@ check("the DC's ports also from the federation's peers (its upstream and each jo
       and any("from 198.51.100.7/32" in r and "/udp" in r for r in peer_lines) and len(peer_lines) == 8, peer_lines)
 check("the DC's ufw rule round-trips through its record form",
       ufw_rule("ad", "tcp@10.0.0.0/24@88,445") == ["from", "10.0.0.0/24", "to", "any", "port", "88,445", "proto", "tcp"])
+check("SSH's rule carries sshd's port; a record from before names the network only and means port 22",
+      ufw_rule("ssh", "10.0.0.0/24@2222") == ["from", "10.0.0.0/24", "to", "any", "port", "2222", "proto", "tcp"]
+      and ufw_rule("ssh", "10.0.0.0/24") == ["from", "10.0.0.0/24", "to", "any", "port", "22", "proto", "tcp"])
+import fabriclib.security.ssh_ports as m_ports  # noqa: E402
+_real_run = m_ports.subprocess.run
+m_ports.subprocess.run = lambda *a, **k: type("R", (), {"stdout": "port 2222\nport 22\nlistenaddress 0.0.0.0:2222\n"})()
+two = m_ports.ssh_ports()
+m_ports.subprocess.run = lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("sshd"))
+none = m_ports.ssh_ports()
+m_ports.subprocess.run = _real_run
+check("the ports sshd listens on are read from `sshd -T` (both of two); without sshd, 22", two == [22, 2222]
+      and none == [22], (two, none))
 final, _ = render_vars(jinja_env(JINJA), {}, {"domain": "lan.test", "hostname": "h", "host_ip": "10.0.0.5",
                                               "lan_cidr": "10.0.0.0/24", "lan_gateway": "10.0.0.1"})
 check("the settings render without secrets (a fresh install plans before anything exists)",

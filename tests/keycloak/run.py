@@ -257,6 +257,61 @@ check("refused: a person outside the site's groups (D90)", "Invalid username or 
 _, _, bad = Browser(root_ca).go(AUTH.replace("mgr.lan.j-j.family%2Foidc", "evil.test%2Foidc"))
 check("refused: a redirect URI that is not registered", "Invalid parameter: redirect_uri" in bad, bad[:200])
 
+# ---- apps signing people in through Keycloak (fabricctl sso, manual 3.8.2)
+from fabriclib.common.errors import ValidationError  # noqa: E402
+from fabriclib.keycloak.add_app_client import add_app_client  # noqa: E402
+from fabriclib.keycloak.list_app_clients import list_app_clients  # noqa: E402
+from fabriclib.keycloak.remove_app_client import remove_app_client  # noqa: E402
+
+SSO_V = {"hostname_keycloak": HOST}
+
+
+def refused(fn, *a):
+    try:
+        fn(*a)
+        return False
+    except ValidationError:
+        return True
+
+
+app = add_app_client(kc, REALM, SSO_V, "proxmox", ["https://pve.lan.test:8006"])
+rep = kc.call("GET", f"{R}/clients?clientId=app-proxmox")[1][0]
+mappers = kc.call("GET", f"{R}/clients/{rep['id']}/protocol-mappers/models")[1]
+flows = {f["id"]: f["alias"] for f in kc.call("GET", f"{R}/authentication/flows")[1]}
+check("sso add: a confidential code-flow client, the exact redirect, fabric's TOTP sign-in, a groups claim",
+      rep["publicClient"] is False and rep["standardFlowEnabled"] and not rep["directAccessGrantsEnabled"]
+      and not rep["implicitFlowEnabled"] and rep["redirectUris"] == ["https://pve.lan.test:8006"]
+      and flows.get(rep.get("authenticationFlowBindingOverrides", {}).get("browser")) == "fabric-webui-mfa"
+      and any(m["protocolMapper"] == "oidc-group-membership-mapper" and m["config"]["claim.name"] == "groups"
+              for m in mappers), rep)
+oidc = TLSClient(KC_IP, 8443, HOST, root_ca)
+token_path = f"/realms/{REALM}/protocol/openid-connect/token"
+st_ok, body_ok = oidc.request("POST", token_path, form={"grant_type": "authorization_code", "code": "x",
+                                                        "client_id": "app-proxmox", "client_secret": app["secret"],
+                                                        "redirect_uri": "https://pve.lan.test:8006"})
+st_bad, _ = oidc.request("POST", token_path, form={"grant_type": "authorization_code", "code": "x",
+                                                   "client_id": "app-proxmox", "client_secret": "wrong",
+                                                   "redirect_uri": "https://pve.lan.test:8006"})
+check("the secret it printed is the client's (a bogus code is refused as such; a wrong secret as a bad client)",
+      st_ok == 400 and "invalid_grant" in str(body_ok) and st_bad == 401, (st_ok, body_ok, st_bad))
+st, disc = oidc.request("GET", f"/realms/{REALM}/.well-known/openid-configuration")
+check("the discovery document it names answers with the issuer it names",
+      st == 200 and disc.get("issuer") == app["issuer"] and app["discovery"].endswith("openid-configuration"),
+      (st, str(disc)[:200]))
+check("refused: the same name again, an http or wildcard redirect, no redirect, a bad name",
+      refused(add_app_client, kc, REALM, SSO_V, "proxmox", ["https://other.test/cb"])
+      and refused(add_app_client, kc, REALM, SSO_V, "nas", ["http://nas.lan.test/cb"])
+      and refused(add_app_client, kc, REALM, SSO_V, "nas", ["https://*.lan.test/cb"])
+      and refused(add_app_client, kc, REALM, SSO_V, "nas", [])
+      and refused(add_app_client, kc, REALM, SSO_V, "Bad Name!", ["https://nas.lan.test/cb"]))
+listed = list_app_clients(kc, REALM)
+check("sso list: the app, its redirect, no secret and none of fabric's own clients",
+      [a["name"] for a in listed] == ["proxmox"] and app["secret"] not in str(listed), listed)
+remove_app_client(kc, REALM, "proxmox")
+check("sso remove: the client is gone; removing it again is refused",
+      kc.call("GET", f"{R}/clients?clientId=app-proxmox")[1] == []
+      and refused(remove_app_client, kc, REALM, "proxmox"))
+
 if not os.environ.get("KEYCLOAK_TEST_KEEP"):
     cleanup()
 print(f"\n{PASS} passed, {FAIL} failed")

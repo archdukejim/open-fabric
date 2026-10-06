@@ -25,3 +25,8 @@ client these files use.
 | `grant_role_to_group.py` | Give a group a realm role if it does not have it |
 | `ensure_mfa_flow.py` | The browser flow with TOTP required for everyone |
 | `ensure_webui_client.py` | The web UI's OIDC client (PKCE, exact redirect, TOTP flow, roles claim) |
+| `app_client_id.py` | An app's Keycloak client id for single sign-on (`app-<name>`), its name checked |
+| `add_app_client.py` | `fabricctl sso add`: an app's confidential OIDC client (exact redirects, fabric's TOTP sign-in, a groups claim); its secret returned once |
+| `list_app_clients.py` | `fabricctl sso list`: the registered apps, never their secrets |
+| `remove_app_client.py` | `fabricctl sso remove`: an app's client gone |
+| `run_sso_command.py` | `fabricctl sso`: routes to the above and prints |

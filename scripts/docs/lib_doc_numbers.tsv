@@ -287,7 +287,9 @@ file	fabriclib-images|src/fabriclib/images/running_image.py	8
 file	fabriclib-images|src/fabriclib/images/switch_image.py	9	
 file	fabriclib-images|src/fabriclib/images/update_images.py	10	
 file	fabriclib-images|src/fabriclib/images/verify_signature.py	13	
+file	fabriclib-keycloak|src/fabriclib/keycloak/add_app_client.py	21	
 file	fabriclib-keycloak|src/fabriclib/keycloak/admin_client.py	1	
+file	fabriclib-keycloak|src/fabriclib/keycloak/app_client_id.py	22	
 file	fabriclib-keycloak|src/fabriclib/keycloak/configure_keycloak.py	2	
 file	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py	3	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py	4	
@@ -301,9 +303,12 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_webui_client.py	11
 file	fabriclib-keycloak|src/fabriclib/keycloak/fabric_groups.py	12	
 file	fabriclib-keycloak|src/fabriclib/keycloak/grant_role_to_group.py	13	
 file	fabriclib-keycloak|src/fabriclib/keycloak/keycloak_admin.py	14	
+file	fabriclib-keycloak|src/fabriclib/keycloak/list_app_clients.py	23	
 file	fabriclib-keycloak|src/fabriclib/keycloak/quote.py	15	
+file	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py	24	
 file	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py	16	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17	0.5.0 / 2026-10-04
+file	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py	25	
 file	fabriclib-keycloak|src/fabriclib/keycloak/step.py	18	
 file	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py	19	
 file	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py	20	
@@ -436,8 +441,10 @@ file	fabriclib-secrets|src/fabriclib/secrets/secrets_in_openbao.py	9
 file	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py	1	
 file	fabriclib-security|src/fabriclib/security/firewall_rules.py	2	
 file	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py	3	
+file	fabriclib-security|src/fabriclib/security/ssh_ports.py	5	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
+file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	
 file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	0.5.0 / 2026-10-04
 file	fabriclib-setup|src/fabriclib/setup/backup_install.py	1	
 file	fabriclib-setup|src/fabriclib/setup/check_export_dir.py	2	
@@ -478,6 +485,7 @@ file	fabriclib-setup|src/fabriclib/setup/upgrade_vars.py	36
 file	fabriclib-setup|src/fabriclib/setup/verify_install.py	37	
 file	fabriclib-system|src/fabriclib/system/apply_changes.py	1	
 file	fabriclib-system|src/fabriclib/system/control_stack.py	2	
+file	fabriclib-system|src/fabriclib/system/host_ram_gb.py	8	
 file	fabriclib-system|src/fabriclib/system/relaxed_settings.py	6	
 file	fabriclib-system|src/fabriclib/system/render_template_file.py	3	
 file	fabriclib-system|src/fabriclib/system/service_status.py	4	
@@ -929,6 +937,7 @@ function	fabriclib-deploy|src/fabriclib/deploy/merge_radius_clients.py|merge_rad
 function	fabriclib-deploy|src/fabriclib/deploy/merge_tsig_keys.py|merge_tsig_keys	1	
 function	fabriclib-deploy|src/fabriclib/deploy/render_templates.py|_render	1	
 function	fabriclib-deploy|src/fabriclib/deploy/render_templates.py|render_templates	2	
+function	fabriclib-deploy|src/fabriclib/deploy/render_vars.py|_host_ram_gb	2	0.5.0 / 2026-10-06
 function	fabriclib-deploy|src/fabriclib/deploy/render_vars.py|render_vars	1	
 function	fabriclib-deploy|src/fabriclib/deploy/restart_changed.py|_enabled	2	
 function	fabriclib-deploy|src/fabriclib/deploy/restart_changed.py|_quiet	1	
@@ -1108,9 +1117,12 @@ function	fabriclib-images|src/fabriclib/images/switch_image.py|switch_image	2
 function	fabriclib-images|src/fabriclib/images/update_images.py|update_images	1	
 function	fabriclib-images|src/fabriclib/images/verify_signature.py|_remembered	1	
 function	fabriclib-images|src/fabriclib/images/verify_signature.py|verify_signature	2	
+function	fabriclib-keycloak|src/fabriclib/keycloak/add_app_client.py|_redirects	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/add_app_client.py|add_app_client	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/admin_client.py|Admin.__init__	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/admin_client.py|Admin._auth	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/admin_client.py|Admin.call	3	
+function	fabriclib-keycloak|src/fabriclib/keycloak/app_client_id.py|app_client_id	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/configure_keycloak.py|configure_keycloak	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py|create_person	2	0.5.0 / 2026-10-04
@@ -1129,10 +1141,13 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_webui_client.py|ensure
 function	fabriclib-keycloak|src/fabriclib/keycloak/fabric_groups.py|fabric_groups	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/grant_role_to_group.py|grant_role_to_group	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/keycloak_admin.py|keycloak_admin	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/list_app_clients.py|list_app_clients	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/quote.py|q	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py|remove_app_client	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py|require_password_change	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|reset_sign_in	2	0.5.0 / 2026-10-04
+function	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py|run_sso_command	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/step.py|step	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py|user_has_role	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py|_client	1	
@@ -1292,9 +1307,12 @@ function	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py|_rul
 function	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py|apply_docker_firewall	2	
 function	fabriclib-security|src/fabriclib/security/firewall_rules.py|firewall_rules	1	
 function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|hardened_daemon_settings	1	
+function	fabriclib-security|src/fabriclib/security/ssh_ports.py|ssh_ports	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	
+function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
@@ -1381,6 +1399,7 @@ function	fabriclib-setup|src/fabriclib/setup/verify_install.py|checks	3
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|run	4	
 function	fabriclib-system|src/fabriclib/system/apply_changes.py|apply_changes	1	
 function	fabriclib-system|src/fabriclib/system/control_stack.py|control_stack	1	
+function	fabriclib-system|src/fabriclib/system/host_ram_gb.py|host_ram_gb	1	
 function	fabriclib-system|src/fabriclib/system/relaxed_settings.py|relaxed_settings	1	
 function	fabriclib-system|src/fabriclib/system/render_template_file.py|render_template_file	1	
 function	fabriclib-system|src/fabriclib/system/service_status.py|_health	1	

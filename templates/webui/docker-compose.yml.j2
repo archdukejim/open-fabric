@@ -42,12 +42,10 @@ services:
       # Only to reach Keycloak; no ports are published.
       fabric_net:
         ipv4_address: "{{ ip_webui }}"
-{% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
     deploy:
       resources:
         limits:
           memory: 96M
-{% endif %}
     healthcheck:
       test: ["CMD", "python3", "-c", "import socket; s = socket.socket(socket.AF_UNIX); s.connect('/run/webui/web.sock')"]
       interval: 15s

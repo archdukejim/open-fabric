@@ -16,7 +16,8 @@ def firewall_rules(v, config_dir):
              decides its networks), install_kea + dhcp.interfaces; config_dir — the install's config folder
              (federation.yaml, for chrony's networks and the federation's peers); ad_rpc_ports + fabric_subnet
              (the DC).
-    Returns: {"ssh": [CIDR, ...] (22/tcp; also where Docker-published ports may be reached from), "ntp": [CIDR, ...]
+    Returns: {"ssh": [CIDR, ...] (SSH, on the ports sshd listens on; also where Docker-published ports may be
+             reached from), "ntp": [CIDR, ...]
              (123/udp), "dhcp": [interface, ...] (67/udp), "ad": ["<proto>@<CIDR>@<ports>", ...] (the domain
              controller's ports, from the SSH networks, fabric's container subnet and the federation's peers: the
              upstream's and every joined site's address)}.

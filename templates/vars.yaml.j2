@@ -176,7 +176,7 @@ posix_id_range: "{{ posix_id_range | default('', true) }}"
 ad_site_ou: "{{ _site_ou }}"
 ad_org_ou: "{{ ad_org_ou | default('OU=organisation,' ~ _site_ou, true) }}"
 posix_id_block: {{ posix_id_block | default(100000) | int }}
-samba_mem_limit: {{ samba_mem_limit | default('384m' if (host_ram_capacity | default(0) | int) == 3 else '512m', true) }}
+samba_mem_limit: {{ samba_mem_limit | default(((512 * ((host_ram_capacity | default(host_ram_detected | default(4), true) | int) / 4)) | int) ~ 'm', true) }}
 # 802.1X (optional, design §6): FreeRADIUS 3.2 checks each device against the site's DC
 # (EAP-TLS by linked certificate, MAB by MAC) and returns its role's VLAN.
 install_freeradius: {{ install_freeradius | default(false) | bool }}
@@ -239,7 +239,9 @@ security:
 # ============================================================
 # DOCKER / SERVICE INFRASTRUCTURE
 # ============================================================
-host_ram_capacity: {{ host_ram_capacity | default(0) }}
+{# the host's memory in GB (D31: 4 at least): the admin's value, else what setup measured (render_vars); every
+   container's memory limit follows from it (manual 1.3.4.2) #}
+host_ram_capacity: {{ host_ram_capacity | default(host_ram_detected | default(4), true) | int }}
 compose_file: {{ compose_file | default((deploy_base_dir | default('/opt')) ~ '/fabric/docker-compose.yml') }}
 keycloak_data_dir: {{ keycloak_data_dir | default((deploy_base_dir | default('/opt')) ~ '/keycloak/data') }}
 postgres_data_dir: {{ postgres_data_dir | default((deploy_base_dir | default('/opt')) ~ '/postgres/data') }}

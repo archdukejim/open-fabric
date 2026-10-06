@@ -91,6 +91,38 @@ check("the suggestion is a sibling at the top of the organisation's name (D87)",
 check("accepted: a sub-domain of fabric's domain too", not refused({**GOOD, "ad_domain": "ad.lan.test"}, ""))
 check("accepted: the suggested sibling", not refused({**GOOD, "ad_domain": "ad.test2", "domain": "lan.test2"}, ""))
 
+print("--- the memory fabric may use (D31, manual 1.3.4.2)")
+import builtins  # noqa: E402
+import types  # noqa: E402
+
+import fabriclib.setup.ask_ram as m_ram  # noqa: E402
+from fabriclib.setup.errors import SetupError  # noqa: E402
+
+
+def ram(have, data, interactive=None):
+    """ask_ram with the host's memory faked (pure logic) and, interactively, the answers typed."""
+    m_ram.host_ram_gb = lambda: have
+    ctx = types.SimpleNamespace(non_interactive=interactive is None)
+    answers = iter(interactive or [])
+    real = builtins.input
+    builtins.input = lambda prompt="": next(answers)
+    try:
+        m_ram.ask_ram(ctx, data)
+        return data.get("host_ram_capacity")
+    except SetupError as e:
+        return f"refused: {e}"
+    finally:
+        builtins.input = real
+
+
+check("a host under 4 GB is refused", str(ram(3, {})).startswith("refused"))
+check("unattended: the measured memory is used and kept", ram(8, {}) == 8)
+check("a value set by the admin is kept when it fits", ram(8, {"host_ram_capacity": 6}) == 6)
+check("refused: more than the host has, or under 4", str(ram(8, {"host_ram_capacity": 12})).startswith("refused")
+      and str(ram(8, {"host_ram_capacity": 2})).startswith("refused"))
+check("interactive: Enter takes all of it; a smaller answer restricts fabric; a wrong one is asked again",
+      ram(8, {}, [""]) == 8 and ram(8, {}, ["5"]) == 5 and ram(8, {}, ["3", "20", "x", "6"]) == 6)
+
 print("--- the Administrator's password")
 pw = [random_password() for _ in range(200)]
 check("64 characters, letters of both cases and digits in every one (any allowed policy accepts it)",
@@ -108,9 +140,7 @@ check("the domain's names follow from ad_domain (lower-cased; realm, base DN, Ne
       (v["ad_domain"], v["ad_realm"], v["ad_base_dn"], v["ad_netbios"], v["hostname_dc"])
       == ("ad.lan.test", "AD.LAN.TEST", "DC=ad,DC=lan,DC=test", "AD", "pi-core.ad.lan.test"),
       (v["ad_domain"], v["ad_realm"], v["ad_base_dn"], v["ad_netbios"], v["hostname_dc"]))
-check("the limit is 512m by default and 384m at 3 GB",
-      v["samba_mem_limit"] == "512m" and yaml.safe_load(env.get_template("vars.yaml.j2").render(
-          **base, host_ram_capacity=3))["samba_mem_limit"] == "384m")
+check("the limit is 512m (4 GB is the smallest host, D31)", v["samba_mem_limit"] == "512m")
 dc = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(**v))["services"]["samba"]
 check("host network (D98), read-only, no-new-privileges, every capability dropped",
       dc["network_mode"] == "host" and dc["read_only"] is True and dc["cap_drop"] == ["ALL"]
@@ -130,6 +160,12 @@ check("its secrets, certificate and converge code are mounted read-only",
 check("a memory limit", dc["mem_limit"] == "512m")
 check("builds locally with BIND's and FreeRADIUS's gids while it is pending",
       dc["build"]["args"]["BIND_GID"] == "600" and dc["build"]["args"]["RADIUS_GID"] == "610")
+
+big = yaml.safe_load(env.get_template("vars.yaml.j2").render(**base, host_ram_capacity=8))
+kc8 = yaml.safe_load(env.get_template("keycloak/docker-compose.yml.j2").render(**big))["services"]["keycloak"]
+check("at 8 GB the growing services scale: Keycloak 2400M, the DC 1024m",
+      kc8["deploy"]["resources"]["limits"]["memory"] == "2400M" and big["samba_mem_limit"] == "1024m",
+      (kc8.get("deploy"), big["samba_mem_limit"]))
 
 print("--- what changes around it")
 ngx = env.get_template("nginx/nginx.conf.j2").render(**v)

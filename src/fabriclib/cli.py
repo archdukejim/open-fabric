@@ -17,6 +17,7 @@
                                  the domain (Samba AD): its DC, roles, password policy, machines to join
   fabricctl gpo load|templates|list|show|set|clear|starter
                                  Group Policy from ADMX templates for this site's machines and people
+  fabricctl sso add|list|remove  apps (Proxmox VE, TrueNAS, …) signing people in through Keycloak
   fabricctl federation status|enable|disable|invite|invitations|revoke|networks
                                  sites joining this install (setup --join on the new site)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
@@ -60,6 +61,7 @@ from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
 from fabriclib.samba.run_gpo_command import run_gpo_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
+from fabriclib.keycloak.run_sso_command import run_sso_command  # noqa: E402
 from fabriclib.federation.run_federation_command import run_federation_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
@@ -225,6 +227,8 @@ def main(argv):
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)
+    if cmd == "sso":
+        return run_sso_command(args)
     if cmd == "acl":
         return run_acl_command(args)
     if cmd == "restore":

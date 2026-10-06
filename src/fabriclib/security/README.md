@@ -6,3 +6,4 @@
 | `firewall_rules.py` | The networks and interfaces the host firewall opens (SSH, NTP, DHCP), for the setup step and its consent question |
 | `ufw_rule.py` | The words of one ufw rule fabric adds (SSH, NTP, DHCP), and the files recording what it opened |
 | `hardened_daemon_settings.py` | Docker's `daemon.json` now and with fabric's hardening merged in |
+| `ssh_ports.py` | The ports this host's SSH daemon listens on (`sshd -T`; 22 without sshd), which the firewall opens |

@@ -13,6 +13,7 @@ from fabriclib.federation.decode_invitation import decode_invitation
 from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.ask_ad_domain import ask_ad_domain
+from fabriclib.setup.ask_ram import ask_ram
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.upgrade_vars import upgrade_vars
 
@@ -119,7 +120,8 @@ def collect_vars(ctx):
              checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images
              (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required
              values are asked for (defaults from detect_network); webui_admin_user is chosen once; the AD domain
-             and the password policy are asked when missing (ask_ad_domain).
+             and the password policy are asked when missing (ask_ad_domain), and once the memory fabric may use
+             (ask_ram).
              Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
     Fails:   SetupError for missing/invalid required values (the AD domain and policy included) with
              --non-interactive, invalid tsig_keys, or a
@@ -180,6 +182,8 @@ def collect_vars(ctx):
                              "2.1.9.7: the directory's domain and password policy have no defaults)")
         ctx.vars = data
         ask_ad_domain(ctx)
+    # how much of this host fabric may use (D31, manual 1.3.4.2): measured, asked once
+    ask_ram(ctx, data)
 
     data["deploy_base_dir"] = ctx.deploy_base
     os.makedirs(ctx.config_dir, mode=0o750, exist_ok=True)

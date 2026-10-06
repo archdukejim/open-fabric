@@ -12,7 +12,7 @@ Requires=docker.service network-online.target{% if item.requires is defined %}{%
 [Service]
 Type=simple
 WorkingDirectory={{ deploy_base_dir }}/{{ item.folder }}
-{% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
+{% if (host_ram_capacity | default(4) | int) <= 4 %}
 {% if item.service == 'postgres' %}
 ExecStartPre=/bin/sleep 0
 {% elif item.service == 'keycloak' %}

@@ -42,13 +42,11 @@ services:
         ipv4_address: "{{ ip_nginx }}"
         aliases:
           - "{{ hostname_nginx }}"
-{% if (host_ram_capacity | default(0) | int) >= 3 and (host_ram_capacity | default(0) | int) <= 4 %}
-{% set nginx_mem = 128 if (host_ram_capacity | default(0) | int) == 3 else 256 %}
+{% set nginx_mem = 256 %}
     deploy:
       resources:
         limits:
           memory: {{ nginx_mem }}M
-{% endif %}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/"]
       interval: 30s

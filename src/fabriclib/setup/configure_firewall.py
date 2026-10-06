@@ -8,6 +8,7 @@ from fabriclib.consent.check_consent import check_consent
 from fabriclib.consent.plan_firewall import plan_firewall
 from fabriclib.security.apply_docker_firewall import apply_docker_firewall
 from fabriclib.security.firewall_rules import firewall_rules
+from fabriclib.security.ssh_ports import ssh_ports
 from fabriclib.security.ufw_rule import RECORDS, ufw_rule
 from fabriclib.setup.errors import SetupError
 
@@ -50,6 +51,8 @@ def _forget_rules(config_dir, kind, allowed, what):
     Feeds:   run."""
     record = os.path.join(config_dir, RECORDS[kind])
     previous = open(record).read().split() if os.path.exists(record) else []
+    if kind == "ssh":            # a record from before ssh_ports names the network only: port 22
+        previous = [x if "@" in x else f"{x}@22" for x in previous]
     for x in previous:
         if x not in allowed:
             subprocess.run(["ufw", "delete", "allow", *ufw_rule(kind, x)], capture_output=True)
@@ -84,7 +87,8 @@ def run(ctx):
              likewise) — the rules come from security/firewall_rules;
              vars_file,
              target_dir, config_dir. Env SSH_CONNECTION.
-    Returns: None. On: ufw defaults deny in/allow out, SSH (22/tcp) from each allowed CIDR, ufw enabled
+    Returns: None. On: ufw defaults deny in/allow out, SSH (each port sshd listens on, security/ssh_ports; 22
+             without sshd) from each allowed CIDR, ufw enabled
              (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
              config/.firewall-ssh-allowed records fabric's own; whether ufw was on before is recorded once for undo),
              UNIT written, enabled and restarted, DOCKER-USER
@@ -113,15 +117,18 @@ def run(ctx):
     if not check_consent(ctx.config_dir, "firewall", plan_firewall(ctx.vars, ctx.config_dir)):
         return
     _keep_ufw_state(ctx.config_dir)
-    info("host firewall (ufw): deny incoming, allow SSH from " + ", ".join(allowed))
+    ports = ssh_ports()          # what sshd listens on, not a guessed 22
+    info(f"host firewall (ufw): deny incoming, allow SSH (port {', '.join(map(str, ports))}) from "
+         + ", ".join(allowed))
     # Existing ufw rules are kept; fabric only sets the defaults and adds its own.
     for cmd in (["ufw", "default", "deny", "incoming"], ["ufw", "default", "allow", "outgoing"]):
         subprocess.run(cmd, check=True, capture_output=True)
-    for cidr in allowed:
-        subprocess.run(["ufw", "allow", *ufw_rule("ssh", cidr)], check=True, capture_output=True)
+    ssh = [f"{cidr}@{port}" for cidr in allowed for port in ports]
+    for entry in ssh:
+        subprocess.run(["ufw", "allow", *ufw_rule("ssh", entry)], check=True, capture_output=True)
     # SSH rules fabric added for a network that is no longer allowed (lan_cidr changed, a firewall_allow entry
     # removed) go; rules fabric did not add are never touched. The record says which are fabric's.
-    _forget_rules(ctx.config_dir, "ssh", allowed, "SSH")
+    _forget_rules(ctx.config_dir, "ssh", ssh, "SSH")
     # time (manual 2.5.1): the networks chrony answers may ask on UDP 123, nobody else
     ntp_nets = rules["ntp"]
     for cidr in ntp_nets:

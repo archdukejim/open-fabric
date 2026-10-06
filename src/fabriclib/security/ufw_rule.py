@@ -6,8 +6,9 @@ RECORDS = {"ssh": ".firewall-ssh-allowed", "ntp": ".firewall-ntp-allowed", "dhcp
 def ufw_rule(kind, what):
     """Purpose: the ufw rule fabric adds for one network or interface, as the words after `ufw allow` (and after
              `ufw delete allow` to remove it).
-    Inputs:  kind — "ssh" (22/tcp from a CIDR), "ntp" (123/udp from a CIDR), "dhcp" (67/udp in on an interface) or
-             "ad" (the domain controller's ports); what — the CIDR, the interface, or for "ad"
+    Inputs:  kind — "ssh" (sshd's port/tcp from a CIDR), "ntp" (123/udp from a CIDR), "dhcp" (67/udp in on an
+             interface) or "ad" (the domain controller's ports); what — the CIDR ("ssh": "<CIDR>@<port>", or a bare
+             CIDR for port 22, as records from before ssh_ports read), the interface, or for "ad"
              "<proto>@<CIDR>@<ports>" (security/firewall_rules).
     Returns: list of str.
     Fails:   KeyError for another kind.
@@ -17,6 +18,9 @@ def ufw_rule(kind, what):
     if kind == "ad":
         proto, cidr, ports = what.split("@")
         return ["from", cidr, "to", "any", "port", ports, "proto", proto]
-    port, proto = {"ssh": ("22", "tcp"), "ntp": ("123", "udp")}[kind]
+    if kind == "ssh":
+        cidr, _, port = what.partition("@")
+        return ["from", cidr, "to", "any", "port", port or "22", "proto", "tcp"]
+    port, proto = {"ntp": ("123", "udp")}[kind]
     return ["from", what, "to", "any", "port", port, "proto", proto]
 

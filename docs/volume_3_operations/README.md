@@ -38,6 +38,7 @@ Operator workflows and end-user procedures.
 ## 3.8 People and identities
 
 - [3.8.1 People and their identities](3.8.1-people.md)
+- [3.8.2 Single sign-on for your apps](3.8.2-single-sign-on.md)
 
 ## 3.9 Federation
 
