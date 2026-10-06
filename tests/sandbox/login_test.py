@@ -352,10 +352,12 @@ if st == 303:       # the admin's session went idle (session_idle, 900 s) during
     login(b, ADMIN, NEW_PW.get(ADMIN, ""))
     st, _, page = b.request("GET", f"https://{MGR}/directory?view=people")
 csrf = page.split('name="csrf" value="')[1].split('"')[0] if 'name="csrf"' in page else ""
+if not csrf or "/directory/people/_new" not in page:     # what the People page showed instead of its forms
+    print(f"    people page ({st}): {page.split('<main>')[-1][:600]!r}")
 st, loc, page = b.request("POST", f"https://{MGR}/directory/people/_new",
                           {"csrf": csrf, "uid": NEW, "first": "Dave", "last": "Doe", "email": f"{NEW}@lan.test"})
 check(f"people: the admin adds {NEW} -> one-time password shown once", st == 200 and "shown only now" in page,
-      (st, urllib.parse.unquote_plus(loc or ""), page[:300]))
+      (st, urllib.parse.unquote_plus(loc or ""), page.split("<main>")[-1][:300]))     # the page's own message
 st, _, page = b.request("GET", f"https://{MGR}/directory?view=people")
 check(f"people: {NEW} is in the directory (written by Keycloak)", f"{NEW}@lan.test" in page, page[:200])
 st, loc, page = b.request("POST", f"https://{MGR}/directory/people/{NEW}/reset", {"csrf": csrf})

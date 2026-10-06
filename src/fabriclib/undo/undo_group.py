@@ -18,8 +18,9 @@ UNDO = {
     "runtime": ("put /etc/docker/daemon.json back as it was before fabric hardened it (without a kept copy: remove "
                 "the keys still holding fabric's values), then restart Docker — containers keep running "
                 "(live-restore is on until then)", lambda ctx: undo_runtime(ctx.config_dir)),
-    "firewall": ("remove the ufw rules fabric added (SSH, NTP, DHCP), its DOCKER-USER rules and "
-                 "fabric-firewall.service; switch ufw off if it was off before fabric (other ufw rules are kept)",
+    "firewall": ("remove the ufw rules fabric added (NTP, DHCP, the DC's ports; SSH too only when ufw goes off), "
+                 "its DOCKER-USER rules and fabric-firewall.service; switch ufw off if it was off before fabric "
+                 "(other ufw rules are kept; while ufw stays on, fabric's SSH rule stays so SSH still works)",
                  lambda ctx: undo_firewall(ctx.config_dir)),
     "trust": ("remove fabric's root and intermediate CA from this host's trust store",
               lambda ctx: undo_trust(ctx.vars)),

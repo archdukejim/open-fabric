@@ -49,7 +49,8 @@ def run_uninstall_command(args, deploy_base):
     """Purpose: `fabricctl uninstall`: offer to export all of fabric's data to a folder you choose, remove
              fabric, and optionally the fabricctl package too. What happens to each host change fabric made is listed
              first (undo/uninstall_plan); every question is asked before anything is touched.
-    Inputs:  args — --yes/-y, --export DIR, --no-export, --purge-package; deploy_base — install root.
+    Inputs:  args — --help/-h (the usage, nothing else), --yes/-y, --export DIR, --no-export, --purge-package;
+             deploy_base — install root.
              Unattended (--yes) the export choice must be explicit. Interactive otherwise.
     Returns: 0 when removed (package purge result is printed, not returned); 1 when refused or not confirmed.
              Leaves the export folder (root only) when one was chosen.
@@ -58,6 +59,9 @@ def run_uninstall_command(args, deploy_base):
              export copying (the stack is stopped by then) and OSError from uninstall propagate; EOFError from
              input().
     Feeds:   cli main (`uninstall`); packaging/deb/postrm (apt purge: --yes --export)."""
+    if "--help" in args or "-h" in args:          # never the interactive removal (it started it before, 5.8.1.27)
+        print(USAGE)
+        return 0
     ctx = SetupContext(deploy_base=deploy_base).load_state()
     export, purge = _opt(args, "--export"), "--purge-package" in args
     try:

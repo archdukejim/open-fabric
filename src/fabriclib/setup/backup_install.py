@@ -7,13 +7,14 @@ from fabriclib.secrets.export_secrets import export_secrets
 from fabriclib.secrets.secrets_in_openbao import secrets_in_openbao
 
 KEEP = ["fabric/config", "stepca/data", "nginx/certs", "bind9/ssl", "keycloak/certs", "postgres/certs",
-        "openbao/data", "openbao/certs"]
+        "openbao/data", "openbao/certs", "samba/data", "samba/secrets"]
 ROOT_DIR = "@root"          # absolute paths outside the install root (the OpenBao seal key)
 
 
 def backup_install(ctx):
     """Purpose: copy what a reinstall must keep — config + secrets, the whole Step-CA (keys, database), every
-             issued certificate/key and OpenBao's data with its key folder — to a root-only folder.
+             issued certificate/key, OpenBao's data with its key folder, and the domain (the DC's database and SYSVOL,
+             with the Administrator's password file) — to a root-only folder.
     Inputs:  ctx — SetupContext: KEEP folders under deploy_base, secrets_file; vars.openbao_key_dir (state is
              reloaded here).
     Returns: the backup path /root/fabric-reinstall-<timestamp> (0700): KEEP copied with cp -a, the key folder
@@ -21,10 +22,14 @@ def backup_install(ctx):
     Fails:   FileExistsError if the folder exists (same second); CalledProcessError from cp -a; ValidationError
              from export_secrets when OpenBao is unreachable.
     Feeds:   cli main (`reinstall`), then restore_install.
-    Notes:   OpenBao's data and its key go together: one is useless without the other. The domain
-             (samba/data) and Keycloak's database are not kept."""
+    Notes:   OpenBao's data and its key go together: one is useless without the other. The DC is stopped first,
+             so its database is copied whole, never mid-write (the reinstall removes it next anyway). Keycloak's
+             database is not kept: people enrol their second factor again."""
     dest = f"/root/fabric-reinstall-{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(dest, mode=0o700)
+    if os.path.isdir(ctx.path("samba", "data")):     # the domain: copied with its DC stopped (manual 4.3)
+        subprocess.run(["systemctl", "stop", "samba"], capture_output=True)
+        subprocess.run(["docker", "stop", "samba"], capture_output=True)
     for rel in KEEP:
         src = ctx.path(*rel.split("/"))
         if os.path.isdir(src):

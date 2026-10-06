@@ -116,8 +116,11 @@ if [ "$published" -eq 8 ]; then
         "in_box 'stat -c %a /etc/fabric/images/verified.json' | grep -qx 600 \
          && [ \"\$(in_box \"grep -cE '^ +.at.: ' /etc/fabric/images/verified.json\")\" -ge 5 ]"
 else
-    check "nothing published in this lock yet ($published of 8): the images are built here, as before" \
-        "in_box 'docker image inspect fabric/bind9:local fabric/web:local' >/dev/null"
+    # some published, some still pending (new or rebuilt on this branch, 4.7.1.4): the pending ones are built here
+    pending=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
+print(' '.join(f'fabric/{n}:local' for n, e in r('$REPO/config')['images'].items() if not e['ref']))")
+    check "$published of 8 published: the pending ones are built here ($pending)" \
+        "in_box 'docker image inspect $pending' >/dev/null"
 fi
 check "fabricctl status lists the relaxed security settings (none here)" \
     "in_box 'fabricctl status' | grep -A1 '^relaxed security settings:' | grep -qx '  none'"
@@ -530,7 +533,9 @@ check "apt remove removes the command but not the running install" \
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > /dev/null 2>&1
 check "reinstalling the package gives the command back" "in_box 'fabricctl status' | grep -qE '^fabric.target +active'"
 
-echo "--- reinstall keeps fabric's secrets (backup exports them, setup re-imports and shreds)"
+echo "--- reinstall keeps fabric's secrets (backup exports them, setup re-imports and shreds) and the domain"
+in_box 'python3 /root/make_person.py keeper' > "$OUT/keeper.log" 2>&1
+SID_BEFORE=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=keeper)' objectSid" | sed -n 's/^objectSid: //p')
 in_box 'fabricctl reinstall --yes --non-interactive' > "$OUT/reinstall.log" 2>&1
 check "reinstall completes" "grep -q 'fabric is ready' '$OUT/reinstall.log'"
 check "reinstall re-imported the exported secrets into OpenBao and left no plaintext file" \
@@ -538,6 +543,7 @@ check "reinstall re-imported the exported secrets into OpenBao and left no plain
 check "after the reinstall the npm TSIG key still works" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
 in_box 'fabricctl doctor' > "$OUT/doctor-reinstall.log" 2>&1
 check "after the reinstall doctor passes" "! grep -q '✗' '$OUT/doctor-reinstall.log' && grep -q '✓' '$OUT/doctor-reinstall.log'"
+check "the domain survives the reinstall: a person made before it is still there, with the same SID (not a new domain)"     "[ -n '$SID_BEFORE' ] && in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=keeper)' objectSid\" | grep -q 'objectSid: $SID_BEFORE'"
 
 cat > "$OUT/argv_check.py" <<'PY'
 import glob, sys
