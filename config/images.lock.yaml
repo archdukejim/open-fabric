@@ -94,14 +94,14 @@ published:
   signer: ^https://github\.com/archdukejim/open-fabric/\.github/workflows/images\.yml@refs/(heads/main|heads/rc/.+|tags/v.+)$
   issuer: https://token.actions.githubusercontent.com
   images:
-    adguard:    {var: image_fabric_adguard, tag: "1.5.0-rc.3", digest: "sha256:600da65296ceefdec893d4b5f18497c285bdd472bf1e4185f6c6909c2b0cabd2"}
-    bind9:      {var: image_fabric_bind9, tag: "", digest: "", account: bind, ids: "600:600", pending: "rebuilt with Samba's DLZ libraries (S1.1)"}
-    freeradius: {var: image_fabric_freeradius, tag: "", digest: "", account: freeradius, ids: "610:610", pending: "winbind's ntlm_auth for PEAP (S3.3)"}
-    kea:        {var: image_fabric_kea, tag: "1.5.0-rc.3", digest: "sha256:45c49a2c46f0f2fc6e3ec453ed628a790a85ba3d272f040a14424da7790ea53a", account: kea, ids: "609:609"}
-    keycloak:   {var: image_fabric_keycloak, tag: "1.5.0-rc.3", digest: "sha256:f9ff8d0124921b4c43136573fe406e97b086a6bbfde2d6db4ebec33c9119e257"}
-    samba:      {var: image_fabric_samba, tag: "", digest: "", groups: "BIND_GID=600,RADIUS_GID=610", pending: "new in S1.1"}
-    stepca:     {var: image_fabric_stepca, tag: "1.5.0-rc.3", digest: "sha256:0d972a7279fbcd6d65b23b7300c890a2d3c06b3f3f3e7be1405d902882dddbaa"}
-    webui:      {var: image_fabric_webui, tag: "", digest: "", account: webui, ids: "606:606", pending: "the Directory and Federation tabs and Group Policy controls (S7, S8.5, S8.8)"}
+    adguard:    {var: image_fabric_adguard, tag: "0.6.0-rc.35", digest: "sha256:61a2aa9411779691c4733f9efd92bb7a245616f06d8f5c5d15bef23745fd1714"}
+    bind9:      {var: image_fabric_bind9, tag: "0.6.0-rc.35", digest: "sha256:e777fc096a7f89786ba5e358c1f17406b843dbdc9da5e298a0b7bb8cd0f01092", account: bind, ids: "600:600"}
+    freeradius: {var: image_fabric_freeradius, tag: "0.6.0-rc.35", digest: "sha256:69bf1f18c4d968548ff6efb3a655909da95531fccc7e9e7b950a7c2526f9481b", account: freeradius, ids: "610:610"}
+    kea:        {var: image_fabric_kea, tag: "0.6.0-rc.35", digest: "sha256:e1debf4224aae371af3e15f141f5f8c63b7951d362719bf23cb761ed5e24ddba", account: kea, ids: "609:609"}
+    keycloak:   {var: image_fabric_keycloak, tag: "0.6.0-rc.35", digest: "sha256:23fe0fda993492906e0105fb601bf8d64310101954a5d9c8ea120215ae5f0cb2"}
+    samba:      {var: image_fabric_samba, tag: "0.6.0-rc.35", digest: "sha256:e9aeca75f0c03cb08aa29548f0ef087f4540ec184ddfde6ac20846834dc1ee14", groups: "BIND_GID=600,RADIUS_GID=610"}
+    stepca:     {var: image_fabric_stepca, tag: "0.6.0-rc.35", digest: "sha256:c3becf9b5671346bc45bb0725ffc5d31b8aae8d06c041815714803eb76fa0744"}
+    webui:      {var: image_fabric_webui, tag: "0.6.0-rc.35", digest: "sha256:77d8e9a9bb000dd5e8b0adf7b9f8e707f6e5bc42f6d68f7c6a9858eca54c6296", account: webui, ids: "606:606"}
 
 # Packages installed into fabric's own images from an upstream's signed apt
 # repository (not Debian's): the exact version and the signing key's
