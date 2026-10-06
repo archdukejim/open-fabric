@@ -13,7 +13,7 @@ THIRD_PARTY_NOTICES	458e3061e4bf3d43a927cb3cdb4530fb263fd5a3	2026-10-03
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	8ab7d73da2b01a35bbd1bbe4046e53dbf1d37c23	2026-10-03	
 config/VERSION	8f0916f768f0487bcf8d33827ce2c8dcecb645c1	2026-10-04	
-config/images.lock.yaml	7c9983f9599547ada3739ab9654c20ca1a26a3a7	2026-10-06	
+config/images.lock.yaml	2caa301177d10deae69b3e53595f36b1aebc854d	2026-10-06	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05	
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
@@ -180,7 +180,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	9d120979b92b3b0b0ca35ff2f3a3eb92cd56f4ad	2026-10-06	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	5ec6076d25eae6fa72f7c7276df8d802c4b7feff	2026-10-06	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
