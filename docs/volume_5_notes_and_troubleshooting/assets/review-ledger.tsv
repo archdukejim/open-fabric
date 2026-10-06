@@ -3,7 +3,7 @@
 .gitattributes	f273656c60a04a693192b0bdc27eb5465842e911	2026-09-30	
 .github/workflows/images.yml	1481161542f74c31ea481cfcae222afa9dd08362	2026-10-05	
 .github/workflows/lint.yml	73461f942487bc6108f21bbb420ee97584eac928	2026-10-03	
-.github/workflows/package.yml	a63f50d55bdc9738625bb5140599d00f4e024b8d	2026-10-04	
+.github/workflows/package.yml	de8af32123cd7986d847970de3a2faf802806b58	2026-10-06	
 .gitignore	e3c8a04befe6886c88daa50ca0a26df4e27679b0	2026-10-04	
 AGENTS.md	8b6138a3c209d4a41bd8c360d4ca1f592a79fa56	2026-10-03	
 CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30	
@@ -19,7 +19,7 @@ docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	825d3aee51e3894077adbd21536b7d35266086f5	2026-10-05	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	f32ecc9983f67d3a8ed2cd83a0b9c8ac03e9ab99	2026-10-06	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	f5c2ba65090647d7d862872fa7593b9b1c7b1df3	2026-10-06	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -69,7 +69,7 @@ docs/volume_1_systems_and_services/1.3.6-pki-chain.md	7098be99ed38e7e9b61f9c0cfa
 docs/volume_1_systems_and_services/1.3.7-templates.md	e72d4377d8acebbf7e4282d18ce6b45611dd6a68	2026-10-05	
 docs/volume_1_systems_and_services/1.3.8-targets-and-hardening.md	44c993d5b413885fdcc15211875029706502eb2a	2026-10-05	
 docs/volume_1_systems_and_services/1.3.9-container-inventory.md	ce0ef4550aaaa505fa892c3f534733a97c68a449	2026-10-05	
-docs/volume_1_systems_and_services/1.4.1-host-package.md	6cb8969bd3c18fd37f9a181fc9bde171d2b99235	2026-10-03	
+docs/volume_1_systems_and_services/1.4.1-host-package.md	4536f6273f41e28fbc794beaffc253695968aa90	2026-10-06	
 docs/volume_1_systems_and_services/1.4.2-setup-design.md	a656d35cc7808b783f2f439b80a27830023e9027	2026-10-03	
 docs/volume_1_systems_and_services/1.5.1-webui-architecture.md	ba4b256465c24e984dfce14377899b75cec04306	2026-10-05	
 docs/volume_1_systems_and_services/1.5.2-webui-security.md	3b6112173ecab6be2faa77530c719c6d407070f8	2026-10-05	
@@ -149,7 +149,7 @@ docs/volume_3_operations/3.9.2-address-plan.md	a52c8726458c6bf132d290c79c51cb029
 docs/volume_3_operations/README.md	a9d5c46b908b86cc9ed28cf112e448cd3eed7e03	2026-10-06	
 docs/volume_4_infrequent_ops/4.1.1-requirements.md	4a3093aaa68e79f0af8fbbd51a2fd7c3b07e29eb	2026-10-05	
 docs/volume_4_infrequent_ops/4.1.2-pki-before-install.md	ded3e2feeaa294a170884fe86d473c2f9c3856e5	2026-10-03	
-docs/volume_4_infrequent_ops/4.1.3-running-setup.md	fa864b66b076e91a163fc5ea8521d578738c40bd	2026-10-06	
+docs/volume_4_infrequent_ops/4.1.3-running-setup.md	38cbcd6d973ef53dc134d561b863aa50cf8f3905	2026-10-06	
 docs/volume_4_infrequent_ops/4.1.4-after-setup.md	346b164c32ee9df7b83dc9834436e87415fb9cfd	2026-10-05	
 docs/volume_4_infrequent_ops/4.1.5-setup-steps.md	4b4c052dec309dc0f4bd4d885cc570b0843494df	2026-10-05	
 docs/volume_4_infrequent_ops/4.1.6-deployed-structure.md	719186aa1450b37b1bf22f22b6826d12bc3cbbcb	2026-10-05	
@@ -159,7 +159,7 @@ docs/volume_4_infrequent_ops/4.3.2-reinstall-uninstall.md	801a8fd65a57c133fc1929
 docs/volume_4_infrequent_ops/4.4.1-subordinate-ca.md	544eecf9d4cee388d64e4b1703d4449fe8e6bdc7	2026-10-03	
 docs/volume_4_infrequent_ops/4.5.1-disk-encryption.md	541cf487a18f1e567e1f7db29a67739e5be4f1c5	2026-10-03	
 docs/volume_4_infrequent_ops/4.6.1-docker-from-ubuntu.md	db4e3ecd50910764f4ec2132a0f96a3681008211	2026-10-03	
-docs/volume_4_infrequent_ops/4.7.1-building-images.md	2021300e8287632e377d8f6c31f2ed2aaef35863	2026-10-05	
+docs/volume_4_infrequent_ops/4.7.1-building-images.md	26f62c1d8122fc182b8172d5f8742286b399240d	2026-10-06	
 docs/volume_4_infrequent_ops/4.8.1-manual-test-plan.md	710ecda80690014b06e1ffbd8350111d4d7390e9	2026-10-05	
 docs/volume_4_infrequent_ops/4.8.2-automated-tests.md	011d11a97f102beb64bf315d32ceeab669f3c820	2026-10-03	
 docs/volume_4_infrequent_ops/4.9.1-dev-preview.md	8721440c08affc04abe0f2603c5a4ac239b236be	2026-10-03	
@@ -180,13 +180,16 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	5ec6076d25eae6fa72f7c7276df8d802c4b7feff	2026-10-06	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	e02e6f4760605e6d47795def453795e8fa761b52	2026-10-06	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
 examples/vars.yaml	7cb14aab3d144d4e827cdd782e5cfedefd39cbca	2026-10-05	
-packaging/README.md	955a934ba69442a15d6e694982db7cc26874a317	2026-10-04	
+packaging/README.md	a9fe16cea3b5ec8ae330108c470b79b9a6d3bf2e	2026-10-06	
+packaging/apt/README.md	e3f7f94e982d5fe8140ecc9e3ad090053f28da02	2026-10-06	
+packaging/apt/build-repo.sh	77b8ebfea9b4928068318063f4f5203cc56bab27	2026-10-06	
+packaging/apt/distributions	c6702e512945162449c62588a4e057afad83bffe	2026-10-06	
 packaging/deb/README.md	35915b9424a377fc57cad99e9c2d4f75dbfb4b0c	2026-10-03	
 packaging/deb/assemble-tree.sh	12b018ab7e7e150f97704618758e0f0de992b861	2026-10-05	
 packaging/deb/build-deb.sh	7104ea4b00de477d5b3f8d5f6f1b09d0addf4e72	2026-10-03	
@@ -225,7 +228,7 @@ packaging/images/webui/.dockerignore	76683618065e127abc520ec990844339e7677973	20
 packaging/images/webui/Dockerfile	56b6a171c42c4fc3537773745ac04de07d20d534	2026-10-02	
 packaging/images/webui/README.md	eeec6c95c1553b73cf8ce2761b4c52b35e4506b7	2026-10-03	
 pyproject.toml	2251f1414b6fec09cc04b37a8664741b66242219	2026-10-03	
-scripts/README.md	e8c39b53ed3db3c4880bf0f5fd678f38ad4fa059	2026-10-04	
+scripts/README.md	23cb6230c47dfd247f8392899418f3bcce8a9b24	2026-10-06	
 scripts/docs/README.md	135dc47f8819d75e217e1865d89d48c256983310	2026-10-03	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	5c811285602805f04add0a71a678dc5cc1c8a9b4	2026-10-05	
@@ -236,6 +239,8 @@ scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-0
 scripts/images/README.md	c16836e4bd5966e65ac173da026d82e7eab4afc4	2026-10-04	
 scripts/images/pin_published.py	bf16049b870d703cec87a8af2b4394ecade12225	2026-10-04	
 scripts/install-from-checkout.sh	b03b6b30bb230d09753b070af8f196285dfe788a	2026-10-03	
+scripts/release/README.md	e67a1c13e927702b7f9ec38f636a1e8c08e24674	2026-10-06	
+scripts/release/make-apt-key.sh	bcf074ba61774ffd292f2e2a5cde9166630728d6	2026-10-06	
 spikes/README.md	b75f2469a199f9dd034a9803f4b537f8d3b659b9	2026-10-05	
 spikes/postgres-nginx/README.md	997417a10f49762c37503650c49e8d6d9fca7207	2026-10-05	
 spikes/postgres-nginx/run.sh	30519ce643e4be24eb9d2c9b814953caa9766837	2026-10-05	

@@ -1,0 +1,17 @@
+Origin: open-fabric
+Label: fabric
+Suite: stable
+Codename: stable
+Architectures: amd64 arm64
+Components: main
+Description: fabric releases (manual 1.4.1.1, D7)
+SignWith: default
+
+Origin: open-fabric
+Label: fabric
+Suite: testing
+Codename: testing
+Architectures: amd64 arm64
+Components: main
+Description: fabric release candidates, for testing before a release (manual 4.7.1)
+SignWith: default
