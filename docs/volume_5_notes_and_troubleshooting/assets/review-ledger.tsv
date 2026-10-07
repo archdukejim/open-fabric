@@ -180,7 +180,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	075161c2e5cea4175c8323df4e8a2ef744d80c77	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	adb3402722a30f91e3c5219fbea7008d9e738b1b	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -831,7 +831,7 @@ src/fabriclib/setup/renew_service_certs.py	9174b30e616a13df93801310514719d1f59d7
 src/fabriclib/setup/restore_install.py	66a6597b738c8087fd3b5959149daba6597f47f6	2026-09-30	
 src/fabriclib/setup/retire_renamed_units.py	14549e4b24368029d893797999207f5a4ca38965	2026-09-30	
 src/fabriclib/setup/run_restore_command.py	25ef79f819a8dfe5fbbdda2f0cba3e15c7b60993	2026-10-02	
-src/fabriclib/setup/run_setup.py	654d62be48cf203b003bc74f75325a81b600a727	2026-10-03	
+src/fabriclib/setup/run_setup.py	b7158f385ec6e145e80f192bb3e44939babaf6df	2026-10-07	
 src/fabriclib/setup/run_uninstall_command.py	c410030db560f90a8d21c7d58052855da93e7159	2026-10-06	
 src/fabriclib/setup/setup_openbao.py	226047644c4e027209806f6cbec82deeecbdd866	2026-10-03	
 src/fabriclib/setup/stage_source.py	fc569e4dbbec1547cbf74bb155ad3d2498c21c6b	2026-09-30	

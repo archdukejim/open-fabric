@@ -109,7 +109,7 @@ def main(argv=None):
                                                       os.path.join(ctx.source_dir, "jinja"), selected),
                     interactive=not ctx.non_interactive, approve=args.approve, decline=args.decline)
 
-        start = time.time()
+        start = time.monotonic()
         for name, step, desc in STEPS:
             if name not in selected:
                 continue
@@ -117,7 +117,7 @@ def main(argv=None):
             step(ctx)
             if name == "deploy":
                 ctx.load_state()
-        heading(f"{BOLD}fabric is ready{NC} ({time.time() - start:.0f}s)")
+        heading(f"{BOLD}fabric is ready{NC} ({time.monotonic() - start:.0f}s)")
         if ctx.vars.get("install_webui"):
             ok(f"web UI: https://{ctx.vars.get('hostname_mgr')}  (login kit: ~/fabric-admin/README.txt)")
         ok("checks any time: sudo fabricctl doctor")
