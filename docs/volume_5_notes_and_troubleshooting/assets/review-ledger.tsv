@@ -1,5 +1,5 @@
 # path	blob (git hash-object of the reviewed content)	reviewed (UTC date)	note
-.claude/launch.json	d825e04e405e671cdac0ca91a0218281215e42b3	2026-10-06	
+.claude/launch.json	d825e04e405e671cdac0ca91a0218281215e42b3	2026-10-07	
 .gitattributes	f273656c60a04a693192b0bdc27eb5465842e911	2026-09-30	
 .github/workflows/images.yml	1481161542f74c31ea481cfcae222afa9dd08362	2026-10-05	
 .github/workflows/lint.yml	73461f942487bc6108f21bbb420ee97584eac928	2026-10-03	
@@ -159,7 +159,7 @@ docs/volume_4_infrequent_ops/4.3.2-reinstall-uninstall.md	801a8fd65a57c133fc1929
 docs/volume_4_infrequent_ops/4.4.1-subordinate-ca.md	544eecf9d4cee388d64e4b1703d4449fe8e6bdc7	2026-10-03	
 docs/volume_4_infrequent_ops/4.5.1-disk-encryption.md	541cf487a18f1e567e1f7db29a67739e5be4f1c5	2026-10-03	
 docs/volume_4_infrequent_ops/4.6.1-docker-from-ubuntu.md	db4e3ecd50910764f4ec2132a0f96a3681008211	2026-10-03	
-docs/volume_4_infrequent_ops/4.7.1-building-images.md	26f62c1d8122fc182b8172d5f8742286b399240d	2026-10-06	
+docs/volume_4_infrequent_ops/4.7.1-building-images.md	4fd08d9b43bb62a70beae71f8dd9fd61eefe713a	2026-10-07	
 docs/volume_4_infrequent_ops/4.8.1-manual-test-plan.md	710ecda80690014b06e1ffbd8350111d4d7390e9	2026-10-05	
 docs/volume_4_infrequent_ops/4.8.2-automated-tests.md	011d11a97f102beb64bf315d32ceeab669f3c820	2026-10-03	
 docs/volume_4_infrequent_ops/4.9.1-dev-preview.md	8721440c08affc04abe0f2603c5a4ac239b236be	2026-10-03	
@@ -239,8 +239,8 @@ scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-0
 scripts/images/README.md	c16836e4bd5966e65ac173da026d82e7eab4afc4	2026-10-04	
 scripts/images/pin_published.py	bf16049b870d703cec87a8af2b4394ecade12225	2026-10-04	
 scripts/install-from-checkout.sh	b03b6b30bb230d09753b070af8f196285dfe788a	2026-10-03	
-scripts/release/README.md	e67a1c13e927702b7f9ec38f636a1e8c08e24674	2026-10-06	
-scripts/release/make-apt-key.sh	bcf074ba61774ffd292f2e2a5cde9166630728d6	2026-10-06	
+scripts/release/README.md	4b684a45cc2a28728817444cc1e70227e4f57b30	2026-10-07	
+scripts/release/make-apt-key.sh	b71afebbb70e29bf3825691780fc1996e9a562d6	2026-10-07	
 spikes/README.md	b75f2469a199f9dd034a9803f4b537f8d3b659b9	2026-10-05	
 spikes/postgres-nginx/README.md	997417a10f49762c37503650c49e8d6d9fca7207	2026-10-05	
 spikes/postgres-nginx/run.sh	30519ce643e4be24eb9d2c9b814953caa9766837	2026-10-05	
