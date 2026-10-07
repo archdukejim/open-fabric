@@ -41,6 +41,7 @@ Engineering notes, troubleshooting, trade-offs and blockers.
 ## 5.8 Design proposals
 
 - [5.8.1 Proposal: Samba AD replaces 389-DS as fabric's directory](5.8.1-samba-replaces-389ds.md)
+- [5.8.2 Proposal: password-free sign-in on the domain](5.8.2-sign-in-on-the-domain.md)
 
 ## Assets
 
