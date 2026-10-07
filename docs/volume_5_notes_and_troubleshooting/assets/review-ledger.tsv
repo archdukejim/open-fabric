@@ -58,7 +58,7 @@ docs/volume_1_systems_and_services/1.2.2-checklist-answers.md	14732b42e4535becdb
 docs/volume_1_systems_and_services/1.2.3-deviations.md	580c8446b8caf508ea4df3ebeca00a46b7849ac2	2026-10-07	
 docs/volume_1_systems_and_services/1.2.4-federation-decisions.md	ea933f3f76d1ce85f29c23449a87e32f59668e9a	2026-10-03	
 docs/volume_1_systems_and_services/1.2.5-domain-join-decisions.md	6b9f95082bf7f6ff57f92a4073f95d0397233346	2026-10-03	
-docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	f76a487c936c3280a715bb65052afbca440bc22c	2026-10-07	
+docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	54b4b044d8ec4a36dcbe5281d5e3d07128d06f6a	2026-10-07	
 docs/volume_1_systems_and_services/1.2.7-alignment-decisions.md	6b5c02487f1a696981d818a4b95df9f389bde396	2026-10-04	
 docs/volume_1_systems_and_services/1.3.1-topology.md	607e867ab88c7b9da780e05b46899c3d63a5baa7	2026-10-05	
 docs/volume_1_systems_and_services/1.3.2-repository-layout.md	2ca9243da4fca415e584c476949e76f770eb74c4	2026-10-05	
@@ -181,7 +181,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	f9ed085182112565297c4081d5b22809e277b416	2026-10-07	
-docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	41f468beaaa9678af8739200b03fb5522eee175e	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	b9122d40ac8c80b25df397f6403a1772e7898b3b	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/README.md	6b0682d8ccf1087defb672936a940a2c9895d68c	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
