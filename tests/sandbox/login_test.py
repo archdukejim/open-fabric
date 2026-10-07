@@ -277,7 +277,8 @@ st, loc, _ = b.request("GET", f"https://{MGR}/")
 check("admin cert, no session -> /login", st == 303 and loc.endswith("/login"), (st, loc))
 st, page, seen = login(b, ADMIN, read("initial-password.txt"))
 check("Keycloak required a new password and TOTP enrolment",
-      seen[:1] == ["login"] and "update-password" in seen and "configure-totp" in seen, seen)
+      [p for p in seen if p != "no-kerberos"][:1] == ["login"] and "update-password" in seen
+      and "configure-totp" in seen, seen)
 check("admin: callback accepted (cert CN = user, fabric-admin role)",
       st == 200 and "__Host-webui" in b.cookies.get(MGR, {}), (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/")
@@ -299,6 +300,9 @@ fresh = Browser(admin_pem)
 st, loc, _ = fresh.request("GET", f"https://{MGR}/login")
 st, loc, page = fresh.request("GET", loc)
 action, fields = form_of(page)
+if set(fields) == {"continue"}:                   # Kerberos asked for and none given: on to the password form
+    st, loc, page = fresh.request("POST", action, fields)
+    action, fields = form_of(page)
 fields.update(username=ADMIN, password=read("initial-password.txt"))
 st, loc, page = fresh.request("POST", action, fields)
 check("initial password no longer accepted", st == 200 and "Invalid" in page, (st, loc))

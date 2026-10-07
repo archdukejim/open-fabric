@@ -1341,6 +1341,8 @@ function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|h
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_actor	2	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_confirm	3	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_lowered	1	0.6.0 / 2026-10-07
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_wait_web	6	
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_web_started	5	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|run_security_command	4	
 function	fabriclib-security|src/fabriclib/security/set_signin_layer.py|_mark	2	
 function	fabriclib-security|src/fabriclib/security/set_signin_layer.py|set_signin_layer	1	

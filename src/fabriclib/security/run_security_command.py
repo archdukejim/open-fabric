@@ -1,6 +1,8 @@
 import argparse
 import os
+import subprocess
 import sys
+import time
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.load_vars import load_vars
@@ -94,11 +96,40 @@ def run_security_command(argv, vars_file=VARS_FILE):
         print(f"{res['layer']} is {res['to']} already: nothing to change")
         return 0
     print(f"{res['layer']}: {res['from']} -> {res['to']}; applying…")
+    before = _web_started()
     ok, out = apply_signin(_actor(), "cli")
     if not ok:
         print(out[-3000:], file=sys.stderr)
         print("error: the setting is saved but did not apply; fix the cause and run sudo fabricctl --apply, then "
               "sudo fabricctl --keycloak-sync", file=sys.stderr)
         return 1
+    if "Restarting webui" in out:              # the apply queued the web console's restart: wait for it
+        _wait_web(before)
     print("done: Keycloak and the web console use it now")
     return 0
+
+
+def _web_started():
+    """Purpose: when the web console's unit last became active (systemd's monotonic clock).
+    Inputs:  none.
+    Returns: str ("" when systemctl or the unit is missing).
+    Fails:   never.
+    Feeds:   run_security_command."""
+    res = subprocess.run(["systemctl", "show", "fabric-web", "-p", "ActiveEnterTimestampMonotonic", "--value"],
+                         capture_output=True, text=True)
+    return res.stdout.strip() if res.returncode == 0 else ""
+
+
+def _wait_web(before, timeout=180):
+    """Purpose: after an apply that queued a restart of the web console (`systemctl restart --no-block`), wait until
+             it has started again, so "done" means it answers.
+    Inputs:  before — _web_started() from before the apply; timeout — seconds.
+    Returns: None (gives up quietly after timeout: doctor shows a web console that did not come back).
+    Fails:   never.
+    Feeds:   run_security_command."""
+    end = time.time() + timeout
+    while time.time() < end:
+        state = subprocess.run(["systemctl", "is-active", "fabric-web"], capture_output=True, text=True).stdout
+        if state.strip() == "active" and _web_started() not in ("", before):
+            return
+        time.sleep(2)

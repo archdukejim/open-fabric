@@ -13,7 +13,7 @@ THIRD_PARTY_NOTICES	458e3061e4bf3d43a927cb3cdb4530fb263fd5a3	2026-10-03
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	8ab7d73da2b01a35bbd1bbe4046e53dbf1d37c23	2026-10-03	
 config/VERSION	8f0916f768f0487bcf8d33827ce2c8dcecb645c1	2026-10-04	
-config/images.lock.yaml	2caa301177d10deae69b3e53595f36b1aebc854d	2026-10-06	
+config/images.lock.yaml	6f1ce8432ea8e60bdf40880136c4b6c6fc06a252	2026-10-07	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05	
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
@@ -37,7 +37,7 @@ docs/volume_1_systems_and_services/1.11.2-fabricctl-agent.md	6307d486cbc8b3d5028
 docs/volume_1_systems_and_services/1.11.20-fabriclib-radius.md	e44023135e6b1c14eb823eee8bad8145caba93f1	2026-10-05	
 docs/volume_1_systems_and_services/1.11.21-fabriclib-rbac.md	dabab7b062a86503a251685eead7b38886b023f1	2026-10-03	
 docs/volume_1_systems_and_services/1.11.22-fabriclib-secrets.md	fb2aa34db73f483bd0cb941ee69599d092ef7fe9	2026-10-06	
-docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	d7d864dc392f42e630c7c4d0111ba708e0927689	2026-10-07	
+docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	ede02b67ed5facb4765d4819d244a089f348b88c	2026-10-07	
 docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	d346c03332108f55e51f62e5574c2a6436dee904	2026-10-07	
 docs/volume_1_systems_and_services/1.11.25-fabriclib-system.md	152adc848c96b665ea39e0e7bf9d250635ea259a	2026-10-07	
 docs/volume_1_systems_and_services/1.11.26-fabriclib-undo.md	3fdd5d1f96f6ff62bf381c864305d0292fc2e4bf	2026-10-06	
@@ -234,7 +234,7 @@ scripts/README.md	23cb6230c47dfd247f8392899418f3bcce8a9b24	2026-10-06
 scripts/docs/README.md	135dc47f8819d75e217e1865d89d48c256983310	2026-10-03	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	5c811285602805f04add0a71a678dc5cc1c8a9b4	2026-10-05	
-scripts/docs/lib_doc_numbers.tsv	abce1f0274c42c361b60e50bafd376d889d9c32b	2026-10-07	
+scripts/docs/lib_doc_numbers.tsv	5f6d2791a71145321c0c7f899f5d3a9ba894aa85	2026-10-07	
 scripts/docs/lib_doc_registry.py	b9ba7c37a7d79fddfb748007b51c784401c1c523	2026-10-03	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-03	
@@ -805,7 +805,7 @@ src/fabriclib/security/apply_signin.py	aeb6a2a6da0db1b4ab8f81bfba6af6232d1cb886	
 src/fabriclib/security/check_signin_lowering.py	1d7f2be3993aa0393ca3dc3acf8fed999ace80bc	2026-10-07	
 src/fabriclib/security/firewall_rules.py	1aeae9a5e79ee7c739dc8e16c920167693a1a8a0	2026-10-06	
 src/fabriclib/security/hardened_daemon_settings.py	0a8808c4d21b5abcd2d9d6525ecb88df00081be8	2026-10-02	
-src/fabriclib/security/run_security_command.py	6a027b1f1b7ced05453ec6728ba748af26c5be07	2026-10-07	
+src/fabriclib/security/run_security_command.py	4a116517006a8ade6d1488d1eb856795f0755915	2026-10-07	
 src/fabriclib/security/set_signin_layer.py	cb5131469a942bb82ef68fd84ae30ee02fb983d8	2026-10-07	
 src/fabriclib/security/signin_layers.py	cecf42c46661e383fe1b1b5e78c1f5ebb0bbdc74	2026-10-07	
 src/fabriclib/security/ssh_ports.py	3859ae3af3751fd7b40409678ada25e3846fb239	2026-10-06	
@@ -1299,7 +1299,7 @@ tests/sandbox/certs_page_test.sh	f9d69252199bc570f30f920ab52ee6800cf0e728	2026-0
 tests/sandbox/iterate.sh	8be80562d8c2adf70ec0ac9f8ed094c5bc1cdb0c	2026-10-03	
 tests/sandbox/ldap_has_users.py	eebcb3553eba632b42ff58347ce8951550ac5aac	2026-09-30	
 tests/sandbox/list_roles.py	857dc28e0a40f95853048b691a117befa804aff3	2026-10-05	
-tests/sandbox/login_test.py	7bb0cd4f58ac5960ef3024d6ecea05b195709911	2026-10-07	
+tests/sandbox/login_test.py	2ddbfa6c0054cfbba04b92e72bb58fe35da929a7	2026-10-07	
 tests/sandbox/make_person.py	f778029f1dfc122927b454149f21fda1c884cdf7	2026-10-05	
 tests/sandbox/posix_check.py	4aa85de6fc7fc9b21dc141f19d92bb1f42c60bc8	2026-10-02	
 tests/sandbox/radius_device.py	12b3e1127a0cc5966846fe0554dc84da7a2e5449	2026-10-05	
