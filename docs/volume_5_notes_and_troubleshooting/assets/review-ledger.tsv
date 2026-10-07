@@ -31,7 +31,7 @@ docs/volume_1_systems_and_services/1.11.14-fabriclib-keycloak.md	c5061f8bce1941a
 docs/volume_1_systems_and_services/1.11.15-fabriclib-ldap.md	f1b23822482dde1cbeffd6a8d3626a7f5320cc2b	2026-10-05	
 docs/volume_1_systems_and_services/1.11.16-fabriclib-logs.md	aee061ddc770c234079cd3f55c005a7801465d35	2026-10-03	
 docs/volume_1_systems_and_services/1.11.17-fabriclib-menu.md	c57dc2f42aefbd2559cfae9cb328bdaccc27f0b0	2026-10-03	
-docs/volume_1_systems_and_services/1.11.18-fabriclib-ntp.md	6e979eb0d7be0408a6cc1ca8e1a43ad0f1c3578f	2026-10-05	
+docs/volume_1_systems_and_services/1.11.18-fabriclib-ntp.md	b334cab62e225a3a0dd8b27f80a75d1fc86fb83b	2026-10-07	
 docs/volume_1_systems_and_services/1.11.19-fabriclib-pki.md	e4d125e7c59e3b80488e53a042be98c74e5e1c48	2026-10-05	
 docs/volume_1_systems_and_services/1.11.2-fabricctl-agent.md	df09263ab77543da5360c0d1c176c368132ac14b	2026-10-05	
 docs/volume_1_systems_and_services/1.11.20-fabriclib-radius.md	e44023135e6b1c14eb823eee8bad8145caba93f1	2026-10-05	
@@ -48,7 +48,7 @@ docs/volume_1_systems_and_services/1.11.3-fabricctl-jinja.md	b58cce7889f99e5cc4d
 docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	cb0b41d142ad1e3385c9bbc26801539e7ed3ad3f	2026-10-05	
 docs/volume_1_systems_and_services/1.11.31-fabriclib-directory.md	88f5a1dd9a9064ee6c0454dbf3e5a0d6cc49a5d2	2026-10-05	
 docs/volume_1_systems_and_services/1.11.4-fabricctl-lib.md	f87125b7cc4c2afdf5f8f7812f325344ab40fd33	2026-10-03	
-docs/volume_1_systems_and_services/1.11.5-fabriclib-common.md	8211a43bf3173b5b9d78240ac934114613f6d498	2026-10-06	
+docs/volume_1_systems_and_services/1.11.5-fabriclib-common.md	77f582a46d19aba1c1bf9e8ff2311a92f204e488	2026-10-07	
 docs/volume_1_systems_and_services/1.11.6-fabriclib-consent.md	424b9927b5c2538a3fce969715af6fd51180c061	2026-10-03	
 docs/volume_1_systems_and_services/1.11.7-fabriclib-core.md	9c5e7972b32f25f0d78e2e6b2862213f6933a2d0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.8-fabriclib-deploy.md	5d92c3a47d7f6b93ac95a3a4a908c3440cc656bd	2026-10-06	
@@ -180,7 +180,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	93f084e5ef30186891aa77e982781889708f46da	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	075161c2e5cea4175c8323df4e8a2ef744d80c77	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -686,7 +686,7 @@ src/fabriclib/menu/save_menu_change.py	693dd6d546d937800fda7142b9e75990d003bd1b	
 src/fabriclib/ntp/README.md	6e7c0f04321f034e141f9f0f54ae84c3c8600455	2026-10-03	
 src/fabriclib/ntp/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/ntp/chrony_settings.py	b0673961f3d7a8cfd00768378f93613a1a8b22c9	2026-10-05	
-src/fabriclib/ntp/deploy_chrony.py	920f5f4bab3e95d2e23ecf7664f6259798871209	2026-10-03	
+src/fabriclib/ntp/deploy_chrony.py	9f740a5c59cef7128ef9d88d812264294050047a	2026-10-07	
 src/fabriclib/ntp/normalize_ntp.py	a1d3d3ed525b65f6791d028b85bff6c70fcf9caa	2026-10-03	
 src/fabriclib/ntp/query_time.py	fb272f690fd7ffcad256bbee834cb576340726b6	2026-10-03	
 src/fabriclib/ntp/time_status.py	a5556089700278c60761eda9ee9e7509134f91ff	2026-10-03	
@@ -803,7 +803,7 @@ src/fabriclib/setup/ask_windows_domain.py	1cc2ada60af664ab15578de1ecbbd3c356b5f5
 src/fabriclib/setup/backup_install.py	4c9118f583d651dd75d6afcaf3031061fecb1579	2026-10-06	
 src/fabriclib/setup/check_export_dir.py	418170a13dff61353dedf91b3e251156af4f931b	2026-09-30	
 src/fabriclib/setup/choose_plan.py	f4570d348c7c715a10aa9c1502978f6e544d539c	2026-10-05	
-src/fabriclib/setup/collect_vars.py	dec22aed3f579dd8a67cdb00a587ec9dda31b3a1	2026-10-06	
+src/fabriclib/setup/collect_vars.py	f99215c8c34670fb78f0af6f081d93a024161040	2026-10-07	
 src/fabriclib/setup/common/README.md	16aa541284a94b46b1d5b3e8e83f97f40c3785af	2026-10-02	
 src/fabriclib/setup/common/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/setup/common/docker_ready.py	7ce2f1a3817b4999483d585129e8621c4c30f8cf	2026-10-02	
