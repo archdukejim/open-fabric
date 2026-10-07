@@ -15,6 +15,24 @@
         <li><a href="https://{{ hostname_certs }}/#join" class="btn">Join a machine to the domain</a></li>
       </ul>
 
+      {# links from the site's DNS records marked for the landing page (manual 2.1.8.2, D118) #}
+      {% set zone = (dns | default({})).get('dynamic_zone_var', {}) %}
+      {% set marked = [] %}
+      {% for rtype in ['A', 'AAAA', 'CNAME'] %}{% for r in zone.get(rtype, []) or [] %}
+        {% if r.link and '*' not in r.name %}
+          {% set host = domain if r.name == '@' else r.name ~ '.' ~ domain %}
+          {% set url = 'https://' ~ host ~ ((':' ~ r.link.port) if r.link.port else '') ~ (r.link.path or '/') %}
+          {% set _ = marked.append({'label': r.link.label or host, 'url': url}) %}
+        {% endif %}
+      {% endfor %}{% endfor %}
+      {% if marked %}
+      <h2 class="section-title">This network</h2>
+      <ul class="link-grid">
+        {% for item in marked | sort(attribute='label') %}
+        <li><a href="{{ item.url }}" class="btn">{{ item.label }}</a></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
       {% if links is defined and links | length > 0 %}
       <h2 class="section-title">Links</h2>
       <ul class="link-grid">

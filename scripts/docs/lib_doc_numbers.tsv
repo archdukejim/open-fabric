@@ -1067,6 +1067,7 @@ function	fabriclib-dns|src/fabriclib/dns/sync_status.py|sync_status	1
 function	fabriclib-dns|src/fabriclib/dns/update_tsig_key.py|update_tsig_key	1	
 function	fabriclib-dns|src/fabriclib/dns/validate_record.py|_host	2	
 function	fabriclib-dns|src/fabriclib/dns/validate_record.py|_int	1	
+function	fabriclib-dns|src/fabriclib/dns/validate_record.py|_link	4	
 function	fabriclib-dns|src/fabriclib/dns/validate_record.py|validate_record	3	
 function	fabriclib-dns|src/fabriclib/dns/zone_content_changed.py|zone_content_changed	1	
 function	fabriclib-dns|src/fabriclib/dns/zone_detail.py|zone_detail	1	

@@ -467,3 +467,33 @@ off_txt, on_txt = _readme(kit, 'jim', 'jim', '/home/jim/fabric-admin'), \
 assert '.p12' not in off_txt and 'p12-password' not in off_txt and '\n3. Your computer must resolve' in off_txt
 assert 'jim.p12' in on_txt and '\n3. Import jim.p12' in on_txt and 'authenticator app (TOTP)' in on_txt
 print('sign-in: no client certificate by default (nginx, webui.json, the admin kit); with it, mutual TLS and the .p12')
+
+# landing-page links from DNS records (manual 2.1.8.2, D118): only marked A/AAAA/CNAME records, https with port and
+# path, never a wildcard; the zone file is unchanged by the mark; the validator refuses what could break the page
+from fabriclib.dns.validate_record import validate_record  # noqa: E402
+_host1 = validate_record("A", {"name": "host1", "ip": "192.168.4.21", "link": "on", "link_label": "Proxmox host1",
+                               "link_port": "8006"})
+assert _host1 == {"name": "host1", "ip": "192.168.4.21", "link": {"label": "Proxmox host1", "port": 8006, "path": None}}
+assert "link" not in validate_record("A", {"name": "printer", "ip": "192.168.4.30"})
+for _bad in ({"link_label": "<script>"}, {"link_path": "no-slash"}, {"link_path": "/a b"}, {"link_port": "70000"},
+             {"link_path": '/"x'}):
+    try:
+        validate_record("CNAME", {"name": "nas", "target": "nas25", "link": "on", **_bad})
+        raise AssertionError(f"accepted {_bad}")
+    except ValidationError:
+        pass
+_zone = copy.deepcopy(v2["dns"])
+_zone["dynamic_zone_var"].setdefault("A", []).extend(
+    [_host1, {"name": "printer", "ip": "192.168.4.30"},
+     {"name": "*.apps", "ip": "192.168.4.40", "link": {"label": "Apps", "port": None, "path": None}}])
+_zone["dynamic_zone_var"].setdefault("CNAME", []).append(
+    {"name": "nas", "canonical": "nas25", "link": {"label": None, "port": None, "path": "/ui/"}})
+_landing = env.get_template('nginx/www/landing/index.html.j2').render(**{**full, 'dns': _zone})
+assert f'href="https://host1.{v2["domain"]}:8006/"' in _landing and '>Proxmox host1<' in _landing, _landing[-1500:]
+assert f'href="https://nas.{v2["domain"]}/ui/"' in _landing and "printer" not in _landing and "Apps" not in _landing
+assert _landing.index("This network") < _landing.index(f'nas.{v2["domain"]}') < _landing.index("Proxmox host1"), \
+    "sorted by label, whatever its case"
+_db = env.get_template('bind9/data/zone.j2').render(**full, federation_links={}, zone_name=v2['domain'],
+                                                    zone_records=_zone["dynamic_zone_var"])
+assert re.search(r"^host1\s+A\s+192\.168\.4\.21$", _db, re.M) and "8006" not in _db and "Proxmox" not in _db
+print('landing links from DNS records: only marked ones, https with port and path; the zone file unchanged (D118)')

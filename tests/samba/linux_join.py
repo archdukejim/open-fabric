@@ -101,7 +101,8 @@ with open(os.path.join(W, "www", "root-ca.crt"), "w") as f:
 sh(["docker", "run", "-d", "--name", WEB, "--network", NET, "--ip", WEB_IP, "-v", f"{W}/www:/srv:ro",
     "--entrypoint", "python3", "fabric/samba:test", "-m", "http.server", "80", "--directory", "/srv"])
 fp = sh(["openssl", "x509", "-in", dc["root_ca"], "-noout", "-fingerprint", "-sha256"]).stdout.strip().split("=")[1]
-script = dc["env"].get_template("nginx/www/certs/join-linux.sh.j2").render(**V)
+# as on a site with Keycloak (Kerberos sign-in on): the join also sets the browsers' policies (D117)
+script = dc["env"].get_template("nginx/www/certs/join-linux.sh.j2").render(**{**V, "install_keycloak": True})
 with open(os.path.join(W, "join-linux.sh"), "w") as f:
     f.write(script)
 SHIM = r"""#!/bin/bash
@@ -147,6 +148,11 @@ def logon(box, uid, password):
 
 
 def checks(box, release):
+    code, out = on(box, "cat /etc/firefox/policies/policies.json /etc/chromium/policies/managed/fabric-sso.json "
+                        f"/etc/opt/chrome/policies/managed/fabric-sso.json; grep -c '.{V['domain']} = ' /etc/krb5.conf")
+    check(f"{release}: browsers may use Kerberos for {V['hostname_keycloak']} (Firefox, Chromium, Chrome); fabric's "
+          "domain maps to the AD realm (D117)", code == 0 and out.count(V["hostname_keycloak"]) == 3
+          and '"SPNEGO"' in out, out)
     code, out = on(box, "id -u alice; id -u adam")
     check(f"{release}: id gives fabric's own ids (from the site's block, not id mapping)",
           out.split() == [str(ids["alice"]), str(ids["adam"])], out)

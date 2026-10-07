@@ -52,7 +52,8 @@ def converge(state):
              temporary account a new site's DC joins with), moving (bool, optional: at a new parent, a site with its
              own DC moving here: its OU and links only, never its GPOs, which its own DC owns), lan_profile (str:
              the Windows wired 802.1X profile the baseline installs, "" without one), sso_spns (list, optional: the
-             HTTP SPNs of the site's Kerberos sign-in account; none, no account).
+             HTTP SPNs of the site's Kerberos sign-in account; none, no account), sso_host (str, optional: Keycloak's
+             name, which the Windows baseline lets browsers use Kerberos for; "" or none, no allowlist).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
     Feeds:   this script's main."""
@@ -92,7 +93,7 @@ def converge(state):
     changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", site_dn, LOGON_EXTENSIONS,
                           {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids, local_admins)})
     changed += ensure_gpo_admins(samdb, lp, site)
-    extensions, files = windows_baseline_policy(state.get("lan_profile") or "")
+    extensions, files = windows_baseline_policy(state.get("lan_profile") or "", state.get("sso_host") or "")
     changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", site_dn, extensions,
                           files)
     if state.get("join_account"):         # at the root, preparing a new site's DC join (manual 1.8.8.4)

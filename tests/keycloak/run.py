@@ -164,6 +164,26 @@ check("the DC made the Kerberos sign-in account: both SPNs, AES only, its keytab
       and "msDS-SupportedEncryptionTypes: 24" in enc and os.path.getsize(os.path.join(krb_dir, "sso.keytab")) > 0,
       (spns, enc))
 check("handing the keytab over again changes nothing", not install_sso_keytab(v))
+READ_POL = """
+import os, sys
+sys.path.insert(0, "/fabric")
+from samba.dcerpc import preg
+from samba.ndr import ndr_unpack
+from open_samdb import open_samdb
+import ldb
+samdb, lp = open_samdb("/data/etc/smb.conf")
+g = samdb.search(base="CN=Policies,CN=System," + str(samdb.domain_dn()), scope=ldb.SCOPE_ONELEVEL,
+                 expression="(displayName=fabric: lan Windows baseline)", attrs=["cn"])[0]
+path = os.path.join(lp.get("path", "sysvol"), lp.get("realm").lower(), "Policies", str(g["cn"]), "Machine",
+                    "Registry.pol")
+for e in ndr_unpack(preg.file, open(path, "rb").read()).entries:
+    print(e.keyname, "|", e.valuename, "|", e.data)
+"""
+pol = sh(["docker", "exec", "-i", DC, "python3", "-"], ok=False, input=READ_POL).stdout
+check("the site's Windows baseline GPO lets Edge, Chrome and Firefox use Kerberos for sso.<domain> (D117)",
+      f"Software\\Policies\\Microsoft\\Edge | AuthServerAllowlist | {HOST}" in pol
+      and f"Software\\Policies\\Google\\Chrome | AuthServerAllowlist | {HOST}" in pol
+      and f"Software\\Policies\\Mozilla\\Firefox\\Authentication\\SPNEGO | 1 | {HOST}" in pol, pol)
 sh(["chown", "-R", "1000", krb_dir])
 shutil.copytree(krb_dir, os.path.join(W, "opt", "keycloak", "kerberos"))
 image = sh([sys.executable, os.path.join(REPO, "tests", "image_ref.py"), "keycloak"]).stdout.strip()

@@ -72,6 +72,9 @@ ad_domain: ad.test
 ad_password_policy: {minimum_length: 14, complexity: true, history: 24, minimum_age_days: 0, maximum_age_days: 0, lockout_threshold: 10, lockout_minutes: 15, lockout_window_minutes: 15}
 install_keycloak: true
 install_webui: true
+# the raised sign-in (5.8.2.6): the strict login test below; the host suite proves the default and raising
+webui_client_cert: true
+signin_admin_second_factor: totp
 install_freeradius: true
 install_kea: true
 dns_filter: adguard

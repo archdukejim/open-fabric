@@ -115,10 +115,10 @@ class Browser:
 
 
 def form_of(page):
-    m = re.search(r'<form[^>]*action="([^"]+)"', page)
+    m = re.search(r'<form[^>]*action="([^"]+)"', page, re.I)
     fields = {}
-    for tag in re.findall(r"<input[^>]*>", page):
-        n = re.search(r'name="([^"]+)"', tag)
+    for tag in re.findall(r"<input[^>]*>", page, re.I):
+        n = re.search(r'name="([^"]+)"', tag, re.I)
         if n:
             val = re.search(r'value="([^"]*)"', tag)
             fields[n.group(1)] = html.unescape(val.group(1)) if val else ""
@@ -163,7 +163,9 @@ def through_keycloak(browser, url, user, password, done):
         action, fields = form_of(page)
         if not action:
             return None, seen, st, page
-        if "username" in fields and "password" in fields:
+        if set(fields) == {"continue"}:           # Kerberos asked for (401 Negotiate) and none given: go on
+            seen.append("no-kerberos")
+        elif "username" in fields and "password" in fields:
             seen.append("login")
             fields.update(username=user, password=NEW_PW.get(user, password))
         elif "password-new" in fields:
@@ -230,6 +232,22 @@ def adguard_login(user, password):
         st, _, page = b.request("GET", loc)
     return st, page
 
+
+# -- the default (D110, 0.6.1): no client certificate, a password only; then stop (SIGNIN_MODE=plain) --------------
+if os.environ.get("SIGNIN_MODE") == "plain":
+    b = Browser()
+    st, loc, _ = b.request("GET", f"https://{MGR}/")
+    check("no certificate asked: a newcomer is sent to sign in (/login), not refused", st == 303 and
+          loc.endswith("/login"), (st, loc))
+    st, page, seen = login(b, ADMIN, read("initial-password.txt"))
+    check("the admin signs in with a password only: a new password asked, no TOTP (D110)",
+          st == 200 and "update-password" in seen and "configure-totp" not in seen and "otp" not in seen, (st, seen))
+    st, _, page = b.request("GET", f"https://{MGR}/security")
+    check("the Security page shows the layers to raise", st == 200 and "admin-2fa" in page, st)
+    bob = Browser()
+    st, page, seen = login(bob, OTHER, OTHER_PW)
+    check("a person without a fabric role is still refused (403)", st == 403, (st, seen))
+    sys.exit(1 if FAILED else 0)
 
 admin_pem = pem_from_p12(os.path.join(KIT, f"{ADMIN}.p12"), read("p12-password.txt"), "admin.pem")
 other_pem = pem_from_p12(os.path.join(KIT, f"{OTHER}.p12"), OTHER_P12_PW, "other.pem")

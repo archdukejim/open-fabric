@@ -92,6 +92,7 @@ cat > /etc/krb5.conf <<EOF
 [domain_realm]
     .$AD_DOMAIN = $REALM
     $AD_DOMAIN = $REALM
+    .{{ domain }} = $REALM
 EOF
 
 # where the site sits (sites nest, each in its parent's OU: manual 1.8.8.14): its OU, the sites above it and the
@@ -177,6 +178,26 @@ if [[ -d /etc/chrony/sources.d ]]; then
     chronyc reload sources >/dev/null 2>&1 || true
 fi
 
+{% if install_keycloak | default(false) | bool and signin_kerberos | default(true) | bool %}
+# browsers (manual 5.8.2.6.5, D117): Firefox, Chromium and Chrome may use the logon's Kerberos ticket for
+# {{ hostname_keycloak }}, so fabric's sign-in asks no password here. Firefox's policies are merged, never replaced.
+SSO_HOST="{{ hostname_keycloak }}"
+mkdir -p /etc/firefox/policies
+python3 - "$SSO_HOST" <<'PY'
+import json, os, sys
+path, host = "/etc/firefox/policies/policies.json", sys.argv[1]
+data = json.load(open(path)) if os.path.exists(path) else {}
+spnego = data.setdefault("policies", {}).setdefault("Authentication", {}).setdefault("SPNEGO", [])
+if host not in spnego:
+    spnego.append(host)
+json.dump(data, open(path, "w"), indent=2)
+PY
+for dir in /etc/chromium/policies/managed /etc/opt/chrome/policies/managed; do
+    mkdir -p "$dir"
+    printf '{"AuthServerAllowlist": "%s"}\n' "$SSO_HOST" > "$dir/fabric-sso.json"
+done
+echo "browsers: Kerberos sign-in to $SSO_HOST (Firefox, Chromium, Chrome)"
+{% endif %}
 systemctl restart sssd
 systemctl enable sssd >/dev/null 2>&1 || true
 echo "done: people of $SITE can log on here (the site's log-on rights); sudo follows the site's rules"

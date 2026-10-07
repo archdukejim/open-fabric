@@ -83,7 +83,7 @@ def run(ctx):
         else:
             raise SetupError(f"Keycloak configuration failed:\n{res.stdout}{res.stderr}")
         ok("Keycloak configured (realm, the domain's people"
-           + (", web UI client, TOTP)" if v.get("install_webui") else ")"))
+           + (", web UI client, sign-in flows)" if v.get("install_webui") else ")"))
 
     if v.get("install_webui"):
         subprocess.run(["systemctl", "enable", "--now", "fabric-agent"], check=True, capture_output=True)
