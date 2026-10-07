@@ -18,7 +18,7 @@ def ensure_openbao_client(kc, realm, v, secret, role_reps, flow_id):
     Inputs:  kc — admin_client.Admin client; realm — realm name; v — fabric vars: hostname_openbao;
              secret — the client secret (openbao_oidc_secret); role_reps — role representations to put in
              the client's scope (keycloak_bootstrap passes every fabric role); flow_id — id of the browser
-             flow to bind (the TOTP login flow the web UI uses).
+             flow to bind (the admin sign-in flow the web UI uses).
     Returns: "created" or "updated" ("updated" for any existing client, even when nothing changed).
     Fails:   SystemExit from kc.call on any admin API error or failed admin login; OSError / ssl errors if
              Keycloak is unreachable.

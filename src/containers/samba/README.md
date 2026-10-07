@@ -13,6 +13,7 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `ensure_groups.py` | `<site>-users`, `<site>-admins` (gids from the site's block); at the root site fabric's groups (`ldap_groups`, their gids), Domain Users as `users` (5000), `fabric-break-glass` |
 | `ensure_site_info.py` | The site's uid/gid block and its high-water mark on its OU (D97) |
 | `alloc_id.py` | The next number of a site's block, taken with one conditional change (never twice) |
+| `ensure_sso_account.py` | The site's `fabric-sso` account: Keycloak's Kerberos SPNs, AES only, its keytab exported to `/data/sso.keytab` |
 | `ensure_service_accounts.py` | The site's `fabric-agent`, `fabric-keycloak`, `fabric-radius` accounts; a password set only when it no longer signs in |
 | `directory_op.py` | fabric-agent's entry point: one directory operation, signed in as the site's agent account (not the system) |
 | `directory_ops.py` | The operations fabric-agent may ask for |

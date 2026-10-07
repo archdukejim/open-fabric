@@ -2,7 +2,6 @@ import urllib.parse
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.keycloak.app_client_id import app_client_id
-from fabriclib.keycloak.ensure_mfa_flow import MFA_FLOW
 from fabriclib.keycloak.quote import q
 
 
@@ -29,7 +28,8 @@ def _redirects(urls):
 def add_app_client(kc, realm, v, name, redirects):
     """Purpose: register an app (Proxmox VE, TrueNAS, …) for single sign-on through this site's Keycloak (manual
              3.8.2): a confidential OpenID Connect client, the authorization-code flow only, the given redirect
-             URLs exactly, sign-in through fabric's own flow (password and TOTP), and the person's groups in a
+             URLs exactly, sign-in through the realm's flow (fabric-signin: Kerberos or a password, and the second
+             factor every sign-in needs), and the person's groups in a
              `groups` claim, for the app to map to its roles. Keycloak makes the client secret.
     Inputs:  kc — keycloak/admin_client Admin; realm — fabric's realm; v — vars (hostname_keycloak); name — the
              app's short name (app_client_id); redirects — list of https URLs.
@@ -42,15 +42,11 @@ def add_app_client(kc, realm, v, name, redirects):
     _, found = kc.call("GET", f"/{q(realm)}/clients?clientId={q(client_id)}")
     if found:
         raise ValidationError(f"an app named {name} is registered already (fabricctl sso remove {name} first)")
-    _, flows = kc.call("GET", f"/{q(realm)}/authentication/flows")
-    flow = next((f["id"] for f in flows if f["alias"] == MFA_FLOW), None)
     rep = {"clientId": client_id, "name": f"{name} (single sign-on)", "enabled": True, "protocol": "openid-connect",
            "publicClient": False, "clientAuthenticatorType": "client-secret", "standardFlowEnabled": True,
            "implicitFlowEnabled": False, "directAccessGrantsEnabled": False, "serviceAccountsEnabled": False,
            "redirectUris": uris, "webOrigins": origins,
            "attributes": {"pkce.code.challenge.method": "", "post.logout.redirect.uris": "+"}}
-    if flow:
-        rep["authenticationFlowBindingOverrides"] = {"browser": flow}
     kc.call("POST", f"/{q(realm)}/clients", rep)
     cid = kc.call("GET", f"/{q(realm)}/clients?clientId={q(client_id)}")[1][0]["id"]
     kc.call("POST", f"/{q(realm)}/clients/{cid}/protocol-mappers/models", {

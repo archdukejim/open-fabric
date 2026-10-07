@@ -450,3 +450,20 @@ from fabriclib.menu.parse_value import parse_value  # noqa: E402
 assert [parse_value(t) for t in ("", "null", "''", "TRUE", "false", "42", "4.2", "eth0")] == \
     [None, None, None, True, False, 42, "4.2", "eth0"]
 print('vars editor: typed values parsed (null, booleans, integers, text)')
+
+# sign-in (manual 5.8.2.6): the web console asks for a client certificate only with webui_client_cert (D108: off by
+# default); webui.json tells the web app; the first admin's README follows both
+from fabriclib.setup.create_admin import _readme  # noqa: E402
+ngx_off = env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_webui': True})
+ngx_on = env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_webui': True, 'webui_client_cert': True})
+assert 'ssl_verify_client optional;' in ngx_off and 'ssl_verify_client on;' not in ngx_off, 'no certificate required by default'
+assert 'ssl_verify_client on;' in ngx_on and 'ssl_client_certificate /etc/nginx/certs/client-ca/ca-bundle.pem;' in ngx_on
+assert v2['webui_client_cert'] is False and v2['signin_kerberos'] is True and v2['signin_admin_second_factor'] == 'none'
+wj = json.loads(env.get_template('webui/webui.json.j2').render(**{**full, 'webui_oidc_secret': 'x'}))
+assert wj['client_cert'] is False, wj
+kit = {**v2, 'host_ip': '192.168.7.53'}
+off_txt, on_txt = _readme(kit, 'jim', 'jim', '/home/jim/fabric-admin'), \
+    _readme({**kit, 'webui_client_cert': True, 'signin_admin_second_factor': 'totp'}, 'jim', 'jim', '/x')
+assert '.p12' not in off_txt and 'p12-password' not in off_txt and '\n3. Your computer must resolve' in off_txt
+assert 'jim.p12' in on_txt and '\n3. Import jim.p12' in on_txt and 'authenticator app (TOTP)' in on_txt
+print('sign-in: no client certificate by default (nginx, webui.json, the admin kit); with it, mutual TLS and the .p12')

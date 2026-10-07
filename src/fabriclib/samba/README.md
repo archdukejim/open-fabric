@@ -11,6 +11,7 @@ itself is a container (`templates/samba`, `packaging/images/samba`); what conver
 | `write_bind_dlz.py` | What BIND includes for the AD zone: Samba's DLZ module and the update keytab, once the domain exists (empty before) |
 | `suggested_ad_domain.py` | The AD domain setup suggests: a sibling at the top of the organisation's name (D87) |
 | `id_range.py` | This site's uid/gid block (the root's starts at today's range start, `posix_id_block` long) |
+| `sso_spns.py` | The HTTP SPNs of the site's Kerberos sign-in account (none without Keycloak or Kerberos, or at a read-only DC) |
 | `converge_domain.py` | The wanted state handed to the converge code inside the running DC; what changed (after every start and apply) |
 | `domain_status.py` | What `fabricctl domain status` shows: the DC, whether it runs, its roles, the policy in force |
 | `set_domain_password_policy.py` | Change the password policy in the settings (checked whole, audited); the next apply writes it |

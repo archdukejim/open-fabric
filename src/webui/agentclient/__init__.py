@@ -10,6 +10,8 @@ from webui.agentclient.add_reservation import add_reservation  # noqa: F401
 from webui.agentclient.add_subnet import add_subnet  # noqa: F401
 from webui.agentclient.apply_changes import apply_changes  # noqa: F401
 from webui.agentclient.audit import audit  # noqa: F401
+from webui.agentclient.raise_signin_layer import raise_signin_layer  # noqa: F401
+from webui.agentclient.security_layers import security_layers  # noqa: F401
 from webui.agentclient.ca_summary import ca_summary  # noqa: F401
 from webui.agentclient.convert_cert import convert_cert  # noqa: F401
 from webui.agentclient.create_person import create_person  # noqa: F401

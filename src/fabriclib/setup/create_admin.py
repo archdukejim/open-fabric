@@ -6,6 +6,7 @@ from fabriclib.common.console import info, ok, warn
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.directory.ensure_admin import ensure_admin
 from fabriclib.federation.common.is_root_site import is_root_site
+from fabriclib.keycloak.signin_levels import admin_level
 from fabriclib.pki.issue_client_cert import issue_client_cert
 from fabriclib.pki.needs_renewal import needs_renewal
 
@@ -15,26 +16,31 @@ README = """fabric web UI — first login
 Everything your computer needs to reach https://{mgr}:
 
   root-ca.crt / root-ca.cer     fabric root CA (Linux, macOS, iOS, Android / Windows)
-  {user}.p12                    your client certificate (password: p12-password.txt)
-  initial-password.txt          your first Keycloak password (changed at first login)
+{cert_line}  initial-password.txt          your first password (changed at first login)
 
 1. Copy this folder to your computer, e.g.
      scp -r {login}@{host}:{folder} .
 2. Trust the root CA: Windows: double-click root-ca.cer and put it in
    "Trusted Root Certification Authorities"; macOS/Linux: root-ca.crt. Every
    system, format and installer: https://{certs}
-3. Import {user}.p12 into your browser (Firefox: Settings > Certificates >
-   Your Certificates > Import; Chrome/Edge/Windows: double-click it).
-4. Your computer must resolve {mgr} (use fabric as its DNS server,
+{cert_step}{n}. Your computer must resolve {mgr} (use fabric as its DNS server,
    {ip}, or add a hosts entry).
-5. Open https://{mgr}, choose the "{user} (fabric)" certificate and log in
-   as '{user}'. Keycloak asks you for a new password and to set up an
-   authenticator app (TOTP) before the dashboard opens.
+{n2}. Open https://{mgr}{choose} and sign in as '{user}'. Keycloak asks you
+   for a new password{factor} before the dashboard opens. On a computer
+   joined to the domain, signing in to Windows or Linux signs you in here.
 
-Delete initial-password.txt and p12-password.txt once you are in.
-More admins: sudo fabricctl client-cert <keycloak-user> (the user must be in
-the '{group}' group).
+Delete initial-password.txt{p12_file} once you are in.
+More admins: add them to the '{group}' group.{more}
+Raise sign-in security (a second factor, the client certificate) in the web
+console's Security page.
 """
+CERT_LINE = "  {user}.p12                    your client certificate (password: p12-password.txt)\n"
+CERT_STEP = """3. Import {user}.p12 into your browser (Firefox: Settings > Certificates >
+   Your Certificates > Import; Chrome/Edge/Windows: double-click it).
+"""
+FACTOR = {"none": "", "totp": " and to set up an authenticator app (TOTP)",
+          "passkey": " and to register a passkey (Windows Hello, a phone or a security key)",
+          "any": " and to set up an authenticator app (TOTP) unless you add a passkey"}
 
 
 def _write(path, text, owner):
@@ -42,7 +48,7 @@ def _write(path, text, owner):
     Inputs:  path — destination; text — content; owner — (uid, gid).
     Returns: None; file 0600 (created under umask 077) owned by owner.
     Fails:   OSError on write, chmod or chown.
-    Feeds:   run (initial-password.txt, <user>.crt, p12-password.txt, README.txt)."""
+    Feeds:   run, _client_cert (initial-password.txt, <user>.crt, p12-password.txt, README.txt)."""
     old = os.umask(0o077)
     try:
         with open(path, "w") as f:
@@ -53,20 +59,40 @@ def _write(path, text, owner):
     os.chown(path, *owner)
 
 
+def _readme(v, user, login, folder):
+    """Purpose: the kit's README.txt for the web console as it is set up: with the client-certificate steps only while
+             the console requires one (webui_client_cert), and the second factor Keycloak will ask for.
+    Inputs:  v — vars: hostname_mgr, hostname_certs, host_ip, webui_admin_group, webui_client_cert, the sign-in
+             settings (admin_level); user — the admin; login — the account the kit is for; folder — the kit's path.
+    Returns: str.
+    Fails:   ValidationError from admin_level for an unknown level; KeyError for a missing var.
+    Feeds:   run; tests/render.py."""
+    cert = bool(v.get("webui_client_cert"))
+    return README.format(mgr=v["hostname_mgr"], certs=v["hostname_certs"], user=user, login=login, host=v["host_ip"],
+                         ip=v["host_ip"], folder=folder, group=v.get("webui_admin_group", "admins"),
+                         cert_line=CERT_LINE.format(user=user) if cert else "",
+                         cert_step=CERT_STEP.format(user=user) if cert else "", n=4 if cert else 3,
+                         n2=5 if cert else 4, choose=f', choose the "{user} (fabric)" certificate' if cert else "",
+                         factor=FACTOR[admin_level(v)], p12_file=" and p12-password.txt" if cert else "",
+                         more=" Their client certificate: sudo fabricctl client-cert <user>." if cert else "")
+
+
 def run(ctx):
     """Purpose: the first web UI admin, end to end: a person in the directory, in the admin group (Keycloak grants it
-             fabric-admin), a client certificate (.p12, CN = username) and the fabric root CA, collected with
-             instructions in ~/fabric-admin of the account that ran setup.
+             fabric-admin), the fabric root CA and, while the web console requires one (webui_client_cert), a client
+             certificate (.p12, CN = username), collected with instructions in ~/fabric-admin of the account that ran
+             setup.
     Inputs:  ctx — SetupContext: vars install_webui, install_keycloak,
-             webui_admin_user, webui_admin_email, webui_admin_group (default admins), webui_client_cert_days
-             (default 365), domain, hostname_mgr, hostname_certs, host_ip; secrets (Keycloak admin); the
-             published CA under <deploy_base>/nginx/www/certs. Env SUDO_USER via sudo_owner.
+             webui_admin_user, webui_admin_email, webui_admin_group (default admins), webui_client_cert,
+             webui_client_cert_days (default 365), the sign-in settings, domain, hostname_mgr, hostname_certs,
+             host_ip; secrets (Keycloak admin); the published CA under <deploy_base>/nginx/www/certs. Env SUDO_USER
+             via sudo_owner.
     Returns: None. Without web UI or Keycloak: nothing. At a federated site the person is not created here
              (people come from the root, M5): only the client certificate and the kit. Otherwise the kit folder (0700)
-             holds root-ca.crt/.cer,
-             README.txt and, when due, <user>.p12, <user>.crt and p12-password.txt; initial-password.txt only when
-             the user was created (a one-time password: Keycloak asks for a new one). Idempotent: an existing user keeps
-             their password; the certificate is renewed when due or from another CA.
+             holds root-ca.crt/.cer, README.txt and, with the certificate on and when due, <user>.p12, <user>.crt and
+             p12-password.txt; initial-password.txt only when the user was created (a one-time password: Keycloak asks
+             for a new one). Idempotent: an existing user keeps their password; the certificate is renewed when due
+             or from another CA.
     Fails:   ValidationError from ensure_admin (the directory) or issue_client_cert (propagates,
              not SetupError); CalledProcessError from openssl; OSError on files. Warns when run as root without sudo.
     Feeds:   setup step `admin`, run by run_setup via STEPS."""
@@ -90,32 +116,43 @@ def run(ctx):
             ok(f"admin '{user}' exists" + (" (added to the admin group)" if "+member" in state else ""))
     else:                                     # a federated site: people (the admin too) come from the root (M5)
         info(f"people are created at the root site: '{user}' signs in here once the root's directory has them "
-             f"(in '{v.get('webui_admin_group', 'admins')}'); their client certificate is issued here")
+             f"(in '{v.get('webui_admin_group', 'admins')}')")
 
-    crt_pub = os.path.join(folder, f"{user}.crt")
-    certs = ctx.path("stepca", "data", "certs")
-    ca = (os.path.join(certs, "root_ca.crt"), os.path.join(certs, "intermediate_ca.crt"))
-    # A kit left from an earlier install (other CA) is replaced too.
-    if needs_renewal(crt_pub, [], ca) or not os.path.exists(os.path.join(folder, f"{user}.p12")):
-        p12, p12_password = issue_client_cert(v, user, folder, owner=(uid, gid),
-                                              days=int(v.get("webui_client_cert_days", 365)))
-        pub = subprocess.run(["openssl", "pkcs12", "-in", p12, "-clcerts", "-nokeys", "-passin", "stdin"],
-                             input=p12_password, capture_output=True, text=True, check=True).stdout
-        _write(crt_pub, pub[pub.index("-----BEGIN CERTIFICATE"):], (uid, gid))
-        os.chmod(crt_pub, 0o644)
-        _write(os.path.join(folder, "p12-password.txt"), p12_password + "\n", (uid, gid))
-        ok(f"client certificate {p12}")
+    if v.get("webui_client_cert"):            # the web console asks for one (D108: off by default)
+        _client_cert(ctx, v, user, folder, (uid, gid))
     else:
-        ok(f"client certificate for '{user}' is current")
+        ok("no client certificate: the web console does not ask for one (raise it in the Security page)")
 
     www = ctx.path("nginx", "www", "certs")
     for name in ("root-ca.crt", "root-ca.cer"):
         shutil.copy2(os.path.join(www, name), os.path.join(folder, name))
         os.chown(os.path.join(folder, name), uid, gid)
-    _write(os.path.join(folder, "README.txt"),
-           README.format(mgr=v["hostname_mgr"], certs=v["hostname_certs"], user=user,
-                         login=login, host=v["host_ip"], ip=v["host_ip"], folder=folder,
-                         group=v.get("webui_admin_group", "admins")), (uid, gid))
+    _write(os.path.join(folder, "README.txt"), _readme(v, user, login, folder), (uid, gid))
     info(f"web UI login kit: {folder} (see README.txt)")
     if login == "root":
         warn("setup was not run with sudo from a user account: the kit is in /root")
+
+
+def _client_cert(ctx, v, user, folder, owner):
+    """Purpose: the first admin's client certificate in the kit (only while the web console requires one): <user>.p12,
+             <user>.crt and p12-password.txt, issued when missing, due or from another CA (an earlier install's).
+    Inputs:  ctx — SetupContext (the CA under stepca/data/certs); v — vars (webui_client_cert_days); user — the
+             admin's name (the certificate's CN); folder — the kit; owner — (uid, gid).
+    Returns: None.
+    Fails:   ValidationError from issue_client_cert; CalledProcessError from openssl; OSError on files.
+    Feeds:   run."""
+    crt_pub = os.path.join(folder, f"{user}.crt")
+    certs = ctx.path("stepca", "data", "certs")
+    ca = (os.path.join(certs, "root_ca.crt"), os.path.join(certs, "intermediate_ca.crt"))
+    # A kit left from an earlier install (other CA) is replaced too.
+    if needs_renewal(crt_pub, [], ca) or not os.path.exists(os.path.join(folder, f"{user}.p12")):
+        p12, p12_password = issue_client_cert(v, user, folder, owner=owner,
+                                              days=int(v.get("webui_client_cert_days", 365)))
+        pub = subprocess.run(["openssl", "pkcs12", "-in", p12, "-clcerts", "-nokeys", "-passin", "stdin"],
+                             input=p12_password, capture_output=True, text=True, check=True).stdout
+        _write(crt_pub, pub[pub.index("-----BEGIN CERTIFICATE"):], owner)
+        os.chmod(crt_pub, 0o644)
+        _write(os.path.join(folder, "p12-password.txt"), p12_password + "\n", owner)
+        ok(f"client certificate {p12}")
+    else:
+        ok(f"client certificate for '{user}' is current")

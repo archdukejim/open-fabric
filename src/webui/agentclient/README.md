@@ -72,3 +72,5 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `add_machine.py` | Pre-create a machine with a one-time join password. Agent route: POST /v1/machines (machines:admin). |
 | `machine_action.py` | Enable, disable or remove a machine. Agent route: POST /v1/machines/<name>/<action> (machines:admin). |
 | `federation_overview.py` | The federation's sites, replication, conflicts, limits and address plan. Agent route: GET /v1/federation (federation:read). |
+| `security_layers.py` | GET /v1/security: the sign-in layers |
+| `raise_signin_layer.py` | POST /v1/security/raise or /kerberos |

@@ -23,3 +23,4 @@ The page templates (Jinja2, rendered by `views/render_page.py` with autoescape; 
 | `tsig_result.html` | The tsig result page |
 | `machine_result.html` | A pre-created machine's one-time join password |
 | `federation.html` | The Federation tab |
+| `security.html` | The Security page (sign-in layers, raises, Kerberos on/off; lowering shown as the host command) |

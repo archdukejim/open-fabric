@@ -158,8 +158,10 @@ check("the DC's time-signing socket in the one folder chrony's AppArmor profile 
 check("its secrets, certificate and converge code are mounted read-only",
       all(any(m.endswith(f":{target}:ro") for m in dc["volumes"]) for target in ("/run/secrets", "/tls", "/fabric")))
 check("a memory limit", dc["mem_limit"] == "512m")
-check("builds locally with BIND's and FreeRADIUS's gids while it is pending",
-      dc["build"]["args"]["BIND_GID"] == "600" and dc["build"]["args"]["RADIUS_GID"] == "610")
+check("fabric's published image, pinned by digest; or, while it is pending, built here with BIND's and FreeRADIUS's gids",
+      ("@sha256:" in dc["image"] and "build" not in dc)
+      or (dc.get("build", {}).get("args", {}).get("BIND_GID") == "600"
+          and dc.get("build", {}).get("args", {}).get("RADIUS_GID") == "610"), dc.get("image"))
 
 big = yaml.safe_load(env.get_template("vars.yaml.j2").render(**base, host_ram_capacity=8))
 kc8 = yaml.safe_load(env.get_template("keycloak/docker-compose.yml.j2").render(**big))["services"]["keycloak"]

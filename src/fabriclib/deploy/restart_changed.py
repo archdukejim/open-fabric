@@ -6,6 +6,7 @@ from fabriclib.deploy.compose_builds import compose_builds
 from fabriclib.dns.install_zone_file import install_zone_file
 from fabriclib.dns.reload_zone import reload_zone
 from fabriclib.dns.rndc import rndc
+from fabriclib.keycloak.install_sso_keytab import install_sso_keytab
 from fabriclib.samba.converge_domain import converge_domain
 from fabriclib.samba.write_bind_dlz import write_bind_dlz
 
@@ -89,6 +90,9 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
         try:                                      # idempotent: the domain as fabric wants it (manual 2.11.2.15)
             done = converge_domain(final_vars, paths["federation"], secrets)
             print("Windows domain: " + ("; ".join(done) if done else "as wanted"))
+            if final_vars.get("install_keycloak") and install_sso_keytab(final_vars) and "keycloak" in running:
+                print("Restarting Keycloak (Kerberos sign-in keytab)...")
+                _quiet(["systemctl", "restart", "keycloak"], "Restart of keycloak", 180)
             if write_bind_dlz(final_vars):        # the first provisioning: BIND now serves the AD zone
                 print("Restarting bind9 (the AD zone through DLZ)...")
                 _quiet(["systemctl", "restart", "bind9"], "Restart of bind9", 60)

@@ -10,6 +10,7 @@ TABS = [
     ("freeradius", "/freeradius", "FreeRADIUS · 802.1X", True),
     ("openbao", "/openbao", "OpenBao · Secrets", False),
     ("federation", "/federation", "Federation", False),
+    ("security", "/security", "Security", False),
 ]
 # BIND9 tab sections: (view, label)
 FREERADIUS_SECTIONS = [("overview", "Overview"), ("switches", "Connect a switch"), ("windows", "Connect Windows")]
@@ -56,7 +57,8 @@ PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:re
 # tab -> the permission(s) that show it (any of them)
 TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dhcp:read",), "stepca": ("pki:read",),
              "directory": ("devices:read", "people:read", "domain:read"), "freeradius": ("radius:read",),
-             "openbao": ("vault:status",), "federation": ("federation:read",)}
+             "openbao": ("vault:status",), "federation": ("federation:read",),
+             "security": ("security:raise",)}
 MENU_PERMS = {"sign": "pki:sign", "issue": "pki:issue", "convert": "pki:issue", "people": "people:read",
               "devices": "devices:read", "roles": "devices:read", "unlock": "vault:status", "disk": "vault:status",
               "domain": "domain:read", "machines": "domain:read", "gpo": "domain:read"}

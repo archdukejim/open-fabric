@@ -19,3 +19,4 @@ Every page (GET) and action (POST) behind the gates; each takes the request hand
 | `vault_post.py` | Change the vault's unlock methods: rotate the key, test or remove a method, or add a USB stick, security key or KMIP HSM — each one fabric-agent call after a recent sign-in and the host name typed as confirmation. |
 | `zone_post.py` | DNS records: add one to a zone, or delete one (published by the next Apply). |
 | `__init__.py` | Empty; makes it a package |
+| `security_post.py` | The Security page's changes: a recent sign-in, the admin's own certificate before turning it on, then the agent |

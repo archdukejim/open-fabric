@@ -167,4 +167,15 @@ SAMPLE_GPO = {"site": "lan", "templates": ["fabric-starter", "samba"], "match": 
               "controls": {"machine": [["Software\\Policies\\Example\\Starter", "ExampleLocked", 4, 1]], "user": []},
               "policies": [{"template": "fabric-starter", "name": "ExampleSetting", "display": "Example setting",
                             "class": "Machine", "elements": ["text:ExampleText"]}], "more": False}
-
+SAMPLE_SECURITY = [
+    {"layer": "admin-2fa",
+     "what": "a second factor for the admin tools (the web console, OpenBao's UI, AdGuard's page)",
+     "value": "totp", "effective": "totp", "choices": ["passkey"], "lowered": None},
+    {"layer": "everyone-2fa", "what": "a second factor for every sign-in (every app signing in through Keycloak)",
+     "value": "none", "effective": "none", "choices": ["any", "totp", "passkey"],
+     "lowered": {"from": "any", "to": "none", "by": "root (sudo by dev)", "at": "2026-10-07 12:00 UTC"}},
+    {"layer": "client-cert", "what": "a client certificate from fabric's CA for the web console", "value": "off",
+     "effective": "off", "choices": ["on"], "lowered": None},
+    {"layer": "kerberos", "what": "signing in with the domain logon (Kerberos)", "value": "on", "effective": None,
+     "choices": [], "lowered": None},
+]

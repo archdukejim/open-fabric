@@ -24,6 +24,8 @@ from fabriclib.vault.detect_devices import detect_devices
 from fabriclib.vault.list_slots import list_slots
 from fabriclib.vault.vault_status import vault_status
 from fabriclib.system.relaxed_settings import relaxed_settings
+from fabriclib.security.signin_layers import read_lowered, signin_rows
+from fabriclib.common.paths import VARS_FILE
 
 # GET /v1/<route> -> the read operation answering it (vars are read per request)
 READS = {
@@ -31,6 +33,7 @@ READS = {
     ("services",): lambda: service_status(),
     ("host-changes",): lambda: consent_status(os.path.join(load_vars()["deploy_base_dir"], "fabric", "config")),
     ("relaxed-settings",): lambda: relaxed_settings(load_vars()),
+    ("security",): lambda: signin_rows(load_vars(), read_lowered(os.path.dirname(VARS_FILE))),
     ("zones",): lambda: list_zones(),
     ("audit",): lambda: read_audit(),
     ("pki", "ca"): lambda: ca_summary(load_vars()),

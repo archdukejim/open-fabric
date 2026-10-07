@@ -7,6 +7,7 @@ from http.server import BaseHTTPRequestHandler
 from webui import agentclient as actions
 from webui import views
 from webui.app_state import App
+from webui.constants import NO_CERT
 from webui.httpio.read_form import read_form
 from webui.routes.get_page import get_page
 from webui.routes.post_action import post_action
@@ -124,10 +125,10 @@ class Handler(BaseHTTPRequestHandler):
         Returns: the response: GET /static/app.css → 200 stylesheet; GET /login and GET /oidc/callback → start_login /
                  finish_login (no session needed); no valid session → 303 to /login; POST → post_action; GET →
                  get_page.
-        Fails:   403 without an accepted client certificate; 403 'CSRF check failed' when Origin is not public_url or
-                 csrf does not match the session's; 400 with the message on agentclient.ValidationError; 303 to /login
-                 on AuthError; 403 'Not allowed: …' on PermissionDenied; 503 on AgentError; 500 on anything else
-                 (traceback to stderr).
+        Fails:   403 without an accepted client certificate (when the web console requires one); 403 'CSRF check
+                 failed' when Origin is not public_url or csrf does not match the session's; 400 with the message on
+                 agentclient.ValidationError; 303 to /login on AuthError; 403 'Not allowed: …' on PermissionDenied;
+                 503 on AgentError; 500 on anything else (traceback to stderr).
         Feeds:   — (called by do_GET, do_HEAD, do_POST).
         Notes:   It first clears the agent token for this thread, then sets the session's ID token so every
                  fabric-agent call runs as the signed-in person; fabric-agent enforces the permissions.
@@ -135,7 +136,8 @@ class Handler(BaseHTTPRequestHandler):
         actions.set_token(None)          # this thread may have served someone else before
         try:
             self.app.sweep()
-            cert = verified_client_cert(self.headers, self.app.issuer_dn)
+            # gates 1, 2 and 5 read the certificate only while the web console requires one (webui_client_cert)
+            cert = verified_client_cert(self.headers, self.app.issuer_dn) if self.app.client_cert else NO_CERT
             if not cert:
                 return self.deny(403, "A client certificate issued by this fabric's certificate authority is required.")
             url = urllib.parse.urlsplit(self.path)
