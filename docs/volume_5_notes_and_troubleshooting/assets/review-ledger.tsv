@@ -19,7 +19,7 @@ docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	825d3aee51e3894077adbd21536b7d35266086f5	2026-10-05	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	7bfa898e4f38291c1ebf0a43a088374cbb865413	2026-10-07	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	888eb00a7876ef2a8ae67b5f4c48e1b4226d74b8	2026-10-07	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -54,11 +54,11 @@ docs/volume_1_systems_and_services/1.11.7-fabriclib-core.md	9c5e7972b32f25f0d78e
 docs/volume_1_systems_and_services/1.11.8-fabriclib-deploy.md	5d92c3a47d7f6b93ac95a3a4a908c3440cc656bd	2026-10-06	
 docs/volume_1_systems_and_services/1.11.9-fabriclib-dhcp.md	fdab748fd11cfa2092a49a595412e2c1679c5d97	2026-10-05	
 docs/volume_1_systems_and_services/1.2.1-product-decisions.md	ba7fc61146f8dc8b1f4bec835cd1082ba0afada3	2026-10-04	
-docs/volume_1_systems_and_services/1.2.2-checklist-answers.md	f979997c9fb98ae602a32db150683d7afed07fdb	2026-10-07	
+docs/volume_1_systems_and_services/1.2.2-checklist-answers.md	14732b42e4535becdbffd2599a33344d1d7e7540	2026-10-07	
 docs/volume_1_systems_and_services/1.2.3-deviations.md	580c8446b8caf508ea4df3ebeca00a46b7849ac2	2026-10-07	
 docs/volume_1_systems_and_services/1.2.4-federation-decisions.md	ea933f3f76d1ce85f29c23449a87e32f59668e9a	2026-10-03	
 docs/volume_1_systems_and_services/1.2.5-domain-join-decisions.md	6b9f95082bf7f6ff57f92a4073f95d0397233346	2026-10-03	
-docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	35fe6999a9cd7e34d8af4a9ab97c9dbb77709752	2026-10-07	
+docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	f76a487c936c3280a715bb65052afbca440bc22c	2026-10-07	
 docs/volume_1_systems_and_services/1.2.7-alignment-decisions.md	6b5c02487f1a696981d818a4b95df9f389bde396	2026-10-04	
 docs/volume_1_systems_and_services/1.3.1-topology.md	607e867ab88c7b9da780e05b46899c3d63a5baa7	2026-10-05	
 docs/volume_1_systems_and_services/1.3.2-repository-layout.md	2ca9243da4fca415e584c476949e76f770eb74c4	2026-10-05	
@@ -1240,7 +1240,7 @@ tests/hardening/README.md	514afa897a841c34383af1ef74949610d5dd333d	2026-10-05
 tests/hardening/run.sh	b4e3e81266e9980d1dc636d34260a2619c00220c	2026-10-05	
 tests/host/README.md	560b70e7b9a2008627d864d4b8833d6942c64406	2026-09-30	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
-tests/host/run.sh	29d690914eae7b3704afdaf19c229e97b24c1afb	2026-10-07	
+tests/host/run.sh	a1b7f570af5edf44abadf4cb8f993d69716ddc0f	2026-10-07	
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
 tests/images/README.md	3d9cb6e69951a547993a9b23fab7cfb54c1e24ab	2026-10-04	
 tests/images/published.py	6d6b7b45a8622c494ffe65262f7bf4fd392ae3e0	2026-10-05	
