@@ -1318,10 +1318,12 @@ function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_d
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
 function	fabriclib-setup|src/fabriclib/setup/check_export_dir.py|check_export_dir	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dns_filter	8	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_log_forwarding	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_radius	3	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_get	4	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_set	5	
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_upstreams_text	7	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|choose_plan	6	
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_ask	3	
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_join_defaults	4	

@@ -8,7 +8,7 @@
 AGENTS.md	8b6138a3c209d4a41bd8c360d4ca1f592a79fa56	2026-10-03	
 CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30	
 LICENSE	05e475fa9aff67dbd7d98e3bc88d87f93e36c79f	2026-09-30	
-README.md	ed7e52849c55d265f4a571ef4121bf1407d484e7	2026-10-05	
+README.md	8152699e678db5a6af697811121b30ac06b15fbc	2026-10-07	
 THIRD_PARTY_NOTICES	458e3061e4bf3d43a927cb3cdb4530fb263fd5a3	2026-10-03	
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	8ab7d73da2b01a35bbd1bbe4046e53dbf1d37c23	2026-10-03	
@@ -19,7 +19,7 @@ docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
 docs/volume_1_systems_and_services/1.1.2-history.md	d0042781c9c8d94ee9853358ad1985cb23847fe3	2026-10-03	
 docs/volume_1_systems_and_services/1.1.3-phases.md	825d3aee51e3894077adbd21536b7d35266086f5	2026-10-05	
-docs/volume_1_systems_and_services/1.1.4-roadmap.md	ae55c0efc2467d9310ab87ed9d6a33bd661d8845	2026-10-07	
+docs/volume_1_systems_and_services/1.1.4-roadmap.md	ab4200559085be0fc0d19ad8710e06054aaf7ea8	2026-10-07	
 docs/volume_1_systems_and_services/1.10.1-code-conventions.md	f7c12a85564aef4e3ff1711a55fb1618e864647a	2026-10-03	
 docs/volume_1_systems_and_services/1.10.2-must-keep-working.md	82c802d6786cfd5d6403f4b0ea5a1248716eccf0	2026-10-03	
 docs/volume_1_systems_and_services/1.11.1-about-the-reference.md	1be31e4eafb4de7eb20bb743c831dbf9a8b02fea	2026-10-03	
@@ -38,7 +38,7 @@ docs/volume_1_systems_and_services/1.11.20-fabriclib-radius.md	e44023135e6b1c14e
 docs/volume_1_systems_and_services/1.11.21-fabriclib-rbac.md	dabab7b062a86503a251685eead7b38886b023f1	2026-10-03	
 docs/volume_1_systems_and_services/1.11.22-fabriclib-secrets.md	fb2aa34db73f483bd0cb941ee69599d092ef7fe9	2026-10-06	
 docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	35d740e6dba7853b5172c4c57f5d28d877080449	2026-10-06	
-docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	9b2002f02f5a8d9b15f8b41fed7d7bf414b61be0	2026-10-06	
+docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	c0b7ee39baa8d8b61e5a98d2558852534c18ab95	2026-10-07	
 docs/volume_1_systems_and_services/1.11.25-fabriclib-system.md	2b29a93c5b70656486ca0b6a6669bd8bc0539a4d	2026-10-06	
 docs/volume_1_systems_and_services/1.11.26-fabriclib-undo.md	3fdd5d1f96f6ff62bf381c864305d0292fc2e4bf	2026-10-06	
 docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b527dab1778bf98f07d5d667a	2026-10-03	
@@ -55,10 +55,10 @@ docs/volume_1_systems_and_services/1.11.8-fabriclib-deploy.md	5d92c3a47d7f6b93ac
 docs/volume_1_systems_and_services/1.11.9-fabriclib-dhcp.md	fdab748fd11cfa2092a49a595412e2c1679c5d97	2026-10-05	
 docs/volume_1_systems_and_services/1.2.1-product-decisions.md	ba7fc61146f8dc8b1f4bec835cd1082ba0afada3	2026-10-04	
 docs/volume_1_systems_and_services/1.2.2-checklist-answers.md	f979997c9fb98ae602a32db150683d7afed07fdb	2026-10-07	
-docs/volume_1_systems_and_services/1.2.3-deviations.md	667736491286116d373eb476a6978f6ba148ee84	2026-10-03	
+docs/volume_1_systems_and_services/1.2.3-deviations.md	580c8446b8caf508ea4df3ebeca00a46b7849ac2	2026-10-07	
 docs/volume_1_systems_and_services/1.2.4-federation-decisions.md	ea933f3f76d1ce85f29c23449a87e32f59668e9a	2026-10-03	
 docs/volume_1_systems_and_services/1.2.5-domain-join-decisions.md	6b9f95082bf7f6ff57f92a4073f95d0397233346	2026-10-03	
-docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	b29ffab94ccc24ffd75d542a0a5b84520e9cefcf	2026-10-07	
+docs/volume_1_systems_and_services/1.2.6-samba-decisions.md	7ae462d60e1a9480e7f6c3543f8f18c5951ed320	2026-10-07	
 docs/volume_1_systems_and_services/1.2.7-alignment-decisions.md	6b5c02487f1a696981d818a4b95df9f389bde396	2026-10-04	
 docs/volume_1_systems_and_services/1.3.1-topology.md	607e867ab88c7b9da780e05b46899c3d63a5baa7	2026-10-05	
 docs/volume_1_systems_and_services/1.3.2-repository-layout.md	2ca9243da4fca415e584c476949e76f770eb74c4	2026-10-05	
@@ -68,7 +68,7 @@ docs/volume_1_systems_and_services/1.3.5-dns-architecture.md	e1daad7faaf5df233e4
 docs/volume_1_systems_and_services/1.3.6-pki-chain.md	7098be99ed38e7e9b61f9c0cfab858bbf28c44d4	2026-10-05	
 docs/volume_1_systems_and_services/1.3.7-templates.md	e72d4377d8acebbf7e4282d18ce6b45611dd6a68	2026-10-05	
 docs/volume_1_systems_and_services/1.3.8-targets-and-hardening.md	44c993d5b413885fdcc15211875029706502eb2a	2026-10-05	
-docs/volume_1_systems_and_services/1.3.9-container-inventory.md	ce0ef4550aaaa505fa892c3f534733a97c68a449	2026-10-05	
+docs/volume_1_systems_and_services/1.3.9-container-inventory.md	d4b7adf968a3feaae3d368d359289f2c3f340a12	2026-10-07	
 docs/volume_1_systems_and_services/1.4.1-host-package.md	4536f6273f41e28fbc794beaffc253695968aa90	2026-10-06	
 docs/volume_1_systems_and_services/1.4.2-setup-design.md	a656d35cc7808b783f2f439b80a27830023e9027	2026-10-03	
 docs/volume_1_systems_and_services/1.5.1-webui-architecture.md	ba4b256465c24e984dfce14377899b75cec04306	2026-10-05	
@@ -99,7 +99,7 @@ docs/volume_2_technologies_and_features/2.1.5-docker.md	8c0b7c03049245d71116166c
 docs/volume_2_technologies_and_features/2.1.6-security.md	2c56f600137ac175665c782b4039c9c1ce57529b	2026-10-05	
 docs/volume_2_technologies_and_features/2.1.7-directory.md	7069f8b9c35321f91277daf90e9e6aa4eedf0f94	2026-10-05	
 docs/volume_2_technologies_and_features/2.1.8-landing-links.md	fe90652ee66699bbb24d1e58a45dfc40ff23f01c	2026-10-03	
-docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	051bf19598e738a1922dba66015b3d27ef5ab7a8	2026-10-06	
+docs/volume_2_technologies_and_features/2.1.9-optional-parts.md	761c11693e9d81ffb72036e7a2f0c0bb7e3d3746	2026-10-07	
 docs/volume_2_technologies_and_features/2.10.1-domain-join.md	7de192a312db784ad93696b8318d138e702f6d5a	2026-10-05	
 docs/volume_2_technologies_and_features/2.10.2-linux-join-ad.md	825139bf5114e8e58cfe4cfeca09a382b6930a0b	2026-10-06	
 docs/volume_2_technologies_and_features/2.11.1-samba-ad.md	72f82eaf4d59314ace1c5c09f2226a63a9dd9c56	2026-10-04	
@@ -108,7 +108,7 @@ docs/volume_2_technologies_and_features/2.12.1-third-party-licences.md	51247e38f
 docs/volume_2_technologies_and_features/2.2.1-kea-design.md	da4655d3733b7fdf899606642209a7e0288d12ab	2026-10-03	
 docs/volume_2_technologies_and_features/2.2.2-dhcp-management.md	b74a0eddcf47789ecdc45a03735b1f51c112e905	2026-10-05	
 docs/volume_2_technologies_and_features/2.3.1-freeradius-design.md	5da3f0a3e2e10ed0f5cba436c2823bda0a8c25c8	2026-10-05	
-docs/volume_2_technologies_and_features/2.4.1-adguard.md	9140a66c15d5dee3b15d0e33ca4e4b0489339ae3	2026-10-04	
+docs/volume_2_technologies_and_features/2.4.1-adguard.md	e9e0411fe2eb28916f4d08a9e657f68a93408016	2026-10-07	
 docs/volume_2_technologies_and_features/2.5.1-chrony.md	f5ab5c790a87e74fc708fc9bee953e977ba2f384	2026-10-03	
 docs/volume_2_technologies_and_features/2.6.1-image-channels.md	531afa23f89cab7d0bd68180a7d1678766cf19fa	2026-10-05	
 docs/volume_2_technologies_and_features/2.6.2-image-updates.md	0c09838a85a4662f17134d9259c22cf54b6bd0bd	2026-10-05	
@@ -140,7 +140,7 @@ docs/volume_3_operations/3.3.1-certificates.md	2d3d835c67c777d49bb81a2c7636a1714
 docs/volume_3_operations/3.3.2-manual-certificates.md	751e32dc4da4668528048d163e76da9c69f6629e	2026-10-03	
 docs/volume_3_operations/3.4.1-dhcp.md	b11283105f4682a2ff1b0d9cc1ec319d80980f62	2026-10-03	
 docs/volume_3_operations/3.5.1-radius.md	4ab90ebf3d3217465726a006cca76d025f6621af	2026-10-05	
-docs/volume_3_operations/3.6.1-dns-filter.md	6af3efcbf224abb722f4110551c4c97bb9ac4d85	2026-10-03	
+docs/volume_3_operations/3.6.1-dns-filter.md	de40e1a00a9fc244a7a1dbb2ee91470d1da2f8f6	2026-10-07	
 docs/volume_3_operations/3.7.1-time.md	81d60dc5586f470e6369fd4aa9919160562fc329	2026-10-03	
 docs/volume_3_operations/3.8.1-people.md	c56cf78c4b61ad46eb250611cb5d7aed5b29b5ea	2026-10-05	
 docs/volume_3_operations/3.8.2-single-sign-on.md	96fa90c0d34acc125dd96657c06542a4a265feb6	2026-10-06	
@@ -180,8 +180,8 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	adb3402722a30f91e3c5219fbea7008d9e738b1b	2026-10-07	
-docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	2d67c89269e4f73bd382ced10f9a462a3e0a9fc9	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	74de6e661f8e5de456b216fedf93ed8a0c7b722d	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	41f468beaaa9678af8739200b03fb5522eee175e	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/README.md	6b0682d8ccf1087defb672936a940a2c9895d68c	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -233,7 +233,7 @@ scripts/README.md	23cb6230c47dfd247f8392899418f3bcce8a9b24	2026-10-06
 scripts/docs/README.md	135dc47f8819d75e217e1865d89d48c256983310	2026-10-03	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	5c811285602805f04add0a71a678dc5cc1c8a9b4	2026-10-05	
-scripts/docs/lib_doc_numbers.tsv	68ea8bc62ddb3f1adf4806c6d3e9292fea076435	2026-10-06	
+scripts/docs/lib_doc_numbers.tsv	d9c58df91c2c94f954e8ec0f0d33a83db6bcf5e9	2026-10-07	
 scripts/docs/lib_doc_registry.py	b9ba7c37a7d79fddfb748007b51c784401c1c523	2026-10-03	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-03	
@@ -803,7 +803,7 @@ src/fabriclib/setup/ask_ram.py	a4e0d00de827979da6afbadcbf9cb2b6085ec9a4	2026-10-
 src/fabriclib/setup/ask_windows_domain.py	1cc2ada60af664ab15578de1ecbbd3c356b5f526	2026-10-04	
 src/fabriclib/setup/backup_install.py	4c9118f583d651dd75d6afcaf3031061fecb1579	2026-10-06	
 src/fabriclib/setup/check_export_dir.py	418170a13dff61353dedf91b3e251156af4f931b	2026-09-30	
-src/fabriclib/setup/choose_plan.py	f4570d348c7c715a10aa9c1502978f6e544d539c	2026-10-05	
+src/fabriclib/setup/choose_plan.py	05149f170e5412fe8e8e652db61bb603421e9555	2026-10-07	
 src/fabriclib/setup/collect_vars.py	f99215c8c34670fb78f0af6f081d93a024161040	2026-10-07	
 src/fabriclib/setup/common/README.md	16aa541284a94b46b1d5b3e8e83f97f40c3785af	2026-10-02	
 src/fabriclib/setup/common/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
@@ -1182,7 +1182,7 @@ templates/systemd/fabric-directory-sync.timer	f4b9f0604e08ba502880ae4c84c89ad89b
 templates/systemd/fabric-federation.service.j2	5c33184dacfdbf2e4b6e37f5bdcf88acb191ca7a	2026-10-01	
 templates/systemd/fabric.target	b3b87d2c8db3fae16df3bbf548e09955f3d1a19e	2026-09-30	
 templates/systemd/wrapper.service.j2	56e9cab9da8ff0396c2b801fe5d469f994dcd011	2026-10-06	
-templates/vars.yaml.j2	772a7ad0512db3fd1dae4df2ca1285d3b680965b	2026-10-06	
+templates/vars.yaml.j2	c10ed8ff4d0491a34d027f43aff7da6ecae3736d	2026-10-07	
 templates/webui-app/README.md	24634648c19e7b86801c49c7dcab5811ac4c73ee	2026-10-05	
 templates/webui-app/apply.html	8b8fd4593d075794cc14f4a38d97874c4cc76c1d	2026-10-02	
 templates/webui-app/audit.html	92d66156a5052b3b375db22a3c8eb3b1f266cf83	2026-10-02	
@@ -1262,7 +1262,7 @@ tests/openbao/run.py	7470293409535699527ba108cad767b372fa06bc	2026-10-05
 tests/pki/README.md	3b02a5829b1f64cd3790dbc4577b18612849941a	2026-10-01	
 tests/pki/run.py	d1c92fc61885b491534a767babd6d28c441c48ac	2026-10-03	
 tests/pki/site_ca.py	ee12f9ac4e2b4d0fbfbcd5163b26200b95120181	2026-10-03	
-tests/render.py	91a33a7b3fcf2ce74e29dfdbbe3894c0d26298d1	2026-10-05	
+tests/render.py	f671fee49de4a48c2ecb2dab860c7292e5a24b27	2026-10-07	
 tests/run-all.sh	355927e2123b3653128bb74eb12dbaea12ab86a2	2026-10-05	
 tests/samba/README.md	3ca8f166ebc5747f1b1df22f81203cde78719264	2026-10-05	
 tests/samba/dc.py	8d932c3a357bed694561f143e3db9b64bbcfc2f2	2026-10-05	

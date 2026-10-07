@@ -175,19 +175,26 @@ db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=link
                                                    zone_records=v2['dns']['dynamic_zone_var'])
 assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
-# DNS filter (manual 2.4.1): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
+# DNS filter (manual 2.4.1): on by default (D112) -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
 # the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
-assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False
-assert v2['bind_dns_port'] == user.get('bind_dns_port', 53), 'with the filter off the port is what vars say (53)'
+assert v2['dns_filter'] == user.get('dns_filter', 'adguard') and v2['install_adguard'] is (v2['dns_filter'] == 'adguard')
+off = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none',
+                                                                 'bind_dns_port': 53}))
+assert off['install_adguard'] is False and off['bind_dns_port'] == 53, 'with the filter off the port is what vars say (53)'
+dflt = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{k: w for k, w in copy.deepcopy(PRISTINE).items()
+                                                                 if not k.startswith(('dns_filter', 'adguard_'))}))
+assert dflt['install_adguard'] is True and dflt['adguard_upstreams'] == ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query'],     'on by default with Cloudflare (D112)'
+assert [f['name'] for f in dflt['adguard_filter_lists']] == ['AdGuard DNS filter'], dflt['adguard_filter_lists']
 adg = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'AdGuard',
                                                                  'bind_dns_port': 53}))
 assert adg['install_adguard'] is True and adg['bind_dns_port'] == 5053, (adg['install_adguard'], adg['bind_dns_port'])
-assert 'adguard' in [r['name'] for r in adg['dns']['dynamic_zone_var']['CNAME']] and adg['adguard_upstreams'] == []
-kept = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'bind_dns_port': 5053}))
+assert 'adguard' in [r['name'] for r in adg['dns']['dynamic_zone_var']['CNAME']] and adg['adguard_upstreams'] == ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query']
+kept = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none',
+                                                                  'bind_dns_port': 5053}))
 assert kept['bind_dns_port'] == 5053, 'with the filter off a chosen port is kept (an AdGuard of your own)'
 ngx = env.get_template('nginx/nginx.conf.j2').render(**{**secrets, **adg})
 assert 'server_name adguard.lan.j-j.family;' in ngx and 'auth_request /oauth2/auth;' in ngx
-assert 'include /etc/nginx/conf.d/adguard-auth.inc;' in ngx and 'adguard' not in env.get_template('nginx/nginx.conf.j2').render(**full)
+assert 'include /etc/nginx/conf.d/adguard-auth.inc;' in ngx and 'adguard' not in env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_adguard': False})
 comp = yaml.safe_load(env.get_template('adguard/docker-compose.yml.j2').render(**{**secrets, **adg}))['services']
 assert comp['adguardhome']['cap_drop'] == ['ALL'] and 'cap_add' not in comp['adguardhome']
 auth = yaml.safe_load(env.get_template('adguard-auth/docker-compose.yml.j2').render(**{**secrets, **adg}))['services']
