@@ -7,7 +7,7 @@ from fabriclib.setup.errors import SetupError
 def start_unit(unit, container, restart):
     """Purpose: enable a fabric unit (links it into multi-user.target and fabric.target), start or restart it,
              and wait for its container to be healthy (its failed state cleared first, so systemd's start limit
-             never refuses the start).
+             never refuses the start; a unit that is not cleanly active is stopped first, ending any restart loop).
     Inputs:  unit — systemd unit name; container — its container name; restart — bool, restart when already
              active (config, certificate or image changed).
     Returns: "running" (active and no restart asked; health not checked), "started" or "restarted".
@@ -19,7 +19,10 @@ def start_unit(unit, container, restart):
     if active and not restart:
         return "running"
     # a unit that kept failing (a bad image restarted until systemd's start limit) refuses a start until its failed
-    # state is cleared: the rollback after a failed image update hit this now and then (manual 5.8.1.27)
+    # state is cleared, and one still in its automatic-restart loop races a start: it is stopped first, which cancels
+    # the pending restart (the rollback after a failed image update hit both now and then: manual 5.8.1.27, 5.8.2.9)
+    if not active:
+        subprocess.run(["systemctl", "stop", unit], capture_output=True)
     subprocess.run(["systemctl", "reset-failed", unit], capture_output=True)
     subprocess.run(["systemctl", "restart" if active else "start", unit], check=True)
     healthy, why = wait_healthy(container, timeout=900)

@@ -421,6 +421,7 @@ check "images rollback nginx: back to the image before the update" \
     "grep -q 'rolled back nginx' '$OUT/images-rollback.log' && [ \"\$(nginx_ref)\" != '$NGX_REF' ] && certs_ok"
 in_box "python3 /root/set_lock.py nginx busybox 1.37 sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
 in_box 'fabricctl images update nginx' > "$OUT/images-bad.log" 2>&1
+in_box 'journalctl -u nginx --no-pager -n 120' > "$OUT/images-bad-journal.log" 2>&1    # kept for an intermittent failure
 check "a validated image that does not come up healthy is rolled back by itself" \
     "grep -q 'rolled back to' '$OUT/images-bad.log' && nginx_ref | grep -q '^nginx:1.30.5@' && certs_ok"
 in_box "python3 /root/set_lock.py nginx nginx 1.30.5 sha256:b972f831f200b19ef0767938224f9711e74cd783718738cd7405d5cabf75c442"

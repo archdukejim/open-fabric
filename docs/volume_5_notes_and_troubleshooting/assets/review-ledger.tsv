@@ -38,7 +38,7 @@ docs/volume_1_systems_and_services/1.11.20-fabriclib-radius.md	e44023135e6b1c14e
 docs/volume_1_systems_and_services/1.11.21-fabriclib-rbac.md	dabab7b062a86503a251685eead7b38886b023f1	2026-10-03	
 docs/volume_1_systems_and_services/1.11.22-fabriclib-secrets.md	fb2aa34db73f483bd0cb941ee69599d092ef7fe9	2026-10-06	
 docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	ede02b67ed5facb4765d4819d244a089f348b88c	2026-10-07	
-docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	d346c03332108f55e51f62e5574c2a6436dee904	2026-10-07	
+docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	116a66accee29db3778a9de96f7f06489d31efde	2026-10-07	
 docs/volume_1_systems_and_services/1.11.25-fabriclib-system.md	152adc848c96b665ea39e0e7bf9d250635ea259a	2026-10-07	
 docs/volume_1_systems_and_services/1.11.26-fabriclib-undo.md	3fdd5d1f96f6ff62bf381c864305d0292fc2e4bf	2026-10-06	
 docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b527dab1778bf98f07d5d667a	2026-10-03	
@@ -182,7 +182,7 @@ docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	f9ed085182112565297c4081d5b22809e277b416	2026-10-07	
-docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	01f38491fc1d6cd45c6f23e6347b55055d271295	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	02bc7828cb0600abeb27085e0b8a7f9cdd2da397	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/README.md	6b0682d8ccf1087defb672936a940a2c9895d68c	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
@@ -852,7 +852,7 @@ src/fabriclib/setup/setup_openbao.py	226047644c4e027209806f6cbec82deeecbdd866	20
 src/fabriclib/setup/stage_source.py	fc569e4dbbec1547cbf74bb155ad3d2498c21c6b	2026-09-30	
 src/fabriclib/setup/start_bootstrap.py	cd55ee690beb024d64109b2ac4927bae129d17e7	2026-09-30	
 src/fabriclib/setup/start_services.py	c978f5d7bcc621df827d84f4037e91c0cf67dea2	2026-10-07	
-src/fabriclib/setup/start_unit.py	01f10d801c619c8ee11c3033001e9448167735b3	2026-10-06	
+src/fabriclib/setup/start_unit.py	0305f5e9cf3b7d28d76978bf21da35653f70d7b5	2026-10-07	
 src/fabriclib/setup/steps.py	84d79c926f624700d018fc5d1f95a9ee1167a101	2026-10-05	
 src/fabriclib/setup/uninstall.py	7965441efdcb867ed05c3db8eb1b446dace326d2	2026-10-05	
 src/fabriclib/setup/upgrade_vars.py	483cd3f85eb49914e39d7298a1f866d4c4b1c38b	2026-10-02	
@@ -1305,7 +1305,7 @@ tests/sandbox/posix_check.py	4aa85de6fc7fc9b21dc141f19d92bb1f42c60bc8	2026-10-02
 tests/sandbox/radius_device.py	12b3e1127a0cc5966846fe0554dc84da7a2e5449	2026-10-05	
 tests/sandbox/radius_mab.py	c9575e9fd8e3c3d52dbd77b879b9ef9a6bd148d5	2026-09-30	
 tests/sandbox/rfc2136_test.sh	21e1a72cdc0eb36df39f8f49725d5476048d3a28	2026-10-02	
-tests/sandbox/run.sh	559641dea90ed2542ca71fad5518ece59752ab07	2026-10-07	
+tests/sandbox/run.sh	6df301d97c30f07a0e93f4803ec7fb057cb6ec98	2026-10-07	
 tests/sandbox/set_lock.py	3f76da2458bc18d18fbf3efb8b176900a0984ae7	2026-09-30	
 tests/security/README.md	5181e9d08a03731704c2b1580b9901a2206849ad	2026-10-07	
 tests/security/run.py	a364941c08bcfbf13803c1a1cf6e6f908fc95b66	2026-10-07	
