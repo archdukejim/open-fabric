@@ -49,4 +49,25 @@ mkdir -p "$OUT"
 cp -a "$WORK/repo/dists" "$WORK/repo/pool" "$OUT/" 2>/dev/null || cp -a "$WORK/repo/dists" "$OUT/"
 gpg --batch --armor --export > "$OUT/public.key"
 touch "$OUT/.nojekyll"                    # GitHub Pages serves the tree as it is
+# the site's own page: how to add the repository, and the key's fingerprint to check it against
+FPR="$(gpg --batch --with-colons --list-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+URL="${APT_URL:-https://archdukejim.github.io/open-fabric}"
+cat > "$OUT/index.html" <<EOF
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fabric apt repository</title>
+<style>body{font-family:system-ui,sans-serif;max-width:52rem;margin:2rem auto;padding:0 1rem;line-height:1.5}
+pre{background:#f4f4f4;padding:.8rem;overflow-x:auto}code{font-size:.9rem}</style></head>
+<body>
+<h1>fabric apt repository</h1>
+<p>Signed packages of <code>fabricctl</code>, for Ubuntu 24.04 and 26.04 (amd64 and arm64). Suite <code>stable</code>
+holds the releases; <code>testing</code> a release candidate.</p>
+<pre><code>wget -qO- $URL/public.key | sudo gpg --dearmor -o /usr/share/keyrings/fabric-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/fabric-archive-keyring.gpg] $URL stable main" | sudo tee /etc/apt/sources.list.d/fabric.list
+sudo apt update &amp;&amp; sudo apt install fabricctl
+sudo fabricctl setup</code></pre>
+<p>Signing key fingerprint: <code>$FPR</code></p>
+<p>Source and manual: <a href="https://github.com/archdukejim/open-fabric">github.com/archdukejim/open-fabric</a></p>
+</body></html>
+EOF
 echo "$OUT"

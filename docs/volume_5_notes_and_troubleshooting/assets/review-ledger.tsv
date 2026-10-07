@@ -180,15 +180,15 @@ docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0c
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
-docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	e02e6f4760605e6d47795def453795e8fa761b52	2026-10-06	
+docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	93f084e5ef30186891aa77e982781889708f46da	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/README.md	9f22a27c3000b5a146b0f67e722bf7be2bdb1b46	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
 examples/vars.yaml	7cb14aab3d144d4e827cdd782e5cfedefd39cbca	2026-10-05	
 packaging/README.md	a9fe16cea3b5ec8ae330108c470b79b9a6d3bf2e	2026-10-06	
-packaging/apt/README.md	e3f7f94e982d5fe8140ecc9e3ad090053f28da02	2026-10-06	
-packaging/apt/build-repo.sh	77b8ebfea9b4928068318063f4f5203cc56bab27	2026-10-06	
+packaging/apt/README.md	bbee276efd0121a627879a1a2fd509906ded2b1c	2026-10-07	
+packaging/apt/build-repo.sh	8b5b92cd47fd08309daf8fdeb29ce892f93165d3	2026-10-07	
 packaging/apt/distributions	c6702e512945162449c62588a4e057afad83bffe	2026-10-06	
 packaging/deb/README.md	35915b9424a377fc57cad99e9c2d4f75dbfb4b0c	2026-10-03	
 packaging/deb/assemble-tree.sh	12b018ab7e7e150f97704618758e0f0de992b861	2026-10-05	
@@ -1239,7 +1239,7 @@ tests/hardening/README.md	514afa897a841c34383af1ef74949610d5dd333d	2026-10-05
 tests/hardening/run.sh	b4e3e81266e9980d1dc636d34260a2619c00220c	2026-10-05	
 tests/host/README.md	560b70e7b9a2008627d864d4b8833d6942c64406	2026-09-30	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
-tests/host/run.sh	a2b620283a87ab3f40b756cabaa293f8472f5911	2026-10-05	
+tests/host/run.sh	b704340880d0def7625c1c85ff43455c68e7c2e0	2026-10-07	
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
 tests/images/README.md	3d9cb6e69951a547993a9b23fab7cfb54c1e24ab	2026-10-04	
 tests/images/published.py	6d6b7b45a8622c494ffe65262f7bf4fd392ae3e0	2026-10-05	

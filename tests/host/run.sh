@@ -8,7 +8,8 @@
 #
 #   TARGET=tempuser@192.168.4.57 HOST_IP=192.168.4.57 LAN_CIDR=192.168.4.0/22 \
 #   GATEWAY=192.168.4.1 [DOMAIN=pitest.home.arpa] [KEY=~/.ssh/id] [EXTRA_VARS=$'site_name: lan\nldap_base_dn: dc=lan'] \
-#   tests/host/run.sh
+#   [APT_SUITE=stable|testing] tests/host/run.sh
+#   (APT_SUITE: install from fabric's signed apt repository, as users do, instead of a .deb built here)
 #
 # It INSTALLS fabric on that host (Docker, firewall, services): use a
 # disposable machine. The install is left in place; CLEANUP=1 uninstalls it.
@@ -30,10 +31,17 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 LOGIN=$("${SSH[@]}" whoami); HOSTNAME_=$("${SSH[@]}" 'hostname -s')
 echo "--- target: $TARGET ($("${SSH[@]}" 'uname -m; . /etc/os-release; echo $PRETTY_NAME' | tr '\n' ' '))"
 
-DEB=$(OUT="$OUT/dist" bash "$REPO/packaging/deb/build-deb.sh") || { echo "FAIL package build"; exit 1; }
-put "$DEB"
-R "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/$(basename "$DEB")" > "$OUT/apt.log" 2>&1
-check "package installs with apt on the host" "R 'dpkg -s fabricctl' | grep -q '^Status: install ok installed'"
+if [ -n "${APT_SUITE:-}" ]; then
+    # as users install it (manual 4.1.3): fabric's signed apt repository on GitHub Pages, suite stable or testing
+    APT_URL="${APT_URL:-https://archdukejim.github.io/open-fabric}"
+    R "wget -qO- $APT_URL/public.key | gpg --dearmor --yes -o /usr/share/keyrings/fabric-archive-keyring.gpg &&        echo 'deb [signed-by=/usr/share/keyrings/fabric-archive-keyring.gpg] $APT_URL $APT_SUITE main'        > /etc/apt/sources.list.d/fabric.list && apt-get update &&        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fabricctl" > "$OUT/apt.log" 2>&1
+    check "fabric's apt repository ($APT_SUITE) is trusted by its key and installs fabricctl"         "R 'dpkg -s fabricctl' | grep -q '^Status: install ok installed' && ! grep -qiE 'NO_PUBKEY|not signed|GPG error' '$OUT/apt.log'"
+else
+    DEB=$(OUT="$OUT/dist" bash "$REPO/packaging/deb/build-deb.sh") || { echo "FAIL package build"; exit 1; }
+    put "$DEB"
+    R "apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/$(basename "$DEB")" > "$OUT/apt.log" 2>&1
+    check "package installs with apt on the host" "R 'dpkg -s fabricctl' | grep -q '^Status: install ok installed'"
+fi
 
 TSIG_SECRET=$(openssl rand -base64 32)
 cat > "$OUT/vars.yaml" <<EOF
