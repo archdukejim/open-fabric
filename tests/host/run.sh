@@ -81,8 +81,15 @@ check "certs page: formats, CA identity, MIME, plain HTTP by name and IP, ca.<do
 check "LAN clients reach the certificate page over plain HTTP: http://$HOST_IP/certs/" \
     "curl -s --max-time 10 http://$HOST_IP/certs/root-ca.pem | grep -q 'BEGIN CERTIFICATE'"
 
-R "bash /tmp/rfc2136_test.sh $HOST_IP $DOMAIN npm '$TSIG_SECRET' npm" > "$OUT/rfc2136.log" 2>&1
-check "RFC2136 with the embedded TSIG key (npm): allowed name only, wrong keys refused" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
+BIND_PORT=$(R "awk '/^bind_dns_port:/ {print \$2}' /opt/fabric/config/vars.yaml")    # 5053 behind the DNS filter
+R "bash /tmp/rfc2136_test.sh $HOST_IP $DOMAIN npm '$TSIG_SECRET' npm $BIND_PORT" > "$OUT/rfc2136.log" 2>&1
+check "RFC2136 to BIND's port ($BIND_PORT) with the embedded TSIG key (npm): allowed name only, wrong keys refused" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
+# the DNS filter is on by default (D112): AdGuard on 53 in front of BIND on 5053, Cloudflare upstream, AdGuard's list
+check "DNS filter on by default: AdGuard on 53 answers fabric's names, BIND behind it on 5053" \
+    "R 'dig +short @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP && R 'dig +short -p 5053 @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP"
+check "DNS filter: internet names through Cloudflare; an ad domain blocked by AdGuard's DNS filter (NXDOMAIN from AdGuard)" \
+    "R 'dig +short @$HOST_IP one.one.one.one' | grep -qE '^1\.(1\.1\.1|0\.0\.1)$' && \
+     R 'for i in \$(seq 30); do dig @$HOST_IP doubleclick.net | grep -q fake-for-negative-caching.adguard.com && exit 0; sleep 2; done; exit 1'"
 
 echo "--- restricted sign-in (real Keycloak)"
 cat > "$OUT/bob.py" <<'PY'
