@@ -1,4 +1,4 @@
-"""The `samba` suite, sites joining the root's domain (manual 1.8.8.4, 2.11.2.22 S8.1-S8.2): a root DC (with BIND
+"""The `samba` suite, sites joining the root's domain (manual 1.9.8.4, 1.6.5.22 S8.1-S8.2): a root DC (with BIND
 serving the AD zone), and a site DC, writable, then another read-only, joining it the way a site's setup does — the
 root prepares each site in its domain (prepare_site: OU, groups, service accounts, ACLs, id block, networks, a join
 account that expires), the site's deploy_samba writes the join credentials and its compose file joins instead of
@@ -183,7 +183,7 @@ if "lab" in joined:
     check("root -> lab: a person made at the root reaches the site's DC",
           until(lambda: "sAMAccountName: rooty" in search(container, "(sAMAccountName=rooty)", ["sAMAccountName"])))
 
-# ---- a site nested under a site that is not the root (D105, manual 1.8.8.14)
+# ---- a site nested under a site that is not the root (2.1.6.20, manual 1.9.8.14)
 if "lab2" in joined:
     container, v, secrets = joined["lab2"]
     check("lab2: its OU sits in lab's, which sits in the root's (as the root sees it, once replicated)",
@@ -201,7 +201,7 @@ if "lab2" in joined:
                                                  "home_base": "/home", "shell": "/bin/bash"}, container)
             return True
         except ValidationError:
-            return False     # a new DC makes accounts only once the root's RID master gave it a pool (5.8.1.23)
+            return False     # a new DC makes accounts only once the root's RID master gave it a pool (2.3.6.1.23)
 
     check("lab2: its agent creates a person at its own DC (once the DC has its RID pool)", until(make_deepy, 600))
     check("lab2 -> lab -> root: a person made two levels down reaches the root's DC",
@@ -215,10 +215,10 @@ if "lab2" in joined:
         except ValidationError:
             return False     # not replicated to lab's DC yet, or refused
 
-    check("lab's agent resets a person of lab2, the site nested below it (inherited rights, D105)",
+    check("lab's agent resets a person of lab2, the site nested below it (inherited rights, 2.1.6.20)",
           until(lab_resets_deepy, 600))
 
-    # ---- re-parenting (manual 1.8.8.14): lab2 moves from lab to the root, as the root's accept_join does for a
+    # ---- re-parenting (manual 1.9.8.14): lab2 moves from lab to the root, as the root's accept_join does for a
     # site already in the domain (no join account; its OU moves with everything in it)
     nets2 = [{"name": "lan", "cidr": SITES["lab2"][3]}]
     try:
@@ -274,7 +274,7 @@ if "edge" in joined:
         wrote = False
     check("edge: writes at the RODC are refused (they belong to a writable DC)", not wrote)
 
-# ---- Group Policy between sites (S8.4, manual 1.8.8.15): hidden shares, folders copied from their owners over SMB
+# ---- Group Policy between sites (S8.4, manual 1.9.8.15): hidden shares, folders copied from their owners over SMB
 EXEC = ["docker", "exec", "-e", "PYTHONDONTWRITEBYTECODE=1", "-e", "KRB5_CONFIG=/data/private/krb5.conf"]
 GPO_STATE = ("import os,sys; sys.path.insert(0,'/fabric'); import ldb; from open_samdb import open_samdb; "
              "s,lp=open_samdb('/data/etc/smb.conf'); r=lp.get('realm').lower(); p=os.path.join(lp.get('path','sysvol'),r,'Policies'); "
@@ -301,7 +301,7 @@ def in_step(container):
 
 hidden = all(sh(["docker", "exec", ROOT, "testparm", "-s", "--section-name", share, "--parameter-name", "browseable",
                  "/data/etc/smb.conf"]).stdout.strip() == "No" for share in ("sysvol", "netlogon"))
-check("SYSVOL and NETLOGON are not browseable, and mDNS is off (never advertised: D94)",
+check("SYSVOL and NETLOGON are not browseable, and mDNS is off (never advertised: 2.1.6.16)",
       hidden and "multicast dns register = no" in sh(["docker", "exec", ROOT, "cat", "/data/etc/smb.conf"]).stdout)
 listing = sh([*EXEC, ROOT, "smbclient", "-s", "/data/etc/smb.conf", "-P", "-L", f"//{RV['hostname_dc']}"])
 check("...so a share list leaves them out", listing.returncode == 0 and "Sharename" in listing.stdout

@@ -37,7 +37,7 @@ def deploy_freeradius(v, secrets, jinja_env):
     changed |= write_file_if_changed(os.path.join(base, "config", "ad-password"),
                                      secrets.get("ad_radius_password", "") + "\n", 0o640, 0, gid)
     src = os.path.join(jinja_env.loader.searchpath[0], "freeradius", "python")
-    if not os.path.isdir(src):              # a checkout: the policy is code, in src/containers/ (manual 1.3.2)
+    if not os.path.isdir(src):              # a checkout: the policy is code, in src/containers/ (manual 1.2.2)
         src = os.path.join(os.path.dirname(jinja_env.loader.searchpath[0]), "src", "containers", "freeradius")
     for name in sorted(os.listdir(src)):
         if name.endswith(".py"):

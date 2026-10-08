@@ -3,7 +3,7 @@ Description=Docker Compose service for {{ item.service }}
 PartOf=fabric.target
 # fabric.target is reached once this service is up (and healthy): `fabricctl start` waits for it.
 Before=fabric.target
-# time-sync.target: certificates, TOTP and TSIG need the right clock (manual 2.5.1); chrony-wait gives up after 90 s
+# time-sync.target: certificates, TOTP and TSIG need the right clock (manual 1.13.1); chrony-wait gives up after 90 s
 After=docker.service network-online.target time-sync.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}
 
 Requires=docker.service network-online.target{% if item.requires is defined %}{% for req in item.requires %} {{ req }}.service{% endfor %}{% endif %}

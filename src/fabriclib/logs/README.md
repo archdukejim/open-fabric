@@ -1,6 +1,6 @@
 # fabriclib/logs
 
-Optional log forwarding (design D20): Fluent Bit sends the host journal
+Optional log forwarding (design 2.1.15.1): Fluent Bit sends the host journal
 (every fabric container logs there, fabric's audit log too) and OpenBao's
 audit log to syslog (RFC 5424 over verified TLS) and/or Elasticsearch /
 OpenSearch (HTTPS, verified), with a disk buffer.

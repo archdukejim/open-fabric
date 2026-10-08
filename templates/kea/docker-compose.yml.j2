@@ -6,7 +6,7 @@ services:
   # root inside the container, with a read-only root and no-new-privileges.
   kea-dhcp4:
 {% set published = published_ref('kea') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or image_kea }}
 {% if not published %}
     build:

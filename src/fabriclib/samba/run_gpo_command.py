@@ -20,7 +20,7 @@ USAGE = """usage: fabricctl gpo load <folder>                 templates (.admx, 
   Policies apply to this site's machines (or people, for user policies) through its "fabric: <site> admin settings"
   GPO, which the sites below may override; with --control through its "fabric: <site> controls" GPO, linked
   enforced, which they may not. Values: a number, text, on/off, an option's name or number, or a list as a;b;c
-  (manual 3.15.4)."""
+  (manual 4.6.8)."""
 
 
 def _files(folder):
@@ -44,7 +44,7 @@ def _files(folder):
 
 
 def run_gpo_command(v, args, container="samba"):
-    """Purpose: `fabricctl gpo …` (manual 3.15.4): only routes to the DC's editor (gpo_request) and prints.
+    """Purpose: `fabricctl gpo …` (manual 4.6.8): only routes to the DC's editor (gpo_request) and prints.
     Inputs:  v — rendered vars (site_name); args — list of str after `gpo`; container — the DC's container.
     Returns: exit status: 0 ok, 1 refused, 2 usage.
     Fails:   OSError reading a folder or writing the audit log (propagates).

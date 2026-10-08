@@ -46,7 +46,7 @@ def run_federation_command(ctx, argv):
     """Purpose: `fabricctl federation status | enable | disable | invite | invitations | revoke | remove | reparent |
              relay | networks` —
              joining sites to
-             this install without the web UI (manual 1.8.4.1).
+             this install without the web UI (manual 1.9.4.1).
     Inputs:  ctx — SetupContext with state loaded (ctx.vars: the rendered vars); argv — list of str after
              "federation" (default status).
     Returns: exit status: 0 success; 1 a ValidationError or a failed apply; 2 usage (printed to stderr).

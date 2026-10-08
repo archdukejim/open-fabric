@@ -10,7 +10,7 @@ EXTENSIONS = "[{35378EAC-683F-11D2-A89A-00C04FBBCFA2}{53D6AB1D-2488-11D1-A28C-00
 
 
 def root_ca_policy(pem):
-    """Purpose: fabric's root CA as a trusted root on every Windows member (S5, D77, manual 2.11.2.9): the Registry.pol
+    """Purpose: fabric's root CA as a trusted root on every Windows member (2.1.6.10, manual 1.6.5.9): the Registry.pol
              that Windows' "Trusted Root Certification Authorities" policy writes —
              Software\\Policies\\Microsoft\\SystemCertificates\\Root\\Certificates\\<SHA-1 thumbprint>, value Blob:
              the certificate as a serialized certificate property (id 0x20, its DER) (Q13).

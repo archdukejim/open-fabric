@@ -12,7 +12,7 @@ from fabriclib.security.signin_layers import KERBEROS, LAYERS, LOWERED_FILE, lay
 
 
 def set_signin_layer(actor, layer, text, source="cli", lower=False, vars_file=VARS_FILE):
-    """Purpose: change one sign-in layer in the install's settings (manual 5.8.2.6.4, D111): a raise from the web
+    """Purpose: change one sign-in layer in the install's settings (manual 2.3.6.2.6.4, 2.1.6.24): a raise from the web
              console or `fabricctl security raise`; a lowering only with lower=True (`fabricctl security lower`, after
              its typed confirmation). Kerberos (layer "kerberos", on/off) changes both ways. A lowering is recorded in
              LOWERED_FILE until the layer is raised back to what it had; every change is audited. The change takes

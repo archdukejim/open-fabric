@@ -23,7 +23,7 @@ LABEL org.fabric.ids="${BIND_UID}:${BIND_GID}"
 
 # bind9: named; bind9-utils: rndc (healthcheck, zone reloads) and named-checkzone.
 # samba-libs, samba-dsdb-modules: Samba's DLZ module, so BIND serves the AD zone from the domain controller's
-# database (manual 2.11.2.6); unused unless named.conf loads it. Its path names the architecture, so a fixed link
+# database (manual 1.6.5.6); unused unless named.conf loads it. Its path names the architecture, so a fixed link
 # lets named.conf name it the same way on amd64 and arm64 (dlz_bind9_18 serves BIND 9.18 and 9.20).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends bind9 bind9-utils samba-libs samba-dsdb-modules \

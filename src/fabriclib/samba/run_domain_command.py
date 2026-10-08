@@ -13,7 +13,7 @@ USAGE = """usage: fabricctl domain status                    the Windows domain:
        fabricctl domain add-machine <name>         pre-create a machine in this site with a one-time join password
   password-policy without options shows the policy in the settings; with options it changes those values (the whole
   policy is checked again) and applies them. add-machine prints the password once: give it to join-linux.sh
-  --one-time on the machine (manual 3.15.2)."""
+  --one-time on the machine (manual 4.6.6)."""
 
 # option -> (policy key, type)
 OPTIONS = {"--minimum-length": ("minimum_length", int), "--complexity": ("complexity", bool),
@@ -48,7 +48,7 @@ def _changes(args):
 
 
 def run_domain_command(v, args):
-    """Purpose: `fabricctl domain …` (manual 3.15.1): only routes to the domain functions.
+    """Purpose: `fabricctl domain …` (manual 4.6.5): only routes to the domain functions.
     Inputs:  v — rendered vars; args — list of str after `domain`.
     Returns: exit status: 0 ok, 1 a refused change or a failed apply, 2 usage.
     Fails:   OSError from the vars file or the audit log (propagates).

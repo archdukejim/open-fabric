@@ -29,7 +29,7 @@ def _role(kc, realm, name, description):
 
 
 def ensure_rbac_roles(kc, realm, admin_role):
-    """Purpose: Converge fabric's access control in Keycloak (design D19): one realm role per permission
+    """Purpose: Converge fabric's access control in Keycloak (design 2.1.6.1): one realm role per permission
              (fabric:<area>:<action>) and one composite role per bundle holding exactly its permissions.
     Inputs:  kc — admin_client.Admin; realm — realm name; admin_role — name of the "admin" bundle
              (webui_admin_role, default fabric-admin). Reads rbac/permissions PERMISSIONS, BUNDLES, PREFIX.

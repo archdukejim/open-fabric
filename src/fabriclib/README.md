@@ -1,7 +1,7 @@
 # fabriclib
 
 fabric's own Python code, grouped by domain; one operation per file
-(see [1.10.1](../../docs/volume_1_systems_and_services/1.10.1-code-conventions.md#1101-code-conventions)). Run with `src` on `sys.path`
+(see [1.1.5](../../docs/volume_1_description_and_architecture/1.1.5-code-conventions.md#115-code-conventions)). Run with `src` on `sys.path`
 and import as `fabriclib.<domain>.<file>`.
 
 | Folder | What |
@@ -18,7 +18,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [dhcp/](dhcp/) | Optional DHCP (Kea 3.0): `dhcp:` checks, config, DDNS zone, reservations, leases, `fabricctl dhcp` |
 | [radius/](radius/) | Optional 802.1X (FreeRADIUS): RADIUS clients and their secrets, config, decisions log, `fabricctl radius` |
 | [directory/](directory/) | fabric's directory on Samba AD: people, groups and the rest, as the site's agent account (manual 1.6.3) |
-| [samba/](samba/) | Optional Windows domain (Samba AD domain controller, manual 2.11.2): its files and, from S1.3, the domain's convergence |
+| [samba/](samba/) | Optional Windows domain (Samba AD domain controller, manual 1.6.5): its files and, from S1.3, the domain's convergence |
 | [logs/](logs/) | Optional log forwarding (Fluent Bit): config, credentials, status |
 | [images/](images/) | Container images: status against the validated list, update (health-gated, rollback), prune |
 | [keycloak/](keycloak/) | Keycloak over its admin REST API: people, sign-in resets, roles, token checks, the OpenBao OIDC client |

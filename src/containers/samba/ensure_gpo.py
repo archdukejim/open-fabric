@@ -21,14 +21,14 @@ def _gpo(samdb, name):
 
 
 def ensure_gpo(samdb, lp, name, link_dn, extensions, files, user_extensions=None, enforced=False):
-    """Purpose: one of fabric's Group Policy objects as wanted (manual 2.11.2.9): created when missing, linked to its
+    """Purpose: one of fabric's Group Policy objects as wanted (manual 1.6.5.9): created when missing, linked to its
              target, its files in SYSVOL exactly `files`; a change bumps its version in AD and in GPT.INI so members
              apply it, and SYSVOL's ACLs are reset after writing (Q13, Q16).
     Inputs:  samdb — SamDB; lp — LoadParm (realm, the SYSVOL path); name — display name; link_dn — str, the domain or
              an OU; extensions — gPCMachineExtensionNames value ("[{CSE}{tool}]…", sorted as Windows writes them);
              files — {path under the GPO folder, e.g. "Machine/Registry.pol": bytes}; user_extensions —
              gPCUserExtensionNames for user policies (None: left as it is; "": none); enforced — link it enforced
-             (a parent's control: wins over the GPOs of the sites below, and passes a blocked inheritance, D105).
+             (a parent's control: wins over the GPOs of the sites below, and passes a blocked inheritance, 2.1.6.20).
     Returns: list of str, what was created or changed.
     Fails:   ldb.LdbError from AD; OSError writing SYSVOL; NTSTATUSError from set_gpo_acl.
     Feeds:   converge.

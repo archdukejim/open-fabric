@@ -10,7 +10,7 @@ def ensure_ddns_zone(v, uid, gid):
     Returns: True if the file was created, False if it already existed.
     Fails:   KeyError on missing vars; OSError if <deploy_base>/bind9/data is missing or not writable.
     Feeds:   deploy_kea.
-    Notes:   fabric never rewrites this file, so hosts registered by DDNS survive every apply (design D16).
+    Notes:   fabric never rewrites this file, so hosts registered by DDNS survive every apply (design 2.1.4.1).
     """
     d = v.get("dhcp") or {}
     zone = f"{d.get('ddns_subdomain', 'dhcp')}.{v['domain']}"

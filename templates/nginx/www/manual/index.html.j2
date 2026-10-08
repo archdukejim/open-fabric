@@ -18,11 +18,10 @@
     <div class="tabs-wrapper">
       <div class="tabs" id="doc-tabs">
         <button class="tab" data-doc="README.md">Index</button>
-        <button class="tab" data-doc="volume_1_systems_and_services/README.md">1 Systems</button>
-        <button class="tab" data-doc="volume_2_technologies_and_features/README.md">2 Technologies</button>
-        <button class="tab" data-doc="volume_3_operations/README.md">3 Operations</button>
-        <button class="tab" data-doc="volume_4_infrequent_ops/README.md">4 Infrequent</button>
-        <button class="tab" data-doc="volume_5_notes_and_troubleshooting/README.md">5 Notes</button>
+        <button class="tab" data-doc="volume_1_description_and_architecture/README.md">1 Architecture</button>
+        <button class="tab" data-doc="volume_2_engineering_decisions/README.md">2 Decisions</button>
+        <button class="tab" data-doc="volume_3_installation/README.md">3 Installation</button>
+        <button class="tab" data-doc="volume_4_operations/README.md">4 Operations</button>
       </div>
     </div>
 
@@ -35,7 +34,7 @@
 
 {% block extra_scripts %}
   <script>
-    // The manual (docs/, design: manual 5.1.1): docs/README.md is the master index, each volume has its own index,
+    // The manual (docs/, design: manual 2.3.1.3): docs/README.md is the master index, each volume has its own index,
     // and every subchapter links to others by relative path. Links are followed here, relative to the page shown.
 
     // GitHub's heading anchor, so the manual's #links land on their heading

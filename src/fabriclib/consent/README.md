@@ -1,6 +1,6 @@
 # fabriclib/consent
 
-Asking before fabric changes the host (design [2.7.1](../../../docs/volume_2_technologies_and_features/2.7.1-host-consent.md#2711-status)): what
+Asking before fabric changes the host (design [1.2.9](../../../docs/volume_1_description_and_architecture/1.2.9-host-consent.md#1291-status)): what
 setup would change outside fabric's own folders, grouped; one yes/no per group before the first step; the
 recorded answers; the check every step makes before it changes the host.
 
@@ -25,5 +25,5 @@ recorded answers; the check every step makes before it changes the host.
 | `consent_status.py` | The answers for status: approved, declined (with its relaxation), not asked |
 | `show_consent_status.py` | Print them for `fabricctl status` |
 | `common/` | Helpers shared by the files above |
-| `plan_ports.py` | The ports fabric needs opened in ufw (D121: the first of the firewall's questions) |
-| `plan_own_rules.py` | The host's own ufw rules securing would remove, one by one (D121: asked only after securing is allowed) |
+| `plan_ports.py` | The ports fabric needs opened in ufw (2.1.2.13: the first of the firewall's questions) |
+| `plan_own_rules.py` | The host's own ufw rules securing would remove, one by one (2.1.2.13: asked only after securing is allowed) |

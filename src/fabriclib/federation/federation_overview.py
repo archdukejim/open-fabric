@@ -16,7 +16,7 @@ LIMITS = [
 
 
 def federation_overview(v):
-    """Purpose: what the Federation tab shows (manual 1.8.8.9, 2.11.2.22 S8.5): this install's place, the sites that
+    """Purpose: what the Federation tab shows (manual 1.9.8.9, 1.6.5.22 S8.5): this install's place, the sites that
              joined here with their DC types, this DC's replication with the others and AD's `CNF:` conflict
              objects, the default write limits, and the address plan with its overlaps.
     Inputs:  v — fabric vars (site_name, and what read_address_plan reads).

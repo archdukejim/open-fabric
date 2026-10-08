@@ -1,10 +1,10 @@
-# fabric's own images (decision D41, manual 4.7.1): nine images, each for amd64 and arm64 (D29).
+# fabric's own images (decision 2.1.1.21, manual 3.14.1): nine images, each for amd64 and arm64 (2.1.1.11).
 #
 # The contexts are the build folders a host has (packaging/images/stage-contexts.sh); the pinned bases and
 # Kea's pinned package come from config/images.lock.yaml (packaging/images/bake_env.py). Nothing has a
 # default that could build an unpinned image: an empty BASE_* fails the build at its FROM.
-# The service account ids are the Dockerfiles' defaults (600–649, D42): a host with other ids builds that
-# image itself (P1, D80).
+# The service account ids are the Dockerfiles' defaults (600–649, 2.1.2.4): a host with other ids builds that
+# image itself (P1, 2.1.14.5).
 #
 #   docker buildx bake -f packaging/docker-bake.hcl                         # every image, this machine's platform
 #   docker buildx bake -f packaging/docker-bake.hcl --set '*.platform=linux/arm64' bind9

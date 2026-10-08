@@ -7,11 +7,11 @@ from fabriclib.common.write_file_if_changed import write_file_if_changed
 MODULE = "/usr/lib/fabric/dlz_bind9.so"
 # where BIND sees the DC's DNS partition and keytab (the DC's smb.conf names /data/bind-dns: the same path)
 BIND_DNS = "/data/bind-dns"
-OFF = "// the Windows domain is not provisioned yet: nothing to load (manual 2.11.2.6)\n"
+OFF = "// the Windows domain is not provisioned yet: nothing to load (manual 1.6.5.6)\n"
 
 
 def write_bind_dlz(v):
-    """Purpose: what BIND includes for the AD zone (manual 2.11.2.6, 1.3.5.2): Samba's DLZ module serving the zone from
+    """Purpose: what BIND includes for the AD zone (manual 1.6.5.6, 1.4.1.2): Samba's DLZ module serving the zone from
              the DC's database, and the keytab that verifies members' signed (GSS-TSIG) updates. Only once the domain
              is provisioned: before, the files are comments, so BIND starts without the DC.
     Inputs:  v — rendered vars: deploy_base_dir. Reads <deploy_base>/samba/data/.fabric-provisioned.

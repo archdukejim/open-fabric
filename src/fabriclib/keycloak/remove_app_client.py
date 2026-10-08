@@ -4,7 +4,7 @@ from fabriclib.keycloak.quote import q
 
 
 def remove_app_client(kc, realm, name):
-    """Purpose: unregister an app from single sign-on (manual 3.8.2): its Keycloak client goes, and with it every
+    """Purpose: unregister an app from single sign-on (manual 4.6.2): its Keycloak client goes, and with it every
              session and token the app held.
     Inputs:  kc — keycloak/admin_client Admin; realm — fabric's realm; name — the app's short name.
     Returns: str, the client id removed.

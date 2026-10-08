@@ -1,4 +1,4 @@
-"""What an ADMX policy writes to the registry, as Windows' editor writes it (manual 2.11.2.9, S5.4): the values for
+"""What an ADMX policy writes to the registry, as Windows' editor writes it (manual 1.6.5.9, S5.4): the values for
 "enabled" with its elements, for "disabled", and which values belong to a policy (to clear it)."""
 REG_SZ, REG_EXPAND_SZ, REG_DWORD = 1, 2, 4
 TRUE_WORDS, FALSE_WORDS = {"1", "true", "on", "yes"}, {"0", "false", "off", "no"}

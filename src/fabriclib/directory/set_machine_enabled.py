@@ -4,7 +4,7 @@ from fabriclib.secrets.load_secrets import load_secrets
 
 
 def set_machine_enabled(v, actor, name, enabled, source="web", secrets=None, container="samba"):
-    """Purpose: disable a machine of this site, or enable it again (manual 2.10.2.6): while disabled its logons and
+    """Purpose: disable a machine of this site, or enable it again (manual 1.6.7.6): while disabled its logons and
              its PEAP sign-in are refused; its account stays.
     Inputs:  v — fabric vars (site_name); actor — str, for the audit; name — the machine's host name; enabled — bool;
              source — audit source; secrets — fabric's secrets (default: load_secrets()); container — the DC's

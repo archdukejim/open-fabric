@@ -67,7 +67,7 @@ def _forget_rules(config_dir, kind, allowed, what):
 
 def _keep_ufw_state(config_dir):
     """Purpose: record once whether ufw was on before fabric first enabled it, so undoing the firewall can leave it
-             as it was (manual 2.7.1.5).
+             as it was (manual 1.2.9.5).
     Inputs:  config_dir — the install's config folder (<config>/host-originals/ufw.state).
     Returns: None; the record written only when absent ("active" or "inactive").
     Fails:   OSError writing it; FileNotFoundError without ufw.
@@ -82,7 +82,7 @@ def _keep_ufw_state(config_dir):
 
 
 def run(ctx):
-    """Purpose: the host firewall in the three steps the owner set (D121), each after its own consent: the ports
+    """Purpose: the host firewall in the three steps the owner set (2.1.2.13), each after its own consent: the ports
              fabric needs opened in ufw (`ports`); the host secured — ufw on, incoming denied by default, SSH from the
              LAN, Docker-published ports LAN-only through DOCKER-USER, re-applied at boot by fabric-firewall.service
              (`firewall`); the host's own ufw rules removed (`own_rules`, recorded for uninstall to put back).
@@ -95,7 +95,7 @@ def run(ctx):
              Each part only after its consent (else a warning, that part left as it is). security.firewall false:
              DOCKER-USER opened, fabric-firewall disabled, a warning; ufw left as it is.
     Fails:   SetupError when securing would lock out the SSH client (outside every allowed CIDR), or when the ports are
-             declined while ufw is on (D119: run_setup stops before any step; this is the backstop);
+             declined while ufw is on (2.1.2.12: run_setup stops before any step; this is the backstop);
              CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an invalid
              CIDR.
     Feeds:   setup step `firewall`, run by run_setup via STEPS."""
@@ -107,9 +107,9 @@ def run(ctx):
         return
     rules = firewall_rules(ctx.vars, ctx.config_dir)
 
-    # 1. the ports fabric needs (D121)
+    # 1. the ports fabric needs (2.1.2.13)
     if not check_consent(ctx.config_dir, "ports", plan_ports(ctx.vars, ctx.config_dir)):
-        if ufw_active():        # ufw's own rules would block fabric's containers from the DC on this host (D119)
+        if ufw_active():        # ufw's own rules would block fabric's containers from the DC on this host (2.1.2.12)
             raise SetupError("ufw is on, and without fabric's rules it blocks fabric's own containers from this "
                              "host's domain controller (Keycloak, FreeRADIUS): setup would fail later. fabric only "
                              "opens its own ports beside your rules: sudo fabricctl setup --approve ports")

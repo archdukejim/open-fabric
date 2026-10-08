@@ -16,7 +16,7 @@ def _dc(args):
 
 
 def domain_status(v):
-    """Purpose: what `fabricctl domain status` shows (manual 3.15.1): the domain, this DC and whether it runs, the
+    """Purpose: what `fabricctl domain status` shows (manual 4.6.5): the domain, this DC and whether it runs, the
              domain-wide roles it holds, the password policy in force.
     Inputs:  v — rendered vars: ad_domain, ad_realm, ad_netbios, hostname_dc.
     Returns: dict {"domain", "realm", "netbios", "dc", "running" (bool), "roles" [str], "policy" [str]}.

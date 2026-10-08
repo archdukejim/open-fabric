@@ -1,6 +1,6 @@
 services:
   fluentbit:
-    # Log forwarding (design D20): the host journal (every fabric container
+    # Log forwarding (design 2.1.15.1): the host journal (every fabric container
     # logs there, and fabric's audit log too) and OpenBao's audit log, to
     # syslog and/or Elasticsearch/OpenSearch. Pinned by digest.
     image: "{{ image_fluentbit }}"

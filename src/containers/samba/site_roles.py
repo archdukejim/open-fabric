@@ -1,6 +1,6 @@
-"""The roles that administer a site (D103, manual 1.6.3.6): each its own group in the site's OU=groups, so each can be
-given to a different admin group; `<site>-admins` is a member of all of them. A parent site's roles reach the sites
-below it (D105)."""
+"""The roles that administer a site (2.1.9.13, manual 1.6.3.6): each its own group in the site's OU=groups, so each can
+be given to a different admin group; `<site>-admins` is a member of all of them. A parent site's roles reach the sites
+below it (2.1.6.20)."""
 
 # role -> what its group's description says
 ROLES = {

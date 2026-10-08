@@ -13,7 +13,7 @@ authorize() runs in three places:
     enabled and hold network:mab.
 post_auth() runs in fabric-inner-tunnel once the domain accepted a PEAP
 (EAP-MSCHAPv2) answer through ntlm_auth: the person, or the domain machine
-of this site, must be in a group mapped for 802.1X (D102).
+of this site, must be in a group mapped for 802.1X (2.1.11.3).
 Accepted: the role's VLAN as Tunnel-Private-Group-Id (none: the port's
 default). Refused, or the directory cannot be asked: Access-Reject (fail
 closed). Every decision is logged as one `fabric: ...` line (the auth log

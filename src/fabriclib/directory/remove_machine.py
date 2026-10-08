@@ -4,7 +4,7 @@ from fabriclib.secrets.load_secrets import load_secrets
 
 
 def remove_machine(v, actor, name, source="web", secrets=None, container="samba"):
-    """Purpose: remove a machine of this site from the domain (manual 2.10.2.6): it can no longer log anyone on or
+    """Purpose: remove a machine of this site from the domain (manual 1.6.7.6): it can no longer log anyone on or
              sign in to the network; joining again makes a new account.
     Inputs:  v — fabric vars (site_name); actor — str, for the audit; name — the machine's host name; source — audit
              source; secrets — fabric's secrets (default: load_secrets()); container — the DC's container.

@@ -3,7 +3,7 @@ from fabriclib.security.signin_layers import LAYERS, rank
 
 
 def check_signin_lowering(current, wanted):
-    """Purpose: setup never lowers a sign-in layer of an existing install (manual 5.8.2.6.4, D111): a --file or a
+    """Purpose: setup never lowers a sign-in layer of an existing install (manual 2.3.6.2.6.4, 2.1.6.24): a --file or a
              re-run that would is refused, pointing to `fabricctl security lower`; a fresh install takes any values.
     Inputs:  current — the install's settings before this run ({} on a fresh install); wanted — the settings this run
              would save.

@@ -1,4 +1,4 @@
-"""Print the build inputs of fabric's own images (decision D41, manual 4.7.1) as KEY=VALUE lines for
+"""Print the build inputs of fabric's own images (decision 2.1.1.21, manual 3.14.1) as KEY=VALUE lines for
 packaging/docker-bake.hcl: the digest-pinned bases and Kea's pinned package, read from config/images.lock.yaml
 (the same lock a host builds from). Usage: python3 packaging/images/bake_env.py >> "$GITHUB_ENV", or
 `set -a; . <(python3 packaging/images/bake_env.py); set +a` in a shell."""

@@ -4,7 +4,7 @@ from fabriclib.dhcp.common.edit_dhcp import edit_dhcp
 
 def add_client_class(actor, name, test, next_server=None, boot_file_name=None, server_hostname=None, source="cli"):
     """Purpose: add a DHCP client class: clients matching a Kea expression (e.g. UEFI PXE, a switch vendor for ZTP)
-             get their own options and network-boot fields (manual 2.2.2.3). Options are added with
+             get their own options and network-boot fields (manual 1.10.2.3). Options are added with
              `set_option(client_class=…)`. Applied by the next apply; Kea checks the expression then.
     Inputs:  actor — who asks (audit); name — class name; test — Kea expression ("option[93].hex == 0x0007");
              next_server — IPv4 address of the boot server or None; boot_file_name, server_hostname — or None;

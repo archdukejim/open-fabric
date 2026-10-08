@@ -1,10 +1,10 @@
-"""The installer test (manual 4.8.2): `sudo fabricctl setup` driven through a real terminal on a test host, as a
+"""The installer test (manual 3.1.2): `sudo fabricctl setup` driven through a real terminal on a test host, as a
 person who gets things wrong would — every question first given answers it must refuse, each refusal checked by its
 message, then the good answer. Two runs:
   1. a fresh host with ufw already on: every refusal, then the host firewall declined — setup must stop before any
-     step, saying why (D119), with nothing started;
+     step, saying why (2.1.2.12), with nothing started;
   2. the same host again: valid answers (an invalid plan choice and consent answer first), everything allowed —
-     setup must finish, then doctor, and the checks a person would make (the domain on IPv4 only, D120; the landing
+     setup must finish, then doctor, and the checks a person would make (the domain on IPv4 only, 2.1.6.29; the landing
      page at the host's own name; the host's own ufw rules kept beside fabric's).
 The host is left installed for a person to look at. Run from a Linux machine that reaches the host with a key:
     TARGET=tempuser@192.168.5.57 KEY=~/.ssh/fabric-test_ed25519 HOST_IP=192.168.5.57 DOMAIN=home.arpa \\
@@ -181,7 +181,7 @@ check("a consent question asked again after an answer that is not y or n",
       len(consent_seen) >= 2 and consent_seen[0] == consent_seen[1], consent_seen[:3])
 check("the Enter defaults: the suggested AD domain ad.<domain> and the host name it found",
       f"ad.{DOMAIN}" in text and guess_host in text, guess_host)
-check("declining the ports fabric needs with ufw on stops setup before any step, saying why (D119, D121)",
+check("declining the ports fabric needs with ufw on stops setup before any step, saying why (2.1.2.12, 2.1.2.13)",
       code != 0 and "ufw is on, and without fabric's firewall rules it blocks" in text and "[preflight]" not in text,
       (code, text[-800:]))
 check("…and securing and the host's own rules were not asked (they need the ports)",
@@ -213,7 +213,7 @@ check("with everything allowed, setup finishes (fabric is ready)", code == 0 and
 doctor = R("fabricctl doctor 2>&1")
 check("doctor passes", "✗" not in doctor and "✓" in doctor, doctor[-1500:])
 aaaa = R(f"dig +short AAAA ad.{DOMAIN} @{HOST_IP}; dig +short AAAA $(hostname -s).ad.{DOMAIN} @{HOST_IP}")
-check("the domain on IPv4 only: no AAAA for the AD domain or its DC, though the host has IPv6 (D120)",
+check("the domain on IPv4 only: no AAAA for the AD domain or its DC, though the host has IPv6 (2.1.6.29)",
       aaaa.strip() == "" and R(f"dig +short A ad.{DOMAIN} @{HOST_IP}").strip() == HOST_IP,
       (aaaa, R("ip -6 addr show scope global | grep inet6")))
 landing = R(f"curl -s --resolve {guess_host}.{DOMAIN}:443:{HOST_IP} https://{guess_host}.{DOMAIN}/ "

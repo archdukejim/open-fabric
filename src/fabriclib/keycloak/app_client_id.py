@@ -7,7 +7,7 @@ NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,38}[a-z0-9])?$")
 
 
 def app_client_id(name):
-    """Purpose: the Keycloak client id of an app registered for single sign-on (manual 3.8.2).
+    """Purpose: the Keycloak client id of an app registered for single sign-on (manual 4.6.2).
     Inputs:  name — the app's short name, e.g. "proxmox": 1-40 lower-case letters, digits or dashes.
     Returns: str "app-<name>".
     Fails:   ValidationError for a name that is not one.

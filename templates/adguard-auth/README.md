@@ -1,6 +1,6 @@
 # jinja/adguard-auth
 
-The sign-in in front of the optional DNS filter's UI (design [2.4.1.6](../../docs/volume_2_technologies_and_features/2.4.1-adguard.md#2416-signing-in-oidc)),
+The sign-in in front of the optional DNS filter's UI (design [1.12.1.6](../../docs/volume_1_description_and_architecture/1.12.1-adguard.md#11216-signing-in-oidc)),
 a unit of its own (`adguard-auth`) so that AdGuard's DNS never depends on it or on Keycloak; only with `dns_filter: adguard`.
 
 | File | What |

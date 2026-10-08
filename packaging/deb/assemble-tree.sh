@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
 # Assemble the installed tree from the repository — the one place that
-# knows how the repository's layout (manual 1.3.2, global Rule 7) maps
+# knows how the repository's layout (manual 1.2.2, global Rule 7) maps
 # onto it (the .deb build and the tests that need an installed-looking
 # tree both use it):
 #
@@ -18,7 +18,7 @@
 #                                                 -> <dest>/fabric/
 #   docs/, LICENSE, THIRD_PARTY_NOTICES, README.md -> <dest>/
 #
-# The installed layout (/usr/lib/fabricctl/fabric, /opt/fabric, D43) never
+# The installed layout (/usr/lib/fabricctl/fabric, /opt/fabric, 2.1.2.5) never
 # depends on the repository's: installs upgrade in place. Tracked and
 # untracked-but-not-ignored files only: never secrets, local vars or
 # __pycache__. Needs git and GNU tar.

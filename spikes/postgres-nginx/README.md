@@ -1,7 +1,7 @@
 # spikes/postgres-nginx
 
-D104's question (manual 1.8.8.16, S8.6): can a site's Postgres replicate to another site's while Postgres is never on
-the host? Throwaway (global Rule 4); its outcome is in manual 5.8.1.25.
+2.1.9.14's question (manual 1.9.8.16, S8.6): can a site's Postgres replicate to another site's while Postgres is never on
+the host? Throwaway (global Rule 4); its outcome is in manual 2.3.6.1.25.
 
 | File | What |
 |---|---|

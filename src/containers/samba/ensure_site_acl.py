@@ -3,7 +3,8 @@ import paths
 from site_roles import role_group
 
 # read, write, create and delete children, list, read permissions, delete — inherited below the OU (Q4); never
-# change permissions or owner (WD, WO): a site could otherwise protect its OU from its parents' inherited access (D105)
+# change permissions or owner (WD, WO): a site could otherwise protect its OU from its parents' inherited access
+# (2.1.6.20)
 FULL = "RPWPCRCCDCLCLORCSDDTSW"
 # what may not be done to a site's service accounts: write, create or delete, change permissions
 SERVICE_DENY = "WPCCDCWDWOSDDT"
@@ -12,9 +13,9 @@ GP_LINK, GP_OPTIONS = "f30e3bbe-9ff0-11d1-b603-0000f80367c1", "f30e3bbf-9ff0-11d
 
 
 def ensure_site_acl(samdb, site, root):
-    """Purpose: who may write what in a site (S2, D103, manual 1.6.3.6), checked by every DC, offline too (Q4, Q12):
+    """Purpose: who may write what in a site (S2, 2.1.9.13, manual 1.6.3.6), checked by every DC, offline too (Q4, Q12):
              its `<site>-ou-admins` and its fabric-agent account have full control below the site's OU, inherited
-             (so into the sites nested below it, D105); its `<site>-machine-admins` full control of its machines and
+             (so into the sites nested below it, 2.1.6.20); its `<site>-machine-admins` full control of its machines and
              devices; its `<site>-gpo-admins` its OU's GPO links and blocked inheritance (their own GPOs: admin_gpo);
              none of them over permissions, nor over its own or a nested site's service accounts; its Keycloak account
              full control of the site's people only (sign-in changes passwords and lockouts), and at the root site

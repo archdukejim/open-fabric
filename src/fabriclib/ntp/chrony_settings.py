@@ -28,7 +28,7 @@ def chrony_settings(v, registry_path):
     """Purpose: what chrony.conf.j2 needs: the sources (the upstream site first) and the networks served.
     Inputs:  v — vars (see normalize_ntp, _allowed); registry_path — config/federation.yaml.
     Returns: {"sources": [{"host", "nts", "pool", "prefer"}], "allow": [network], "serve": bool, "ad_ntp_signd_dir":
-             the DC's time-signing socket folder (D100)}.
+             the DC's time-signing socket folder (2.1.13.1)}.
     Fails:   ValidationError from normalize_ntp; yaml/OSError from load_registry.
     Feeds:   deploy_chrony; tests/ntp/run.py, tests/render.py."""
     sources = normalize_ntp(v)

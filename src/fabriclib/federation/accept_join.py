@@ -38,7 +38,7 @@ def _port(value):
 
 
 def _check_networks(v, site, networks):
-    """Purpose: refuse a joining site whose networks overlap another site's (manual 2.2.2.6): the
+    """Purpose: refuse a joining site whose networks overlap another site's (manual 1.10.2.6): the
              upstream's copy of the address plan, plus its own networks (the plan may not list them yet).
     Inputs:  v — the upstream's vars; site — the joining site's name; networks — what the request reported
              ([{name, cidr, allow_overlap}]; an older fabric sends none).
@@ -68,7 +68,7 @@ def _check_networks(v, site, networks):
 
 
 def accept_join(v, req, client_ip="", now=None):
-    """Purpose: On the upstream: let an invited site join (manual 1.8.4.1 step 3): check the one-time
+    """Purpose: On the upstream: let an invited site join (manual 1.9.4.1 step 3): check the one-time
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
              invitation.
     Inputs:  v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip,
@@ -82,7 +82,7 @@ def accept_join(v, req, client_ip="", now=None):
              parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>",
              "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this
              site's published DNS port) (kept here in fabric's
-             secrets as federation_tsig[site]; manual 1.8 M4), "org": {"org_domain", "ldap_base_dn",
+             secrets as federation_tsig[site]; manual 1.9 M4), "org": {"org_domain", "ldap_base_dn",
              friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}} and, for an invitation
              that names a DC type (made on the root), "domain": {"ad_domain", "dc_type", "dc_host", "dc_address",
              "id_range", "join_user", "join_password", "accounts" {agent, keycloak, radius}, "site_ou", "org_ou"}
@@ -154,14 +154,14 @@ def accept_join(v, req, client_ip="", now=None):
             **({"domain": domain_answer} if domain_answer else {})}
 
 def _prepare_domain(v, site, dc_type, networks, registry):
-    """Purpose: at the parent (the root, or a site with a writable DC), the domain part of a join (manual 1.8.8.4,
-             S8.1, 1.8.8.14): converge the new site in the domain, in this site's OU,
+    """Purpose: at the parent (the root, or a site with a writable DC), the domain part of a join (manual 1.9.8.4,
+             S8.1, 1.9.8.14): converge the new site in the domain, in this site's OU,
              (prepare_site) with fresh service-account passwords and the next id block, and a temporary join account.
     Inputs:  v — this site's vars (ad_domain, hostname_dc, host_ip and what prepare_site reads); site — the new site;
              dc_type — the invitation's ("writable", "rodc"; "" for none: nothing is prepared); networks — the join
              request's; registry — load_registry()'s dict (the blocks handed out so far).
     Returns: {"ad_domain", "dc_type", "dc_host", "dc_address", "id_range", "join_user", "join_password",
-             "accounts" {agent, keycloak, radius}, "site_ou" (its OU in this site's, D105), "org_ou"}; for a site
+             "accounts" {agent, keycloak, radius}, "site_ou" (its OU in this site's, 2.1.6.20), "org_ou"}; for a site
              already in the domain (moving here) {"ad_domain", "dc_type", "id_range" (its own), "moved": True,
              "site_ou", "org_ou"} (its OU moved, no join account, its service accounts keep their passwords); {}
              without a DC type.
@@ -171,7 +171,7 @@ def _prepare_domain(v, site, dc_type, networks, registry):
         return {}
     held = {s["site"]: s for s in domain_sites()}
     accounts = {kind: random_password() for kind in ("agent", "keycloak", "radius")}
-    if site in held:        # a site of the domain moving here (re-parenting, D105): its OU moves, its DC stays
+    if site in held:        # a site of the domain moving here (re-parenting, 2.1.6.20): its OU moves, its DC stays
         block = held[site]["id_range"] or next_id_block(v, registry, sites=list(held.values()))
         prepare_site(v, site, networks, block, {}, None)
         site_ou = v.get("ad_site_ou") or f"OU={v['site_name']},OU=sites"

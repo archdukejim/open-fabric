@@ -3,15 +3,15 @@ import ldb
 import paths
 from site_roles import role_group
 
-MARK = "fabric: the site's linux-sudo role (D103)"
-OLD_MARK = "fabric: the site's admins (D103)"      # the rule before the roles: named <site>-admins
+MARK = "fabric: the site's linux-sudo role (2.1.9.13)"
+OLD_MARK = "fabric: the site's admins (2.1.9.13)"      # the rule before the roles: named <site>-admins
 
 
 def ensure_sudo_rule(samdb, site, admin_group, root=False):
-    """Purpose: the site's default sudo rule (manual 2.11.2.19, S6.3; D103): members of `<site>-linux-sudo` (and, at
+    """Purpose: the site's default sudo rule (manual 1.6.5.19, S6.3; 2.1.9.13): members of `<site>-linux-sudo` (and, at
              the root site, the organisation's admin group) may run any command as root on the site's joined Linux
              machines, and on those of every site below it (their installer reads the rules of each site above,
-             2.10.2.4). Kept to match; other rules in OU=sudoers are the admins' and never touched, except fabric's
+             1.6.7.4). Kept to match; other rules in OU=sudoers are the admins' and never touched, except fabric's
              own rule from before the roles, which it removes.
     Inputs:  samdb — SamDB (as the system); site — str; admin_group — the web UI's admin group (sAMAccountName);
              root — bool, the root site.

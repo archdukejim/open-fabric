@@ -2,7 +2,7 @@ from fabriclib.security.firewall_rules import firewall_rules
 
 
 def plan_ports(v, config_dir):
-    """Purpose: the ports fabric itself needs opened in ufw (manual 2.7.1.3 `ports`, D121), rule by rule: the domain
+    """Purpose: the ports fabric itself needs opened in ufw (manual 1.2.9.3 `ports`, 2.1.2.13), rule by rule: the domain
              controller's (from the LAN, fabric's containers and the federation's peers), NTP, DHCP.
     Inputs:  v — vars (security.firewall, default True; firewall_rules reads the rest); config_dir — the install's
              config folder.

@@ -5,7 +5,7 @@ from fabriclib.common.keep_original import ORIGINALS
 
 
 def restore_original(path, config_dir):
-    """Purpose: put a host file back as it was before fabric first changed it (manual 2.7.1.5).
+    """Purpose: put a host file back as it was before fabric first changed it (manual 1.2.9.5).
     Inputs:  path — the host file (absolute); config_dir — the install's config folder holding the record made by
              common/keep_original.
     Returns: "restored" (the copy or the symlink is back), "removed" (the file did not exist before fabric: it is

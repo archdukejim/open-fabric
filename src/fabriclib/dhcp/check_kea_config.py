@@ -9,8 +9,8 @@ PROGRAMS = {"kea-dhcp4.conf": "/usr/sbin/kea-dhcp4", "kea-dhcp-ddns.conf": "/usr
 
 
 def check_kea_config(image, name, text):
-    """Purpose: have Kea itself check a configuration before fabric installs it (`kea-dhcp4 -t`, manual 2.2.2.4): a file
-                Kea would refuse is never put in place.
+    """Purpose: have Kea itself check a configuration before fabric installs it (`kea-dhcp4 -t`, manual 1.10.2.4): a
+                file Kea would refuse is never put in place.
     Inputs:  image — fabric's Kea image (vars image_kea); name — "kea-dhcp4.conf" or "kea-dhcp-ddns.conf";
              text — the rendered configuration.
     Returns: True when Kea accepted it; None when it could not be checked (no Docker, or the image is not built

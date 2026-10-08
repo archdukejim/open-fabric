@@ -1,4 +1,4 @@
-"""Start a real domain controller for a test suite, as an install runs it (manual 2.11.2): fabric's image built from a
+"""Start a real domain controller for a test suite, as an install runs it (manual 1.6.5): fabric's image built from a
 copy of its build folder staged with a host's plain modes, the compose file's hardening, fabric's deploy_samba, a test
 PKI (a root CA and the DC's certificate naming its address), then converge_domain. Used by tests/keycloak (and any
 suite that needs AD)."""

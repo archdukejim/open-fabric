@@ -1,7 +1,7 @@
 # templates
 
 Templates rendered by `deploy.py` (and `fabriclib`) from `vars.yaml` into `/opt/<service>/` (systemd units into
-`/etc/systemd/system/`). One folder per service. On a host this folder is `jinja/` (manual 1.3.2); the images'
+`/etc/systemd/system/`). One folder per service. On a host this folder is `jinja/` (manual 1.2.2); the images'
 build files are in `packaging/images/` (installed as `jinja/<service>/build/`) and the code that runs inside
 containers in `src/containers/`.
 

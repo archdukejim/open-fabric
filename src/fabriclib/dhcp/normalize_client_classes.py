@@ -11,7 +11,7 @@ RESERVED_PREFIXES = ("VENDOR_CLASS_", "HA_", "SPAWN_", "AFTER_")
 
 
 def normalize_client_classes(classes):
-    """Purpose: check dhcp.client_classes (manual 2.2.2.3): clients matched by a Kea expression get
+    """Purpose: check dhcp.client_classes (manual 1.10.2.3): clients matched by a Kea expression get
              their own options, and for network boot their own next-server, server name and boot file.
     Inputs:  classes — list of {name, test, options, next_server, server_hostname, boot_file_name}, or None.
     Returns: the classes normalized (options through normalize_options; empty optional fields left out).

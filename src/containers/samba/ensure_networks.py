@@ -2,13 +2,13 @@ import ldb
 
 import paths
 
-# what a fabricNetwork entry holds, from a site_networks item (manual 2.2.2.8)
+# what a fabricNetwork entry holds, from a site_networks item (manual 1.10.2.8)
 FIELDS = {"fabricCidr": "cidr", "fabricNetworkKind": "kind", "fabricVlan": "vlan", "description": "notes",
           "fabricAllowOverlap": "allow_overlap"}
 
 
 def ensure_networks(samdb, site, networks):
-    """Purpose: the site's networks as `fabricNetwork` entries in its OU=networks (manual 2.2.2.8, S4.1), the address
+    """Purpose: the site's networks as `fabricNetwork` entries in its OU=networks (manual 1.10.2.8, S4.1), the address
              plan every site reads: added, changed to match, and removed when the site no longer has them.
     Inputs:  samdb — SamDB (as the system); site — str; networks — site_networks' list of {name, cidr, kind, vlan,
              notes, allow_overlap}.

@@ -1,4 +1,4 @@
-# fabric: numbers of the function reference (manual 1.11.1.2). Written by gen_lib_doc.py; never edit.
+# fabric: numbers of the function reference (manual 1.17.1.2). Written by gen_lib_doc.py; never edit.
 file	fabricctl-agent|src/agent/get_route.py	1	
 file	fabricctl-agent|src/agent/handler.py	2	
 file	fabricctl-agent|src/agent/post_dhcp.py	3	

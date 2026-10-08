@@ -3,7 +3,7 @@ import yaml
 
 def compose_builds(compose_file):
     """Purpose: whether a rendered compose file builds its image (has a `build:` section) or pulls it (fabric's
-             published images and upstream images, manual 2.6.3.3).
+             published images and upstream images, manual 1.14.3.3).
     Inputs:  compose_file — str, path of a rendered docker-compose.yml.
     Returns: bool.
     Fails:   OSError if unreadable; yaml.YAMLError on invalid YAML.

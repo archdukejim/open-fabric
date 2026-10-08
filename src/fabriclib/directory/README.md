@@ -1,6 +1,6 @@
 # fabriclib/directory
 
-fabric's directory on Samba AD (manual 1.6.3, 2.11.2.16): what fabric-agent, setup and the web UI ask of it. Every
+fabric's directory on Samba AD (manual 1.6.3, 1.6.5.16): what fabric-agent, setup and the web UI ask of it. Every
 operation runs inside the DC (`src/containers/samba/directory_op.py`), signed in as this site's `fabric-agent`
 account, so AD's per-site limits apply to it.
 

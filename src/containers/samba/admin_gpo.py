@@ -1,6 +1,6 @@
-"""The site's admin GPOs (manual 2.11.2.20, S5.4; 1.8.8.14): the policies an admin sets with `fabricctl gpo` and the
+"""The site's admin GPOs (manual 1.6.5.20, S5.4; 1.9.8.14): the policies an admin sets with `fabricctl gpo` and the
 web UI's editor, kept apart from fabric's own GPOs, which convergence rewrites. `fabric: <site> admin settings` holds
-defaults the sites below may override; `fabric: <site> controls` is linked enforced, so they cannot (D105)."""
+defaults the sites below may override; `fabric: <site> controls` is linked enforced, so they cannot (2.1.6.20)."""
 import os
 
 import ldb
@@ -81,8 +81,8 @@ def save_admin_settings(samdb, lp, site, settings, control=False):
 
 
 def ensure_gpo_admins(samdb, lp, site):
-    """Purpose: the site's GPO admins (D103) edit its two admin GPOs with Windows' own tools too: full control of each
-             GPO object (never its permissions), and so of its SYSVOL folder (its file ACLs follow the object's).
+    """Purpose: the site's GPO admins (2.1.9.13) edit its two admin GPOs with Windows' own tools too: full control of
+             each GPO object (never its permissions), and so of its SYSVOL folder (its file ACLs follow the object's).
     Inputs:  samdb — SamDB (as the system); lp — LoadParm; site — str.
     Returns: list of str, the access entries added (none for a GPO not made yet).
     Fails:   ldb.LdbError; NTSTATUSError from set_gpo_acl.

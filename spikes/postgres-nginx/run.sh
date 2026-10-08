@@ -1,8 +1,8 @@
 #!/bin/bash
-# Spike for D104 (manual 1.8.8.16, S8.6): can a site's Postgres replicate to another's with Postgres never on the host?
+# Spike for 2.1.9.14 (manual 1.9.8.16, S8.6): can a site's Postgres replicate to another's with Postgres never on the host?
 #   - nginx's stream proxy terminates TLS, requires a client certificate from the organisation's CA and checks its name
 #   - Postgres 17+ direct TLS (sslnegotiation=direct, ALPN "postgresql") through it
-#   - the hop from nginx to Postgres: TLS (D51) if nginx's stream proxy can speak Postgres's direct TLS; else a Unix
+#   - the hop from nginx to Postgres: TLS (2.1.2.10) if nginx's stream proxy can speak Postgres's direct TLS; else a Unix
 #     socket the two share (no network at all); else plain on the private network
 #   - logical replication of one table with a row filter (one writer per row) across that path
 #   - refused: no client certificate, another CA's certificate, a valid certificate of a site not linked

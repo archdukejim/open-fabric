@@ -12,7 +12,7 @@ USAGE = """usage: fabricctl logs status                    log forwarding: desti
 
 
 def run_logs_command(ctx, argv):
-    """Purpose: `fabricctl logs status | set-password elastic` (design D20).
+    """Purpose: `fabricctl logs status | set-password elastic` (design 2.1.15.1).
     Inputs:  ctx — SetupContext after load_state (vars, secrets, secrets_file, target_dir).
              argv — list of str after "logs" (default status). set-password reads the password from a hidden prompt, or
              one line of stdin when stdin is not a terminal.

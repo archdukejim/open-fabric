@@ -6,7 +6,7 @@ from fabriclib.pki.common.ca_path_len import ca_path_len
 
 
 def signing_capacity(v, registry_path=FEDERATION_FILE):
-    """Purpose: how this install signs a joining site's CA and how deep the sites it signs may nest (manual 1.8.5.1):
+    """Purpose: how this install signs a joining site's CA and how deep the sites it signs may nest (manual 1.9.5.1):
                 the root site signs with the root key, a site that joined an upstream with its
              own intermediate.
     Inputs:  v — fabric vars: deploy_base_dir (the CA certificates); registry_path — default FEDERATION_FILE.

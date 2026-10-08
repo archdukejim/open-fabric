@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The review ledger (docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv): every file in
+"""The review ledger (docs/volume_2_engineering_decisions/assets/review-ledger.tsv): every file in
 the repository, when it was last reviewed against the code and docs, and
 the git blob hash of the content that was reviewed.
 
@@ -19,7 +19,7 @@ import sys
 
 from product_code import REPO, tracked_files
 
-LEDGER_PATH = "docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv"
+LEDGER_PATH = "docs/volume_2_engineering_decisions/assets/review-ledger.tsv"
 LEDGER = os.path.join(REPO, *LEDGER_PATH.split("/"))
 HEAD = "# path\tblob (git hash-object of the reviewed content)\treviewed (UTC date)\tnote\n"
 
@@ -36,7 +36,7 @@ def blob(path):
 
 def load():
     """Purpose: the ledger's entries.
-    Inputs:  none (reads docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv; absent = empty).
+    Inputs:  none (reads docs/volume_2_engineering_decisions/assets/review-ledger.tsv; absent = empty).
     Returns: {path: (blob, date, note)}.
     Fails:   ValueError on a malformed line (fewer than 3 tab-separated fields).
     Feeds:   check, mark, save."""

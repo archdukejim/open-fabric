@@ -1,7 +1,7 @@
 # packaging/deb
 
 The Debian package: turns the repository into an installable `fabricctl` .deb whose installed tree does not
-depend on the repository's layout (decision D43).
+depend on the repository's layout (decision 2.1.2.5).
 
 | File | What |
 |---|---|
@@ -26,8 +26,8 @@ Repository → host:
 
 `fabricctl setup` then copies `/usr/lib/fabricctl/fabric` to `/opt/fabric` (the
 install) and creates `/opt/<service>`, the systemd units and `fabric.target`.
-The installed layout did not change when the repository was split (D25) or
-moved to the Rule 7 layout (manual 5.1.3), so existing installs upgrade in place.
+The installed layout did not change when the repository was split (2.1.1.7) or
+moved to the Rule 7 layout (manual 2.3.2.1), so existing installs upgrade in place.
 The CLI command is `src/ux/cli/fabricctl`; installing from a checkout is
 `scripts/install-from-checkout.sh`.
 

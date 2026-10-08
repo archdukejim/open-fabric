@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fluent Bit (optional log forwarding, design D20) on the real pinned image,
+"""Fluent Bit (optional log forwarding, design 2.1.15.1) on the real pinned image,
 from fabric's own templates: it forwards OpenBao's audit log to a TLS syslog
 receiver and to an HTTPS Elasticsearch-style receiver, both verified against
 the fabric CA; a destination with a certificate from another CA gets

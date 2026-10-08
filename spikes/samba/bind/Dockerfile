@@ -1,4 +1,4 @@
-# S0 spike (manual 5.8.1.5) — throwaway. fabric's BIND (Debian trixie, BIND 9.20, uid/gid 600) plus Samba's DLZ
+# S0 spike (manual 2.3.6.1.5) — throwaway. fabric's BIND (Debian trixie, BIND 9.20, uid/gid 600) plus Samba's DLZ
 # module, so it can serve the AD zone straight from the DC's database.
 ARG BASE_IMAGE=debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 FROM ${BASE_IMAGE}

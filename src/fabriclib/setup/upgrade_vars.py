@@ -14,7 +14,7 @@ def upgrade_vars(data, pinned):
              admin changed are kept.
     Fails:   never — dict operations only.
     Feeds:   collect_vars (logs each change).
-    Notes:   `fabricctl images update` is what changes images (design D21)."""
+    Notes:   `fabricctl images update` is what changes images (design 2.1.14.3)."""
     changes = []
     for key in [k for k in data if k.startswith("image_") and k != "image_pins" and k not in pinned]:
         if isinstance(data[key], str) and "@sha256:" in data[key]:

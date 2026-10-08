@@ -46,7 +46,7 @@ def _ensure(samdb, name, ou, gid, description, done):
 
 def ensure_groups(samdb, site, root, org_groups):
     """Purpose: the groups access is built on (manual 1.6.3.6, 1.6.3.10), with their gid numbers (1.6.3.9): the site's
-             people and admins, and its five role groups with `<site>-admins` in each (D103) (gids from the site's
+             people and admins, and its five role groups with `<site>-admins` in each (2.1.9.13) (gids from the site's
              block), and at the root site the organisation's groups — fabric's
              `ldap_groups` (the web UI's admin group, the RBAC bundle groups, the 802.1X groups) with their own gids,
              `users` as AD's Domain Users, and `fabric-break-glass` (in every site's log-on policy).
@@ -62,7 +62,7 @@ def ensure_groups(samdb, site, root, org_groups):
     for name in (f"{site}-users", f"{site}-admins"):
         _ensure(samdb, name, groups, lambda: alloc_id(samdb, site_dn), "", done)
     admins = str(_group(samdb, f"{site}-admins").dn)
-    for role, description in ROLES.items():      # the site's roles, <site>-admins in each (D103)
+    for role, description in ROLES.items():      # the site's roles, <site>-admins in each (2.1.9.13)
         name = role_group(site, role)
         _ensure(samdb, name, groups, lambda: alloc_id(samdb, site_dn), description, done)
         members = samdb.search(base=str(_group(samdb, name).dn), scope=ldb.SCOPE_BASE, attrs=["member"])[0]

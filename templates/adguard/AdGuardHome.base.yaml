@@ -1,4 +1,4 @@
-# AdGuard Home's starting configuration when an install has none yet (manual 2.4.1.4), from the
+# AdGuard Home's starting configuration when an install has none yet (manual 1.12.1.4), from the
 # owner's running setup. fabric fills in and owns: http.address, dns.bind_hosts/port/upstream_dns/
 # bootstrap_dns/upstream_mode/allowed_clients/local_ptr_upstreams/trusted_proxies, users, user_rules
 # (its part), dhcp.enabled, tls.enabled; filters are seeded once. Everything else is AdGuard's (and

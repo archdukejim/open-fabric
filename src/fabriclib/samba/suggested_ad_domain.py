@@ -1,5 +1,5 @@
 def suggested_ad_domain(domain):
-    """Purpose: the AD domain setup suggests (D87, manual 1.6.3.3): a protected sibling at the top of the
+    """Purpose: the AD domain setup suggests (2.1.6.11, manual 1.6.3.3): a protected sibling at the top of the
              organisation's name, so the Windows domain stays apart from the sites' names — `ad.` plus fabric's
              domain without its first label (lan.j-j.family -> ad.j-j.family).
     Inputs:  domain — str, fabric's domain on the first node (the root site).

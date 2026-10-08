@@ -1,4 +1,4 @@
-"""Asking before fabric changes the host (manual 2.7.1): the recorded answers, the questions setup asks
+"""Asking before fabric changes the host (manual 1.2.9): the recorded answers, the questions setup asks
 (unattended and interactive), what steps may do with them, the account plan with its move from the previous
 accounts, and the upgrade of an older install's settings. No containers and nothing changed on this host: the
 answers live in a scratch folder and the account checks read (or stand in for) the host's accounts."""
@@ -152,7 +152,7 @@ changes = upgrade_vars(old, set())
 check("previous defaults are dropped (the new accounts apply), an admin's own ids are kept",
       old["service_users"] == {"nginx": {"uid": 1443, "gid": 1443}} and len(changes) == 1, (old, changes))
 
-print("--- the firewall's questions (D121): the ports fabric needs, then securing, then the host's own rules")
+print("--- the firewall's questions (2.1.2.13): the ports fabric needs, then securing, then the host's own rules")
 rules = plan_firewall({**v, "ntp_serve": False}, cfg, active=False)
 check("securing: the default policy, SSH, the DOCKER-USER limit — and no fabric port (those are the first question)",
       rules[0].startswith("ufw: deny incoming") and "ufw: allow 22/tcp (SSH) from 10.0.0.0/24" in rules
@@ -213,7 +213,7 @@ with open(os.path.join(peer_cfg, "federation.yaml"), "w") as f:
     yaml.safe_dump({"upstream": {"site_name": "lan", "address": "192.0.2.10"},
                     "sites": {"edge": {"address": "198.51.100.7"}}}, f)
 peer_lines = [r for r in plan_ports({**v, "ntp_serve": False}, peer_cfg) if "domain controller" in r]
-check("the DC's ports also from the federation's peers (its upstream and each joined site: replication, 1.8.8.5)",
+check("the DC's ports also from the federation's peers (its upstream and each joined site: replication, 1.9.8.5)",
       any("from 192.0.2.10/32" in r and "/tcp" in r for r in peer_lines)
       and any("from 198.51.100.7/32" in r and "/udp" in r for r in peer_lines) and len(peer_lines) == 8, peer_lines)
 check("the DC's ufw rule round-trips through its record form",

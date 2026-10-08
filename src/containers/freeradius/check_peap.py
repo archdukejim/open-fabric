@@ -12,8 +12,8 @@ ACCOUNTDISABLE = 0x2
 def check_peap(name):
     """Purpose: decide an account whose PEAP-MSCHAPv2 answer the domain has just accepted (through ntlm_auth): may it
              join, and on which VLAN (manual 1.6.3.10). A person (`alice`): anywhere under OU=sites, never a service
-             account. A domain machine (`ws1$`, from `host/ws1.<domain>`): only one in this site's OU=machines (D102).
-             Either must be in a group mapped in fabric-radius.json "people".
+             account. A domain machine (`ws1$`, from `host/ws1.<domain>`): only one in this site's OU=machines
+             (2.1.11.3). Either must be in a group mapped in fabric-radius.json "people".
     Inputs:  name — str, the account's sAMAccountName as mschap gives it (a machine's ends in "$").
     Returns: dict {account, machine (bool), allowed, vlan, reason}; when allowed also "group" (the best mapping).
     Fails:   ldap errors (directory down, timeout) and config errors (OSError, KeyError) propagate; the caller turns

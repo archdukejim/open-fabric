@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Make fabric's apt repository signing key, once (manual 1.4.1.1, D7, 4.7.1):
+# Make fabric's apt repository signing key, once (manual 1.3.1.1, 2.1.1.2, 3.14.1):
 # a dedicated Ed25519 signing key that expires in two years, with a random
 # passphrase. Both go into this repository's Actions secrets
 # (GPG_PRIVATE_KEY, GPG_PASSPHRASE) through `gh secret set` on standard input,

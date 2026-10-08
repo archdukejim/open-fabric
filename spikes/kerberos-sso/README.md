@@ -1,6 +1,6 @@
 # spikes/kerberos-sso
 
-Spike K1 (manual 5.8.2.7, outcome in 5.8.2.8): Kerberos sign-in (SPNEGO) to Keycloak with a keytab exported from
+Spike K1 (manual 2.3.6.2.7, outcome in 2.3.6.2.8): Kerberos sign-in (SPNEGO) to Keycloak with a keytab exported from
 fabric's Samba DC. Throwaway; never merged into `src/`.
 
 | File | What |

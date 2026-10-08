@@ -3,7 +3,7 @@ services:
   # answers from the site's DC (AD, LDAPS to the host's address). Non-root, no capabilities, read-only.
   freeradius:
 {% set published = published_ref('freeradius') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or image_freeradius }}
 {% if not published %}
     build:

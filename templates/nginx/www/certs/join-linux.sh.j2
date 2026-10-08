@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Join this Linux machine (Ubuntu 24.04 or 26.04, Debian 12 or 13 — Proxmox VE 8 and 9 too) to fabric's domain
-# {{ ad_domain }} (manual 2.10.2, 3.15.2).
+# {{ ad_domain }} (manual 1.6.7, 4.6.6).
 #   sudo bash join-linux.sh <root CA SHA-256 fingerprint> --user <a site admin>   [--site <site>] [--name <name>]
 #   sudo bash join-linux.sh <root CA SHA-256 fingerprint> --one-time              [--site <site>] [--name <name>]
 # The fingerprint is shown on http://{{ hostname_certs }}/. The password - a site admin's, or with --one-time the
@@ -95,7 +95,7 @@ cat > /etc/krb5.conf <<EOF
     .{{ domain }} = $REALM
 EOF
 
-# where the site sits (sites nest, each in its parent's OU: manual 1.8.8.14): its OU, the sites above it and the
+# where the site sits (sites nest, each in its parent's OU: manual 1.9.8.14): its OU, the sites above it and the
 # organisation's OU, read from the DC as the account that joins (a site admin, or the pre-created machine), signed in
 # with Kerberos, the password on stdin
 if [[ $ONE_TIME -eq 1 ]]; then PRINCIPAL="${MACHINE^^}\$@$REALM"; else PRINCIPAL="$JOIN_USER@$REALM"; fi
@@ -109,7 +109,7 @@ SITE_DN=$(lookup "(&(objectClass=fabricSiteInfo)(ou=$SITE))")
 [[ -n $SITE_DN && $SITE_DN != *$'\n'* ]] || die "no site $SITE in $AD_DOMAIN"
 ORG_DN=$(lookup "(&(objectClass=organizationalUnit)(ou=organisation))")
 [[ -n $ORG_DN && $ORG_DN != *$'\n'* ]] || die "no organisation OU in $AD_DOMAIN"
-# sudo rules: the site's own, each site's above it (their roles reach the sites below, D103), the organisation's
+# sudo rules: the site's own, each site's above it (their roles reach the sites below, 2.1.9.13), the organisation's
 SUDO_BASES=""
 dn=$SITE_DN
 while [[ ${dn^^} == OU=* && ${dn^^} != OU=SITES,* ]]; do
@@ -179,7 +179,7 @@ if [[ -d /etc/chrony/sources.d ]]; then
 fi
 
 {% if install_keycloak | default(false) | bool and signin_kerberos | default(true) | bool %}
-# browsers (manual 5.8.2.6.5, D117): Firefox, Chromium and Chrome may use the logon's Kerberos ticket for
+# browsers (manual 2.3.6.2.6.5, 2.1.6.28): Firefox, Chromium and Chrome may use the logon's Kerberos ticket for
 # {{ hostname_keycloak }}, so fabric's sign-in asks no password here. Firefox's policies are merged, never replaced.
 SSO_HOST="{{ hostname_keycloak }}"
 mkdir -p /etc/firefox/policies

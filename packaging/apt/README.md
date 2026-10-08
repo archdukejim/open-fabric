@@ -1,6 +1,6 @@
 # packaging/apt
 
-fabric's signed apt repository on GitHub Pages (manual 1.4.1.1, decision D7), built by `.github/workflows/package.yml`.
+fabric's signed apt repository on GitHub Pages (manual 1.3.1.1, decision 2.1.1.2), built by `.github/workflows/package.yml`.
 
 | File | What |
 |---|---|

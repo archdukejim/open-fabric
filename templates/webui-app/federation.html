@@ -3,7 +3,7 @@
 <section class="card"><h2>This site <span class="muted">{{ f.site }}</span></h2>
 {% if f.upstream %}<p>A site of <strong>{{ f.upstream.site_name }}</strong> ({{ f.upstream.domain }}){% if f.upstream.relay %}, through {{ f.upstream.relay.site }}{% endif %}.</p>
 {% else %}<p>{{ 'The root site of this fabric.' if f.sites else 'Standalone: no site has joined, and this install joined none.' }}</p>{% endif %}
-<p class="muted small">Invite a site on the fabric host: <code>sudo fabricctl federation invite &lt;site&gt; [--dc writable|rodc]</code> (manual 3.9.1).</p>
+<p class="muted small">Invite a site on the fabric host: <code>sudo fabricctl federation invite &lt;site&gt; [--dc writable|rodc]</code> (manual 4.9.1).</p>
 </section>
 
 <section class="card"><h2>Sites that joined here <span class="muted">{{ f.sites | length }}</span></h2>
@@ -27,7 +27,7 @@
 <table><thead><tr><th>Who</th><th>May write</th><th>Elsewhere</th></tr></thead><tbody>
 {% for who, what, other in f.limits %}<tr><td><code class="small">{{ who }}</code></td><td>{{ what }}</td><td>{{ other or '—' }}</td></tr>{% endfor %}
 </tbody></table>
-<p class="muted small">Overrides and access grants between sites come later (manual 1.8.8.9).</p>
+<p class="muted small">Overrides and access grants between sites come later (manual 1.9.8.9).</p>
 </section>
 
 <section class="card"><h2>Address plan <span class="muted">every site's networks</span></h2>

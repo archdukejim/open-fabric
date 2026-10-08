@@ -27,7 +27,7 @@ def backup_install(ctx):
              database is not kept: people enrol their second factor again."""
     dest = f"/root/fabric-reinstall-{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(dest, mode=0o700)
-    if os.path.isdir(ctx.path("samba", "data")):     # the domain: copied with its DC stopped (manual 4.3)
+    if os.path.isdir(ctx.path("samba", "data")):     # the domain: copied with its DC stopped (manual 3.2.4)
         subprocess.run(["systemctl", "stop", "samba"], capture_output=True)
         subprocess.run(["docker", "stop", "samba"], capture_output=True)
     for rel in KEEP:

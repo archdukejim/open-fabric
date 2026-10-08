@@ -251,7 +251,7 @@ http {
 {% endif %}
 {% if install_adguard | default(false) | bool %}
 
-    # DNS filter (manual 2.4.1.6): AdGuard Home's UI, only after OIDC sign-in through
+    # DNS filter (manual 1.12.1.6): AdGuard Home's UI, only after OIDC sign-in through
     # oauth2-proxy (fabric:dns:filter); nginx then adds AdGuard's own local login.
     server {
         listen 443 ssl;
@@ -301,7 +301,7 @@ http {
 {% endif %}
 {% if federation_endpoint | default(false) | bool %}
 
-    # Federation endpoint (manual 1.8.4.2): other sites join here. A join
+    # Federation endpoint (manual 1.9.4.2): other sites join here. A join
     # is authenticated by its one-time invitation secret; the joining node has no
     # certificate yet. Small bodies, few requests.
     limit_req_zone $binary_remote_addr zone=federation:1m rate=6r/m;
@@ -334,7 +334,7 @@ http {
 {% endif %}
 {% if install_webui | default(false) | bool %}
 
-    # webui management UI — Keycloak OIDC in the app; with webui_client_cert, mutual TLS first (manual 5.8.2.6.3)
+    # webui management UI — Keycloak OIDC in the app; with webui_client_cert, mutual TLS first (manual 2.3.6.2.6.3)
     server {
         listen 443 ssl;
         server_name {{ hostname_mgr }};
@@ -353,8 +353,8 @@ http {
 {% if webui_client_cert | default(false) | bool %}
         ssl_verify_client on;
 {% else %}
-        # webui_client_cert off (D108): a certificate is only asked for, never required; the web app skips its
-        # certificate gates and reads one only before turning the setting on (the admin's own, manual 5.8.2.6.4)
+        # webui_client_cert off (2.1.8.2): a certificate is only asked for, never required; the web app skips its
+        # certificate gates and reads one only before turning the setting on (the admin's own, manual 2.3.6.2.6.4)
         ssl_verify_client optional;
 {% endif %}
 

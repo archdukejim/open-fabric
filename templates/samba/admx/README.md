@@ -1,6 +1,6 @@
 # templates/samba/admx
 
-fabric's blank starter template (manual 2.11.2.9, 3.15.4): copied out with `fabricctl gpo starter <folder>`, filled in
+fabric's blank starter template (manual 1.6.5.9, 4.6.8): copied out with `fabricctl gpo starter <folder>`, filled in
 by the admin and loaded into the domain's central store with `fabricctl gpo load <folder>`. Not rendered.
 
 | File | What |

@@ -8,7 +8,7 @@ STUB = "/run/systemd/resolve/stub-resolv.conf"     # Ubuntu's own /etc/resolv.co
 
 
 def undo_resolver(config_dir):
-    """Purpose: undo the `resolver` host change (manual 2.7.1.5): systemd-resolved's stub listener back
+    """Purpose: undo the `resolver` host change (manual 1.2.9.5): systemd-resolved's stub listener back
              and /etc/resolv.conf as it was.
     Inputs:  config_dir — the install's config folder (the kept copies: common/keep_original).
     Returns: list of str, what was done (empty when fabric never changed the resolver).

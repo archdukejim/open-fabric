@@ -5,9 +5,9 @@ from fabriclib.security.set_signin_layer import set_signin_layer
 
 
 def post_security(route, actor, data):
-    """Purpose: the Security page's changes (manual 5.8.2.6.4, D111, D116): POST /v1/security/raise {layer, value} —
-             only a raise (a lowering is refused here: it is done on the host with `fabricctl security lower`) —
-             and POST /v1/security/kerberos {value: on|off}; each saved, audited and applied at once.
+    """Purpose: the Security page's changes (manual 2.3.6.2.6.4, 2.1.6.24, 2.1.6.27): POST /v1/security/raise {layer,
+             value} — only a raise (a lowering is refused here: it is done on the host with `fabricctl security lower`)
+             — and POST /v1/security/kerberos {value: on|off}; each saved, audited and applied at once.
     Inputs:  route — segments after /v1/; actor — the verified user; data — the body.
     Returns: {"layer", "from", "to", "changed", "applied": bool, "output": the last 2000 characters}.
     Fails:   ValidationError from set_signin_layer (-> 400: a lowering, an unknown layer or value); RouteNotFound for

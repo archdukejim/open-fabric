@@ -17,7 +17,7 @@ def rollback_image(ctx, name, actor="root", source="cli"):
              switch_image raises (ValidationError on a failed pull or failed health check);
              json.JSONDecodeError if STATE is corrupt.
     Feeds:   run_images_command (rollback)."""
-    # as this host runs it: a published image in use has its own var (manual 2.6.3.5)
+    # as this host runs it: a published image in use has its own var (manual 1.14.3.5)
     service = (next((s for s in installed_services(ctx) if s["name"] == name), None)
                or next((s for s in SERVICES if s["name"] == name), None))
     if service is None:

@@ -59,7 +59,7 @@ def run_uninstall_command(args, deploy_base):
              export copying (the stack is stopped by then) and OSError from uninstall propagate; EOFError from
              input().
     Feeds:   cli main (`uninstall`); packaging/deb/postrm (apt purge: --yes --export)."""
-    if "--help" in args or "-h" in args:          # never the interactive removal (it started it before, 5.8.1.27)
+    if "--help" in args or "-h" in args:          # never the interactive removal (it started it before, 2.3.6.1.27)
         print(USAGE)
         return 0
     ctx = SetupContext(deploy_base=deploy_base).load_state()

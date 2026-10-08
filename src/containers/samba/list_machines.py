@@ -24,7 +24,7 @@ def _when(filetime):
 
 
 def list_machines(samdb, lp, site):
-    """Purpose: the site's machines (manual 2.10.2.6, 2.11.2.21 S7.4): the computer accounts in its OU=machines,
+    """Purpose: the site's machines (manual 1.6.7.6, 1.6.5.21 S7.4): the computer accounts in its OU=machines,
              Windows and Linux alike.
     Inputs:  samdb — SamDB (as the site's agent); lp — LoadParm (unused); site — str.
     Returns: list of {"name" (the host name, lower case), "dns", "os", "enabled", "last_logon" (ISO or ""),

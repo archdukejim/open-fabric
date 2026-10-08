@@ -3,9 +3,9 @@ from fabriclib.samba.id_range import id_range
 
 
 def next_id_block(v, registry, container="samba", sites=None):
-    """Purpose: the uid/gid block a new site gets at its join (D97, manual 1.6.3.9): the next posix_id_block numbers
-             after every block the domain holds (each site OU's, read from this site's DC: a parent that is not the
-             root does not know the other branches' sites), this site's own and those its registry recorded.
+    """Purpose: the uid/gid block a new site gets at its join (2.1.6.17, manual 1.6.3.9): the next posix_id_block
+             numbers after every block the domain holds (each site OU's, read from this site's DC: a parent that is not
+             the root does not know the other branches' sites), this site's own and those its registry recorded.
     Inputs:  v — this site's vars (its block: id_range; posix_id_block); registry — load_registry()'s dict;
              container — this site's DC; sites — domain_sites()'s list when the caller read it already.
     Returns: str "first-last".

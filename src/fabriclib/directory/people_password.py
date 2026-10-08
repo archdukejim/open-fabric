@@ -2,7 +2,7 @@ from fabriclib.common.one_time_password import one_time_password
 
 
 def people_password(v):
-    """Purpose: a one-time password for a person that the domain's policy accepts (D89, manual 1.6.3.8): every
+    """Purpose: a one-time password for a person that the domain's policy accepts (2.1.6.13, manual 1.6.3.8): every
              character kind (so complexity is met) and at least as long as the policy's minimum (20 at least).
     Inputs:  v — fabric vars (ad_password_policy.minimum_length).
     Returns: str.

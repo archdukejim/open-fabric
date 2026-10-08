@@ -6,7 +6,7 @@ MARK = "fabric: address plan"
 
 
 def ensure_ad_site(samdb, site, networks):
-    """Purpose: the AD site of this fabric site and its subnets from the address plan (manual 1.8.8.5, 2.2.2.8), so
+    """Purpose: the AD site of this fabric site and its subnets from the address plan (manual 1.9.8.5, 1.10.2.8), so
              Windows machines find their own site's DC by their subnet.
     Inputs:  samdb — SamDB; site — str; networks — list of CIDR str (the site's LAN and DHCP subnets).
     Returns: list of str, what was created, moved or removed.

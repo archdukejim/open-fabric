@@ -1,5 +1,5 @@
-# Samba AD domain controller (manual 2.11.2) from Debian's packages on the validated Debian base. Debian, not
-# Ubuntu: Samba's DLZ module must match BIND's version, and fabric's BIND is Debian's (5.8.1.7).
+# Samba AD domain controller (manual 1.6.5) from Debian's packages on the validated Debian base. Debian, not
+# Ubuntu: Samba's DLZ module must match BIND's version, and fabric's BIND is Debian's (2.3.6.1.7).
 #
 # A DC runs as root in its container (it switches to each user's identity for file access); compose drops every
 # capability but CHOWN, DAC_OVERRIDE, FOWNER, SETUID and SETGID, sets no-new-privileges and a read-only root.

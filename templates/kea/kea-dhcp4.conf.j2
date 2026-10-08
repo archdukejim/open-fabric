@@ -17,7 +17,7 @@
     "renew-timer": {{ ((d.lease_time | default(86400)) / 2) | int }},
     "rebind-timer": {{ ((d.lease_time | default(86400)) * 7 / 8) | int }},
 {% if d.ddns | default(true) %}
-    // hostnames of leases go to their own dynamic zone, never a zone fabric renders (design D16)
+    // hostnames of leases go to their own dynamic zone, never a zone fabric renders (design 2.1.4.1)
     "dhcp-ddns": { "enable-updates": true, "server-ip": "{{ ip_kea_ddns }}", "server-port": 53001 },
     "ddns-send-updates": true,
     "ddns-qualifying-suffix": "{{ ddns_zone }}.",
@@ -29,7 +29,7 @@
     "hostname-char-replacement": "-",
 {% endif %}
 {# fabric's own options (DNS, time, domain, search list); the admin's dhcp.options replace them by name and add
-   any others (manual 2.2.2) #}
+   any others (manual 1.10.2) #}
 {% set fabric_options = [{"name": "domain-name-servers", "data": (d.dns | default([host_ip])) | join(', ')}] %}
 {% if (d.ntp is defined or ntp_serve | default(true)) and (d.ntp | default([host_ip])) %}
 {% set _ = fabric_options.append({"name": "ntp-servers", "data": (d.ntp | default([host_ip])) | join(', ')}) %}

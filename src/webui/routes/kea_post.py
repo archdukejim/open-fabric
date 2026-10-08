@@ -66,7 +66,7 @@ def _kea(parts, form):
 
 
 def kea_post(h, parts, form):
-    """Purpose: route a signed-in, CSRF-checked POST under /kea/ (manual 2.2.2.5).
+    """Purpose: route a signed-in, CSRF-checked POST under /kea/ (manual 1.10.2.5).
     Inputs:  h — the request handler; parts — URL-decoded segments after /kea/; form — dict.
     Returns: 303 back to /kea with the outcome (saved_and_applied); 404 for an unknown path.
     Fails:   AgentError, PermissionDenied and AuthError propagate to handle_request.

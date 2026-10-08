@@ -6,7 +6,7 @@ from fabriclib.common.read_images_lock import LOCK
 
 
 def read_published_lock(fabric_dir):
-    """Purpose: fabric's own published images as the lock pins them (`published:` in images.lock.yaml, manual 2.6.3).
+    """Purpose: fabric's own published images as the lock pins them (`published:` in images.lock.yaml, manual 1.14.3).
     Inputs:  fabric_dir — str, folder holding images.lock.yaml (the install, or the checkout's config/).
     Returns: dict {"registry", "signer", "issuer", "images": {name: {var, tag, digest, account?, ids?, repo, ref}}},
              where repo is "<registry>/<name>" and ref "repo:tag@digest", or "" while the image is not published

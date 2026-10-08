@@ -1,4 +1,4 @@
-# fabric: rendered by fabricctl (jinja/chrony/chrony.conf.j2, manual 2.5.1); apply overwrites edits.
+# fabric: rendered by fabricctl (jinja/chrony/chrony.conf.j2, manual 1.13.1); apply overwrites edits.
 # Sources: this site's upstream site first (federation), then ntp_servers.
 {% for s in sources %}
 {{ 'pool' if s.pool else 'server' }} {{ s.host }} iburst{{ ' nts' if s.nts }}{{ ' prefer' if s.prefer }}
@@ -19,7 +19,7 @@ rtcsync
 # still reach an authenticated source (the time it then gets is checked by NTS itself)
 nocerttimecheck 1
 
-# Windows members of the domain ask for time signed with their DC's key (D100): the DC signs through this socket
+# Windows members of the domain ask for time signed with their DC's key (2.1.13.1): the DC signs through this socket
 ntpsigndsocket {{ ad_ntp_signd_dir }}
 
 # chronyc only from this host

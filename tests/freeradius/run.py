@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """FreeRADIUS 802.1X (optional, design §6) on fabric's image and templates, against a real domain controller
-(manual 2.11.2.17, S3.2) with devices and roles created by fabric's own directory functions and people made the way
+(manual 1.6.5.17, S3.2) with devices and roles created by fabric's own directory functions and people made the way
 fabric makes them:
 
   EAP-TLS (eapol_test): a certificate linked to an enabled device whose role

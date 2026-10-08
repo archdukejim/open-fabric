@@ -33,7 +33,7 @@ def _strip_hardening(path):
 
 
 def undo_runtime(config_dir, restart=True):
-    """Purpose: undo the `runtime` host change (manual 2.7.1.5): Docker's daemon.json as it was before
+    """Purpose: undo the `runtime` host change (manual 1.2.9.5): Docker's daemon.json as it was before
              fabric hardened it, and Docker restarted to apply it.
     Inputs:  config_dir — the install's config folder (the kept copy: common/keep_original); restart — restart Docker
              when the file changed (False in tests).

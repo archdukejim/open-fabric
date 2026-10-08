@@ -3,7 +3,7 @@ services:
     # Pre-built (optimized) local layer: no re-augmentation at start, so the
     # root filesystem can be read-only (see build/Dockerfile).
 {% set published = published_ref('keycloak') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or 'fabric/keycloak:local' }}
 {% if not published %}
     build:
@@ -45,7 +45,7 @@ services:
     volumes:
       - {{ keycloak_data_dir }}:/opt/keycloak/data
       - {{ deploy_base_dir }}/keycloak/certs:/etc/keycloak/certs:ro
-      # Kerberos sign-in (manual 5.8.2.6.2): the site's keytab and krb5.conf (install_sso_keytab); the folder is made
+      # Kerberos sign-in (manual 2.3.6.2.6.2): the site's keytab and krb5.conf (install_sso_keytab); the folder is made
       # by setup before the first start, empty until the DC has exported the keytab
       - {{ deploy_base_dir }}/keycloak/kerberos:/etc/keycloak/kerberos:ro
     networks:

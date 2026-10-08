@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""fabric-federation: the federation endpoint (manual 1.8.4.2).
+"""fabric-federation: the federation endpoint (manual 1.9.4.2).
 
 A separate, minimal root service, deliberately not part of fabric-agent: it
 is the only fabric API that peers on the network reach (through nginx,
@@ -39,7 +39,7 @@ class Handler(BaseHTTPRequestHandler):
     @staticmethod
     def after_join(site):
         """Purpose: after a site joined here: apply in the background, so its DNS delegation, secondary zone and
-                 TSIG key take effect (manual 1.8 M4). The join was answered already.
+                 TSIG key take effect (manual 1.9 M4). The join was answered already.
         Inputs:  site — str, the site that joined (the apply's actor is "site:<site>").
         Returns: None; a daemon thread runs apply_changes.
         Fails:   never here (the apply's own result is audited by apply_changes).

@@ -1,5 +1,6 @@
-"""Group Policy between sites (manual 1.8.8.15, D94 revised, S8.4): Samba replicates GPO objects but not their SYSVOL
-folders, so every DC copies the folders it does not own from the DC that does, over SMB as its own machine account.
+"""Group Policy between sites (manual 1.9.8.15, 2.1.6.16 revised, S8.4): Samba replicates GPO objects but not their
+SYSVOL folders, so every DC copies the folders it does not own from the DC that does, over SMB as its own machine
+account.
     docker exec samba python3 /fabric/pull_sysvol.py
 Run by the DC's entrypoint every 5 minutes. Prints one line per GPO copied or refused; exit 0 unless it could not
 start (the DC's database or SYSVOL unreadable)."""
@@ -32,7 +33,7 @@ def _version(text):
 
 
 def _site_of(dn, sites):
-    """Purpose: the fabric site that owns a link target: the nearest site OU at or above it (sites nest, D105).
+    """Purpose: the fabric site that owns a link target: the nearest site OU at or above it (sites nest, 2.1.6.20).
     Inputs:  dn — str, the OU (or the domain) a GPO is linked to; sites — {lower-case site OU DN: site name}.
     Returns: str site name, or None (the domain, OU=Domain Controllers, anything outside OU=sites).
     Fails:   never.
@@ -63,7 +64,7 @@ def _owners(samdb, sites, root):
 
 def _writable_dc(samdb, site, parents, root):
     """Purpose: the DC that holds a site's GPO folders: a writable DC in the site's own AD site, else its nearest
-             ancestor's (an RODC site, or one with no DC, has its GPOs written there: manual 1.8.8.14).
+             ancestor's (an RODC site, or one with no DC, has its GPOs written there: manual 1.9.8.14).
     Inputs:  samdb — SamDB; site — str; parents — {site: parent site}; root — the root site.
     Returns: (dnsHostName str, NTDS Settings DN str) or None.
     Fails:   ldb.LdbError from a search.
@@ -103,7 +104,7 @@ def pull_sysvol():
         sites[str(res.dn).lower()] = str(res["ou"][0])
     for dn, name in sites.items():
         above = dn.split(",", 1)[1]
-        if above in sites:                  # a site nested in its parent's OU (D105)
+        if above in sites:                  # a site nested in its parent's OU (2.1.6.20)
             parents[name] = sites[above]
     # the root site's OU is the one holding OU=organisation (manual 1.6.3.4)
     for res in samdb.search(base=f"OU=sites,{base}", scope=ldb.SCOPE_SUBTREE, expression="(ou=organisation)",

@@ -7,7 +7,7 @@ MAX_DATA = 1024
 
 
 def normalize_options(options, where):
-    """Purpose: check a list of DHCP options as fabric stores them (manual 2.2.2.3): Kea's own
+    """Purpose: check a list of DHCP options as fabric stores them (manual 1.10.2.3): Kea's own
              option-data at global, class, subnet or reservation level.
     Inputs:  options — list of {name | code, data, space (default dhcp4), csv_format, always_send}, or None;
              where — what the list belongs to, for messages ("dhcp.options", "subnet iot", ...).

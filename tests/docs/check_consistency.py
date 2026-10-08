@@ -3,12 +3,12 @@
 on that drift silently otherwise:
 
   readmes      every folder has a README.md naming each of its files and subfolders
-  vars         every setting in vars.yaml.j2 is in the settings reference (manual 2.1), which names no setting that is gone
+  vars         every setting in vars.yaml.j2 is in the manual's settings (SETTINGS), which names no setting that is gone
   cli          every `fabricctl` command and subcommand is in the docs
-  api          fabric-agent's routes = the permission table = the list in the manual (1.5)
-  permissions  every permission is explained in the manual (1.5)
+  api          fabric-agent's routes = the permission table = the list in the manual (1.3.3)
+  permissions  every permission is explained in the manual (1.3.3, 1.6.8, 1.8)
   suites       every test suite in tests/run-all.sh has a folder or file and is in tests/README.md
-  steps        every setup step is in the manual's installation chapter (4.1)
+  steps        every setup step is in the manual's installation chapters (3.2, 3.3)
   links        every relative Markdown link points at something that exists
 
     python3 tests/docs/check_consistency.py [check ...]     exit 1 if any check finds a problem
@@ -25,13 +25,18 @@ from product_code import REPO, tracked_files  # noqa: E402
 SKIP_README = {"__init__.py", "README.md"}     # a README need not list itself or package markers
 
 
+# the settings reference: how settings work (1.1.8), then each part's settings
+SETTINGS = ("1.1.8", "1.1.9", "1.2.10", "1.2.11", "1.2.12", "1.4.2", "1.5.2", "1.6.9", "1.6.10", "1.8.4")
+WHERE = "the manual's settings (1.1.8 and each part's)"
+
+
 def _read(path):
     return open(os.path.join(REPO, path), encoding="utf-8").read()
 
 
 def _manual(*numbers):
     """Purpose: the text of the manual's subchapters under the given chapter or subchapter numbers.
-    Inputs:  numbers — "2.1", "1.5.3", … (a subchapter file is docs/volume_*/<V.C.S>-name.md).
+    Inputs:  numbers — "1.1.8", "1.3.3", … (a subchapter file is docs/volume_*/<V.C.S>-name.md).
     Returns: their text, joined, in number order; "" when none match.
     Fails:   OSError if a matching file cannot be read.
     Feeds:   check_vars, check_api, check_permissions, check_steps."""
@@ -83,14 +88,14 @@ def _vars_template_keys():
 
 
 def check_vars():
-    """Purpose: vars.yaml.j2 and the settings reference (manual 2.1) name the same settings.
+    """Purpose: vars.yaml.j2 and the manual's settings (SETTINGS) name the same settings.
     Inputs:  none.
     Returns: problems: settings without docs, and documented settings
              (`x` headings, first table cells) that do not exist.
     Fails:   OSError if a file is unreadable.
     Feeds:   main."""
     keys = _vars_template_keys()
-    doc = _manual("2.1")
+    doc = _manual(*SETTINGS)
     documented = set(re.findall(r"^###+\s+(?:\d+(?:\.\d+)+\s+)?`([a-z][a-z0-9_]*)`", doc, re.M))
     documented |= set(re.findall(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", doc, re.M))
     # a setting read only where it is used (`x | default(...)` in a template, v.get("x") in code) is real too
@@ -98,8 +103,8 @@ def check_vars():
                      if p.endswith((".j2", ".py", ".sh")) and not p.endswith("vars.yaml.j2"))
     used = {k for k in documented - keys
             if re.search(rf"(\{{\{{-?\s*{k}\b|\b{k}\s*\||get\(\s*['\"]{k}['\"]|\[['\"]{k}['\"]\])", code)}
-    out = [f"vars.yaml.j2 setting `{k}` is not in the manual (2.1)" for k in sorted(keys) if f"`{k}`" not in doc]
-    out += [f"the manual (2.1) documents `{k}`, which nothing reads" for k in sorted(documented - keys - used)]
+    out = [f"vars.yaml.j2 setting `{k}` is not in {WHERE}" for k in sorted(keys) if f"`{k}`" not in doc]
+    out += [f"{WHERE} documents `{k}`, which nothing reads" for k in sorted(documented - keys - used)]
     return out
 
 
@@ -146,14 +151,14 @@ def _routes_in_table():
 
 
 def check_api():
-    """Purpose: fabric-agent's permission table and the manual (1.5) list the same routes.
+    """Purpose: fabric-agent's permission table and the manual (1.3.3) list the same routes.
     Inputs:  none.
     Returns: problems: routes the table has but the docs do not, and routes
              the docs list that the table does not (so they would be refused).
     Fails:   OSError if a file is missing.
     Feeds:   main."""
     table = {r for _, r in _routes_in_table()}
-    doc = _manual("1.5")
+    doc = _manual("1.3.3")
     listed = set()
     for m in re.finditer(r"`(/v1/[^`]+)`", doc):
         path = m.group(1)[len("/v1/"):]
@@ -161,14 +166,14 @@ def check_api():
         variants = [brace.group(1) + v + brace.group(3) for v in brace.group(2).split(",")] if brace else [path]
         for v in variants:
             listed.add(re.sub(r"<[^>]+>", "*", v))
-    out = [f"agent route /v1/{r} is not in the manual (1.5)" for r in sorted(table - listed)]
-    out += [f"the manual (1.5) lists /v1/{r}, which fabric-agent refuses (not in the permission table)"
+    out = [f"agent route /v1/{r} is not in the manual (1.3.3)" for r in sorted(table - listed)]
+    out += [f"the manual (1.3.3) lists /v1/{r}, which fabric-agent refuses (not in the permission table)"
             for r in sorted(listed - table)]
     return out
 
 
 def check_permissions():
-    """Purpose: every permission in rbac/permissions.py is explained in the manual (1.5).
+    """Purpose: every permission in rbac/permissions.py is explained in the manual (1.3.3, 1.6.8, 1.8).
     Inputs:  none.
     Returns: problems, one per permission not mentioned as `area:action`.
     Fails:   OSError / SyntaxError if permissions.py is unreadable.
@@ -176,8 +181,8 @@ def check_permissions():
     src = ast.parse(_read("src/fabriclib/rbac/permissions.py"))
     perms = next(ast.literal_eval(n.value) for n in src.body
                  if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "PERMISSIONS")
-    doc = _manual("1.5")
-    return [f"permission `{p}` is not in the manual (1.5)" for p in sorted(perms) if f"`{p}`" not in doc]
+    doc = _manual("1.3.3", "1.6.8", "1.8")
+    return [f"permission `{p}` is not in the manual (1.3.3, 1.6.8, 1.8)" for p in sorted(perms) if f"`{p}`" not in doc]
 
 
 def check_suites():
@@ -198,14 +203,14 @@ def check_suites():
 
 
 def check_steps():
-    """Purpose: every setup step (setup/steps.py) is described in the manual's installation chapter (4.1).
+    """Purpose: every setup step (setup/steps.py) is described in the manual's installation chapters (3.2, 3.3).
     Inputs:  none.
     Returns: problems, one per step name not mentioned as `name`.
     Fails:   OSError if a file is missing.
     Feeds:   main."""
     steps = re.findall(r'^\s+\("([a-z]+)", ', _read("src/fabriclib/setup/steps.py"), re.M)
-    doc = _manual("4.1")
-    return [f"setup step `{s}` is not in the manual (4.1)" for s in steps if f"`{s}`" not in doc]
+    doc = _manual("3.2", "3.3", "3.5.1")
+    return [f"setup step `{s}` is not in the manual (3.2, 3.3)" for s in steps if f"`{s}`" not in doc]
 
 
 def _anchors(path):

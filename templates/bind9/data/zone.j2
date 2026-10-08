@@ -17,12 +17,12 @@ $ORIGIN {{ zone_name }}.
 ;-----------------------------------------------------------------
 @       IN      NS      ns.{{ domain }}.
 {% if zone_name == domain and install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
-; DHCP-registered hosts live in their own zone on this server (design D16)
+; DHCP-registered hosts live in their own zone on this server (design 2.1.4.1)
 {{ "%-24s" | format((dhcp | default({})).ddns_subdomain | default('dhcp')) }}NS      ns.{{ domain }}.
 {% endif %}
 {% if zone_name == domain %}
 {% for child in (federation_links | default({'children': []})).children if child.delegate %}
-; federation: site {{ child.site }} answers for {{ child.domain }} (manual 1.8 M4)
+; federation: site {{ child.site }} answers for {{ child.domain }} (manual 1.9 M4)
 {{ "%-24s" | format(child.label) }}NS      ns.{{ child.domain }}.
 {{ "%-24s" | format("ns." ~ child.label) }}A       {{ child.address }}
 {% endfor %}

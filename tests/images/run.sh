@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# The images suite (decision D41, manual 4.7.1, 2.6.3): which image a host
+# The images suite (decision 2.1.1.21, manual 3.14.1, 1.14.3): which image a host
 # runs (published.py), signature verification (verify.py, needs network),
 # and fabric's own images building from packaging/docker-bake.hcl the way
 # CI publishes them, with the same build inputs a host with the default
@@ -27,7 +27,7 @@ set +a
 # the contexts are staged outside the checkout: bake reads them only when allowed
 BAKE=(docker buildx bake -f packaging/docker-bake.hcl "--allow=fs.read=$CONTEXTS")
 
-# hosts: which image a host runs (rendered), and signature verification against real signatures (manual 2.6.3)
+# hosts: which image a host runs (rendered), and signature verification against real signatures (manual 1.14.3)
 python3 tests/images/published.py
 python3 tests/images/verify.py
 

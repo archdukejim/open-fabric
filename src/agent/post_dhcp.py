@@ -45,7 +45,7 @@ def _where(data):
 
 
 def post_dhcp(route, actor, data):
-    """Purpose: DHCP changes from the Kea tab, each saved and applied at once (manual 2.2.2.5):
+    """Purpose: DHCP changes from the Kea tab, each saved and applied at once (manual 1.10.2.5):
              POST /v1/dhcp/reservations[/<mac>/delete], /v1/dhcp/subnets, /v1/dhcp/subnets/update,
              /v1/dhcp/subnets/delete, /v1/dhcp/options, /v1/dhcp/options/delete, /v1/dhcp/classes,
              /v1/dhcp/classes/<name>/delete.

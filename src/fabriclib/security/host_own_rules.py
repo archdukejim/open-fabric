@@ -3,11 +3,11 @@ import subprocess
 
 from fabriclib.security.ufw_rule import RECORDS, ufw_rule
 
-OWN_RULES = "host-originals/ufw.own-rules"     # in the config folder: the host's rules fabric removed (D121)
+OWN_RULES = "host-originals/ufw.own-rules"     # in the config folder: the host's rules fabric removed (2.1.2.13)
 
 
 def host_own_rules(config_dir, planned=()):
-    """Purpose: the ufw rules on this host that fabric did not add — the host's own (D121): every rule ufw lists as
+    """Purpose: the ufw rules on this host that fabric did not add — the host's own (2.1.2.13): every rule ufw lists as
              added, less fabric's (its records, and what this run plans to add).
     Inputs:  config_dir — the install's config folder (security/ufw_rule RECORDS); planned — (kind, entry) pairs
              fabric is about to add.
