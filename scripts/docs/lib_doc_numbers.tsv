@@ -148,6 +148,7 @@ file	fabriclib-deploy|src/fabriclib/deploy/install_openbao_config.py	14
 file	fabriclib-deploy|src/fabriclib/deploy/install_runtime_dirs.py	15	
 file	fabriclib-deploy|src/fabriclib/deploy/install_service_units.py	16	
 file	fabriclib-deploy|src/fabriclib/deploy/install_stepca_templates.py	17	
+file	fabriclib-deploy|src/fabriclib/deploy/install_timers.py	29	
 file	fabriclib-deploy|src/fabriclib/deploy/install_webui_files.py	18	
 file	fabriclib-deploy|src/fabriclib/deploy/load_link_vars.py	19	
 file	fabriclib-deploy|src/fabriclib/deploy/merge_radius_clients.py	20	
@@ -366,11 +367,14 @@ file	fabriclib-ntp|src/fabriclib/ntp/normalize_ntp.py	3
 file	fabriclib-ntp|src/fabriclib/ntp/query_time.py	4	
 file	fabriclib-ntp|src/fabriclib/ntp/time_status.py	5	
 file	fabriclib-pki|src/fabriclib/pki/ca_summary.py	1	
+file	fabriclib-pki|src/fabriclib/pki/cert_warnings.py	36	
+file	fabriclib-pki|src/fabriclib/pki/check_cert_lifetimes.py	37	
 file	fabriclib-pki|src/fabriclib/pki/common/artifacts_dir.py	2	
 file	fabriclib-pki|src/fabriclib/pki/common/ca_chain_pem.py	3	
 file	fabriclib-pki|src/fabriclib/pki/common/ca_files.py	4	
 file	fabriclib-pki|src/fabriclib/pki/common/ca_parents_pem.py	5	
 file	fabriclib-pki|src/fabriclib/pki/common/ca_path_len.py	6	
+file	fabriclib-pki|src/fabriclib/pki/common/cert_dates.py	38	
 file	fabriclib-pki|src/fabriclib/pki/common/describe_cert.py	7	
 file	fabriclib-pki|src/fabriclib/pki/common/openssl.py	8	
 file	fabriclib-pki|src/fabriclib/pki/common/record_issued.py	9	
@@ -393,10 +397,12 @@ file	fabriclib-pki|src/fabriclib/pki/mint_cert.py	25
 file	fabriclib-pki|src/fabriclib/pki/mint_extra_cert.py	26	
 file	fabriclib-pki|src/fabriclib/pki/mint_offline_cert.py	27	
 file	fabriclib-pki|src/fabriclib/pki/needs_renewal.py	28	
+file	fabriclib-pki|src/fabriclib/pki/pick_up_cert.py	39	
 file	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py	29	
 file	fabriclib-pki|src/fabriclib/pki/replace_site_ca.py	30	
 file	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py	31	
 file	fabriclib-pki|src/fabriclib/pki/run_service_cert_command.py	32	
+file	fabriclib-pki|src/fabriclib/pki/show_cert_warnings.py	40	
 file	fabriclib-pki|src/fabriclib/pki/sign_csr.py	33	
 file	fabriclib-pki|src/fabriclib/pki/sign_site_ca.py	34	
 file	fabriclib-pki|src/fabriclib/pki/stage_site_ca.py	35	
@@ -571,6 +577,7 @@ file	webui|src/webui/agentclient/add_subnet.py	5
 file	webui|src/webui/agentclient/apply_changes.py	6	
 file	webui|src/webui/agentclient/audit.py	7	
 file	webui|src/webui/agentclient/ca_summary.py	8	
+file	webui|src/webui/agentclient/cert_warnings.py	136	
 file	webui|src/webui/agentclient/connection.py	9	
 file	webui|src/webui/agentclient/convert_cert.py	10	
 file	webui|src/webui/agentclient/create_person.py	11	
@@ -960,6 +967,7 @@ function	fabriclib-deploy|src/fabriclib/deploy/install_runtime_dirs.py|install_r
 function	fabriclib-deploy|src/fabriclib/deploy/install_service_units.py|_present	2	
 function	fabriclib-deploy|src/fabriclib/deploy/install_service_units.py|install_service_units	1	
 function	fabriclib-deploy|src/fabriclib/deploy/install_stepca_templates.py|install_stepca_templates	1	
+function	fabriclib-deploy|src/fabriclib/deploy/install_timers.py|install_timers	1	
 function	fabriclib-deploy|src/fabriclib/deploy/install_webui_files.py|install_webui_files	1	
 function	fabriclib-deploy|src/fabriclib/deploy/load_link_vars.py|load_link_vars	1	
 function	fabriclib-deploy|src/fabriclib/deploy/merge_radius_clients.py|merge_radius_clients	1	
@@ -1243,11 +1251,16 @@ function	fabriclib-ntp|src/fabriclib/ntp/normalize_ntp.py|normalize_ntp	1
 function	fabriclib-ntp|src/fabriclib/ntp/query_time.py|query_time	1	
 function	fabriclib-ntp|src/fabriclib/ntp/time_status.py|time_status	1	
 function	fabriclib-pki|src/fabriclib/pki/ca_summary.py|ca_summary	1	
+function	fabriclib-pki|src/fabriclib/pki/cert_warnings.py|_left	1	
+function	fabriclib-pki|src/fabriclib/pki/cert_warnings.py|cert_warnings	2	
+function	fabriclib-pki|src/fabriclib/pki/check_cert_lifetimes.py|_days	1	
+function	fabriclib-pki|src/fabriclib/pki/check_cert_lifetimes.py|check_cert_lifetimes	2	
 function	fabriclib-pki|src/fabriclib/pki/common/artifacts_dir.py|artifacts_dir	1	
 function	fabriclib-pki|src/fabriclib/pki/common/ca_chain_pem.py|ca_chain_pem	1	
 function	fabriclib-pki|src/fabriclib/pki/common/ca_files.py|ca_files	1	
 function	fabriclib-pki|src/fabriclib/pki/common/ca_parents_pem.py|ca_parents_pem	1	
 function	fabriclib-pki|src/fabriclib/pki/common/ca_path_len.py|ca_path_len	1	
+function	fabriclib-pki|src/fabriclib/pki/common/cert_dates.py|cert_dates	1	
 function	fabriclib-pki|src/fabriclib/pki/common/describe_cert.py|describe_cert	1	
 function	fabriclib-pki|src/fabriclib/pki/common/openssl.py|openssl	1	
 function	fabriclib-pki|src/fabriclib/pki/common/record_issued.py|record_issued	1	
@@ -1272,6 +1285,7 @@ function	fabriclib-pki|src/fabriclib/pki/mint_extra_cert.py|extra_cert_paths	1
 function	fabriclib-pki|src/fabriclib/pki/mint_extra_cert.py|mint_extra_cert	2	
 function	fabriclib-pki|src/fabriclib/pki/mint_offline_cert.py|mint_offline_cert	1	
 function	fabriclib-pki|src/fabriclib/pki/needs_renewal.py|needs_renewal	1	
+function	fabriclib-pki|src/fabriclib/pki/pick_up_cert.py|pick_up_cert	1	
 function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|_info	2	
 function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|_openssl	1	
 function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|_write_if_changed	3	
@@ -1281,6 +1295,7 @@ function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_ask	1
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_show	2	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|run_mint_certs_command	3	
 function	fabriclib-pki|src/fabriclib/pki/run_service_cert_command.py|run_service_cert_command	1	
+function	fabriclib-pki|src/fabriclib/pki/show_cert_warnings.py|show_cert_warnings	1	
 function	fabriclib-pki|src/fabriclib/pki/sign_csr.py|sign_csr	1	
 function	fabriclib-pki|src/fabriclib/pki/sign_site_ca.py|_hours_left	1	
 function	fabriclib-pki|src/fabriclib/pki/sign_site_ca.py|_stage	2	
@@ -1376,10 +1391,12 @@ function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	0.5
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
 function	fabriclib-setup|src/fabriclib/setup/check_export_dir.py|check_export_dir	1	
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_ca_lifetime	10	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dns_filter	8	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_log_forwarding	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_radius	3	
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ca_exists	9	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_get	4	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_set	5	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_upstreams_text	7	
@@ -1423,8 +1440,10 @@ function	fabriclib-setup|src/fabriclib/setup/detect_network.py|detect_network	1
 function	fabriclib-setup|src/fabriclib/setup/export_install.py|_copy	1	
 function	fabriclib-setup|src/fabriclib/setup/export_install.py|export_install	2	
 function	fabriclib-setup|src/fabriclib/setup/harden_docker.py|run	1	
+function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_check_root_lifetime	9	
 function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_chown_tree	1	
 function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_configure_ca_json	2	
+function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_intermediate_for_root	8	
 function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_make_root	4	
 function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_public_certs_readable	6	
 function	fabriclib-setup|src/fabriclib/setup/init_pki.py|_publish_ca_certs	5	
@@ -1440,6 +1459,7 @@ function	fabriclib-setup|src/fabriclib/setup/preflight.py|_mem_gb	2
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_os_release	1	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|run	4	
 function	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py|read_join_invitation	1	
+function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|_record	2	
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|renew_service_certs	1	
 function	fabriclib-setup|src/fabriclib/setup/restore_install.py|restore_install	1	
 function	fabriclib-setup|src/fabriclib/setup/retire_renamed_units.py|retire_renamed_units	1	
@@ -1572,6 +1592,7 @@ function	webui|src/webui/agentclient/add_subnet.py|add_subnet	1
 function	webui|src/webui/agentclient/apply_changes.py|apply_changes	1	
 function	webui|src/webui/agentclient/audit.py|audit	1	
 function	webui|src/webui/agentclient/ca_summary.py|ca_summary	1	
+function	webui|src/webui/agentclient/cert_warnings.py|cert_warnings	1	
 function	webui|src/webui/agentclient/connection.py|_UnixConnection.__init__	3	
 function	webui|src/webui/agentclient/connection.py|_UnixConnection.connect	4	
 function	webui|src/webui/agentclient/connection.py|call_agent	5	

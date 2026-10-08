@@ -26,6 +26,7 @@ from fabriclib.deploy.install_openbao_config import install_openbao_config
 from fabriclib.deploy.install_runtime_dirs import install_runtime_dirs
 from fabriclib.deploy.install_service_units import install_service_units
 from fabriclib.deploy.install_stepca_templates import install_stepca_templates
+from fabriclib.deploy.install_timers import install_timers
 from fabriclib.deploy.install_webui_files import install_webui_files
 from fabriclib.deploy.load_link_vars import load_link_vars
 from fabriclib.deploy.merge_radius_clients import merge_radius_clients
@@ -119,6 +120,7 @@ def _deploy(paths, start_services):
     if install_stepca_templates(paths, final_vars):
         restart.add("stepca")
     install_runtime_dirs(paths, final_vars, p["tsig_keys"])
+    install_timers(paths)
 
     state = {"restart": restart, "rebuild": svc["rebuild"],
              "daemon_reload": svc["daemon_reload"] or ngx["daemon_reload"] or web["agent"]

@@ -7,6 +7,7 @@ from fabriclib.common.console import info, ok
 from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.check_consent import check_consent
 from fabriclib.consent.plan_trust import plan_trust
+from fabriclib.pki.common.cert_dates import cert_dates
 from fabriclib.pki.common.ca_path_len import ca_path_len
 from fabriclib.pki.publish_ca_certs import publish_ca_certs
 from fabriclib.setup.errors import SetupError
@@ -80,10 +81,11 @@ def _make_root(ctx, data, uid, gid):
     """Purpose: make this install's own root CA before `step ca init`, with the path length that decides how
              deeply sites may nest below it (manual 1.9.5.1): ca_nest_depth + 1. `step ca init` alone
              makes path length 1 (flat sites only).
-    Inputs:  ctx — SetupContext: vars ca_name, ca_nest_depth (0..4, default 1), image_stepca; data — Step-CA's
-             data folder (secrets/password written); uid, gid — the step user.
+    Inputs:  ctx — SetupContext: vars ca_name, ca_nest_depth (0..4, default 1), image_stepca, cert_root_ca_days;
+             data — Step-CA's data folder (secrets/password written); uid, gid — the step user.
     Returns: (root certificate path, root key path) in <data>/root-new (as /home/step/... for the container);
-             EC P-256, ten years, subject "O=<ca_name>, CN=<ca_name> Root CA" like step's own.
+             EC P-256, cert_root_ca_days long (manual 2.1.5.6; default ten years), subject
+             "O=<ca_name>, CN=<ca_name> Root CA" like step's own.
     Fails:   SetupError when ca_nest_depth is not 0..4 or step refuses.
     Feeds:   run (own root only)."""
     depth = ctx.vars.get("ca_nest_depth", 1)
@@ -102,11 +104,57 @@ def _make_root(ctx, data, uid, gid):
                           "--entrypoint", "/usr/local/bin/step", ctx.vars["image_stepca"], "certificate", "create",
                           f"{name} Root CA", "/home/step/root-new/root_ca.crt", "/home/step/root-new/root_ca_key",
                           "--template", "/home/step/root-new/root.tpl", "--kty", "EC", "--curve", "P-256",
-                          "--not-after", "87600h", "--password-file", "/home/step/secrets/password"],
+                          "--not-after", f"{int(ctx.vars.get('cert_root_ca_days', 3650)) * 24}h",
+                          "--password-file", "/home/step/secrets/password"],
                          capture_output=True, text=True)
     if res.returncode != 0:
         raise SetupError(f"making the root CA failed: {(res.stderr or res.stdout)[-600:]}")
     return "/home/step/root-new/root_ca.crt", "/home/step/root-new/root_ca_key"
+
+
+def _intermediate_for_root(ctx, data, uid, gid):
+    """Purpose: re-issue the intermediate `step ca init` made, to live the root's lifetime less one year (manual
+             2.1.5.6), so it never outlives the root and leaves a year to replace it.
+    Inputs:  ctx — SetupContext: vars ca_name, cert_root_ca_days, image_stepca; data — Step-CA's data folder (the
+             root
+             and its key under certs/ and secrets/, the password in secrets/password); uid, gid — the step user.
+    Returns: None; certs/intermediate_ca.crt and secrets/intermediate_ca_key replaced (EC P-256, the key encrypted
+             with the CA password, as step's own).
+    Fails:   SetupError when step refuses.
+    Feeds:   run (own root only, before the CA first starts)."""
+    hours = (int(ctx.vars.get("cert_root_ca_days", 3650)) - 365) * 24
+    name = ctx.vars["ca_name"]
+    res = subprocess.run(["docker", "run", "--rm", "--network", "none", "-v", f"{data}:/home/step", "-u",
+                          f"{uid}:{gid}", "--entrypoint", "/usr/local/bin/step", ctx.vars["image_stepca"],
+                          "certificate", "create", f"{name} Intermediate CA", "/home/step/certs/intermediate_ca.crt",
+                          "/home/step/secrets/intermediate_ca_key", "--profile", "intermediate-ca",
+                          "--ca", "/home/step/certs/root_ca.crt", "--ca-key", "/home/step/secrets/root_ca_key",
+                          "--ca-password-file", "/home/step/secrets/password",
+                          "--password-file", "/home/step/secrets/password", "--kty", "EC", "--curve", "P-256",
+                          "--not-after", f"{hours}h", "--force"], capture_output=True, text=True)
+    if res.returncode != 0:
+        raise SetupError(f"issuing the intermediate CA failed: {(res.stderr or res.stdout)[-600:]}")
+
+
+def _check_root_lifetime(v, certs_dir):
+    """Purpose: refuse a changed CA lifetime on an existing CA (manual 2.1.5.6): it is fixed once the CA is made.
+    Inputs:  v — vars: cert_root_ca_days, byoc (a brought-in root's lifetime is its own: not checked); certs_dir —
+             Step-CA's certs folder.
+    Returns: None.
+    Fails:   SetupError saying the root's actual lifetime and what to do, when cert_root_ca_days differs from it by
+             more than a day.
+    Feeds:   run (an existing CA)."""
+    if v.get("byoc"):
+        return
+    dates = cert_dates(os.path.join(certs_dir, "root_ca.crt"))
+    if not dates:
+        return
+    actual = round((dates[1] - dates[0]).total_seconds() / 86400)
+    wanted = int(v.get("cert_root_ca_days", 3650))
+    if abs(actual - wanted) > 1:
+        raise SetupError(f"cert_root_ca_days is {wanted}, but this install's root CA was made for {actual} days: a "
+                         "CA's lifetime cannot change once it exists. Set cert_root_ca_days back to "
+                         f"{actual} (sudo fabricctl edit), or start a new CA with a reinstall (manual 3.2.4).")
 
 
 def _publish_ca_certs(ctx, certs_dir):
@@ -154,7 +202,8 @@ def run(ctx):
              init` generated is removed, since it does not belong to the brought-in root. With an existing ca.json only
              the
              permissions, publishing and trust are (re)done.
-    Fails:   SetupError when byoc files are missing or `step ca init` fails; CalledProcessError when
+    Fails:   SetupError when byoc files are missing, `step ca init` fails, or an existing CA's lifetime differs
+             from cert_root_ca_days (_check_root_lifetime); CalledProcessError when
              `openssl verify` rejects the intermediate or from publishing; ValidationError from ctx.secrets
              when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars.
     Feeds:   setup step `pki`, run by run_setup via STEPS.
@@ -166,6 +215,7 @@ def run(ctx):
     ca_json = os.path.join(data, "config", "ca.json")
     uid, gid = ctx.uid("step")
     if os.path.exists(ca_json):
+        _check_root_lifetime(v, os.path.join(data, "certs"))
         if _single_intermediate(os.path.join(data, "certs", "intermediate_ca.crt")):
             ctx.restart_services.add("stepca")
             ok("intermediate_ca.crt: the intermediate alone (the root it carried is in root_ca.crt)")
@@ -205,6 +255,7 @@ def run(ctx):
     if own_root:              # the root key goes where sign_site_ca and step's own layout expect it
         shutil.move(os.path.join(data, "root-new", "root_ca_key"), os.path.join(data, "secrets", "root_ca_key"))
         shutil.rmtree(os.path.join(data, "root-new"))
+        _intermediate_for_root(ctx, data, uid, gid)
 
     certs = os.path.join(data, "certs")
     if v.get("byoc"):

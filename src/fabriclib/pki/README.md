@@ -4,6 +4,9 @@ Certificates from fabric's Step-CA.
 
 | File | What |
 |---|---|
+| `cert_warnings.py` | What is wrong or coming with fabric's certificates (a failed renewal, a service certificate under 7 days, the CA within 180 days, issued certificates within 30), for status, doctor and the web console |
+| `check_cert_lifetimes.py` | Refuses certificate lifetimes that cannot work (2.1.5.4, 2.1.5.6) |
+| `pick_up_cert.py` | How a service takes a renewed certificate: a reload, by itself, or a restart (2.1.5.4) |
 | `needs_renewal.py` | True if a cert is missing, expires within 30 days, lacks a required DNS/IP name, or is not from the current CA |
 | `mint_cert.py` | Issue a service cert from the running step-ca (JWK provisioner `admin`, RSA 4096); chain includes the intermediate |
 | `install_cert.py` | Copy chain/key/root CA into a service's cert dir with its owner (chain/root 0644, key 0600) |
@@ -27,3 +30,4 @@ Certificates from fabric's Step-CA.
 | `run_mint_certs_command.py` | `fabricctl --mint-certs`: mint every `extra_certs` entry (`--apply`), or ask for one, record it and mint it |
 | `run_service_cert_command.py` | `fabricctl --service-cert`: list expiry dates, then re-issue every service certificate |
 | `common/` | Helpers shared by the operations above (see its README) |
+| `show_cert_warnings.py` | `fabricctl status`'s certificates section |

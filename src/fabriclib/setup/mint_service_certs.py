@@ -53,10 +53,12 @@ def _targets(ctx):
 def run(ctx):
     """Purpose: issue (or renew) every service certificate from Step-CA and the CA bundles that verify client
              certificates, then the extra_certs.
-    Inputs:  ctx — SetupContext: vars (see _targets; install_webui, install_freeradius for the bundles),
+    Inputs:  ctx — SetupContext: vars (see _targets; cert_renew_after_days, cert_service_days; install_webui,
+             install_freeradius for the bundles),
              force_certs (re-issue even when current), Step-CA certs under <deploy_base>/stepca/data/certs.
-    Returns: None. Certificates that exist, cover their names, chain to this CA and are valid for 30+ days
-             are left alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the
+    Returns: None. Certificates that exist, cover their names, chain to this CA, are younger than
+             cert_renew_after_days and live no longer than cert_service_days (manual 2.1.5.4, 2.1.5.7) are left
+             alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the
              FreeRADIUS ca.pem and the DNS filter's oauth2-proxy root_ca.crt only when changed. Services whose
              certificates changed are added to
              ctx.restart_services.
@@ -69,11 +71,14 @@ def run(ctx):
     parents = os.path.join(certs_dir, "ca_parents.crt")           # a nested site's parent CAs (else empty/absent)
     chain_cas = [intermediate] + ([parents] if os.path.exists(parents) else [])
     restart = set()
+    renew_after = int(ctx.vars.get("cert_renew_after_days", 30))
+    lifetime = int(ctx.vars.get("cert_service_days", 47))
 
     for cn, sans, dests, services in _targets(ctx):
         first = dests[0][0]
         check = os.path.join(first, "server.pem" if dests[0][1] == "freeradius:eap" else "fullchain.pem")
-        if not ctx.force_certs and not needs_renewal(check, [cn, *sans], (root_ca, intermediate)):
+        if not ctx.force_certs and not needs_renewal(check, [cn, *sans], (root_ca, intermediate),
+                                                     renew_after_days=renew_after, max_days=lifetime):
             ok(f"{cn}: current")
             continue
         crt, key = mint_cert(ctx, cn, sans, cn.replace(".", "-"))

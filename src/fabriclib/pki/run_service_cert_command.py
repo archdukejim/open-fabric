@@ -25,6 +25,8 @@ def run_service_cert_command(ctx, args):
         if input("  Re-issue all service certificates? [y/N] ").strip().lower() not in ("y", "yes"):
             print("[*] Cancelled.")
             return 0
-    renew_service_certs(ctx, force=True)
-    print("[+] Service certificates re-issued (affected services restarted).")
+    if renew_service_certs(ctx, force=True) != 0:
+        print("[✗] Re-issuing failed: see the error above.")
+        return 1
+    print("[+] Service certificates re-issued (affected services reloaded or restarted).")
     return 0

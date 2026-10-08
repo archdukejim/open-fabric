@@ -5,7 +5,9 @@
   fabricctl doctor               end-to-end checks of the running install
   fabricctl status|start|stop|restart
                                  the whole stack (systemd fabric.target)
-  fabricctl certs [--force]      renew service certificates that need it (--force: all)
+  fabricctl certs [--force|--scheduled]
+                                 renew service certificates that need it (--force: all; --scheduled:
+                                 the daily timer's run, recorded for status and doctor)
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
@@ -84,6 +86,7 @@ from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
+from fabriclib.pki.show_cert_warnings import show_cert_warnings  # noqa: E402
 from fabriclib.system.show_relaxed_settings import show_relaxed_settings  # noqa: E402
 
 
@@ -205,8 +208,12 @@ def main(argv):
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":
-        renew_service_certs(SetupContext(deploy_base=_base(args)), force="--force" in args)
-        return 0
+        flags = [a for a in args if a.startswith("--") and a != "--deploy-base"]
+        if set(flags) - {"--force", "--scheduled"} or {"--force", "--scheduled"} <= set(flags):
+            print("usage: fabricctl certs [--force | --scheduled]", file=sys.stderr)
+            return 2
+        return renew_service_certs(SetupContext(deploy_base=_base(args)), force="--force" in args,
+                                   scheduled="--scheduled" in args)
     if cmd == "client-cert" and args and not args[0].startswith("-"):
         days = int(args[args.index("--days") + 1]) if "--days" in args else 365
         p12, password = hand_out_client_cert(SetupContext(deploy_base=_base(args)).load_state().vars, args[0], days)
@@ -226,7 +233,9 @@ def main(argv):
         else:
             ctx = SetupContext(deploy_base=_base(args))
             show_consent_status(ctx.config_dir)
-            show_relaxed_settings(ctx.load_state().vars)
+            vars_ = ctx.load_state().vars
+            show_relaxed_settings(vars_)
+            show_cert_warnings(vars_)
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)

@@ -20,7 +20,7 @@ def get_page(h, sess, path, query):
     ctx = page_context(sess)
     if path == "/":
         return h.send(200, views.overview(ctx, actions.service_status(), actions.host_changes(),
-                                             actions.relaxed_settings()))
+                                             actions.relaxed_settings(), actions.cert_warnings()))
     if path == "/bind9":
         return bind9_page(h, ctx, query)
     if path == "/stepca":

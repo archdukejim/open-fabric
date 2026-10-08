@@ -13,6 +13,7 @@ from fabriclib.keycloak.user_has_role import user_has_role
 from fabriclib.ntp.chrony_settings import chrony_settings
 from fabriclib.ntp.query_time import query_time
 from fabriclib.ntp.time_status import time_status
+from fabriclib.pki.cert_warnings import cert_warnings
 from fabriclib.setup.errors import SetupError
 from fabriclib.system.relaxed_settings import relaxed_settings
 from fabriclib.vault.vault_status import vault_status
@@ -38,7 +39,7 @@ def checks(ctx):
              (Keycloak role, the client certificate while one is required), OpenBao state, the federation endpoint and
              the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and
              under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its
-             upstream site), and every installed service.
+             upstream site), the certificates (renewal working, none about to expire), and every installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, bind_dns_port, install_webui/keycloak,
              federation_endpoint, install_adguard, webui_admin_user/role), secrets (Keycloak), Step-CA root, the
              agent socket, ~/fabric-admin of the sudo user.
@@ -160,6 +161,8 @@ def checks(ctx):
                      root_ca)
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
+    failing = [w["what"] for w in cert_warnings(v) if w["level"] == "fail"]
+    add("certificates: renewal working, none about to expire (2.1.5.4)", not failing, "; ".join(failing))
     for unit in ("bind9", "stepca", "nginx", "samba", "postgres", "keycloak", "openbao", "kea", "freeradius",
                  "samba", "fluentbit",
                  "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
@@ -174,7 +177,7 @@ def run(ctx):
              `fabricctl doctor`).
     Inputs:  ctx — SetupContext with state loaded (see checks).
     Returns: None; each check printed as ok or error, then a warning for each sign-in layer lowered below a level
-             it had.
+             it had and for what is coming with the certificates (cert_warnings).
     Fails:   SetupError("<n> check(s) failed"); exceptions from checks propagate.
     Feeds:   setup step `verify`, run by run_setup via STEPS; run_setup main for `fabricctl doctor`."""
     failed = 0
@@ -186,5 +189,8 @@ def run(ctx):
     for row in relaxed_settings(ctx.vars, ctx.config_dir):
         if " lowered: " in row["setting"]:
             warn(f"sign-in {row['setting']} — {row['effect']}")
+    for row in cert_warnings(ctx.vars):          # what is coming (a CA, issued certificates): warnings
+        if row["level"] == "warn":
+            warn(f"certificates: {row['what']}")
     if failed:
         raise SetupError(f"{failed} check(s) failed")

@@ -26,6 +26,7 @@ installs what changed and restarts or reloads what is affected.
 | `install_bind9_files.py` | BIND's folders and config; the zones whose records changed |
 | `install_webui_files.py` | The web UI's folders and config; fabric-agent's unit |
 | `install_stepca_templates.py` | Step-CA's certificate templates |
+| `install_timers.py` | fabric's timers (certificate renewal), installed and enabled |
 | `install_runtime_dirs.py` | Data folders services write; each TSIG key's `rfc2136.ini` |
 | `deploy_optional_parts.py` | Fluent Bit, the DNS filter, chrony, Kea, FreeRADIUS through their own deploy steps |
 | `finish_without_start.py` | Setup's ending: start nothing, swap zones safely, build images, return what to restart |
