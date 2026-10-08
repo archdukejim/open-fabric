@@ -76,18 +76,21 @@ check("refused: complexity that is not true or false",
 check("refused: a minimum length over 64 (the Administrator's generated password must fit)",
       refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_length": 65}}, "minimum_length"))
 check("refused: a minimum age not below the maximum",
-      refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_age_days": 365}}, "below maximum_age_days"))
+      refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_age_days": 365}}, "must be below the second"))
 check("refused: a lockout shorter than its reset window (AD refuses it)",
-      refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 5}}, "lockout_window_minutes"))
+      refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 5}}, "at least as long as that window"))
 check("accepted: locked until an admin unlocks (lockout 0) with any window",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 0}}, ""))
 check("accepted: passwords that never expire (maximum 0) with any minimum age",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "maximum_age_days": 0}}, ""))
 check("refused: an RPC range at or below 1024", refused({**GOOD, "ad_rpc_ports": "100-200"}, "ad_rpc_ports"))
 
-check("the suggestion is a sibling at the top of the organisation's name (D87)",
+check("the suggestion is a sibling at the top of the organisation's name (D87); a two-label domain gets ad.<it>",
       suggested_ad_domain("lan.j-j.family") == "ad.j-j.family" and suggested_ad_domain("pitest.home.arpa")
-      == "ad.home.arpa" and suggested_ad_domain("example.org") == "")
+      == "ad.home.arpa" and suggested_ad_domain("home.arpa") == "ad.home.arpa"
+      and suggested_ad_domain("example.org") == "ad.example.org" and suggested_ad_domain("lan") == "")
+check("the two-label suggestion is a valid AD domain (a sub-domain, never the domain or a parent)",
+      not refused({**GOOD, "domain": "home.arpa", "ad_domain": suggested_ad_domain("home.arpa")}, ""))
 check("accepted: a sub-domain of fabric's domain too", not refused({**GOOD, "ad_domain": "ad.lan.test"}, ""))
 check("accepted: the suggested sibling", not refused({**GOOD, "ad_domain": "ad.test2", "domain": "lan.test2"}, ""))
 

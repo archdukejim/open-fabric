@@ -150,10 +150,10 @@ http {
         }
     }
 
-    # Fabric Landing Portal (Landing, Certificates, Manual)
+    # Fabric Landing Portal (Landing, Certificates, Manual); also at the host's own name (<host>.<domain>)
     server {
         listen 443 ssl;
-        server_name {{ hostname_landing }};
+        server_name {{ hostname_landing }} {{ (hostname ~ '.' ~ domain) | lower }};
 
         ssl_certificate     /etc/nginx/certs/{{ hostname_landing }}/fullchain.pem;
         ssl_certificate_key /etc/nginx/certs/{{ hostname_landing }}/privkey.pem;

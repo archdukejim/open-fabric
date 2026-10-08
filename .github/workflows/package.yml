@@ -80,8 +80,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p released
-          for tag in $(gh release list --repo "${GITHUB_REPOSITORY}" --limit 100 --json tagName --jq '.[].tagName'); do
-            gh release download "$tag" --repo "${GITHUB_REPOSITORY}" --pattern 'fabricctl_*.deb' --dir released || true
+          # full releases only (from 0.6.1, D113: earlier ones are pre-releases, and v0.5.0 still carries the 1.5.0 it
+          # was built as before the renumbering, which would outrank every 0.x), and only the .deb of the tag's own version
+          for tag in $(gh release list --repo "${GITHUB_REPOSITORY}" --limit 100 --json tagName,isPrerelease                          --jq '.[] | select(.isPrerelease | not) | .tagName'); do
+            gh release download "$tag" --repo "${GITHUB_REPOSITORY}" --pattern "fabricctl_${tag#v}_all.deb"               --dir released || true
           done
           ls released
       - name: This branch's package (testing)

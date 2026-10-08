@@ -22,6 +22,10 @@ from fabriclib.consent.ask_consent import ask_consent  # noqa: E402
 from fabriclib.consent.check_consent import check_consent  # noqa: E402
 from fabriclib.consent.consent_status import consent_status  # noqa: E402
 from fabriclib.consent.plan_firewall import plan_firewall  # noqa: E402
+from fabriclib.consent.plan_own_rules import plan_own_rules  # noqa: E402
+from fabriclib.consent.plan_ports import plan_ports  # noqa: E402
+from fabriclib.consent.groups import GROUPS  # noqa: E402
+import fabriclib.consent.ask_consent as ask_consent_mod  # noqa: E402
 from fabriclib.deploy.render_vars import render_vars  # noqa: E402
 from fabriclib.security.ufw_rule import ufw_rule  # noqa: E402
 from fabriclib.setup.errors import SetupError  # noqa: E402
@@ -148,13 +152,56 @@ changes = upgrade_vars(old, set())
 check("previous defaults are dropped (the new accounts apply), an admin's own ids are kept",
       old["service_users"] == {"nginx": {"uid": 1443, "gid": 1443}} and len(changes) == 1, (old, changes))
 
-print("--- the firewall question")
-rules = plan_firewall({**v, "ntp_serve": False}, cfg)
-check("one line per rule fabric adds, plus the default policy and the DOCKER-USER limit",
+print("--- the firewall's questions (D121): the ports fabric needs, then securing, then the host's own rules")
+rules = plan_firewall({**v, "ntp_serve": False}, cfg, active=False)
+check("securing: the default policy, SSH, the DOCKER-USER limit — and no fabric port (those are the first question)",
       rules[0].startswith("ufw: deny incoming") and "ufw: allow 22/tcp (SSH) from 10.0.0.0/24" in rules
-      and rules[-1].startswith("iptables DOCKER-USER"), rules)
+      and rules[-1].startswith("iptables DOCKER-USER") and not any("domain controller" in x for x in rules), rules)
+on = plan_firewall({**v, "ntp_serve": False}, cfg, active=True)
+check("ufw on already: the first line says so, the rest the same",
+      on[0].startswith("ufw is on already: deny incoming") and on[1:] == rules[1:], on[:2])
+check("the three questions in order; securing needs the ports, the host's own rules need securing",
+      list(GROUPS).index("ports") < list(GROUPS).index("firewall") < list(GROUPS).index("own_rules")
+      and GROUPS["firewall"]["needs"] == "ports" and GROUPS["own_rules"]["needs"] == "firewall")
+_asked = []
+_orig_ask = ask_consent_mod._ask
+ask_consent_mod._ask = lambda group, changes, new: (_asked.append(group), group != "ports")[1]
+_ans = ask_consent_mod.ask_consent(os.path.join(cfg, "needs"), {"ports": ["p"], "firewall": ["f"], "own_rules": ["o"]},
+                                   interactive=True)
+ask_consent_mod._ask = _orig_ask
+check("the ports declined: securing and the host's own rules are not asked", _asked == ["ports"]
+      and _ans == {"ports": "no", "firewall": "skipped", "own_rules": "skipped"}, (_asked, _ans))
+_asked.clear()
+ask_consent_mod._ask = lambda group, changes, new: (_asked.append(group), True)[1]
+_ans = ask_consent_mod.ask_consent(os.path.join(cfg, "needs"), {"ports": ["p"], "firewall": ["f"], "own_rules": ["o"]},
+                                   interactive=True, stops={"ports"})
+ask_consent_mod._ask = _orig_ask
+check("a declined question that stops setup is asked again in the next interactive run (never stuck with the no)",
+      _asked[:1] == ["ports"] and _ans.get("ports") == "yes", (_asked, _ans))
+_ans = ask_consent_mod.ask_consent(os.path.join(cfg, "needs"), {"ports": ["p"]}, interactive=False, stops={"ports"})
+check("…and unattended, the recorded answer stands (no question without a person)", _ans.get("ports") == "yes", _ans)
+fake = os.path.join(cfg, "fakebin")
+os.makedirs(fake, exist_ok=True)
+with open(os.path.join(fake, "ufw"), "w") as f:
+    f.write("\n".join(["#!/bin/sh", "echo \"Added user rules (see 'ufw status' for running firewall):\"",
+                       "echo 'ufw allow from 10.0.0.0/24 to any port 9090 proto tcp'", "echo 'ufw allow OpenSSH'",
+                       "echo 'ufw allow from 10.0.0.0/24 to any port 22 proto tcp'", ""]))
+os.chmod(os.path.join(fake, "ufw"), 0o755)
+os.environ["PATH"] = fake + os.pathsep + os.environ["PATH"]
+own = plan_own_rules({**v, "ntp_serve": False}, cfg)
+check("the host's own rules: ufw's added rules less fabric's (SSH from the LAN is fabric's), each named",
+      own == ["ufw: remove `ufw allow from 10.0.0.0/24 to any port 9090 proto tcp` (the host's own)",
+              "ufw: remove `ufw allow OpenSSH` (the host's own)"], own)
+os.environ["PATH"] = os.environ["PATH"].split(os.pathsep, 1)[1]
+_orig = os.path.join(cfg, "host-originals")
+os.makedirs(_orig, exist_ok=True)
+with open(os.path.join(_orig, "ufw.state"), "w") as f:
+    f.write("active\n")
+check("the wording follows ufw as it was before fabric (its record), so it does not change once fabric turns it on",
+      plan_firewall({**v, "ntp_serve": False}, cfg)[0].startswith("ufw is on already"))
+os.remove(os.path.join(_orig, "ufw.state"))
 check("security.firewall false asks nothing", plan_firewall({**v, "security": {"firewall": False}}, cfg) == [])
-dc_rules = plan_firewall({**v, "ntp_serve": False, "ad_rpc_ports": "49152-49251"}, cfg)
+dc_rules = plan_ports({**v, "ntp_serve": False, "ad_rpc_ports": "49152-49251"}, cfg)
 dc_lines = [r for r in dc_rules if "domain controller" in r]
 check("the DC's TCP ports (RPC range included) and UDP ports, from the LAN and fabric_net",
       f"ufw: allow 88,135,389,445,464,636,3268,3269,49152:49251/tcp (the Windows domain controller) from "
@@ -165,7 +212,7 @@ peer_cfg = tempfile.mkdtemp()
 with open(os.path.join(peer_cfg, "federation.yaml"), "w") as f:
     yaml.safe_dump({"upstream": {"site_name": "lan", "address": "192.0.2.10"},
                     "sites": {"edge": {"address": "198.51.100.7"}}}, f)
-peer_lines = [r for r in plan_firewall({**v, "ntp_serve": False}, peer_cfg) if "domain controller" in r]
+peer_lines = [r for r in plan_ports({**v, "ntp_serve": False}, peer_cfg) if "domain controller" in r]
 check("the DC's ports also from the federation's peers (its upstream and each joined site: replication, 1.8.8.5)",
       any("from 192.0.2.10/32" in r and "/tcp" in r for r in peer_lines)
       and any("from 198.51.100.7/32" in r and "/udp" in r for r in peer_lines) and len(peer_lines) == 8, peer_lines)
@@ -249,7 +296,8 @@ check("undo without --yes never runs unattended",
       "--yes" in refused(lambda: undo_group(Ctx(cfg, {"domain_file": "x"}), "trust", False, False)))
 rows = {t: (how, what) for t, how, what in uninstall_plan()}
 check("uninstall lists every kind of host change: removed, undone or kept (Docker's settings: how to undo first)",
-      len(rows) == 8 and rows["Service accounts"][0] == "removed" and rows["Host firewall"][0] == "undone"
+      len(rows) == 10 and rows["Service accounts"][0] == "removed" and rows["Secure this host"][0] == "undone"
+      and rows["Ports fabric needs"][0] == rows["The host's own firewall rules"][0] == "undone"
       and rows["Docker daemon settings"][0] == "kept" and "--undo runtime" in rows["Docker daemon settings"][1], rows)
 
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")

@@ -13,6 +13,13 @@ KEPT = {
 }
 
 
+# undone together with the host firewall (undo/undo_firewall, D121)
+WITH_FIREWALL = {
+    "ports": "the ufw rules opening fabric's ports are removed with the host firewall's",
+    "own_rules": "the host's own ufw rules fabric removed are put back with the host firewall's undo",
+}
+
+
 def uninstall_plan():
     """Purpose: what `fabricctl uninstall` does with each kind of host change, shown before it asks (manual 2.7.1.4,
                 step 8).
@@ -26,6 +33,8 @@ def uninstall_plan():
             rows.append((meta["title"], "removed", REMOVED[group]))
         elif group in KEPT:
             rows.append((meta["title"], "kept", KEPT[group]))
+        elif group in WITH_FIREWALL:
+            rows.append((meta["title"], "undone", WITH_FIREWALL[group]))
         else:
             rows.append((meta["title"], "undone", UNDO[group][0]))
     return rows

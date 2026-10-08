@@ -497,3 +497,7 @@ _db = env.get_template('bind9/data/zone.j2').render(**full, federation_links={},
                                                     zone_records=_zone["dynamic_zone_var"])
 assert re.search(r"^host1\s+A\s+192\.168\.4\.21$", _db, re.M) and "8006" not in _db and "Proxmox" not in _db
 print('landing links from DNS records: only marked ones, https with port and path; the zone file unchanged (D118)')
+_ngx = env.get_template('nginx/nginx.conf.j2').render(**full)
+assert f"server_name {v2['hostname_landing']} {(v2['hostname'] + '.' + v2['domain']).lower()};" in _ngx, \
+    "the landing page also answers at the host's own name"
+print("landing page at the host's own name too (no bare 404 at https://<host>.<domain>)")

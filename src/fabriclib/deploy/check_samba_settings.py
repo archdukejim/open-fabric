@@ -1,12 +1,9 @@
 import re
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.samba.check_password_policy import check_password_policy
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
-# the password policy's keys (D89): every one is the admin's, none has a default
-POLICY_KEYS = {"minimum_length": (0, 64), "history": (0, 24), "minimum_age_days": (0, 998),
-               "maximum_age_days": (0, 999), "lockout_threshold": (0, 999), "lockout_minutes": (0, 99999),
-               "lockout_window_minutes": (0, 99999)}
 _LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")
 _NETBIOS = re.compile(r"^[A-Z0-9][A-Z0-9-]{0,14}$")
 
@@ -19,8 +16,7 @@ def check_samba_settings(v):
     Returns: None.
     Fails:   ValidationError naming the first problem: no or an invalid ad_domain; ad_domain equal to fabric's domain
              (same-domain mode was dropped, D87) or a parent of it; a NetBIOS domain name or host name
-             Windows cannot use (more than 15 characters); a missing, unknown or out-of-range password-policy key;
-             a policy whose minimum age is not below its maximum, or whose lockout is shorter than its window; an
+             Windows cannot use (more than 15 characters); the password policy's (check_password_policy); an
              invalid old-password window or RPC range.
     Feeds:   deploy/check_settings."""
     ad, domain = str(v.get("ad_domain") or ""), str(v.get("domain") or "").lower()
@@ -28,7 +24,8 @@ def check_samba_settings(v):
     if not ad:
         raise ValidationError("ad_domain is required: the directory's AD domain, chosen once (manual 2.1.9.8; "
                               f"suggested: {suggested_ad_domain(domain) or 'ad.<parent of ' + domain + '>'})")
-    if len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253:
+    if (len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253
+            or labels[-1] in ("local", "localhost")):
         raise ValidationError(f"ad_domain {ad!r} is not a valid DNS domain of two labels or more")
     if ad == domain:
         raise ValidationError(f"ad_domain cannot be fabric's own domain ({ad}): the AD zone is always a zone of its "
@@ -42,24 +39,7 @@ def check_samba_settings(v):
         raise ValidationError(f"the host name {v.get('hostname')!r} is the domain controller's NetBIOS name: at "
                               "most 15 letters, digits or hyphens")
     policy = v.get("ad_password_policy") or {}
-    missing = sorted((set(POLICY_KEYS) | {"complexity"}) - set(policy))
-    if missing:
-        raise ValidationError("the password policy is the admin's (D89), with no defaults: ad_password_policy "
-                              f"needs {', '.join(missing)}")
-    unknown = sorted(set(policy) - set(POLICY_KEYS) - {"complexity"})
-    if unknown:
-        raise ValidationError(f"ad_password_policy has unknown keys: {', '.join(unknown)}")
-    if not isinstance(policy["complexity"], bool):
-        raise ValidationError("ad_password_policy.complexity must be true or false")
-    for key, (low, high) in POLICY_KEYS.items():
-        value = policy[key]
-        if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
-            raise ValidationError(f"ad_password_policy.{key} must be a whole number from {low} to {high}")
-    if policy["maximum_age_days"] and policy["minimum_age_days"] >= policy["maximum_age_days"]:
-        raise ValidationError("ad_password_policy.minimum_age_days must be below maximum_age_days")
-    if policy["lockout_minutes"] and policy["lockout_minutes"] < policy["lockout_window_minutes"]:
-        raise ValidationError("ad_password_policy.lockout_minutes (0: until an admin unlocks) must be at least "
-                              "lockout_window_minutes, as AD requires")
+    check_password_policy(policy)
     if not 0 <= int(v.get("ad_old_password_minutes", 0)) <= 99999:
         raise ValidationError("ad_old_password_minutes must be from 0 to 99999")
     m = re.fullmatch(r"(\d+)-(\d+)", str(v.get("ad_rpc_ports") or ""))
