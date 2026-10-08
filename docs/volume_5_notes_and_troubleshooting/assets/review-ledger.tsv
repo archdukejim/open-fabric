@@ -1,9 +1,9 @@
 # path	blob (git hash-object of the reviewed content)	reviewed (UTC date)	note
-.claude/launch.json	d825e04e405e671cdac0ca91a0218281215e42b3	2026-10-07	
+.claude/launch.json	d825e04e405e671cdac0ca91a0218281215e42b3	2026-10-08	
 .gitattributes	f273656c60a04a693192b0bdc27eb5465842e911	2026-09-30	
 .github/workflows/images.yml	1481161542f74c31ea481cfcae222afa9dd08362	2026-10-05	
 .github/workflows/lint.yml	73461f942487bc6108f21bbb420ee97584eac928	2026-10-03	
-.github/workflows/package.yml	de8af32123cd7986d847970de3a2faf802806b58	2026-10-06	
+.github/workflows/package.yml	df34aecd6d9eea5f912bcf1642f6b92ac088e031	2026-10-08	
 .gitignore	e3c8a04befe6886c88daa50ca0a26df4e27679b0	2026-10-04	
 AGENTS.md	8b6138a3c209d4a41bd8c360d4ca1f592a79fa56	2026-10-03	
 CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30	
@@ -160,7 +160,7 @@ docs/volume_4_infrequent_ops/4.3.2-reinstall-uninstall.md	801a8fd65a57c133fc1929
 docs/volume_4_infrequent_ops/4.4.1-subordinate-ca.md	544eecf9d4cee388d64e4b1703d4449fe8e6bdc7	2026-10-03	
 docs/volume_4_infrequent_ops/4.5.1-disk-encryption.md	541cf487a18f1e567e1f7db29a67739e5be4f1c5	2026-10-03	
 docs/volume_4_infrequent_ops/4.6.1-docker-from-ubuntu.md	db4e3ecd50910764f4ec2132a0f96a3681008211	2026-10-03	
-docs/volume_4_infrequent_ops/4.7.1-building-images.md	4fd08d9b43bb62a70beae71f8dd9fd61eefe713a	2026-10-07	
+docs/volume_4_infrequent_ops/4.7.1-building-images.md	a2fa843a6a24adc0e5f06b625ed970aeb0ed4dda	2026-10-08	
 docs/volume_4_infrequent_ops/4.8.1-manual-test-plan.md	710ecda80690014b06e1ffbd8350111d4d7390e9	2026-10-05	
 docs/volume_4_infrequent_ops/4.8.2-automated-tests.md	011d11a97f102beb64bf315d32ceeab669f3c820	2026-10-03	
 docs/volume_4_infrequent_ops/4.9.1-dev-preview.md	8721440c08affc04abe0f2603c5a4ac239b236be	2026-10-03	
