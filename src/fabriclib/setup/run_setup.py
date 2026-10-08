@@ -108,14 +108,15 @@ def main(argv=None):
         planned = planned_vars(ctx) if any(s in NEEDS_INPUT for s in selected) else ctx.vars
         answers = ask_consent(ctx.config_dir, plan_host_changes(planned, ctx.deploy_base, ctx.config_dir,
                                                                 os.path.join(ctx.source_dir, "jinja"), selected),
-                              interactive=not ctx.non_interactive, approve=args.approve, decline=args.decline)
+                              interactive=not ctx.non_interactive, approve=args.approve, decline=args.decline,
+                              stops={"ports"} if ufw_active() else set())
         # ufw already on blocks fabric's containers from the DC on this host unless fabric adds its rules (D119):
         # said now, before any step changes the host, not when Keycloak cannot reach the DC much later
-        if answers.get("firewall") == "no" and "firewall" in selected and ufw_active():
+        if answers.get("ports") == "no" and "firewall" in selected and ufw_active():
             raise SetupError("ufw is on, and without fabric's firewall rules it blocks fabric's own containers from "
                              "this host's domain controller (Keycloak, FreeRADIUS): setup would fail later. fabric "
-                             "only adds its own ports beside your rules: run setup again and allow the host "
-                             "firewall changes (or --approve firewall)")
+                             "only opens its own ports beside your rules: run setup again and allow the ports "
+                             "fabric needs (or --approve ports)")
 
         start = time.monotonic()
         for name, step, desc in STEPS:

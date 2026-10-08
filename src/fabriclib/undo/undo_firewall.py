@@ -2,14 +2,16 @@ import os
 import subprocess
 
 from fabriclib.common.keep_original import ORIGINALS
+from fabriclib.security.host_own_rules import OWN_RULES
 from fabriclib.security.ufw_rule import RECORDS, ufw_rule
 
 UNIT = "/etc/systemd/system/fabric-firewall.service"
 
 
 def undo_firewall(config_dir):
-    """Purpose: undo the `firewall` host change (manual 2.7.1.5): the ufw rules fabric added, its
-             DOCKER-USER rules and their boot unit; ufw switched off again if it was off before fabric. When ufw stays
+    """Purpose: undo the `ports`, `firewall` and `own_rules` host changes (manual 2.7.1.5, D121): the ufw rules
+             fabric added, the host's own rules it removed put back, its DOCKER-USER rules and their boot unit; ufw
+             switched off again if it was off before fabric. When ufw stays
              on (it was on before, or that is not known), fabric's SSH rules stay too: removing them would lock every
              remote admin out of the host.
     Inputs:  config_dir — the install's config folder: the records of what fabric opened (security/ufw_rule RECORDS)
@@ -35,6 +37,13 @@ def undo_firewall(config_dir):
             subprocess.run(["ufw", "delete", "allow", *ufw_rule(kind, x)], capture_output=True)
             done.append(f"ufw: fabric's {kind} rule for {x} removed")
         os.remove(record)
+    own = os.path.join(config_dir, OWN_RULES)          # the host's own rules fabric removed (D121): put back
+    if os.path.exists(own):
+        for rule in open(own).read().splitlines():
+            if rule.startswith("ufw "):
+                subprocess.run(["ufw", *rule.split()[1:]], capture_output=True)
+                done.append(f"ufw: the host's own rule put back: {rule}")
+        os.remove(own)
     if os.path.exists(UNIT):
         subprocess.run(["systemctl", "disable", "--now", "fabric-firewall"], capture_output=True)
         os.remove(UNIT)

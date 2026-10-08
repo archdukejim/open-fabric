@@ -13,3 +13,4 @@
 | `run_security_command.py` | `fabricctl security`: status, raise, lower (the layer's name typed back), Kerberos on or off |
 | `check_signin_lowering.py` | Setup never lowers a sign-in layer of an existing install (a --file that would is refused) |
 | `ufw_active.py` | Whether ufw is on: as before fabric first turned it on (recorded), or now — for the firewall question and a decline with ufw on (D119) |
+| `host_own_rules.py` | The host's own ufw rules: what ufw lists as added, less fabric's (records and planned) |

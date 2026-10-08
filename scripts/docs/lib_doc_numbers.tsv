@@ -116,7 +116,9 @@ file	fabriclib-consent|src/fabriclib/consent/load_consent.py	6
 file	fabriclib-consent|src/fabriclib/consent/plan_accounts.py	7	
 file	fabriclib-consent|src/fabriclib/consent/plan_firewall.py	8	
 file	fabriclib-consent|src/fabriclib/consent/plan_host_changes.py	9	
+file	fabriclib-consent|src/fabriclib/consent/plan_own_rules.py	19	
 file	fabriclib-consent|src/fabriclib/consent/plan_packages.py	10	
+file	fabriclib-consent|src/fabriclib/consent/plan_ports.py	20	
 file	fabriclib-consent|src/fabriclib/consent/plan_resolver.py	11	
 file	fabriclib-consent|src/fabriclib/consent/plan_runtime.py	12	
 file	fabriclib-consent|src/fabriclib/consent/plan_services.py	13	
@@ -451,6 +453,7 @@ file	fabriclib-security|src/fabriclib/security/apply_signin.py	6
 file	fabriclib-security|src/fabriclib/security/check_signin_lowering.py	10	
 file	fabriclib-security|src/fabriclib/security/firewall_rules.py	2	
 file	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py	3	
+file	fabriclib-security|src/fabriclib/security/host_own_rules.py	12	
 file	fabriclib-security|src/fabriclib/security/run_security_command.py	7	
 file	fabriclib-security|src/fabriclib/security/set_signin_layer.py	8	
 file	fabriclib-security|src/fabriclib/security/signin_layers.py	9	
@@ -917,7 +920,9 @@ function	fabriclib-consent|src/fabriclib/consent/plan_accounts.py|_user_uid	3
 function	fabriclib-consent|src/fabriclib/consent/plan_accounts.py|plan_accounts	6	
 function	fabriclib-consent|src/fabriclib/consent/plan_firewall.py|plan_firewall	1	
 function	fabriclib-consent|src/fabriclib/consent/plan_host_changes.py|plan_host_changes	1	
+function	fabriclib-consent|src/fabriclib/consent/plan_own_rules.py|plan_own_rules	1	
 function	fabriclib-consent|src/fabriclib/consent/plan_packages.py|plan_packages	1	
+function	fabriclib-consent|src/fabriclib/consent/plan_ports.py|plan_ports	1	
 function	fabriclib-consent|src/fabriclib/consent/plan_resolver.py|plan_resolver	1	
 function	fabriclib-consent|src/fabriclib/consent/plan_runtime.py|plan_runtime	1	
 function	fabriclib-consent|src/fabriclib/consent/plan_services.py|plan_services	1	
@@ -1343,6 +1348,7 @@ function	fabriclib-security|src/fabriclib/security/apply_signin.py|apply_signin	
 function	fabriclib-security|src/fabriclib/security/check_signin_lowering.py|check_signin_lowering	1	
 function	fabriclib-security|src/fabriclib/security/firewall_rules.py|firewall_rules	1	
 function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|hardened_daemon_settings	1	
+function	fabriclib-security|src/fabriclib/security/host_own_rules.py|host_own_rules	1	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_actor	2	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_confirm	3	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_lowered	1	0.6.0 / 2026-10-07

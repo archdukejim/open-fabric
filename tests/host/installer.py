@@ -70,7 +70,7 @@ def drive(answers, consent, log):
     pid, fd = pty.fork()
     if pid == 0:
         os.execvp("ssh", ["ssh", "-tt", "-o", "BatchMode=yes", "-i", KEY, TARGET, "sudo fabricctl setup"])
-    screen, transcript, asked, last = "", "", [], time.time()
+    screen, transcript, asked, last, last_title = "", "", [], time.time(), ""
     with open(log, "w") as out:
         while True:
             r, _, _ = select.select([fd], [], [], 1)
@@ -92,7 +92,9 @@ def drive(answers, consent, log):
                         if name == "consent":
                             title = re.findall(r"\n  (\S[^\n(]*?) \((?:required|recommended|optional|choice)",
                                                re.sub(r"\x1b\[[0-9;]*m", "", screen))
-                            answer = consent(title[-1].strip() if title else "")
+                            if title:
+                                last_title = title[-1].strip()      # a question asked again shows no title
+                            answer = consent(last_title)
                         else:
                             queue = answers.get(name, [])
                             answer = queue.pop(0) if queue else ""
@@ -148,7 +150,7 @@ def decline_firewall(title):
     consent_seen.append(title)
     if len(consent_seen) == 1:
         return "maybe"                 # not y or n: asked again
-    return "n" if title == "Host firewall" else "y"
+    return "n" if title == "Ports fabric needs" else "y"
 
 
 code, text, asked = drive(bad, decline_firewall, f"{OUT}/run1.log")
@@ -179,9 +181,11 @@ check("a consent question asked again after an answer that is not y or n",
       len(consent_seen) >= 2 and consent_seen[0] == consent_seen[1], consent_seen[:3])
 check("the Enter defaults: the suggested AD domain ad.<domain> and the host name it found",
       f"ad.{DOMAIN}" in text and guess_host in text, guess_host)
-check("declining the host firewall with ufw on stops setup before any step, saying why (D119)",
+check("declining the ports fabric needs with ufw on stops setup before any step, saying why (D119, D121)",
       code != 0 and "ufw is on, and without fabric's firewall rules it blocks" in text and "[preflight]" not in text,
       (code, text[-800:]))
+check("…and securing and the host's own rules were not asked (they need the ports)",
+      "Secure this host" not in consent_seen and "The host's own firewall rules" not in consent_seen, consent_seen)
 check("…and nothing was started or changed: no containers, ufw's rules as they were",
       R("docker ps -q | wc -l").strip() == "0"
       and R("ufw status | grep -iE 'ALLOW|DENY' | grep -v '(v6)'") == own_rules)
@@ -192,7 +196,18 @@ good = {
     "min_age": ["0"], "max_age": ["0"], "threshold": ["5"], "window": ["15"], "lock": ["30"], "complexity": ["y"],
     "plan": ["p"],
 }
-code, text, asked = drive(good, lambda title: "y", f"{OUT}/run2.log")
+seen2 = []
+
+
+def keep_own(title):
+    seen2.append(title)
+    return "n" if title == "The host's own firewall rules" else "y"
+
+
+code, text, asked = drive(good, keep_own, f"{OUT}/run2.log")
+check("the three firewall questions, in order: the ports, securing, then the host's own rules (they exist here)",
+      [t for t in seen2 if t in ("Ports fabric needs", "Secure this host", "The host's own firewall rules")]
+      == ["Ports fabric needs", "Secure this host", "The host's own firewall rules"], seen2)
 check("with everything allowed, setup finishes (fabric is ready)", code == 0 and "fabric is ready" in text,
       (code, text[-1500:]))
 doctor = R("fabricctl doctor 2>&1")
@@ -206,7 +221,24 @@ landing = R(f"curl -s --resolve {guess_host}.{DOMAIN}:443:{HOST_IP} https://{gue
 check("the landing page at the host's own name, trusted (not a bare 404)", "Fabric Landing Portal" in landing,
       landing[:300])
 after = R("ufw status | grep -iE 'ALLOW|DENY' | grep -v '(v6)'")
-check("the host's own ufw rules kept beside fabric's", all(line in after for line in own_rules.splitlines()),
+check("the host's own ufw rules kept beside fabric's (answered no)", all(line in after for line in own_rules.splitlines()),
       after)
+check("secured: ufw on, incoming denied by default", "Default: deny (incoming)" in R("ufw status verbose"))
+
+# ---- the host's own rules removed (yes), then put back by undoing the firewall
+own_added = [ln for ln in R("ufw show added").splitlines() if ln.startswith("ufw ")]
+R("fabricctl setup --step firewall --non-interactive --approve own_rules >/tmp/own-rules.log 2>&1")
+added = [ln for ln in R("ufw show added").splitlines() if ln.startswith("ufw ")]
+check("own rules removed (yes): only fabric's ports and SSH left, the 9090 and OpenSSH rules gone",
+      len(added) < len(own_added) and not any("9090" in ln or "OpenSSH" in ln for ln in added), added)
+check("…and SSH still works (fabric's SSH rule from the LAN)", R("echo ok").strip() == "ok")
+R("fabricctl setup --undo firewall --yes >/tmp/undo-firewall.log 2>&1")
+back = [ln for ln in R("ufw show added").splitlines() if ln.startswith("ufw ")]
+check("undoing the firewall puts the host's own rules back", any("9090" in ln for ln in back)
+      and any("OpenSSH" in ln for ln in back), back)
+R("fabricctl setup --step firewall --non-interactive --approve ports,firewall --decline own_rules >/dev/null 2>&1")
+check("the firewall set up again for the person to use (own rules kept)",
+      "Default: deny (incoming)" in R("ufw status verbose") and any("9090" in ln for ln in
+                                                                    R("ufw show added").splitlines()))
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
