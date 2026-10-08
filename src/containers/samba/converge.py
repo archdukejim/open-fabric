@@ -1,4 +1,4 @@
-"""Converge fabric's Samba AD domain to what fabric wants (manual 2.11.2.15, S1.3), inside the DC, as root, on its own
+"""Converge fabric's Samba AD domain to what fabric wants (manual 1.6.5.15, S1.3), inside the DC, as root, on its own
 database: no credentials, no network. Run after every start and apply by fabriclib/samba/converge_domain:
     docker exec -i samba python3 /fabric/converge.py < state.json
 The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [site_networks
@@ -26,6 +26,7 @@ from ensure_sso_account import ensure_sso_account
 from ensure_sudo_rule import ensure_sudo_rule
 from logon_rights_policy import BUILTIN_ADMINISTRATORS, EXTENSIONS as LOGON_EXTENSIONS, logon_rights_policy
 from open_samdb import open_samdb
+from remove_ipv6_records import remove_ipv6_records
 from root_ca_policy import EXTENSIONS as TRUST_EXTENSIONS, root_ca_policy
 from set_password_policy import set_password_policy
 from share_winbind import share_winbind
@@ -38,7 +39,8 @@ CONF = "/data/etc/smb.conf"
 
 def converge(state):
     """Purpose: every part of the domain fabric owns, in order: the schema, the layout, the site's id block, the
-             groups, the site's service accounts, its access entries, its networks (the address plan), its default
+             groups, the site's service accounts, the AD zones on IPv4 only (2.1.6.29), its access entries, its networks
+             (the address plan), its default
              sudo rule, the AD site and its subnets, the password policy, the domain's trust GPO (fabric's root CA),
              the site's log-on GPO, its Windows baseline GPO and winbind's privileged pipe for FreeRADIUS. Each part
              changes only what differs, so a second run changes nothing.
@@ -68,14 +70,15 @@ def converge(state):
     changed += ensure_groups(samdb, site, root, state["groups"])
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
     changed += ensure_sso_account(samdb, lp, CONF, site, state.get("sso_spns") or [])
+    changed += remove_ipv6_records(samdb)            # IPv4 only (2.1.6.29)
     changed += ensure_site_acl(samdb, site, root)
     changed += ensure_networks(samdb, site, state["networks"])
     changed += ensure_sudo_rule(samdb, site, state["admin_group"], root)
     changed += ensure_ad_site(samdb, site, [n["cidr"] for n in state["networks"]])
-    if state.get("parent"):               # a site: its AD site linked to its parent's (manual 1.8.8.5)
+    if state.get("parent"):               # a site: its AD site linked to its parent's (manual 1.9.8.5)
         changed += ensure_site_link(samdb, site, state["parent"])
     base, site_dn = str(samdb.domain_dn()), paths.site_dn(samdb, site)
-    if root:                              # the domain's own settings are the root's (manual 1.8.8.3)
+    if root:                              # the domain's own settings are the root's (manual 1.9.8.3)
         changed += [f"password policy: {a}" for a in set_password_policy(samdb, state["password_policy"])]
         changed += ensure_gpo(samdb, lp, "fabric: trust in fabric's root CA", base, TRUST_EXTENSIONS,
                               {"Machine/Registry.pol": root_ca_policy(state["root_ca_pem"])})
@@ -83,7 +86,7 @@ def converge(state):
         changed += share_winbind(lp, int(state["radius_gid"]))
         return changed
     # a machine's own local Administrators keep log-on too: the policy replaces Windows' local lists, and its owners
-    # must never be locked out of it; the roles of this site and of every site above it log on to administer (D103)
+    # must never be locked out of it; the roles of this site and of every site above it log on to administer (2.1.9.13)
     owners = [site] + paths.ancestors(samdb, site)
     names = [f"{site}-users", f"{site}-admins", state["admin_group"], "fabric-break-glass"]
     names += [role_group(o, r) for o in owners for r in ("linux-sudo", "windows-admins")]
@@ -96,7 +99,7 @@ def converge(state):
     extensions, files = windows_baseline_policy(state.get("lan_profile") or "", state.get("sso_host") or "")
     changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", site_dn, extensions,
                           files)
-    if state.get("join_account"):         # at the root, preparing a new site's DC join (manual 1.8.8.4)
+    if state.get("join_account"):         # at the root, preparing a new site's DC join (manual 1.9.8.4)
         changed += ensure_join_account(samdb, state["join_account"]["name"], state["join_account"]["password"])
     changed += share_winbind(lp, int(state["radius_gid"]))
     return changed

@@ -15,7 +15,7 @@ def _q(s):
 
 def ensure_adguard_client(kc, realm, v, secret, role_reps, flow_id):
     """Purpose: Converge the Keycloak OIDC client (fabric-adguard) that oauth2-proxy signs people into AdGuard
-             Home's UI with (manual 2.4.1.6).
+             Home's UI with (manual 1.12.1.6).
     Inputs:  kc — admin_client.Admin client; realm — realm name; v — fabric vars: hostname_adguard;
              secret — the client secret (adguard_oidc_secret); role_reps — role representations for the
              client's scope (every fabric role); flow_id — id of the browser flow to bind (the admin sign-in flow).

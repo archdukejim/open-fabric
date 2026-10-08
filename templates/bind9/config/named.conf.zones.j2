@@ -9,7 +9,7 @@ zone "{{ zone_name }}" {
     file "/var/lib/bind/db.{{ zone_name }}";
     allow-query { {% for acl_name in bind_acls.keys() %}"{{ acl_name }}"; {% endfor %}};
 {% if zone_name == domain and peers %}
-    // Federation: the sites next to this one keep a secondary copy (TSIG-signed transfers, manual 1.8 M4)
+    // Federation: the sites next to this one keep a secondary copy (TSIG-signed transfers, manual 1.9 M4)
     allow-transfer { {% for link in peers %}key "{{ link.key }}"; {% endfor %}};
     notify explicit;
     also-notify { {% for link in peers %}{{ link.address }} port {{ link.port | default(53) }} key "{{ link.key }}"; {% endfor %}};
@@ -65,7 +65,7 @@ zone "{{ zone_name }}" {
 {% if install_kea | default(false) and (dhcp | default({})).ddns | default(true) %}
 {% set ddns_zone = ((dhcp | default({})).ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
 // DHCP-registered hosts: created once, then only Kea's DDNS writes here (BIND's
-// journal); fabric never rewrites this file (design D16).
+// journal); fabric never rewrites this file (design 2.1.4.1).
 zone "{{ ddns_zone }}" {
     type master;
     file "/var/lib/bind/db.{{ ddns_zone }}";

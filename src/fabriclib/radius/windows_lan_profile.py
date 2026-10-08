@@ -40,7 +40,7 @@ _TLS = """<Config xmlns="http://www.microsoft.com/provisioning/EapHostConfig">
           </Eap>
         </Config>"""
 # PEAP-MSCHAPv2 (type 25, inner 26): the machine's own domain account before anyone signs in, then the person's
-# Windows sign-in (UseWinLogonCredentials), checked by the domain through FreeRADIUS (manual 2.11.2.17)
+# Windows sign-in (UseWinLogonCredentials), checked by the domain through FreeRADIUS (manual 1.6.5.17)
 _PEAP = """<Config xmlns="http://www.microsoft.com/provisioning/EapHostConfig">
           <Eap xmlns="http://www.microsoft.com/provisioning/BaseEapConnectionPropertiesV1">
             <Type>25</Type>

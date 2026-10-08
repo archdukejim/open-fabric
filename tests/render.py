@@ -135,7 +135,7 @@ same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
 
-# Federation (manual 1.8): the endpoint's vhost, socket mount, CNAME and unit only when it is
+# Federation (manual 1.9): the endpoint's vhost, socket mount, CNAME and unit only when it is
 # on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.
 assert v2['federation_endpoint'] is False and v2['org_domain'] == v2['domain'], (v2['federation_endpoint'], v2['org_domain'])
 assert v2['hostname_federation'] == 'federation.lan.j-j.family', v2['hostname_federation']
@@ -159,7 +159,7 @@ for base in ('dc=lan', 'o=acme,dc=lan'):
     chosen = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'ldap_base_dn': base}))
     assert chosen['ldap_base_dn'] == base, chosen['ldap_base_dn']
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
-# DNS links (manual 1.8 M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
+# DNS links (manual 1.9 M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
 plain = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
 assert 'type secondary' not in plain and 'also-notify' not in plain, 'no federation links: no secondaries, no notify'
 links = {'children': [{'site': 'lab', 'key': 'fed-lab', 'algorithm': 'hmac-sha256', 'secret': 'c2VjcmV0', 'delegate': True,
@@ -175,7 +175,7 @@ db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=link
                                                    zone_records=v2['dns']['dynamic_zone_var'])
 assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
-# DNS filter (manual 2.4.1): on by default (D112) -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
+# DNS filter (manual 1.12.1): on by default (2.1.12.1) -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
 # the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
 assert v2['dns_filter'] == user.get('dns_filter', 'adguard') and v2['install_adguard'] is (v2['dns_filter'] == 'adguard')
 off = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none',
@@ -183,7 +183,7 @@ off = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(
 assert off['install_adguard'] is False and off['bind_dns_port'] == 53, 'with the filter off the port is what vars say (53)'
 dflt = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{k: w for k, w in copy.deepcopy(PRISTINE).items()
                                                                  if not k.startswith(('dns_filter', 'adguard_'))}))
-assert dflt['install_adguard'] is True and dflt['adguard_upstreams'] == ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query'],     'on by default with Cloudflare (D112)'
+assert dflt['install_adguard'] is True and dflt['adguard_upstreams'] == ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query'],     'on by default with Cloudflare (2.1.12.1)'
 assert [f['name'] for f in dflt['adguard_filter_lists']] == ['AdGuard DNS filter'], dflt['adguard_filter_lists']
 adg = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'AdGuard',
                                                                  'bind_dns_port': 53}))
@@ -205,7 +205,7 @@ _o2p = env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg)
 assert not [ln for ln in _o2p.splitlines() if ln.strip().startswith(('client_secret', 'cookie_secret'))], \
     'oauth2-proxy secrets only via secrets.env'
 print('DNS filter: off by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
-# time (manual 2.5.1): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
+# time (manual 1.13.1): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
 assert v2['ntp_serve'] is True and v2['ntp_set_clock'] is True and all(x.endswith(' nts') for x in v2['ntp_servers'])
 assert 'ntp' in [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']]
 own = copy.deepcopy(PRISTINE)
@@ -215,7 +215,7 @@ assert 'ntp' not in [r['name'] for r in own_v['dns']['dynamic_zone_var'].get('CN
 assert yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'ntp_servers': []}))['ntp_servers'] == []
 assert 'time-sync.target' in env.get_template('systemd/wrapper.service.j2').render(**{**v2, 'item': {'service': 'x', 'folder': 'x', 'compose': 'x'}})
 print('time: served with NTS sources by default, ntp.<domain>, units after time-sync.target, Kea option 42')
-# Every image is pinned by digest (design D21): the vars defaults are the lock's refs,
+# Every image is pinned by digest (design 2.1.14.3): the vars defaults are the lock's refs,
 # no compose file or Dockerfile names an image any other way.
 import re  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
@@ -225,7 +225,7 @@ for e in lock.values():
     assert v2[e['var']] == e['ref'], f"{e['var']} default is not the lock's ref: {v2[e['var']]}"
 for key, val in v2.items():
     if key.startswith('image_') and isinstance(val, str):
-        # image_fabric_*: "" until the lock pins fabric's published image (manual 2.6.3)
+        # image_fabric_*: "" until the lock pins fabric's published image (manual 1.14.3)
         assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local') or \
             (key.startswith('image_fabric_') and val == ''), f'{key} not pinned: {val}'
 for svc in ('nginx', 'bind9', 'stepca', 'samba', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
@@ -241,7 +241,7 @@ for df in glob.glob(os.path.join(REPO, 'packaging', 'images', '*', 'Dockerfile')
         f'{df}: FROM must be the pinned ${{BASE_IMAGE}}'
 print('every image pinned by digest (lock, vars defaults, compose files, Dockerfiles)')
 
-# Fluent Bit (optional log forwarding, D20): verified TLS to every destination, no credential in the file
+# Fluent Bit (optional log forwarding, 2.1.15.1): verified TLS to every destination, no credential in the file
 fb_vars = {**v2, "hostname": "pi-core", "log_forwarding": {"syslog": {"host": "siem.lan", "port": 6514},
                                                           "elastic": {"url": "https://es.lan:9200", "user": "fabric"}}}
 fb = yaml.safe_load(env.get_template('fluentbit/fluent-bit.yaml.j2').render(**fb_vars))
@@ -261,7 +261,7 @@ print('Fluent Bit: verified TLS to syslog and Elasticsearch, password from the e
 hcl = env.get_template('openbao/openbao.hcl.j2').render(**{**secrets, **v2})
 assert 'audit "file" "file" {\n  description = "fabric: every request"\n  options {\n    file_path = "/openbao/logs/audit.log"\n  }\n}' in hcl, 'the original audit device changed'
 print('OpenBao audit devices: the original one unchanged')
-# Kea (optional DHCP, design §5 / D16): configs, the DHCP subzone, the key's rights, input checks
+# Kea (optional DHCP, design §5 / 2.1.4.1): configs, the DHCP subzone, the key's rights, input checks
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 kv = {**v2, "install_kea": True, "kea_ddns_secret": "a2VhLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmchIQ==",
@@ -282,7 +282,7 @@ sn = k4["subnet4"][0]
 assert sn["pools"] == [{"pool": "192.168.7.100 - 192.168.7.199"}] and sn["reservations"][0]["ip-address"] == "192.168.7.20"
 assert k4["ddns-qualifying-suffix"] == "dhcp.lan.j-j.family." and k4["ddns-conflict-resolution-mode"] == "check-with-dhcid"
 assert k4["control-socket"]["socket-name"].startswith("/var/run/kea/") and k4["interfaces-config"]["interfaces"] == ["eth0"]
-# time (manual 2.5.1): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
+# time (manual 1.13.1): Kea hands out this host's chrony (option 42) unless dhcp.ntp says otherwise
 assert {"name": "ntp-servers", "data": kv["host_ip"]} in k4["option-data"], k4["option-data"]
 kv["dhcp"] = {**kv["dhcp"], "ntp": ["192.168.7.2", "192.168.7.3"]}
 assert {"name": "ntp-servers", "data": "192.168.7.2, 192.168.7.3"} in kea_json("kea-dhcp4.conf")["Dhcp4"]["option-data"]
@@ -322,7 +322,7 @@ for bad, msg in ((lambda d: d["subnets"][0].update(pools=["192.168.8.1 - 192.168
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]
 assert kc["kea-dhcp4"]["cap_add"] == ["NET_RAW", "NET_BIND_SERVICE"] and kc["kea-dhcp4"]["network_mode"] == "host"
 assert kc["kea-ddns"]["user"] == "609:609" and not kc["kea-ddns"].get("cap_add")
-if "build" in kc["kea-dhcp4"]:      # built here; a host on fabric's published Kea image pulls it (manual 2.6.3)
+if "build" in kc["kea-dhcp4"]:      # built here; a host on fabric's published Kea image pulls it (manual 1.14.3)
     assert kc["kea-dhcp4"]["build"]["args"]["KEA_KEY_FINGERPRINT"] == "9DA570BB192211885E4EB280B16C44CD45514C3C"
 else:
     assert "@sha256:" in kc["kea-dhcp4"]["image"] and kc["kea-ddns"]["image"] == kc["kea-dhcp4"]["image"]
@@ -451,7 +451,7 @@ assert [parse_value(t) for t in ("", "null", "''", "TRUE", "false", "42", "4.2",
     [None, None, None, True, False, 42, "4.2", "eth0"]
 print('vars editor: typed values parsed (null, booleans, integers, text)')
 
-# sign-in (manual 5.8.2.6): the web console asks for a client certificate only with webui_client_cert (D108: off by
+# sign-in (manual 2.3.6.2.6): the web console asks for a client certificate only with webui_client_cert (2.1.8.2: off by
 # default); webui.json tells the web app; the first admin's README follows both
 from fabriclib.setup.create_admin import _readme  # noqa: E402
 ngx_off = env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_webui': True})
@@ -468,7 +468,7 @@ assert '.p12' not in off_txt and 'p12-password' not in off_txt and '\n3. Your co
 assert 'jim.p12' in on_txt and '\n3. Import jim.p12' in on_txt and 'authenticator app (TOTP)' in on_txt
 print('sign-in: no client certificate by default (nginx, webui.json, the admin kit); with it, mutual TLS and the .p12')
 
-# landing-page links from DNS records (manual 2.1.8.2, D118): only marked A/AAAA/CNAME records, https with port and
+# landing-page links from DNS records (manual 1.4.2.2, 2.1.4.2): only marked A/AAAA/CNAME records, https with port and
 # path, never a wildcard; the zone file is unchanged by the mark; the validator refuses what could break the page
 from fabriclib.dns.validate_record import validate_record  # noqa: E402
 _host1 = validate_record("A", {"name": "host1", "ip": "192.168.4.21", "link": "on", "link_label": "Proxmox host1",
@@ -496,4 +496,8 @@ assert _landing.index("This network") < _landing.index(f'nas.{v2["domain"]}') < 
 _db = env.get_template('bind9/data/zone.j2').render(**full, federation_links={}, zone_name=v2['domain'],
                                                     zone_records=_zone["dynamic_zone_var"])
 assert re.search(r"^host1\s+A\s+192\.168\.4\.21$", _db, re.M) and "8006" not in _db and "Proxmox" not in _db
-print('landing links from DNS records: only marked ones, https with port and path; the zone file unchanged (D118)')
+print('landing links from DNS records: only marked ones, https with port and path; the zone file unchanged (2.1.4.2)')
+_ngx = env.get_template('nginx/nginx.conf.j2').render(**full)
+assert f"server_name {v2['hostname_landing']} {(v2['hostname'] + '.' + v2['domain']).lower()};" in _ngx, \
+    "the landing page also answers at the host's own name"
+print("landing page at the host's own name too (no bare 404 at https://<host>.<domain>)")

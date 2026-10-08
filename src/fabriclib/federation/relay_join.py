@@ -10,7 +10,7 @@ PREFIX = "the upstream refused: "
 def relay_join(v, req, client_ip=""):
     """Purpose: on a relay node (a site named in an invitation's --via): pass a join on to this site's upstream —
              the root, over TLS verified against the organisation's root — and hand its answer back unchanged
-             (manual 1.8.5.1). The node signs nothing and decides nothing.
+             (manual 1.9.5.1). The node signs nothing and decides nothing.
     Inputs:  v — fabric vars: site_name, deploy_base_dir (the root certificate); req — the join request; it must
              name this site in "via"; client_ip — str for the audit.
     Returns: the upstream's answer (dict), as accept_join returned it there.

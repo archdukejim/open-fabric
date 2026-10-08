@@ -4,7 +4,7 @@ LIMIT = 200          # a search shows at most this many policies (Microsoft's te
 
 
 def gpo_overview(v, match="", container="samba"):
-    """Purpose: what the Directory tab's Group Policy section shows (manual 2.11.2.21 S7.4, 3.15.4): the templates in
+    """Purpose: what the Directory tab's Group Policy section shows (manual 1.6.5.21 S7.4, 4.6.8): the templates in
              the central store, what this site's admin settings and controls GPOs set, and — when searched — the
              matching policies.
     Inputs:  v — fabric vars (site_name); match — text to search policy names and titles for ("" lists none);

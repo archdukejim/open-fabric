@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Build fabric's signed apt repository (manual 1.4.1.1, D7) with reprepro:
+# Build fabric's signed apt repository (manual 1.3.1.1, 2.1.1.2) with reprepro:
 # suite `stable` from the released packages, suite `testing` from a release
 # candidate's, signed with the repository key. Only the published tree is
 # written to <out>: dists/, pool/ and public.key (reprepro's conf/ and db/

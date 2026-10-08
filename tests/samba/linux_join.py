@@ -1,8 +1,8 @@
-"""The `samba` suite, Linux machines joining AD (manual 2.10.2, 2.11.2.19, S6): real Ubuntu 24.04 and 26.04
+"""The `samba` suite, Linux machines joining AD (manual 1.6.7, 1.6.5.19, S6): real Ubuntu 24.04 and 26.04
 containers run fabric's join-linux.sh as rendered against a converged test DC. Proves: the installer refuses a wrong
 root-CA fingerprint and changes nothing; a join with a site admin's password and one with a one-time join password
 (`fabricctl domain add-machine`); `id` with fabric's own ids; a password logon through PAM and a Kerberos ticket;
-sudo for a site admin (D103's rule) and none for a person; a person of another site refused by the site's log-on
+sudo for a site admin (2.1.9.13's rule) and none for a person; a person of another site refused by the site's log-on
 GPO; cached logons with the DC stopped. The containers have no systemd: a stand-in `systemctl` starts sssd.
     sudo python3 tests/samba/linux_join.py
 """
@@ -65,7 +65,7 @@ check("a converged DC (its site's sudo rule included)", dc_healthy())
 sudo_rule = sh(["docker", "exec", DC, "ldbsearch", "-H", "/data/private/sam.ldb", "(objectClass=sudoRole)",
                 "sudoUser", "sudoHost", "sudoCommand"], ok=False).stdout
 check("the site's sudo rule: its linux-sudo role (lan-admins is in it) and, at the root, the admin group may run "
-      "anything (D103)", "sudoUser: %lan-linux-sudo" in sudo_rule and "sudoUser: %admins" in sudo_rule
+      "anything (2.1.9.13)", "sudoUser: %lan-linux-sudo" in sudo_rule and "sudoUser: %admins" in sudo_rule
       and "sudoCommand: ALL" in sudo_rule and "%lan-admins" not in sudo_rule, sudo_rule)
 
 # people: alice (a person of lan), adam (a lan admin), lara (a person of another site, lab)
@@ -101,7 +101,7 @@ with open(os.path.join(W, "www", "root-ca.crt"), "w") as f:
 sh(["docker", "run", "-d", "--name", WEB, "--network", NET, "--ip", WEB_IP, "-v", f"{W}/www:/srv:ro",
     "--entrypoint", "python3", "fabric/samba:test", "-m", "http.server", "80", "--directory", "/srv"])
 fp = sh(["openssl", "x509", "-in", dc["root_ca"], "-noout", "-fingerprint", "-sha256"]).stdout.strip().split("=")[1]
-# as on a site with Keycloak (Kerberos sign-in on): the join also sets the browsers' policies (D117)
+# as on a site with Keycloak (Kerberos sign-in on): the join also sets the browsers' policies (2.1.6.28)
 script = dc["env"].get_template("nginx/www/certs/join-linux.sh.j2").render(**{**V, "install_keycloak": True})
 with open(os.path.join(W, "join-linux.sh"), "w") as f:
     f.write(script)
@@ -151,7 +151,7 @@ def checks(box, release):
     code, out = on(box, "cat /etc/firefox/policies/policies.json /etc/chromium/policies/managed/fabric-sso.json "
                         f"/etc/opt/chrome/policies/managed/fabric-sso.json; grep -c '.{V['domain']} = ' /etc/krb5.conf")
     check(f"{release}: browsers may use Kerberos for {V['hostname_keycloak']} (Firefox, Chromium, Chrome); fabric's "
-          "domain maps to the AD realm (D117)", code == 0 and out.count(V["hostname_keycloak"]) == 3
+          "domain maps to the AD realm (2.1.6.28)", code == 0 and out.count(V["hostname_keycloak"]) == 3
           and '"SPNEGO"' in out, out)
     code, out = on(box, "id -u alice; id -u adam")
     check(f"{release}: id gives fabric's own ids (from the site's block, not id mapping)",

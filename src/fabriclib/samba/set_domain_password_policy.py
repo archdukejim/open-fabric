@@ -6,7 +6,7 @@ from fabriclib.deploy.check_samba_settings import check_samba_settings
 
 
 def set_domain_password_policy(actor, changes, source="cli"):
-    """Purpose: change the domain's password policy (D89: the admin's; manual 1.6.3.8). The whole policy is checked
+    """Purpose: change the domain's password policy (2.1.6.13: the admin's; manual 1.6.3.8). The whole policy is checked
              again; the next apply writes it into the domain.
     Inputs:  actor — str, who asks (audit); changes — dict of policy keys to new values (minimum_length, complexity,
              history, minimum_age_days, maximum_age_days, lockout_threshold, lockout_minutes, lockout_window_minutes);

@@ -1,11 +1,11 @@
-# Tool configuration only: fabric is not packaged as a Python project (its package is the .deb, manual 1.4.1).
+# Tool configuration only: fabric is not packaged as a Python project (its package is the .deb, manual 1.3.1).
 
 [tool.ruff]
 line-length = 120
 target-version = "py310"
 
 [tool.ruff.lint]
-# pycodestyle errors and warnings, pyflakes (decision D34, manual 4.8.2)
+# pycodestyle errors and warnings, pyflakes (decision 2.1.1.15, manual 3.1.2)
 select = ["E", "F", "W"]
 
 [tool.ruff.lint.per-file-ignores]

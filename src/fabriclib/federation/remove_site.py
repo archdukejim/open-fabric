@@ -9,7 +9,7 @@ from fabriclib.secrets.save_secrets import save_secrets
 
 def remove_site(actor, site, source="cli", v=None):
     """Purpose: on a site's parent (the root, or the site it is nested under): forget a site that joined here —
-             a disposable lab torn down, or one moved elsewhere (manual 1.8.5.1).
+             a disposable lab torn down, or one moved elsewhere (manual 1.9.5.1).
     Inputs:  actor — str (audit); site — its name; source — default "cli"; v — fabric vars for OpenBao
              (default: read from vars.yaml).
     Returns: the removed record (dict); its DNS link key (federation_tsig[site]) is deleted too (and an older

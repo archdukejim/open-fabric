@@ -5,7 +5,7 @@ NAMES = {"bind": "fabric-dns", "nginx": "fabric-proxy", "step": "fabric-ca",
 
 
 def service_account_name(key, ids):
-    """Purpose: the host account name of one service_users entry (manual 2.7.1.6): fabric-* names,
+    """Purpose: the host account name of one service_users entry (manual 1.2.9.6): fabric-* names,
              so no Ubuntu package ever claims or questions them.
     Inputs:  key — the service_users key (e.g. "bind"); ids — its entry ({uid, gid[, name]}).
     Returns: ids["name"] when set, else NAMES[key], else "fabric-<key>".

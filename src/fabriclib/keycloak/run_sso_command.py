@@ -14,7 +14,7 @@ from fabriclib.secrets.load_secrets import load_secrets
 
 def run_sso_command(argv):
     """Purpose: `fabricctl sso add | list | remove` — apps (Proxmox VE, TrueNAS, …) signing people in through this
-             site's Keycloak (manual 3.8.2): only routes to the keycloak/ units and prints.
+             site's Keycloak (manual 4.6.2): only routes to the keycloak/ units and prints.
     Inputs:  argv — list of str after "sso". add: name, --redirect URL (repeatable).
     Returns: exit status: 0 done; 1 refused ("error: …" on stderr).
     Fails:   SystemExit 2 from argparse on bad arguments; SystemExit from the Keycloak admin client (Keycloak down,

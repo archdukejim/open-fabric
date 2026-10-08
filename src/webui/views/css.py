@@ -1,7 +1,7 @@
 import os
 
 _PACKAGE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# static/ beside the package on a host (lib/webui/static); a checkout keeps it in static/webui-app (manual 1.3.2)
+# static/ beside the package on a host (lib/webui/static); a checkout keeps it in static/webui-app (manual 1.2.2)
 CSS_FILE = next((p for p in (os.path.join(_PACKAGE, "static", "app.css"),
                              os.path.join(_PACKAGE, "..", "..", "static", "webui-app",
                                           "app.css")) if os.path.exists(p)),

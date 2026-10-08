@@ -7,7 +7,7 @@ from webui.security.verified_client_cert import verified_client_cert
 
 
 def security_post(h, sess, parts, form):
-    """Purpose: the Security page's changes (manual 5.8.2.6.4): raise a sign-in layer, or turn Kerberos sign-in on or
+    """Purpose: the Security page's changes (manual 2.3.6.2.6.4): raise a sign-in layer, or turn Kerberos sign-in on or
              off — each one fabric-agent call after a recent sign-in. Turning the client certificate on needs this
              browser to present the signed-in person's own certificate first, so the change never locks them out.
     Inputs:  h — the request handler (redirect, deny, headers, app); sess — dict from find_session (user, auth_at);

@@ -1,4 +1,4 @@
-# The validated container images fabric runs (manual 2.6.2).
+# The validated container images fabric runs (manual 1.14.2).
 #
 # Every image is pinned by its multi-arch index digest (amd64 + arm64): an
 # upstream push never changes what a host runs. vars.yaml.j2 takes its
@@ -67,7 +67,7 @@ images:
     digest: sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
     track: "v7.15.*"
     policy: auto
-  cosign:                            # verifies the signatures of fabric's published images (D81, D86)
+  cosign:                            # verifies the signatures of fabric's published images (2.1.14.6, 2.1.14.11)
     var: image_cosign
     repo: ghcr.io/sigstore/cosign/cosign
     tag: "v3.0.6"
@@ -83,29 +83,29 @@ images:
     track: trixie-slim
     policy: auto
 
-# fabric's own images, built and smoke tested in CI, signed and published (manual 2.6.3, 4.7.1; D41).
+# fabric's own images, built and smoke tested in CI, signed and published (manual 1.14.3, 3.14.1; 2.1.1.21).
 # An empty digest: not published yet, and hosts build that image themselves; it needs `pending` (why),
 # which pin_published drops when it pins the image (the images suite refuses an unexplained gap). `ids` are the service
 # account ids baked into the published image (the Dockerfile's defaults): a host whose
-# service_users.<account> differ builds that image itself (D80).
+# service_users.<account> differ builds that image itself (2.1.14.5).
 published:
   registry: ghcr.io/archdukejim/open-fabric
-  # who may have signed them: this repository's images workflow, from main, an rc/ branch or a v tag (D84)
+  # who may have signed them: this repository's images workflow, from main, an rc/ branch or a v tag (2.1.14.9)
   signer: ^https://github\.com/archdukejim/open-fabric/\.github/workflows/images\.yml@refs/(heads/main|heads/rc/.+|tags/v.+)$
   issuer: https://token.actions.githubusercontent.com
   images:
-    adguard:    {var: image_fabric_adguard, tag: "0.6.1-rc.40", digest: "sha256:dc1963b0e18310bd93fd06a37701312b1ceaa0e774f410493409ffc2f4aee173"}
-    bind9:      {var: image_fabric_bind9, tag: "0.6.1-rc.40", digest: "sha256:8b769f48fd0460597d1ffe2fe316ba28a977d3b3b7c0b5185b1144def314e6ce", account: bind, ids: "600:600"}
-    freeradius: {var: image_fabric_freeradius, tag: "0.6.1-rc.40", digest: "sha256:7fc9a06dbc6f3194c4c9cd18e5aebc404e346885deb7a3efbc17b99d609072f9", account: freeradius, ids: "610:610"}
-    kea:        {var: image_fabric_kea, tag: "0.6.1-rc.40", digest: "sha256:571b1665758c06a0e95bbcafe1f09e48fa5bea128ad6e2e3e6236d5fd7cd82dc", account: kea, ids: "609:609"}
-    keycloak:   {var: image_fabric_keycloak, tag: "0.6.1-rc.40", digest: "sha256:dc1e726278b4910c660a1302bdf91b96e17ac309322245673262bf7c62f7d76b"}
-    samba:      {var: image_fabric_samba, tag: "0.6.1-rc.40", digest: "sha256:9c9302ed534124b3b88c1c54fb31cbd18cabc78a1f37bf33ceaf3f2fcdc23653", groups: "BIND_GID=600,RADIUS_GID=610"}
-    stepca:     {var: image_fabric_stepca, tag: "0.6.1-rc.40", digest: "sha256:9d1daa146a0cad05940095a3853774b10db4f485339fcc0178267efa723f1108"}
-    webui:      {var: image_fabric_webui, tag: "0.6.1-rc.40", digest: "sha256:0c62c7d623cb0aa4c8acf37f49fab341d7a5b874cbb2d786e1561723eec9ffe0", account: webui, ids: "606:606"}
+    adguard:    {var: image_fabric_adguard, tag: "0.6.2-rc.47", digest: "sha256:132e926c03a77632e1a6ea388076943a52f28d1a42c6def8b7b5a3f1a6bc9cdb"}
+    bind9:      {var: image_fabric_bind9, tag: "0.6.2-rc.47", digest: "sha256:fdff1a3984de031116d79a483f8387c91872a9d043cc1c652f1b0088a5fb2697", account: bind, ids: "600:600"}
+    freeradius: {var: image_fabric_freeradius, tag: "0.6.2-rc.47", digest: "sha256:08f2fbc7fa4d990f4c7a272f04ea1350c67f2279268eb21054b90a3e69c152c8", account: freeradius, ids: "610:610"}
+    kea:        {var: image_fabric_kea, tag: "0.6.2-rc.47", digest: "sha256:e3cecdb3f1442054a53f7ddc6185a3cb76344f92b6e141319251265a3c6f9dd3", account: kea, ids: "609:609"}
+    keycloak:   {var: image_fabric_keycloak, tag: "0.6.2-rc.47", digest: "sha256:1673b9f7860e0042d8dc7b99424cc18e5da565698dbdf88259156f664cd2292f"}
+    samba:      {var: image_fabric_samba, tag: "0.6.2-rc.47", digest: "sha256:7403e59ff286ca50e9a059ec7225569fe7b2ce25b20fb3242f81aa16507ea179", groups: "BIND_GID=600,RADIUS_GID=610"}
+    stepca:     {var: image_fabric_stepca, tag: "0.6.2-rc.47", digest: "sha256:e25442ee57e8bc75016f68e777f320c9a2f23f91f13803e307abd0ab96fb3852"}
+    webui:      {var: image_fabric_webui, tag: "0.6.2-rc.47", digest: "sha256:f6be81ab2e766907a1fcd122c9d77b629c9142f56e949920b4c4bc40de8ff391", account: webui, ids: "606:606"}
 
 # Packages installed into fabric's own images from an upstream's signed apt
 # repository (not Debian's): the exact version and the signing key's
-# fingerprint are pinned, so a rebuild gets exactly this (design D22).
+# fingerprint are pinned, so a rebuild gets exactly this (design 2.1.1.5).
 packages:
   kea:                               # Kea DHCP 3.0 LTS (ISC); Debian trixie ships only 2.6
     version: "3.0.4-isc20260728182757"

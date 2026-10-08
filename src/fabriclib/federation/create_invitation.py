@@ -31,7 +31,7 @@ DC_TYPES = ("writable", "rodc")
 
 
 def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="", dc="writable"):
-    """Purpose: On the upstream: a one-time invitation for a new site to join this fabric (manual 1.8.4.1). Only a hash
+    """Purpose: On the upstream: a one-time invitation for a new site to join this fabric (manual 1.9.4.1). Only a hash
                 of its secret is kept.
     Inputs:  v — fabric vars: federation_endpoint (must be true), site_name (this site), domain, org_domain
              (default domain), ldap_base_dn, ldap_organizational_units, host_ip, hostname_federation,
@@ -40,11 +40,11 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
              already; source — default "cli"; now — epoch seconds, default time.time() (tests); nest — how many
              levels of sites the new site may hold below it (its CA's path length), default 0. Made on the
              root site, the new site attaches flat; made on a site (one that may nest), it is nested under
-             that site (manual 1.8.5.1); via — a site that joined this install, through whose
+             that site (manual 1.9.5.1); via — a site that joined this install, through whose
              endpoint the new site joins (a relay: it forwards, signs nothing), default "" (direct); dc — the new
-             site's domain controller, "writable" (default) or "rodc" (manual 1.8.8.3); the invitation names the AD
+             site's domain controller, "writable" (default) or "rodc" (manual 1.9.8.3); the invitation names the AD
              domain, its password policy and dc, and this site prepares the new one in its own DC at the join (a
-             parent that is not the root too: its OU holds the new site's, D105, manual 1.8.8.14).
+             parent that is not the root too: its OU holds the new site's, 2.1.6.20, manual 1.9.8.14).
     Returns: {"invitation": "fabric-join-1.<base64url JSON>", "site", "id", "expires" (epoch), "nest", "nested"
              (True when made on a site: the new site will be nested under it), "via"}. With via, the
              invitation's host and address are the relay's endpoint. The JSON holds
@@ -109,7 +109,7 @@ def create_invitation(v, actor, site_name, source="cli", now=None, nest=0, via="
             "root_sha256": describe_cert(open(root).read())["sha256"], "expires": expires}
     if via:
         body["via"] = via
-    # the domain the new site's DC joins (manual 1.8.8.4)
+    # the domain the new site's DC joins (manual 1.9.8.4)
     body.update({"dc": dc, "ad_domain": v["ad_domain"], "ad_password_policy": v["ad_password_policy"]})
     text = INVITE_PREFIX + base64.urlsafe_b64encode(json.dumps(body, separators=(",",
                                                                                  ":")).encode()).decode().rstrip("=")

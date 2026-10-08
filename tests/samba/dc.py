@@ -1,4 +1,4 @@
-"""The `samba` suite, real containers (manual 2.11.2.13, S1.3): a DC from fabric's image, run as the rendered compose
+"""The `samba` suite, real containers (manual 1.6.5.13, S1.3): a DC from fabric's image, run as the rendered compose
 file runs it (on a private test network instead of the host's: WSL is shared with other environments), its files
 written by the real deploy_samba, the domain converged by the real converge_domain — twice, the second changing
 nothing — and the refusals: a site admin in another site, a password the policy refuses, a wrong password.
@@ -159,6 +159,33 @@ first = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, containe
 check("converge: schema, layout, groups, access, AD site, policy and GPOs made", len(first) > 30, first)
 again = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("converge again changes nothing (idempotent)", again == [], again)
+
+# 2.1.6.29: the AD zones keep no AAAA (the DC listens on IPv4 only); one published from the host's IPv6 goes at converge
+AAAA_PROBE = r"""
+import sys
+sys.path.insert(0, "/fabric")
+import ldb
+from samba.dcerpc import dnsp
+from samba.dnsserver import AAAARecord
+from samba.ndr import ndr_pack, ndr_unpack
+from open_samdb import open_samdb
+samdb, lp = open_samdb("/data/etc/smb.conf")
+base, realm = str(samdb.domain_dn()), lp.get("realm").lower()
+dn = f"DC=@,DC={realm},CN=MicrosoftDNS,DC=DomainDnsZones,{base}"
+node = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=["dnsRecord"])[0]
+types = lambda n: sorted({ndr_unpack(dnsp.DnssrvRpcRecord, bytes(r)).wType for r in n.get("dnsRecord", [])})
+if sys.argv[1] == "add":
+    m = ldb.Message(node.dn)
+    m["dnsRecord"] = ldb.MessageElement([ndr_pack(AAAARecord("fd01::d034"))], ldb.FLAG_MOD_ADD, "dnsRecord")
+    samdb.modify(m)
+print(types(samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=["dnsRecord"])[0]))
+"""
+added = dc("python3", "-", "add", stdin=AAAA_PROBE).stdout.strip()
+cleaned = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
+after = dc("python3", "-", "show", stdin=AAAA_PROBE).stdout.strip()
+check("an IPv6 record in the AD zone (from the host's IPv6) is removed by the next converge; its A stays (2.1.6.29)",
+      "28" in added and any("IPv6 record removed" in c for c in cleaned) and "28" not in after and "1" in after,
+      (added, cleaned, after))
 check("converge wrote the site's networks into its OU=networks (the address plan, S4.1)",
       "network lan added" in first and [(n["site"], n["name"], n["cidr"]) for n in read_address_plan(v, SECRETS, DC)]
       == [("lan", "lan", SUBNET)], first)
@@ -186,7 +213,7 @@ check("winbind's privileged pipe: FreeRADIUS's group only (root, 0750); its sock
       and os.path.exists(os.path.join(W, "samba", "winbindd", "pipe")),
       (priv.st_uid, priv.st_gid, oct(priv.st_mode)))
 signd = os.stat(os.path.join(W, "ntp_signd"))
-check("the DC's time-signing socket in the folder the host's chrony reaches (D100): root, 0750",
+check("the DC's time-signing socket in the folder the host's chrony reaches (2.1.13.1): root, 0750",
       os.path.exists(os.path.join(W, "ntp_signd", "socket")) and signd.st_uid == 0
       and signd.st_mode & 0o7777 == 0o750, oct(signd.st_mode))
 SECRETS["ad_agent_password"] = random_password()
@@ -223,16 +250,16 @@ inf_path = next(x for x in files.splitlines() if x.endswith("GptTmpl.inf"))
 inf = subprocess.run(["docker", "exec", DC, "cat", inf_path], capture_output=True).stdout     # UTF-16: bytes
 check("the log-on policy names the site's groups and each machine's local Administrators (never lock out)",
       "S-1-5-32-544".encode("utf-16-le") in inf and "SeInteractiveLogonRight".encode("utf-16-le") in inf)
-check("...and makes the site's windows-admins role a member of each machine's Administrators (added, D103)",
+check("...and makes the site's windows-admins role a member of each machine's Administrators (added, 2.1.9.13)",
       "__Memberof = *S-1-5-32-544".encode("utf-16-le") in inf and "[Group Membership]".encode("utf-16-le") in inf)
 roles = dc("ldbsearch", "-H", "/data/private/sam.ldb", "(&(objectClass=group)(sAMAccountName=lan-*))",
            "sAMAccountName", "member").stdout
-check("the site's five role groups, lan-admins a member of each (D103)",
+check("the site's five role groups, lan-admins a member of each (2.1.9.13)",
       all(f"sAMAccountName: lan-{r}" in roles for r in ("ou-admins", "machine-admins", "gpo-admins", "linux-sudo",
                                                       "windows-admins"))
       and roles.count("member: CN=lan-admins,") == 5, roles[-600:])
 
-# BIND serves the AD zone from the DC's database through DLZ (manual 2.11.2.6, Q2): fabric's BIND image with the
+# BIND serves the AD zone from the DC's database through DLZ (manual 1.6.5.6, Q2): fabric's BIND image with the
 # files write_bind_dlz makes, mounted as the rendered compose file mounts them; a minimal named.conf around them
 check("before the domain exists BIND's DLZ files load nothing", "not provisioned" in open(
     os.path.join(W, "samba", "bind", "dlz.conf")).read())
@@ -305,7 +332,7 @@ lab = {"site": "lab", "root": False, "parent": "lan", "password_policy": POLICY,
 res = dc("python3", "/fabric/converge.py", stdin=json.dumps(lab))
 check("a second site's OU, groups and access entries", res.returncode == 0 and "group lab-admins created" in res.stdout,
       res.stderr)
-check("...its OU nested in its parent's (D105), marked as a site OU",
+check("...its OU nested in its parent's (2.1.6.20), marked as a site OU",
       "dn: OU=lab,OU=lan,OU=sites," in dc("ldbsearch", "-H", "/data/private/sam.ldb", "(&(objectClass=fabricSiteInfo)(ou=lab))", "dn").stdout)
 READ_BASELINE = r"""
 import json, os, sys
@@ -381,7 +408,7 @@ agent_own = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", 
 check("the site's agent adds a person in its own site", "successfully" in agent_own.stdout + agent_own.stderr,
       agent_own.stderr[-200:])
 agent_child = as_user("fabric-agent-lan", SECRETS["ad_agent_password"], "ldbadd", user.format("agentkid", LAB_OU))
-check("the parent's agent adds a person in the site nested below it (inherited, D105)",
+check("the parent's agent adds a person in the site nested below it (inherited, 2.1.6.20)",
       "successfully" in agent_child.stdout + agent_child.stderr, agent_child.stderr[-200:])
 lab_agent = lab["accounts"]["fabric-agent-lab"]
 agent_up = as_user("fabric-agent-lab", lab_agent, "ldbadd", user.format("agentevil", LAN_OU))
@@ -412,7 +439,7 @@ check("refused: a site admin adding to its site's service accounts", "successful
 domain = as_user("labadmin", lab_pw, "ldbmodify",
                  f"dn: CN=Administrator,CN=Users,{BASE}\nchangetype: modify\nreplace: description\ndescription: x\n")
 check("refused: a site admin changing the domain's Administrator", "successfully" not in domain.stdout + domain.stderr)
-# roles given apart (D103): a machine admin of lab who is not a lab admin
+# roles given apart (2.1.9.13): a machine admin of lab who is not a lab admin
 mach_pw = random_password(20)
 dc("samba-tool", "user", "create", "macky", mach_pw, f"--userou=OU=people,{LAB_OU}", "-s", "/data/etc/smb.conf")
 dc("samba-tool", "group", "addmembers", "lab-machine-admins", "macky", "-s", "/data/etc/smb.conf")
@@ -508,7 +535,7 @@ except ValidationError as e:
 
 # a read-only DC joining with fabric's image (its join path), and NTLM at it for an account it does not cache:
 # forwarded to the writable DC while it is up (the Q6 follow-up S1 owes: PEAP at an RODC site relies on it); with the
-# writable DC down, cached accounts only, and no writes (manual 1.8.8.3)
+# writable DC down, cached accounts only, and no writes (manual 1.9.8.3)
 RODC, RODC_IP = "sambatest-rodc", "10.254.30.12"
 rw = os.path.join(W, "rodc")
 for sub in ("data", "secrets"):

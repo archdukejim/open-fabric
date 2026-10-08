@@ -3,7 +3,7 @@ import os
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.ntp.chrony_settings import chrony_settings
 
-# the domain controller's ports (manual 2.11.2.4), besides 53 (BIND, published by Docker): Kerberos, the RPC endpoint
+# the domain controller's ports (manual 1.6.5.4), besides 53 (BIND, published by Docker): Kerberos, the RPC endpoint
 # mapper, LDAP (CLDAP on UDP), SMB, kpasswd, LDAPS, the global catalog, then its RPC range
 AD_TCP = "88,135,389,445,464,636,3268,3269"
 AD_UDP = "88,389,464"
@@ -11,7 +11,7 @@ AD_UDP = "88,389,464"
 
 def firewall_rules(v, config_dir):
     """Purpose: the networks and interfaces fabric's host firewall opens, computed once for the setup step and for
-             the consent question that asks before it (manual 2.7.1).
+             the consent question that asks before it (manual 1.2.9).
     Inputs:  v — vars: lan_cidr, security.firewall_allow (extra CIDRs), ntp_serve (default True; chrony_settings
              decides its networks), install_kea + dhcp.interfaces; config_dir — the install's config folder
              (federation.yaml, for chrony's networks and the federation's peers); ad_rpc_ports + fabric_subnet
@@ -30,7 +30,7 @@ def firewall_rules(v, config_dir):
     ad = []
     rpc = str(v.get("ad_rpc_ports") or "49152-49251").replace("-", ":")
     # Keycloak and FreeRADIUS reach the DC at the host's address from fabric_net; the DCs of the sites next to this
-    # one replicate with it (manual 1.8.8.5): its upstream's and each joined site's address
+    # one replicate with it (manual 1.9.8.5): its upstream's and each joined site's address
     registry = load_registry(os.path.join(config_dir, "federation.yaml"))
     peers = [p["address"] for p in [registry.get("upstream") or {}, *registry.get("sites", {}).values()]
              if p.get("address")]

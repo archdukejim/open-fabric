@@ -4,8 +4,8 @@ BUILTIN_ADMINISTRATORS = "S-1-5-32-544"        # each machine's own local Admini
 
 
 def logon_rights_policy(sids, local_admins=()):
-    """Purpose: who may log on to a site's machines (D90, manual 1.6.3.10), and who is a local administrator on its
-             Windows machines (D103): the GptTmpl.inf granting interactive and remote interactive log-on to exactly
+    """Purpose: who may log on to a site's machines (2.1.6.14, manual 1.6.3.10), and who is a local administrator on its
+             Windows machines (2.1.9.13): the GptTmpl.inf granting interactive and remote interactive log-on to exactly
              these SIDs, and putting each of local_admins in every machine's own Administrators group (Restricted
              Groups "member of": added, never replacing who else is there), written as Windows writes it (UTF-16
              with its byte-order mark, CRLF); Windows applies it, and Linux members the log-on part through SSSD's

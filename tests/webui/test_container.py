@@ -593,7 +593,7 @@ audit_tail = open(f"{W}/fabric/archive/audit.log").read().splitlines()[-1] if os
     f"{W}/fabric/archive/audit.log") else ""
 check("the audit log names the token's user, not the actor the request claims",
       " 200 " in out and "alice" in audit_tail and "mallory" not in audit_tail, (out, audit_tail))
-# ---------------------------------------------- without a client certificate (webui_client_cert off, manual 5.8.2.6.3)
+# ---------------------------------------------- without a client certificate (webui_client_cert off, manual 2.3.6.2.6.3)
 json.dump({**cfg, "client_cert": False}, open(f"{W}/config/webui.json", "w"))
 os.remove(f"{W}/run/web.sock")
 sh("docker restart cwebui >/dev/null")
@@ -616,7 +616,7 @@ check("certificate off: a person without a fabric role is still refused", st == 
 audit_tail = open(f"{W}/fabric/archive/audit.log").read() if os.path.exists(f"{W}/fabric/archive/audit.log") else ""
 check("certificate off: the sign-in is audited as made without a certificate",
       "dave" in audit_tail and "no client certificate" in audit_tail, audit_tail[-300:])
-# the Security page (manual 5.8.2.6.4): admins only; turning the certificate on needs this browser's own certificate
+# the Security page (manual 2.3.6.2.6.4): admins only; turning the certificate on needs this browser's own certificate
 csrf = req("GET", "/", cookie=sess)[3].split('name="csrf" value="')[1].split('"')[0]
 st, _, _, page = req("GET", "/security", cookie=sess)
 check("Security page: the admin sees each layer and its raises", st == 200 and "admin-2fa" in page

@@ -87,7 +87,7 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
         print("Reloading NGINX...")
         _quiet(["docker", "exec", "nginx", "nginx", "-s", "reload"], "Reloading NGINX", 15)
     if "samba" in running or "samba" in restart:
-        try:                                      # idempotent: the domain as fabric wants it (manual 2.11.2.15)
+        try:                                      # idempotent: the domain as fabric wants it (manual 1.6.5.15)
             done = converge_domain(final_vars, paths["federation"], secrets)
             print("Windows domain: " + ("; ".join(done) if done else "as wanted"))
             if final_vars.get("install_keycloak") and install_sso_keytab(final_vars) and "keycloak" in running:

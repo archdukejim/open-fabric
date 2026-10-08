@@ -4,7 +4,7 @@ import paths
 
 
 def ensure_site_info(samdb, site, id_range):
-    """Purpose: a site's uid/gid block on its OU (D97, manual 1.6.3.9): `fabricIdRange` "first-last" and the
+    """Purpose: a site's uid/gid block on its OU (2.1.6.17, manual 1.6.3.9): `fabricIdRange` "first-last" and the
              high-water mark `fabricIdNext`, starting at the block's first number. The block is set once: a site never
              changes its block (ids already handed out stay valid), and the mark only moves forward (alloc_id).
     Inputs:  samdb — SamDB; site — str; id_range — str "first-last" (the root's: from today's range start; a site's:

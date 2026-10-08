@@ -1,4 +1,4 @@
-"""Who may do what in fabric (design D19). Each permission is a Keycloak
+"""Who may do what in fabric (design 2.1.6.1). Each permission is a Keycloak
 realm role named PREFIX + name ("fabric:dns:write"); each bundle is a
 composite realm role of permissions, granted to directory groups. The
 fabric-agent checks every request against these (required_permission.py);
@@ -34,7 +34,7 @@ PERMISSIONS = {
     "vault:unlock": "add, test, remove unlock methods; rotate the vault key",
     "audit:read": "read the audit log",
     "system:admin": "services, updates and settings",
-    "security:raise": "raise sign-in security: second factors, the web console's client certificate (D116)",
+    "security:raise": "raise sign-in security: second factors, the web console's client certificate (2.1.6.27)",
 }
 
 _READ = ["status:read", "dns:read", "dhcp:read", "pki:read", "devices:read", "radius:read", "people:read",

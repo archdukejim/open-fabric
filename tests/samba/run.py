@@ -1,6 +1,6 @@
-"""The `samba` suite (manual 2.11.2.13, 4.8.2): the Windows domain controller.
+"""The `samba` suite (manual 1.6.5.13, 3.1.2): the Windows domain controller.
 
-S1.2: the settings check (D87, D89), the Administrator's password, the rendered container (host network, exactly the
+S1.2: the settings check (2.1.6.11, 2.1.6.13), the Administrator's password, the rendered container (host network, exactly the
 six capabilities, read-only, its limit), nginx giving up 389/636, the unit and the certificate target.
 Real containers (provisioning, DLZ, refusals) are added with S1.3-S1.5.
     python3 tests/samba/run.py
@@ -48,7 +48,7 @@ POLICY = {"minimum_length": 14, "complexity": True, "history": 24, "minimum_age_
 GOOD = {"ad_domain": "ad.lan.test", "domain": "lan.test", "hostname": "pi-core",
         "ad_netbios": "AD", "ad_password_policy": POLICY, "ad_old_password_minutes": 0, "ad_rpc_ports": "49152-49251"}
 
-print("--- settings (D87, D89)")
+print("--- settings (2.1.6.11, 2.1.6.13)")
 try:
     check_samba_settings(copy.deepcopy(GOOD))
     check("a complete configuration passes", True)
@@ -56,7 +56,7 @@ except ValidationError as e:
     check("a complete configuration passes", False, e)
 check("refused: no AD domain (it has no default)", refused({**GOOD, "ad_domain": ""}, "ad_domain is required"))
 check("refused: an AD domain of one label", refused({**GOOD, "ad_domain": "ad"}, "not a valid DNS domain"))
-check("refused: fabric's own domain (same-domain mode dropped, D87)",
+check("refused: fabric's own domain (same-domain mode dropped, 2.1.6.11)",
       refused({**GOOD, "ad_domain": "lan.test"}, "cannot be fabric's own domain"))
 check("accepted: any other domain, not only the suggested ad.<domain>",
       not refused({**GOOD, "ad_domain": "corp.example.net"}, ""))
@@ -66,7 +66,7 @@ check("refused: a NetBIOS domain name over 15 characters",
       refused({**GOOD, "ad_netbios": "A" * 16}, "at most 15"))
 check("refused: a host name Windows cannot use as the DC's NetBIOS name",
       refused({**GOOD, "hostname": "a-very-long-host-name"}, "NetBIOS name"))
-check("refused: no password policy (no defaults, D89)",
+check("refused: no password policy (no defaults, 2.1.6.13)",
       refused({**GOOD, "ad_password_policy": {}}, "no defaults"))
 check("refused: one policy key missing, named",
       refused({**GOOD, "ad_password_policy": {k: x for k, x in POLICY.items() if k != "history"}}, "history"))
@@ -76,22 +76,25 @@ check("refused: complexity that is not true or false",
 check("refused: a minimum length over 64 (the Administrator's generated password must fit)",
       refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_length": 65}}, "minimum_length"))
 check("refused: a minimum age not below the maximum",
-      refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_age_days": 365}}, "below maximum_age_days"))
+      refused({**GOOD, "ad_password_policy": {**POLICY, "minimum_age_days": 365}}, "must be below the second"))
 check("refused: a lockout shorter than its reset window (AD refuses it)",
-      refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 5}}, "lockout_window_minutes"))
+      refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 5}}, "at least as long as that window"))
 check("accepted: locked until an admin unlocks (lockout 0) with any window",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "lockout_minutes": 0}}, ""))
 check("accepted: passwords that never expire (maximum 0) with any minimum age",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "maximum_age_days": 0}}, ""))
 check("refused: an RPC range at or below 1024", refused({**GOOD, "ad_rpc_ports": "100-200"}, "ad_rpc_ports"))
 
-check("the suggestion is a sibling at the top of the organisation's name (D87)",
+check("the suggestion is a sibling at the top of the organisation's name (2.1.6.11); a two-label domain gets ad.<it>",
       suggested_ad_domain("lan.j-j.family") == "ad.j-j.family" and suggested_ad_domain("pitest.home.arpa")
-      == "ad.home.arpa" and suggested_ad_domain("example.org") == "")
+      == "ad.home.arpa" and suggested_ad_domain("home.arpa") == "ad.home.arpa"
+      and suggested_ad_domain("example.org") == "ad.example.org" and suggested_ad_domain("lan") == "")
+check("the two-label suggestion is a valid AD domain (a sub-domain, never the domain or a parent)",
+      not refused({**GOOD, "domain": "home.arpa", "ad_domain": suggested_ad_domain("home.arpa")}, ""))
 check("accepted: a sub-domain of fabric's domain too", not refused({**GOOD, "ad_domain": "ad.lan.test"}, ""))
 check("accepted: the suggested sibling", not refused({**GOOD, "ad_domain": "ad.test2", "domain": "lan.test2"}, ""))
 
-print("--- the memory fabric may use (D31, manual 1.3.4.2)")
+print("--- the memory fabric may use (2.1.2.3, manual 1.2.4.2)")
 import builtins  # noqa: E402
 import types  # noqa: E402
 
@@ -130,7 +133,7 @@ check("64 characters, letters of both cases and digits in every one (any allowed
           and any(c in string.digits for c in p) and p.isalnum() for p in pw))
 check("never the same twice", len(set(pw)) == len(pw))
 
-print("--- the rendered container (manual 2.11.2.3, 1.3.9)")
+print("--- the rendered container (manual 1.6.5.3, 1.2.7)")
 env = jinja_env(os.path.join(REPO, "templates"))
 base = {"domain": "lan.test", "hostname": "pi-core", "host_ip": "192.168.7.53", "lan_cidr": "192.168.7.0/24",
         "lan_gateway": "192.168.7.1", "ad_domain": "AD.lan.test",
@@ -140,12 +143,12 @@ check("the domain's names follow from ad_domain (lower-cased; realm, base DN, Ne
       (v["ad_domain"], v["ad_realm"], v["ad_base_dn"], v["ad_netbios"], v["hostname_dc"])
       == ("ad.lan.test", "AD.LAN.TEST", "DC=ad,DC=lan,DC=test", "AD", "pi-core.ad.lan.test"),
       (v["ad_domain"], v["ad_realm"], v["ad_base_dn"], v["ad_netbios"], v["hostname_dc"]))
-check("the limit is 512m (4 GB is the smallest host, D31)", v["samba_mem_limit"] == "512m")
+check("the limit is 512m (4 GB is the smallest host, 2.1.2.3)", v["samba_mem_limit"] == "512m")
 dc = yaml.safe_load(env.get_template("samba/docker-compose.yml.j2").render(**v))["services"]["samba"]
-check("host network (D98), read-only, no-new-privileges, every capability dropped",
+check("host network (2.1.6.18), read-only, no-new-privileges, every capability dropped",
       dc["network_mode"] == "host" and dc["read_only"] is True and dc["cap_drop"] == ["ALL"]
       and "no-new-privileges:true" in dc["security_opt"])
-check("exactly the six capabilities of the inventory (1.3.9)",
+check("exactly the six capabilities of the inventory (1.2.7)",
       sorted(dc["cap_add"]) == ["CHOWN", "DAC_OVERRIDE", "FOWNER", "NET_BIND_SERVICE", "SETGID", "SETUID"],
       dc["cap_add"])
 check("bound to loopback and the host's address only", dc["environment"]["INTERFACES"] == "127.0.0.1 192.168.7.53")
@@ -153,7 +156,7 @@ check("no secret in its environment (the Administrator's password comes as a fil
       not any(k.endswith(("PASSWORD", "SECRET", "PASS")) for k in dc["environment"]), sorted(dc["environment"]))
 check("its resolver is fabric's file (the host's address), not the host's resolver",
       "/opt/samba/resolv.conf:/etc/resolv.conf:ro" in dc["volumes"])
-check("the DC's time-signing socket in the one folder chrony's AppArmor profile allows (D100)",
+check("the DC's time-signing socket in the one folder chrony's AppArmor profile allows (2.1.13.1)",
       "/var/lib/samba/ntp_signd:/run/samba/ntp_signd" in dc["volumes"], dc["volumes"])
 check("its secrets, certificate and converge code are mounted read-only",
       all(any(m.endswith(f":{target}:ro") for m in dc["volumes"]) for target in ("/run/secrets", "/tls", "/fabric")))
@@ -176,7 +179,7 @@ check("nginx passes nothing on 389/636 (the DC owns them)",
       "listen 389" not in ngx and "listen 636" not in ngx and not any(":389:" in p or ":636:" in p for p in ports), ports)
 named = env.get_template("bind9/config/named.conf.j2").render(**v)
 opts = env.get_template("bind9/config/named.conf.options.j2").render(**v)
-check("BIND includes the AD zone (DLZ) and the keytab option (manual 2.11.2.6)",
+check("BIND includes the AD zone (DLZ) and the keytab option (manual 1.6.5.6)",
       'include "/etc/bind-samba/dlz.conf";' in named and 'include "/etc/bind-samba/options.conf";' in opts)
 b = yaml.safe_load(env.get_template("bind9/docker-compose.yml.j2").render(**{**v, "host_ram_capacity": 4}))
 b = b["services"]["bind9"]

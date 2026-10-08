@@ -1,4 +1,4 @@
-"""The domain's central store of ADMX templates (manual 2.11.2.9, S5.4): SYSVOL's Policies/PolicyDefinitions, read by
+"""The domain's central store of ADMX templates (manual 1.6.5.9, S5.4): SYSVOL's Policies/PolicyDefinitions, read by
 Windows' own editor too. Templates are parsed the way Windows' editor reads them (Microsoft's and Samba's forms)."""
 import os
 import subprocess

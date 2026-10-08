@@ -1,6 +1,6 @@
 # src/containers/samba
 
-Code that runs inside the Samba AD domain controller (manual 2.11.2.15, S1.3), copied to `<deploy_base>/samba/converge`
+Code that runs inside the Samba AD domain controller (manual 1.6.5.15, S1.3), copied to `<deploy_base>/samba/converge`
 and mounted read-only. `converge.py` runs as root inside the DC on its own database (no credentials, no network);
 `directory_op.py` signs in over loopback LDAP as the site's agent account, so AD's limits apply to it.
 
@@ -11,7 +11,7 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `ensure_schema.py` | fabric's and sudo's attributes and classes in AD's schema, added once (OIDs AD accepts, Q3) |
 | `ensure_layout.py` | `OU=sites`, the site's OU tree, `OU=organisation` at the root site; new users and computers into it |
 | `ensure_groups.py` | `<site>-users`, `<site>-admins` (gids from the site's block); at the root site fabric's groups (`ldap_groups`, their gids), Domain Users as `users` (5000), `fabric-break-glass` |
-| `ensure_site_info.py` | The site's uid/gid block and its high-water mark on its OU (D97) |
+| `ensure_site_info.py` | The site's uid/gid block and its high-water mark on its OU (2.1.6.17) |
 | `alloc_id.py` | The next number of a site's block, taken with one conditional change (never twice) |
 | `ensure_sso_account.py` | The site's `fabric-sso` account: Keycloak's Kerberos SPNs, AES only, its keytab exported to `/data/sso.keytab` |
 | `ensure_service_accounts.py` | The site's `fabric-agent`, `fabric-keycloak`, `fabric-radius` accounts; a password set only when it no longer signs in |
@@ -20,10 +20,10 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `site_info.py` | Operation `site_info`: a site's OU and id block |
 | `ensure_site_acl.py` | The site's admins and agent: full control of their site's OU, nothing on its service accounts (Q4); Keycloak: the site's people |
 | `ensure_ad_site.py` | The AD site of this fabric site and its subnets from the address plan |
-| `set_password_policy.py` | The admin's password policy on the domain object (D89) |
+| `set_password_policy.py` | The admin's password policy on the domain object (2.1.6.13) |
 | `ensure_gpo.py` | One of fabric's GPOs created, linked, its SYSVOL files written, its version bumped on change |
 | `root_ca_policy.py` | The Registry.pol that makes fabric's root CA a trusted root on Windows (Q13) |
-| `logon_rights_policy.py` | The GptTmpl.inf granting log-on to a site's machines (D90, Q16) |
+| `logon_rights_policy.py` | The GptTmpl.inf granting log-on to a site's machines (2.1.6.14, Q16) |
 | `list_people.py` | Operation `list_people`: people and groups under OU=sites (service accounts left out) |
 | `create_person.py` | Operation `create_person`: a person in the site's OU=people, a uid from its block, in `<site>-users`, must change their password |
 | `get_person.py` | Operation `get_person`: where a person lives and their groups |
@@ -40,7 +40,7 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `ensure_networks.py` | The site's networks as `fabricNetwork` entries in its OU=networks (the address plan), kept to match |
 | `read_networks.py` | Operation `read_networks`: the address plan, every site's networks in one search |
 | `create_machine.py` | Operation `create_machine`: a machine pre-created in the site's OU=machines with a one-time join password |
-| `ensure_sudo_rule.py` | The site's default sudo rule: its admins and the admin group may run anything on its machines (D103) |
+| `ensure_sudo_rule.py` | The site's default sudo rule: its admins and the admin group may run anything on its machines (2.1.9.13) |
 | `windows_baseline_policy.py` | The site's Windows baseline: wait for the network at log-on, the domain's time, Wired AutoConfig and the 802.1X profile (start-up script) |
 | `gpo_tool.py` | fabric's ADMX editor's entry point: one operation (load, templates, policies, show, set, clear) as JSON |
 | `admx_store.py` | The domain's central store: templates saved, and every policy they define read as Windows' editor reads them |
@@ -56,5 +56,6 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `read_replication.py` | This DC's inbound replication per partition, from its own `repsFrom` (works at a read-only DC too) |
 | `pull_sysvol.py` | The GPO folders this DC does not own, copied over SMB from the DC that owns each (run every 5 minutes by the entrypoint) |
 | `read_sites.py` | Every site in the domain: its name, where its OU sits and its uid/gid block (a parent hands out a free block, and recognises a site moving under it) |
-| `site_roles.py` | The five roles that administer a site, each its own group (D103) |
+| `site_roles.py` | The five roles that administer a site, each its own group (2.1.9.13) |
 | `acl_entries.py` | Access entries added once (compared parsed, object entries by their attribute) and a principal's SID |
+| `remove_ipv6_records.py` | The AD zones on IPv4 only (2.1.6.29): every AAAA record removed (the DC listens on IPv4) |

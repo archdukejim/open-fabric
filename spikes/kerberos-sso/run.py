@@ -1,4 +1,4 @@
-"""Spike K1 (manual 5.8.2.7): Kerberos sign-in (SPNEGO) to Keycloak with a keytab from fabric's Samba DC.
+"""Spike K1 (manual 2.3.6.2.7): Kerberos sign-in (SPNEGO) to Keycloak with a keytab from fabric's Samba DC.
 
 Runs against the containers the keycloak suite leaves when kept (a real DC and a real Keycloak, configured by fabric):
     sudo env KEYCLOAK_TEST_KEEP=1 python3 tests/keycloak/run.py

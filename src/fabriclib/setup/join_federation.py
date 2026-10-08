@@ -13,7 +13,7 @@ def run(ctx):
     """Purpose: setup step `join` (only with `fabricctl setup --join`): join the upstream before
              anything is rendered, so this install is set up as a site of that fabric — its CA an
              intermediate signed by the organisation's root (bring-your-own-CA path), its organisation suffix
-             the upstream's (manual 1.8.4.1).
+             the upstream's (manual 1.9.4.1).
     Inputs:  ctx — SetupContext: join_invitation, vars (from collect_vars: domain, host_ip, image_stepca if set),
              secrets / secrets_file (ca_password, created here if missing), config_dir, source_dir (images.lock).
     Returns: None. ctx.vars gains byoc, ca_crt_path, ica_crt_path, ica_key_path, site_name, org_domain,
@@ -23,7 +23,7 @@ def run(ctx):
              TSIG secret goes to fabric's secrets (federation_tsig.upstream). When the root prepared this site in
              its domain: the service accounts' passwords (ad_*_password) and the temporary join account (ad_join)
              go to fabric's secrets, and ctx.vars gains ad_domain, ad_dc_type, ad_join_server, ad_join_server_name,
-             posix_id_range, ad_site_ou and ad_org_ou (manual 1.8.8.4, 1.8.8.14).
+             posix_id_range, ad_site_ou and ad_org_ou (manual 1.9.8.4, 1.9.8.14).
     Fails:   SetupError with join_upstream's message (invitation damaged/expired/used, the upstream refused or
              unreachable, the root not the pinned one, a certificate that does not fit).
     Feeds:   setup STEPS, after `docker` (the key is made with the pinned Step-CA image) and before `deploy`.
@@ -53,7 +53,7 @@ def run(ctx):
     dom = res.get("domain") or {}
     if res.get("dns_secret") or dom:
         update = {"federation_tsig": {"upstream": res["dns_secret"]}} if res.get("dns_secret") else {}
-        if dom:                                  # the domain this site's DC joins (manual 1.8.8.4)
+        if dom:                                  # the domain this site's DC joins (manual 1.9.8.4)
             update.update({f"ad_{kind}_password": dom["accounts"][kind] for kind in ("agent", "keycloak", "radius")})
             update["ad_join"] = {"user": dom["join_user"], "password": dom["join_password"]}
         try:

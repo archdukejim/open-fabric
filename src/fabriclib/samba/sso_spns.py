@@ -1,5 +1,5 @@
 def sso_spns(v):
-    """Purpose: the SPNs of the site's Kerberos sign-in account (manual 5.8.2.6.2): Keycloak's name, and the host's
+    """Purpose: the SPNs of the site's Kerberos sign-in account (manual 2.3.6.2.6.2): Keycloak's name, and the host's
              name, which sso.<domain> is a CNAME of (Windows browsers ask for the ticket of the name a CNAME points to).
     Inputs:  v — rendered vars: install_keycloak, signin_kerberos, hostname_keycloak, hostname, domain, ad_dc_type.
     Returns: list of str ("HTTP/<name>"), [] when there is no Kerberos sign-in here: Keycloak off, signin_kerberos

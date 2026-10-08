@@ -1,4 +1,4 @@
-"""A software passkey for the keycloak suite (manual 5.8.2.6.2): what a browser and a platform authenticator (Windows
+"""A software passkey for the keycloak suite (manual 2.3.6.2.6.2): what a browser and a platform authenticator (Windows
 Hello, a phone) hand Keycloak's WebAuthn forms, with an ES256 key in memory. It always reports user verification (the
 PIN or fingerprint), so it stands for an unlocked device. Attestation "none". Test code only."""
 import base64

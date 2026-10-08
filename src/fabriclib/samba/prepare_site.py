@@ -4,8 +4,8 @@ from fabriclib.samba.run_converge import run_converge
 
 
 def prepare_site(v, site, networks, id_block, accounts, join_password, container="samba"):
-    """Purpose: at the parent (the root, or a site with a writable DC: manual 1.8.8.14), before answering a join
-             (manual 1.8.8.4, S8.1): converge the new site in the domain, in the parent's OU —
+    """Purpose: at the parent (the root, or a site with a writable DC: manual 1.9.8.14), before answering a join
+             (manual 1.9.8.4, S8.1): converge the new site in the domain, in the parent's OU —
              its OU and the OUs under it, its groups (`<site>-users`, `<site>-admins`), its service accounts with
              the passwords it is given, its ACLs, its id block, its networks and AD site, its sudo rule and GPOs — and
              make the temporary account its DC joins with (expiring in an hour).

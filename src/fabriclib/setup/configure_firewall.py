@@ -6,9 +6,13 @@ from fabriclib.common.console import info, ok, warn
 from fabriclib.common.keep_original import ORIGINALS
 from fabriclib.consent.check_consent import check_consent
 from fabriclib.consent.plan_firewall import plan_firewall
+from fabriclib.consent.plan_own_rules import plan_own_rules
+from fabriclib.consent.plan_ports import plan_ports
 from fabriclib.security.apply_docker_firewall import apply_docker_firewall
 from fabriclib.security.firewall_rules import firewall_rules
+from fabriclib.security.host_own_rules import OWN_RULES, host_own_rules
 from fabriclib.security.ssh_ports import ssh_ports
+from fabriclib.security.ufw_active import ufw_active
 from fabriclib.security.ufw_rule import RECORDS, ufw_rule
 from fabriclib.setup.errors import SetupError
 
@@ -63,7 +67,7 @@ def _forget_rules(config_dir, kind, allowed, what):
 
 def _keep_ufw_state(config_dir):
     """Purpose: record once whether ufw was on before fabric first enabled it, so undoing the firewall can leave it
-             as it was (manual 2.7.1.5).
+             as it was (manual 1.2.9.5).
     Inputs:  config_dir — the install's config folder (<config>/host-originals/ufw.state).
     Returns: None; the record written only when absent ("active" or "inactive").
     Fails:   OSError writing it; FileNotFoundError without ufw.
@@ -78,27 +82,22 @@ def _keep_ufw_state(config_dir):
 
 
 def run(ctx):
-    """Purpose: default-deny host firewall (UFW: SSH from the LAN only) plus DOCKER-USER rules so
-             Docker-published ports are LAN-only too, re-applied at boot by fabric-firewall.service.
+    """Purpose: the host firewall in the three steps the owner set (2.1.2.13), each after its own consent: the ports
+             fabric needs opened in ufw (`ports`); the host secured — ufw on, incoming denied by default, SSH from the
+             LAN, Docker-published ports LAN-only through DOCKER-USER, re-applied at boot by fabric-firewall.service
+             (`firewall`); the host's own ufw rules removed (`own_rules`, recorded for uninstall to put back).
     Inputs:  ctx — SetupContext: vars lan_cidr, security.firewall (default True), security.firewall_allow
              (extra CIDRs, e.g. a VPN), install_kea + dhcp.interfaces (UDP 67 allowed on them), ntp_serve (UDP 123
-             from the networks chrony answers — chrony_settings —, fabric's earlier NTP rules for other networks
-             removed: config/.firewall-ntp-allowed; DHCP likewise), the domain controller's ports (
-             likewise) — the rules come from security/firewall_rules;
-             vars_file,
-             target_dir, config_dir. Env SSH_CONNECTION.
-    Returns: None. On: ufw defaults deny in/allow out, SSH (each port sshd listens on, security/ssh_ports; 22
-             without sshd) from each allowed CIDR, ufw enabled
-             (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
-             config/.firewall-ssh-allowed records fabric's own; whether ufw was on before is recorded once for undo),
-             UNIT written, enabled and restarted, DOCKER-USER
-             rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is).
-             Off: DOCKER-USER
-             opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left
-             as it is.
-    Fails:   SetupError when the SSH client is outside every allowed CIDR (would lock the operator out);
-             CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an
-             invalid CIDR.
+             from the networks chrony answers — chrony_settings), the domain controller's ports — the rules come from
+             security/firewall_rules; vars_file, target_dir, config_dir. Env SSH_CONNECTION.
+    Returns: None. Rules fabric added earlier for a network or interface no longer allowed are removed (the records,
+             security/ufw_rule RECORDS, say which are fabric's); whether ufw was on before is recorded once for undo.
+             Each part only after its consent (else a warning, that part left as it is). security.firewall false:
+             DOCKER-USER opened, fabric-firewall disabled, a warning; ufw left as it is.
+    Fails:   SetupError when securing would lock out the SSH client (outside every allowed CIDR), or when the ports are
+             declined while ufw is on (2.1.2.12: run_setup stops before any step; this is the backstop);
+             CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an invalid
+             CIDR.
     Feeds:   setup step `firewall`, run by run_setup via STEPS."""
     security = ctx.vars.get("security") or {}
     if not security.get("firewall", True):
@@ -106,42 +105,52 @@ def run(ctx):
         subprocess.run(["systemctl", "disable", "--now", "fabric-firewall"], capture_output=True)
         warn("firewall disabled (security.firewall: false): published ports are reachable from anywhere")
         return
-
     rules = firewall_rules(ctx.vars, ctx.config_dir)
+
+    # 1. the ports fabric needs (2.1.2.13)
+    if not check_consent(ctx.config_dir, "ports", plan_ports(ctx.vars, ctx.config_dir)):
+        if ufw_active():        # ufw's own rules would block fabric's containers from the DC on this host (2.1.2.12)
+            raise SetupError("ufw is on, and without fabric's rules it blocks fabric's own containers from this "
+                             "host's domain controller (Keycloak, FreeRADIUS): setup would fail later. fabric only "
+                             "opens its own ports beside your rules: sudo fabricctl setup --approve ports")
+        return
+    _keep_ufw_state(ctx.config_dir)
+    for kind, entries, what in (("ntp", rules["ntp"], "NTP"), ("dhcp", rules["dhcp"], "DHCP"),
+                                ("ad", rules["ad"], "the domain controller")):
+        for entry in entries:
+            subprocess.run(["ufw", "allow", *ufw_rule(kind, entry)], check=True, capture_output=True)
+        _forget_rules(ctx.config_dir, kind, entries, what)
+    ok("host firewall: the ports fabric needs are open (the domain controller, NTP" +
+       (", DHCP)" if rules["dhcp"] else ")"))
+
+    # 2. securing the host: only what fabric needs plus SSH (asked only after the ports are allowed)
     allowed = rules["ssh"]
     client = _ssh_client()
     if client and not any(ipaddress.ip_address(client) in ipaddress.ip_network(c, strict=False) for c in allowed):
         raise SetupError(f"your SSH session comes from {client}, outside {', '.join(allowed)}; enabling the "
                          f"firewall would lock you out. Add it to security.firewall_allow or connect from the LAN.")
-
     if not check_consent(ctx.config_dir, "firewall", plan_firewall(ctx.vars, ctx.config_dir)):
         return
-    _keep_ufw_state(ctx.config_dir)
     ports = ssh_ports()          # what sshd listens on, not a guessed 22
     info(f"host firewall (ufw): deny incoming, allow SSH (port {', '.join(map(str, ports))}) from "
          + ", ".join(allowed))
-    # Existing ufw rules are kept; fabric only sets the defaults and adds its own.
     for cmd in (["ufw", "default", "deny", "incoming"], ["ufw", "default", "allow", "outgoing"]):
         subprocess.run(cmd, check=True, capture_output=True)
     ssh = [f"{cidr}@{port}" for cidr in allowed for port in ports]
     for entry in ssh:
         subprocess.run(["ufw", "allow", *ufw_rule("ssh", entry)], check=True, capture_output=True)
-    # SSH rules fabric added for a network that is no longer allowed (lan_cidr changed, a firewall_allow entry
-    # removed) go; rules fabric did not add are never touched. The record says which are fabric's.
     _forget_rules(ctx.config_dir, "ssh", ssh, "SSH")
-    # time (manual 2.5.1): the networks chrony answers may ask on UDP 123, nobody else
-    ntp_nets = rules["ntp"]
-    for cidr in ntp_nets:
-        subprocess.run(["ufw", "allow", *ufw_rule("ntp", cidr)], check=True, capture_output=True)
-    _forget_rules(ctx.config_dir, "ntp", ntp_nets, "NTP")
-    # DHCP (optional): clients have no address yet (source 0.0.0.0), so allow port 67 on the served interfaces
-    for iface in rules["dhcp"]:
-        subprocess.run(["ufw", "allow", *ufw_rule("dhcp", iface)], check=True, capture_output=True)
-    _forget_rules(ctx.config_dir, "dhcp", rules["dhcp"], "DHCP")
-    # the Windows domain controller (optional, manual 2.11.2.4): on the host network, so ufw, not DOCKER-USER
-    for rule in rules["ad"]:
-        subprocess.run(["ufw", "allow", *ufw_rule("ad", rule)], check=True, capture_output=True)
-    _forget_rules(ctx.config_dir, "ad", rules["ad"], "the domain controller")
+
+    # 3. the host's own rules (asked only after securing is allowed, and only when there are any)
+    own = host_own_rules(ctx.config_dir)
+    if own and check_consent(ctx.config_dir, "own_rules", plan_own_rules(ctx.vars, ctx.config_dir)):
+        record = os.path.join(ctx.config_dir, OWN_RULES)
+        os.makedirs(os.path.dirname(record), mode=0o700, exist_ok=True)
+        with open(record, "a") as f:         # kept for uninstall to put back
+            f.write("".join(r + "\n" for r in own))
+        for r in own:
+            subprocess.run(["ufw", "delete", *r.split()[1:]], capture_output=True)
+            info(f"host firewall: the host's own rule removed: {r}")
     subprocess.run(["ufw", "--force", "enable"], check=True, capture_output=True)
 
     lib = os.path.join(ctx.target_dir, "lib")

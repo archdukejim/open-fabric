@@ -1,6 +1,6 @@
 # scripts/release
 
-Release chores the repository's owner runs by hand (manual 4.7.1).
+Release chores the repository's owner runs by hand (manual 3.14.1).
 
 | File | What |
 |---|---|

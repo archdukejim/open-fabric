@@ -2,7 +2,7 @@ from fabriclib.dhcp.common.edit_dhcp import edit_dhcp
 
 
 def add_subnet(actor, subnet, name, vlan=None, router=None, pools=(), notes="", allow_overlap="", source="cli"):
-    """Purpose: add a DHCP subnet with its name, VLAN record, router, pools and notes (manual 2.2.2.5). Applied by the
+    """Purpose: add a DHCP subnet with its name, VLAN record, router, pools and notes (manual 1.10.2.5). Applied by the
                 next apply.
     Inputs:  actor — who asks (audit); subnet — network ("192.168.20.0/24"); name — one DNS label, unique;
              vlan — 1-4094 or None (a record: fabric configures no switch); router — address in the subnet or None;

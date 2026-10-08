@@ -1,7 +1,7 @@
 # src/ux
 
-Thin entry points, one folder per UX variant (global Rule 7.2, decision D27): they parse input and call the
-shared code, nothing more (manual 1.10.1.3).
+Thin entry points, one folder per UX variant (global Rule 7.2, decision 2.1.1.9): they parse input and call the
+shared code, nothing more (manual 1.1.5.3).
 
 | Path | What |
 |---|---|

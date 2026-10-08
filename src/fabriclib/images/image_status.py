@@ -18,7 +18,7 @@ def image_status(ctx):
     Notes:   for local builds "running" is the base the image was built FROM, so it is compared with the base ref."""
     v = ctx.vars
     validated = {e["var"]: e["ref"] for e in read_images_lock(ctx.target_dir).values()}
-    # fabric's published images (manual 2.6.3): their var is image_fabric_<name> while a service runs one
+    # fabric's published images (manual 1.14.3): their var is image_fabric_<name> while a service runs one
     validated.update({e["var"]: e["ref"] for e in (read_published_lock(ctx.target_dir).get("images") or {}).values()
                       if e["ref"]})
     held = set(v.get("image_pins") or [])

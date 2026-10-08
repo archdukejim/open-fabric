@@ -73,7 +73,7 @@ def checks(ctx):
         add(f"https://{v['hostname_adguard']} asks for sign-in first (OIDC)", (rc, code) == (0, "302"),
             f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
 
-    if shutil.which("chronyc"):             # time (manual 2.5.1): certificates, TOTP and TSIG depend on it
+    if shutil.which("chronyc"):             # time (manual 1.13.1): certificates, TOTP and TSIG depend on it
         t = time_status()
         own_only = not chrony_settings(v, os.path.join(ctx.config_dir, "federation.yaml"))["sources"]
         if t.get("error"):
@@ -117,7 +117,7 @@ def checks(ctx):
 
     if v.get("install_webui"):
         rc, code = _curl(f"https://{v['hostname_mgr']}/", v["hostname_mgr"], v["ip_nginx"], 443, root_ca)
-        if v.get("webui_client_cert"):          # the web console asks for a client certificate (D108)
+        if v.get("webui_client_cert"):          # the web console asks for a client certificate (2.1.8.2)
             add("web UI refuses requests without a client certificate", code == "400", f"HTTP {code}")
         else:                                   # no certificate asked: the web app sends a newcomer to sign in
             add("web UI answers and sends a newcomer to sign in", code == "303", f"HTTP {code}")
@@ -181,7 +181,7 @@ def run(ctx):
     for name, passed, detail in checks(ctx):
         (ok if passed else err)(f"{name}" + (f" — {detail}" if detail else ""))
         failed += not passed
-    # sign-in layers lowered with `fabricctl security lower` stay in view until raised again (D111): warnings, which
+    # sign-in layers lowered with `fabricctl security lower` stay in view until raised again (2.1.6.24): warnings, which
     # do not fail the checks
     for row in relaxed_settings(ctx.vars, ctx.config_dir):
         if " lowered: " in row["setting"]:

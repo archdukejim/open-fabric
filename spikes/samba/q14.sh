@@ -1,5 +1,5 @@
 #!/bin/bash
-# S0 spike Q14: same-domain mode (D87) — AD's domain equals fabric's (lan.test). fabric's records then live in AD's
+# S0 spike Q14: same-domain mode (2.1.6.11) — AD's domain equals fabric's (lan.test). fabric's records then live in AD's
 # zone; ACME DNS-01 with TSIG keys is tried straight into that zone and through a CNAME into a zone of BIND's own.
 # A separate domain and containers (s0-dcx, s0-bindx); needs only the images.   sudo bash spikes/samba/q14.sh
 . "$(dirname "$0")/common.sh"

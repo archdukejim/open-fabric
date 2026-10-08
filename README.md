@@ -44,8 +44,8 @@ Unattended: `sudo fabricctl setup --file vars.yaml --non-interactive --yes --app
 
 The manual is in [`docs/`](docs/README.md), in five volumes: systems and services, technologies and features,
 operations, installation and upgrades, notes and troubleshooting. Start with
-[installation (4.1)](docs/volume_4_infrequent_ops/4.1.1-requirements.md) and
-[working with fabricctl (3.1)](docs/volume_3_operations/3.1.1-fabricctl.md).
+[installation (3.2, 3.3)](docs/volume_3_installation/3.2.1-requirements.md) and
+[working with fabricctl (4.3)](docs/volume_4_operations/4.3.1-fabricctl.md).
 
 ## License
 

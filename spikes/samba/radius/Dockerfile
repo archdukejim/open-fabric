@@ -1,4 +1,4 @@
-# S0 spike Q8 (manual 5.8.1.5) — throwaway. FreeRADIUS (fabric's uid/gid 610) checking PEAP-MSCHAPv2 against AD
+# S0 spike Q8 (manual 2.3.6.1.5) — throwaway. FreeRADIUS (fabric's uid/gid 610) checking PEAP-MSCHAPv2 against AD
 # with ntlm_auth through the DC's winbind; eapol_test as the 802.1X client.
 ARG BASE_IMAGE=debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 FROM ${BASE_IMAGE}

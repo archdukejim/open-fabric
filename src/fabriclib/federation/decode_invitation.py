@@ -48,7 +48,7 @@ def decode_invitation(text):
     if body.get("via") is not None and not (isinstance(body["via"], str) and SITE_NAME_RE.match(body["via"])):
         raise ValidationError("the invitation has a bad via")
     dc = body.get("dc")
-    if dc is not None:                       # the domain the site's DC joins (manual 1.8.8.4)
+    if dc is not None:                       # the domain the site's DC joins (manual 1.9.8.4)
         if dc not in ("writable", "rodc"):
             raise ValidationError("the invitation has a bad dc")
         if not (isinstance(body.get("ad_domain"), str) and DOMAIN_RE.match(body["ad_domain"])):

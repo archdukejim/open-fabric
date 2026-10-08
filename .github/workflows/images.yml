@@ -1,8 +1,8 @@
-# fabric's own images (decision D41, manual 4.7.1, 2.6.3.6): build the eight images on native amd64 and arm64
-# runners (P3, D82) and smoke test each one. Publishing (D84): run by hand with `publish` ticked on main
+# fabric's own images (decision 2.1.1.21, manual 3.14.1, 1.14.3.6): build the eight images on native amd64 and arm64
+# runners (P3, 2.1.14.7) and smoke test each one. Publishing (2.1.14.9): run by hand with `publish` ticked on main
 # (tag <version>) or an rc/<version> branch (tag <version>-rc.<run>): push one multi-arch image per name and
-# sign it keyless with cosign (P2, D81); the digests then go into config/images.lock.yaml through a reviewed
-# commit (D40). A v<version> tag builds nothing: it verifies the digests its lock pins and tags them <version>.
+# sign it keyless with cosign (P2, 2.1.14.6); the digests then go into config/images.lock.yaml through a reviewed
+# commit (2.1.14.4). A v<version> tag builds nothing: it verifies the digests its lock pins and tags them <version>.
 name: images
 
 on:
@@ -65,7 +65,7 @@ jobs:
                 # an rc branch is named for the version it prepares
                 [ "$GITHUB_REF_NAME" = "rc/$version" ] || { echo "::error::rc branch must be rc/$version"; exit 1; }
                 publish=true; tag="$version-rc.$GITHUB_RUN_NUMBER" ;;
-              *) echo "::error::images publish only from main or rc/<version> (D84)"; exit 1 ;;
+              *) echo "::error::images publish only from main or rc/<version> (2.1.14.9)"; exit 1 ;;
             esac
           fi
           echo "publish=$publish" >> "$GITHUB_OUTPUT"
@@ -132,7 +132,7 @@ jobs:
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           REGISTRY="ghcr.io/${GITHUB_REPOSITORY,,}"
           TAG="${{ needs.plan.outputs.tag }}"
-          echo "Published as \`$TAG\`; pin with \`python3 scripts/images/pin_published.py $TAG\` (manual 4.7.1.4)" \
+          echo "Published as \`$TAG\`; pin with \`python3 scripts/images/pin_published.py $TAG\` (manual 3.14.1.4)" \
             >> "$GITHUB_STEP_SUMMARY"
           echo "| image | digest |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"

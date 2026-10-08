@@ -24,8 +24,8 @@ def _remembered(cache):
 
 def verify_signature(ref, cosign_image, signer, issuer, cache=VERIFIED, timeout=300):
     """Purpose: refuse a published image unless it carries a keyless signature by fabric's images workflow
-             (decisions D81, D85; manual 2.6.3.4): `cosign verify` from the pinned cosign image (D86), the
-             certificate's identity matching `signer` and its issuer equal to `issuer`. A digest that verified is
+             (decisions 2.1.14.6, 2.1.14.10; manual 1.14.3.4): `cosign verify` from the pinned cosign image (2.1.14.11),
+             the certificate's identity matching `signer` and its issuer equal to `issuer`. A digest that verified is
              remembered in `cache`, so it is checked once.
     Inputs:  ref — str, "repo:tag@sha256:…" (pinned by digest); cosign_image — str, the pinned cosign image
              (vars image_cosign); signer — str, regular expression for the certificate identity; issuer — str, the
@@ -49,11 +49,11 @@ def verify_signature(ref, cosign_image, signer, issuer, cache=VERIFIED, timeout=
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         raise ValidationError(f"{ref}: the signature check did not finish in {timeout}s (no network?); not used "
-                              f"(image_signature_check: false turns the check off, manual 2.6.3.4)")
+                              f"(image_signature_check: false turns the check off, manual 1.14.3.4)")
     if res.returncode != 0:
         why = (res.stderr or res.stdout).strip().splitlines()[-1:] or ["no output"]
         raise ValidationError(f"{ref}: no valid signature by fabric's images workflow ({why[0][:300]}); not used "
-                              f"(image_signature_check: false turns the check off, manual 2.6.3.4)")
+                              f"(image_signature_check: false turns the check off, manual 1.14.3.4)")
     known[digest] = {"ref": ref, "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     os.makedirs(os.path.dirname(cache), mode=0o700, exist_ok=True)
     fd = os.open(cache, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)

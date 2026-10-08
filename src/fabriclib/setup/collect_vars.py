@@ -1,12 +1,13 @@
 import ipaddress
 import os
 import re
+import subprocess
 
 import yaml
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
-from fabriclib.deploy.check_samba_settings import POLICY_KEYS
+from fabriclib.samba.check_password_policy import POLICY_KEYS
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.decode_invitation import decode_invitation
@@ -29,16 +30,22 @@ LABELS = {
     "webui_admin_user": "Username of the first web UI admin (a person in the domain, signing in through Keycloak)",
 }
 ADMIN_RE = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}$")
+# names the first admin cannot take: the system's own, and AD's built-in accounts
+RESERVED = {"admin", "root", "administrator", "guest", "krbtgt", "nobody", "daemon"}
 HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
                      r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
 
 
 def _valid(key, value):
-    """Purpose: check one answer or vars value for a required or asked setting.
-    Inputs:  key — setting name (host_ip, lan_gateway, lan_cidr, webui_admin_user, domain, hostname, or other);
-             value — str.
-    Returns: True if valid: IPv4 address, IPv4 network, an admin username matching ADMIN_RE that is not
-             "admin"/"root", a DNS name (hostname without dots); any other key just needs a non-empty value.
+    """Purpose: check one answer or vars value for a required or asked setting, as strictly as what uses it later, so a
+             bad answer is asked again at once instead of failing a later step (the owner's first install, 2.3.6.2.11).
+    Inputs:  key — setting name (host_ip, lan_gateway, lan_cidr, webui_admin_user, domain, hostname, friendly_name, or
+             other); value — str.
+    Returns: True if valid: an IPv4 address; an IPv4 network; an admin username matching ADMIN_RE that no system or
+             AD account uses (RESERVED, and not fabric-…); a domain of two labels or more that is not `.local` (mDNS)
+             or `localhost`; a host name of one label, at most 15 characters (the DC's NetBIOS name), not
+             `localhost`; an organisation name of 1-40 printable characters without quotes, backslashes or <> (the
+             CA's certificate names, at most 64 characters, are built from it); any other key just needs a value.
     Fails:   never — ValueError from ipaddress is turned into False.
     Feeds:   collect_vars (which required values to ask), _ask."""
     try:
@@ -47,9 +54,15 @@ def _valid(key, value):
         elif key == "lan_cidr":
             ipaddress.IPv4Network(value, strict=False)
         elif key == "webui_admin_user":
-            return bool(ADMIN_RE.match(value)) and value not in ("admin", "root")
-        elif key in ("domain", "hostname"):
-            return bool(HOST_RE.match(value)) and (key != "hostname" or "." not in value)
+            return bool(ADMIN_RE.match(value)) and value not in RESERVED and not value.startswith("fabric-")
+        elif key == "domain":
+            low = value.lower()
+            return (bool(HOST_RE.match(value)) and "." in value and not low.endswith(".local")
+                    and low != "localhost" and not low.endswith(".localhost"))
+        elif key == "hostname":
+            return bool(HOST_RE.match(value)) and "." not in value and len(value) <= 15 and value.lower() != "localhost"
+        elif key == "friendly_name":
+            return 0 < len(value) <= 40 and value.isprintable() and not any(c in value for c in '"\\<>')
         return bool(value)
     except ValueError:
         return False
@@ -65,6 +78,33 @@ def _load(path):
         return {}
     with open(path) as f:
         return yaml.safe_load(f) or {}
+
+
+def _network_problem(data):
+    """Purpose: what is wrong with the network's answers taken together (each one valid on its own).
+    Inputs:  data — settings: host_ip, lan_cidr, lan_gateway.
+    Returns: str, the problem; "" when they fit: the host and the gateway inside the subnet, neither its network nor
+             its broadcast address, the gateway not the host, and the host's address one this machine has (the domain
+             controller and nginx bind to it).
+    Fails:   never (`ip` missing: this machine's addresses are not checked).
+    Feeds:   collect_vars."""
+    host, net = ipaddress.IPv4Address(data["host_ip"]), ipaddress.IPv4Network(data["lan_cidr"], strict=False)
+    gw = ipaddress.IPv4Address(data["lan_gateway"])
+    for name, ip in (("this host's address", host), ("the gateway", gw)):
+        if ip not in net:
+            return f"{name} {ip} is not in the subnet {net}"
+        if net.prefixlen < 31 and ip in (net.network_address, net.broadcast_address):
+            return f"{name} {ip} is the subnet's network or broadcast address"
+    if host == gw:
+        return f"this host's address and the gateway are both {host}"
+    try:
+        out = subprocess.run(["ip", "-4", "-o", "addr", "show"], capture_output=True, text=True).stdout
+    except FileNotFoundError:
+        return ""
+    mine = {f.split("/")[0] for line in out.splitlines() for f in line.split()[3:4]}
+    if mine and str(host) not in mine:
+        return f"{host} is not an address of this machine (it has {', '.join(sorted(mine - {'127.0.0.1'}))})"
+    return ""
 
 
 def _ask(key, default):
@@ -104,7 +144,7 @@ def _join_defaults(ctx, data):
     data["site_name"], data["org_domain"], data["ldap_base_dn"] = inv["site"], inv["org_domain"], inv["ldap_base_dn"]
     if not data.get("domain"):
         data["domain"] = f"{inv['site']}.{inv['org_domain']}"
-    if inv["dc"]:                            # the organisation's domain: this site's DC joins it (manual 1.8.8.4)
+    if inv["dc"]:                            # the organisation's domain: this site's DC joins it (manual 1.9.8.4)
         data["ad_domain"], data["ad_password_policy"] = inv["ad_domain"], inv["ad_password_policy"]
         data["ad_dc_type"] = inv["dc"]
     info(f"joining {inv['upstream']} ({inv['org_domain']}) as site {inv['site']}, domain {data['domain']}")
@@ -153,7 +193,7 @@ def collect_vars(ctx):
         # Never on an existing install: it would undo later edits.
         user_file, user = repo_vars, _load(repo_vars)
     if user_file:
-        try:                                  # a --file never lowers a sign-in layer (D111): the command does
+        try:                                  # a --file never lowers a sign-in layer (2.1.6.24): the command does
             check_signin_lowering(_load(ctx.vars_file) if os.path.exists(ctx.vars_file) else {}, user)
         except ValidationError as e:
             raise SetupError(str(e))
@@ -171,8 +211,18 @@ def collect_vars(ctx):
         print("\n  A few details about this network:")
         for key in bad:
             data[key] = _ask(key, data.get(key) or guess.get(key))
-        if not data.get("friendly_name"):
-            data["friendly_name"] = _ask("friendly_name", "Home Network")
+    # the network's answers together: the host in its subnet, the gateway too and not the host, the host's own address
+    while (problem := _network_problem(data)):
+        if ctx.non_interactive:
+            raise SetupError(problem)
+        print(f"    {problem}: asked again")
+        guess = detect_network()           # offered first: the bad answer would be offered back otherwise
+        for key in ("host_ip", "lan_cidr", "lan_gateway"):
+            data[key] = _ask(key, guess.get(key) or data.get(key))
+    if not _valid("friendly_name", str(data.get("friendly_name") or "")):
+        if ctx.non_interactive and data.get("friendly_name"):
+            raise SetupError("friendly_name: 1-40 printable characters without quotes, backslashes or <>")
+        data["friendly_name"] = "Home Network" if ctx.non_interactive else _ask("friendly_name", "Home Network")
 
     # First web UI admin (created by the admin step). Chosen once, then kept.
     if not _valid("webui_admin_user", str(data.get("webui_admin_user") or "")):
@@ -180,15 +230,15 @@ def collect_vars(ctx):
         default = sudo_user if sudo_user != "root" and _valid("webui_admin_user", sudo_user) else "fabricadmin"
         data["webui_admin_user"] = default if ctx.non_interactive else _ask("webui_admin_user", default)
 
-    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (D87, D89)
+    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (2.1.6.11, 2.1.6.13)
     policy = data.get("ad_password_policy") or {}
     if not data.get("ad_domain") or not (set(POLICY_KEYS) | {"complexity"}) <= set(policy):
         if ctx.non_interactive:
             raise SetupError("missing in the vars file: ad_domain and every key of ad_password_policy (manual "
-                             "2.1.9.7: the directory's domain and password policy have no defaults)")
+                             "1.1.9.7: the directory's domain and password policy have no defaults)")
         ctx.vars = data
         ask_ad_domain(ctx)
-    # how much of this host fabric may use (D31, manual 1.3.4.2): measured, asked once
+    # how much of this host fabric may use (2.1.2.3, manual 1.2.4.2): measured, asked once
     ask_ram(ctx, data)
 
     data["deploy_base_dir"] = ctx.deploy_base

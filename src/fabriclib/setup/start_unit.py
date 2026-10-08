@@ -20,7 +20,7 @@ def start_unit(unit, container, restart):
         return "running"
     # a unit that kept failing (a bad image restarted until systemd's start limit) refuses a start until its failed
     # state is cleared, and one still in its automatic-restart loop races a start: it is stopped first, which cancels
-    # the pending restart (the rollback after a failed image update hit both now and then: manual 5.8.1.27, 5.8.2.9)
+    # the pending restart (the rollback after a failed image update hit both now and then: manual 2.3.6.1.27, 2.3.6.2.9)
     if not active:
         subprocess.run(["systemctl", "stop", unit], capture_output=True)
     subprocess.run(["systemctl", "reset-failed", unit], capture_output=True)

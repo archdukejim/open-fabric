@@ -7,7 +7,7 @@ NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,13}[a-z0-9])?$")
 
 def create_machine(samdb, lp, site, name, password):
     """Purpose: pre-create a machine's computer account in the site's OU=machines with a one-time join password
-             (manual 2.10.2.3, S6.2), so the machine joins with `adcli --login-type=computer` and no admin password
+             (manual 1.6.7.3, S6.2), so the machine joins with `adcli --login-type=computer` and no admin password
              is typed on it.
     Inputs:  samdb — SamDB (as the site's agent); lp — LoadParm (unused); site — str; name — the machine's name
              (1–15 lower-case letters, digits, dashes: a NetBIOS name); password — the one-time password.

@@ -25,7 +25,8 @@ def _targets(ctx):
         (v["hostname_bind9"], [f"ns.{v['domain']}", "127.0.0.1"],
          [nginx(v["hostname_bind9"]), (p("bind9", "ssl"), "bind")], ["nginx", "bind9"]),
         (v["hostname_stepca"], [], [nginx(v["hostname_stepca"])], ["nginx"]),
-        (v["hostname_landing"], [], [nginx(v["hostname_landing"])], ["nginx"]),
+        # the host's own name too: opening https://<host>.<domain> shows the landing page, not a bare 404
+        (v["hostname_landing"], [f"{v['hostname']}.{v['domain']}".lower()], [nginx(v["hostname_landing"])], ["nginx"]),
         (v["hostname_certs"], [], [nginx(v["hostname_certs"])], ["nginx"]),
         (v["hostname_openbao"], ["openbao"], [nginx(v["hostname_openbao"]), (p("openbao", "certs"), "openbao")],
          ["nginx", "openbao"]),
@@ -40,7 +41,7 @@ def _targets(ctx):
         t.append((v["hostname_federation"], [], [nginx(v["hostname_federation"])], ["nginx"]))
     if v.get("install_adguard"):
         t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
-    # the DC's LDAPS/TLS certificate (manual 2.11.2.7): Keycloak, FreeRADIUS and members verify it; Keycloak and
+    # the DC's LDAPS/TLS certificate (manual 1.6.5.7): Keycloak, FreeRADIUS and members verify it; Keycloak and
     # FreeRADIUS reach it at the host's address, so it names that too
     t.append((v["hostname_dc"], [v["ad_domain"], v["host_ip"]], [(p("samba", "tls"), "root")], ["samba"]))
     if v.get("install_freeradius"):

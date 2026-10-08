@@ -2,7 +2,7 @@
 first). `var` is the vars key holding the pinned ref (for local builds: the
 base they are built FROM); `build` is the local image name, if any;
 `published` names fabric's published image that replaces the local build
-where the host can use it (manual 2.6.3, images/effective_service)."""
+where the host can use it (manual 1.14.3, images/effective_service)."""
 SERVICES = [
     {"name": "bind9", "unit": "bind9", "container": "bind9", "folder": "bind9", "var": "image_debian",
      "build": "fabric/bind9:local",
@@ -40,4 +40,4 @@ SERVICES = [
      "published": "webui"},
 ]
 STATE = "/etc/fabric/images/state.json"      # previous ref per image var (for rollback), root 0600
-VERIFIED = "/etc/fabric/images/verified.json"  # digests whose signature verified (manual 2.6.3.4), root 0600
+VERIFIED = "/etc/fabric/images/verified.json"  # digests whose signature verified (manual 1.14.3.4), root 0600

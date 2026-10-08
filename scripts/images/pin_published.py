@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Pin fabric's published images in config/images.lock.yaml (manual 4.7.1.4, decision D40): for each of the
+"""Pin fabric's published images in config/images.lock.yaml (manual 3.14.1.4, decision 2.1.14.4): for each of the
 images, the multi-arch digest a publish produced under <tag>, after checking it has both architectures and a valid
-signature by fabric's images workflow (the same check hosts make, D81). Needs Docker and network access.
+signature by fabric's images workflow (the same check hosts make, 2.1.14.6). Needs Docker and network access.
 
     python3 scripts/images/pin_published.py <tag>        e.g. 0.6.0-rc.1
 
@@ -47,7 +47,7 @@ def pin_published(tag):
     Returns: dict {name: digest} as written; a pinned image loses its `pending` mark.
     Fails:   ValidationError if an image lacks a platform, its tag cannot be inspected or its signature does not
              verify (nothing is written then); OSError writing the lock.
-    Feeds:   this script (the release procedure, 4.7.1.4)."""
+    Feeds:   this script (the release procedure, 3.14.1.4)."""
     lock = read_published_lock(os.path.dirname(LOCK))
     cosign = read_images_lock(os.path.dirname(LOCK))["cosign"]["ref"]
     pinned = {}

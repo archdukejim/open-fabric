@@ -23,7 +23,7 @@ def _actor():
 
 
 def _confirm(layer, row, new):
-    """Purpose: the typed confirmation before a lowering (D111): what is lost, then the layer's name typed back.
+    """Purpose: the typed confirmation before a lowering (2.1.6.24): what is lost, then the layer's name typed back.
     Inputs:  layer — a LAYERS key; row — its signin_rows entry; new — the lower value as shown.
     Returns: bool, whether the name was typed back exactly.
     Fails:   EOFError when stdin closes.
@@ -35,8 +35,8 @@ def _confirm(layer, row, new):
 
 
 def run_security_command(argv, vars_file=VARS_FILE):
-    """Purpose: `fabricctl security` — the sign-in layers (manual 5.8.2.6.4, D111): status; raise a layer (also the
-             web console's Security page); lower one, only here on the host, after its name is typed back (--yes
+    """Purpose: `fabricctl security` — the sign-in layers (manual 2.3.6.2.6.4, 2.1.6.24): status; raise a layer (also
+             the web console's Security page); lower one, only here on the host, after its name is typed back (--yes
              does not skip it, and it refuses without a terminal); Kerberos on or off. Only routes to the security/
              units and prints.
     Inputs:  argv — list of str after "security": none (status) | raise <layer> [<value>] | lower <layer> [<value>] |

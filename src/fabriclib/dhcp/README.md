@@ -1,6 +1,6 @@
 # fabriclib/dhcp
 
-Optional DHCP with Kea 3.0 LTS (design §5, D16, D22): `dhcp:` in
+Optional DHCP with Kea 3.0 LTS (design §5, 2.1.4.1, 2.1.1.5): `dhcp:` in
 `vars.yaml` is the source of truth; lease hostnames go to their own dynamic
 zone `dhcp.<domain>` through kea-dhcp-ddns.
 

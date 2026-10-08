@@ -40,7 +40,7 @@ def _prune(ctx):
 
 
 def run_images_command(ctx, argv):
-    """Purpose: route `fabricctl images status|update|rollback|prune` (design D21) and print the results.
+    """Purpose: route `fabricctl images status|update|rollback|prune` (design 2.1.14.3) and print the results.
              Nothing here runs on its own; applying is these commands.
     Inputs:  ctx — SetupContext with state loaded; argv — list of str after "images" (empty = status).
     Returns: exit status int: 0 done, 1 ValidationError (printed to stderr), 2 usage error (usage printed).

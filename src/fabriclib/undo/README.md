@@ -1,6 +1,6 @@
 # fabriclib/undo
 
-Reverting a host change fabric made (design [2.7.1.5](../../../docs/volume_2_technologies_and_features/2.7.1-host-consent.md#2715-upgrades)):
+Reverting a host change fabric made (design [1.2.9.5](../../../docs/volume_1_description_and_architecture/1.2.9-host-consent.md#1295-upgrades)):
 `fabricctl setup --undo GROUP`, and what `fabricctl uninstall` does with each kind of change. The host's own files
 are kept before fabric first changes them (`common/keep_original`).
 

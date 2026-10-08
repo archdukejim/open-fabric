@@ -18,7 +18,7 @@ SETS = {
                 ("fabricVlan", 5, INT, True), ("fabricPriority", 6, INT, True), ("fabricRoleName", 7, STRING, False),
                 ("fabricSite", 8, STRING, True), ("fabricCidr", 9, IA5, True), ("fabricNetworkKind", 10, STRING, True),
                 ("fabricAllowOverlap", 11, STRING, True),
-                # a site's uid/gid block "first-last" and its high-water mark (D97, manual 1.6.3.9)
+                # a site's uid/gid block "first-last" and its high-water mark (2.1.6.17, manual 1.6.3.9)
                 ("fabricIdRange", 12, IA5, True), ("fabricIdNext", 13, INT, True)],
                [("fabricDevice", 1, 3, [], ["fabricDeviceType", "fabricEnabled", "fabricCertFingerprint"]),
                 ("fabricRole", 2, 3, [], ["fabricPermission", "fabricVlan", "fabricPriority"]),

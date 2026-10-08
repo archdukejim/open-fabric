@@ -2,7 +2,7 @@ from webui.agentclient.connection import call_agent
 
 
 def host_changes():
-    """Purpose: What fabric may change on this host, by group, for the overview page (manual 2.7.1.4,
+    """Purpose: What fabric may change on this host, by group, for the overview page (manual 1.2.9.4,
              step 7). Agent route: GET /v1/host-changes (status:read).
     Inputs:  none.
     Returns: list of {"group", "title", "state": "approved"|"declined"|"not asked", "when", "by", "relaxation"};

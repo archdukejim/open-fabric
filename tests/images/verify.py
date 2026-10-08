@@ -1,4 +1,4 @@
-"""Signature verification of published images (manual 2.6.3.4, decisions D81, D85, D86), against real keyless
+"""Signature verification of published images (manual 1.14.3.4, decisions 2.1.14.6, 2.1.14.10, 2.1.14.11), against real keyless
 signatures in Sigstore's public log. Needs Docker and network access. Run by tests/images/run.sh.
 
 - a real keyless-signed image (cosign's own release, signed by Sigstore's release identity) verifies with its
@@ -71,7 +71,7 @@ try:
     check("an unsigned image (the pinned Debian base) is refused", "no valid signature" in why, why)
     why = refused("localhost:5999/fabric-test/bind9:1@sha256:" + "0" * 64, PUBLISHED["signer"],
                   PUBLISHED["issuer"], fresh)
-    check("an image whose registry cannot be reached is refused, not used (D85)", "no valid signature" in why, why)
+    check("an image whose registry cannot be reached is refused, not used (2.1.14.10)", "no valid signature" in why, why)
     why = refused("ghcr.io/archdukejim/open-fabric/bind9:1.5.0", PUBLISHED["signer"], PUBLISHED["issuer"], fresh)
     check("a ref not pinned by digest is refused", "not pinned by digest" in why, why)
 

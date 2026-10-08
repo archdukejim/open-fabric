@@ -8,7 +8,7 @@ UNIT_PATH = f"/etc/systemd/system/{UNIT}.service"
 
 
 def deploy_federation_endpoint(v, render_tmp, deploy_base):
-    """Purpose: install or remove the federation endpoint's host side (manual 1.8.4.2): its systemd
+    """Purpose: install or remove the federation endpoint's host side (manual 1.9.4.2): its systemd
              unit and the socket directory nginx mounts. The nginx vhost and the CNAME follow
              federation_endpoint in their own templates.
     Inputs:  v — rendered vars: federation_endpoint, service_users.nginx.gid; render_tmp — where

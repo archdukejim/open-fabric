@@ -53,9 +53,9 @@ def run(ctx):
     except ValidationError as e:
         raise SetupError(str(e))
     ok(f"directory {v['ad_domain']}: " + (f"{len(done)} change(s)" if done else "as wanted"))
-    if v.get("install_keycloak") and install_sso_keytab(v):     # Kerberos sign-in's keytab (manual 5.8.2.6.2)
+    if v.get("install_keycloak") and install_sso_keytab(v):     # Kerberos sign-in's keytab (manual 2.3.6.2.6.2)
         ok(f"keycloak: {start_unit('keycloak', 'keycloak', True)} (Kerberos sign-in keytab)")
-    if (ctx.secrets or {}).get("ad_join"):        # a site whose DC just joined: its join account goes (1.8.8.4)
+    if (ctx.secrets or {}).get("ad_join"):        # a site whose DC just joined: its join account goes (1.9.8.4)
         try:
             ok(finish_join(v, ctx.secrets))
             save_secrets({"ad_join": None}, ctx.secrets_file)

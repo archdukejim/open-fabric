@@ -1,6 +1,6 @@
 # jinja/fluentbit
 
-Optional log forwarding (Fluent Bit, design D20; only with `install_fluentbit`).
+Optional log forwarding (Fluent Bit, design 2.1.15.1; only with `install_fluentbit`).
 The compose file is rendered by `deploy.py`; the config by
 `fabriclib/logs/deploy_fluentbit.py`. The `fluentbit` systemd unit runs it.
 

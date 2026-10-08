@@ -1,6 +1,6 @@
 """Every site the domain holds (manual 1.6.3.4, 1.6.3.9): each site OU's name, where it sits and its uid/gid block,
 read from this DC's own database, so a parent that is not the root hands a new site a block no other site has, and
-sees a site that moves under it (D105) already exists.
+sees a site that moves under it (2.1.6.20) already exists.
     docker exec samba python3 /fabric/read_sites.py
 Prints one JSON object: {"sites": [{"site", "dn", "id_range"}, …]}."""
 import json

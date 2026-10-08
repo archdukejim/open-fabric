@@ -5,7 +5,7 @@ from fabriclib.pki.publish_ca_certs import TRUST_DIR
 
 
 def undo_trust(v):
-    """Purpose: undo the `trust` host change (manual 2.7.1.5): fabric's root and intermediate CA out of
+    """Purpose: undo the `trust` host change (manual 1.2.9.5): fabric's root and intermediate CA out of
              this host's trust store.
     Inputs:  v — vars: domain_file (the trust files' prefix, pki/publish_ca_certs).
     Returns: list of str, what was done (empty when nothing was there).

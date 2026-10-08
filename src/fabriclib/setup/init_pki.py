@@ -78,7 +78,7 @@ def _single_intermediate(path):
 
 def _make_root(ctx, data, uid, gid):
     """Purpose: make this install's own root CA before `step ca init`, with the path length that decides how
-             deeply sites may nest below it (manual 1.8.5.1): ca_nest_depth + 1. `step ca init` alone
+             deeply sites may nest below it (manual 1.9.5.1): ca_nest_depth + 1. `step ca init` alone
              makes path length 1 (flat sites only).
     Inputs:  ctx — SetupContext: vars ca_name, ca_nest_depth (0..4, default 1), image_stepca; data — Step-CA's
              data folder (secrets/password written); uid, gid — the step user.
@@ -159,7 +159,7 @@ def run(ctx):
              when the secrets are in a locked OpenBao (not converted to SetupError); KeyError for missing vars.
     Feeds:   setup step `pki`, run by run_setup via STEPS.
     Notes:   trusting the CA on the host needs the `trust` consent; without it a warning, and the CA is only
-             published (manual 2.7.1)."""
+             published (manual 1.2.9)."""
     v = ctx.vars
     check_consent(ctx.config_dir, "trust", plan_trust(v))       # warns once when declined; _publish_ca_certs checks
     data = ctx.path("stepca", "data")

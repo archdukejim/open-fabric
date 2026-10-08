@@ -77,7 +77,7 @@ def uninstall(ctx):
         shutil.rmtree(path, ignore_errors=True)
     ok(f"removed fabric directories under {ctx.deploy_base}")
     signd = v.get("ad_ntp_signd_dir") or "/var/lib/samba/ntp_signd"
-    shutil.rmtree(signd, ignore_errors=True)               # the DC's time-signing socket folder (D100)
+    shutil.rmtree(signd, ignore_errors=True)               # the DC's time-signing socket folder (2.1.13.1)
     try:
         os.rmdir(os.path.dirname(signd))                   # /var/lib/samba, when fabric's folder was all it held
     except OSError:

@@ -1,7 +1,7 @@
 """The `keycloak` suite (manual 1.6.2, 1.6.3.11): keycloak_bootstrap against a real Keycloak and a real Samba AD
 domain controller, twice (idempotent); the admin API's view of what it made; and a real browser sign-in by the first
 admin, created by fabric with a one-time password: Keycloak makes them choose a new one (AD's pwdLastSet), which
-lands in AD, then enrol TOTP. Refusals: a disabled person, a person outside the site's groups (D90), an unregistered
+lands in AD, then enrol TOTP. Refusals: a disabled person, a person outside the site's groups (2.1.6.14), an unregistered
 redirect URI.
     sudo python3 tests/keycloak/run.py
 """
@@ -152,7 +152,7 @@ sh(["openssl", "x509", "-req", "-in", f"{kc_dir}/kc.csr", "-CA", root_ca, "-CAke
 sh(["cp", root_ca, f"{kc_dir}/root_ca.crt"])
 for name in os.listdir(kc_dir):
     os.chmod(os.path.join(kc_dir, name), 0o644)
-# Kerberos sign-in (manual 5.8.2.6.2): the DC's converge made fabric-sso-<site> and exported its keytab; fabric
+# Kerberos sign-in (manual 2.3.6.2.6.2): the DC's converge made fabric-sso-<site> and exported its keytab; fabric
 # hands it to Keycloak with a krb5.conf (this test's Keycloak runs as the image's own user, 1000, so it owns them here)
 krb_dir = os.path.join(v["deploy_base_dir"], "keycloak", "kerberos")
 spns = sh(["docker", "exec", DC, "samba-tool", "spn", "list", "fabric-sso-lan", "-s", "/data/etc/smb.conf"],
@@ -180,7 +180,7 @@ for e in ndr_unpack(preg.file, open(path, "rb").read()).entries:
     print(e.keyname, "|", e.valuename, "|", e.data)
 """
 pol = sh(["docker", "exec", "-i", DC, "python3", "-"], ok=False, input=READ_POL).stdout
-check("the site's Windows baseline GPO lets Edge, Chrome and Firefox use Kerberos for sso.<domain> (D117)",
+check("the site's Windows baseline GPO lets Edge, Chrome and Firefox use Kerberos for sso.<domain> (2.1.6.28)",
       f"Software\\Policies\\Microsoft\\Edge | AuthServerAllowlist | {HOST}" in pol
       and f"Software\\Policies\\Google\\Chrome | AuthServerAllowlist | {HOST}" in pol
       and f"Software\\Policies\\Mozilla\\Firefox\\Authentication\\SPNEGO | 1 | {HOST}" in pol, pol)
@@ -250,7 +250,7 @@ def steps(flow):
 
 realm_rep = kc.call("GET", R)[1]
 signin, admin_flow = steps("fabric-signin"), steps("fabric-admin-signin")
-check("sign-in flows (D110): fabric-signin is the realm's, fabric-admin-signin the web UI's; 0.6.0's flow is gone",
+check("sign-in flows (2.1.6.23): fabric-signin is the realm's, fabric-admin-signin the web UI's; 0.6.0's flow is gone",
       realm_rep["browserFlow"] == "fabric-signin" and "fabric-webui-mfa" not in flows
       and client["authenticationFlowBindingOverrides"].get("browser") == flows.get("fabric-admin-signin"),
       (realm_rep["browserFlow"], sorted(flows)))
@@ -297,7 +297,7 @@ for _ in range(4):
         break
     if st in (302, 303):
         st, hdr, page = b.go(location)
-check("with a password only (D110): Keycloak asks jim for a new password (AD's must-change), then signs him in",
+check("with a password only (2.1.6.23): Keycloak asks jim for a new password (AD's must-change), then signs him in",
       seen == {"password"} and "mgr.lan.j-j.family/oidc/callback" in location and "code=" in location,
       (seen, location[:120], page[:200]))
 check("the new password chosen in Keycloak landed in AD", ntlm_signs_in("jim", new_pw))
@@ -324,11 +324,11 @@ sh(["docker", "exec", DC, "samba-tool", "group", "removemembers", "lan-users", "
 b3 = Browser(root_ca)
 page = start(b3, AUTH)
 _, _, page = b3.go(action(page), {"username": "eve", "password": eve_pw})
-check("refused: a person outside the site's groups (D90)", "Invalid username or password" in page, page[:300])
+check("refused: a person outside the site's groups (2.1.6.14)", "Invalid username or password" in page, page[:300])
 bad = start(Browser(root_ca), AUTH.replace("mgr.lan.j-j.family%2Foidc", "evil.test%2Foidc"))
 check("refused: a redirect URI that is not registered", "Invalid parameter: redirect_uri" in bad, bad[:200])
 
-# ---- raising the admin tools' second factor (manual 5.8.2.6.1): what the Security page and `fabricctl security` set
+# ---- raising the admin tools' second factor (manual 2.3.6.2.6.1): what the Security page and `fabricctl security` set
 def converge_with(**settings):
     """The settings changed in vars.yaml, then fabric's Keycloak configuration run again."""
     path = os.path.join(cfg, "vars.yaml")
@@ -375,7 +375,7 @@ check("refused: the console without the TOTP code (the form asks for it; a wrong
       st == 200 and 'name="otp"' in page
       and "Invalid authenticator code" in b5.go(action(page), {"otp": "000000"})[2], page[:200])
 
-# ---- Kerberos sign-in from a domain client (manual 5.8.2.6.2): a ticket from the DC, a browser's Negotiate
+# ---- Kerberos sign-in from a domain client (manual 2.3.6.2.6.2): a ticket from the DC, a browser's Negotiate
 kerb_pw = person("kerb")
 AD_REALM = v["ad_domain"].upper()
 # a person made by fabric must change the one-time password first (the KDC refuses it until then); a real person does
@@ -453,7 +453,7 @@ def required_actions(browser, page, st, hdr, password, passkey=None):
     return seen, st, location, page
 
 
-# ---- passkeys (manual 5.8.2.6.1): a second factor that must be unlocked on the device
+# ---- passkeys (manual 2.3.6.2.6.1): a second factor that must be unlocked on the device
 run5 = converge_with(signin_everyone_second_factor="passkey")
 check("raising every sign-in to passkeys converges; the admin tools follow (never less than every sign-in)",
       "complete" in run5.stdout and steps("fabric-signin").get("fabric-signin passkey") == "REQUIRED"
@@ -491,7 +491,7 @@ check("any: a person with neither is made to enrol TOTP (and choose a password),
       sorted(seen) == ["password", "totp"] and "code=" in location, (seen, location[:120], page[:300]))
 converge_with(signin_everyone_second_factor="none")
 
-# ---- apps signing people in through Keycloak (fabricctl sso, manual 3.8.2)
+# ---- apps signing people in through Keycloak (fabricctl sso, manual 4.6.2)
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.keycloak.add_app_client import add_app_client  # noqa: E402
 from fabriclib.keycloak.list_app_clients import list_app_clients  # noqa: E402

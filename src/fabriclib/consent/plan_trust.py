@@ -1,5 +1,5 @@
 def plan_trust(v):
-    """Purpose: adding fabric's CA to the host's trust store (manual 2.7.1.3 `trust`).
+    """Purpose: adding fabric's CA to the host's trust store (manual 1.2.9.3 `trust`).
     Inputs:  v — vars: domain_file (the trust files' prefix).
     Returns: list of str (one entry: the files and update-ca-certificates).
     Fails:   never.

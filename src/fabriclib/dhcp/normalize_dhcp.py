@@ -75,7 +75,7 @@ def normalize_dhcp(v):
              record, fabric configures no switch), notes (at most 500 characters), allow_overlap (why it may
              overlap another site's network, at most 200 characters), pools, routers, options,
              reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes
-             (manual 2.2.2.3), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default
+             (manual 1.10.2.3), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default
              this host), lease_time (int 300-2592000, default 86400)}; dns (its A records); fabric_subnet
              (default 10.255.0.0/24: no DHCP subnet may overlap it).
     Returns: a copy of `dhcp`, unchecked, when install_kea is off; else `dhcp` normalized: every subnet with its id

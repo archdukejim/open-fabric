@@ -1,71 +1,69 @@
 # fabric manual
 
-The manual is fabric's only source of truth: architecture, decisions, procedures and notes (global Rule 5).
+The manual is fabric's only source of truth (global Rule 5), in four volumes: what fabric is, why it is so, how to install it, how to run it. Volumes 2, 3 and 4 follow Volume 1's chapters, so one number leads to every aspect of one part (Rule 5.9).
 
-## [Volume 1 — Systems and services](volume_1_systems_and_services/README.md)
+## [Volume 1 — Description and architecture](volume_1_description_and_architecture/README.md)
 
-- 1.1 Product overview
-- 1.2 Decision register
-- 1.3 Architecture
-- 1.4 fabricctl and fabric-agent
-- 1.5 Open Fabric web UI
-- 1.6 Identity: directory and sign-in
+- 1.1 The product, and how it is built and released
+- 1.2 Architecture and the host
+- 1.3 fabricctl, setup and fabric-agent
+- 1.4 DNS: BIND
+- 1.5 Certificates: Step-CA
+- 1.6 Identity: the directory and sign-in
 - 1.7 Secrets: OpenBao
-- 1.8 Federation
-- 1.9 Security defaults
-- 1.10 Code conventions
-- 1.11 Function reference
+- 1.8 The web UI
+- 1.9 Federation
+- 1.10 DHCP: Kea
+- 1.11 802.1X: FreeRADIUS
+- 1.12 The DNS filter: AdGuard Home
+- 1.13 Time: chrony
+- 1.14 Container images
+- 1.15 Log forwarding: Fluent Bit
+- 1.16 Disk encryption
+- 1.17 The function reference
 
-## [Volume 2 — Technologies and features](volume_2_technologies_and_features/README.md)
+## [Volume 2 — Engineering decisions](volume_2_engineering_decisions/README.md)
 
-- 2.1 Settings reference
-- 2.2 DHCP: Kea
-- 2.3 802.1X: FreeRADIUS
-- 2.4 DNS filter: AdGuard Home
-- 2.5 Time: chrony
-- 2.6 Container images
-- 2.7 Host changes and consent
-- 2.8 Log forwarding: Fluent Bit
-- 2.9 Disk encryption
-- 2.10 Joining Linux machines
-- 2.11 Windows domain: Samba AD
-- 2.12 Third-party licences
+- 2.1 Decisions
+- 2.2 Troubleshooting
+- 2.3 Engineering notes
 
-## [Volume 3 — Operations](volume_3_operations/README.md)
+## [Volume 3 — Installation](volume_3_installation/README.md)
 
-- 3.1 Working with fabricctl
-- 3.2 DNS
-- 3.3 Certificates
-- 3.4 DHCP
-- 3.5 802.1X
-- 3.6 DNS filter
-- 3.7 Time
-- 3.8 People and identities
+- 3.1 The product, and how it is built and released
+- 3.2 Architecture and the host
+- 3.3 fabricctl, setup and fabric-agent
+- 3.4 DNS: BIND
+- 3.5 Certificates: Step-CA
+- 3.6 Identity: the directory and sign-in
+- 3.7 Secrets: OpenBao
+- 3.8 The web UI
 - 3.9 Federation
-- 3.10 OpenBao
-- 3.11 Images
-- 3.12 Log forwarding
-- 3.13 The web UI
-- 3.14 Lifecycle, status and ports
-- 3.15 The directory
+- 3.10 DHCP: Kea
+- 3.11 802.1X: FreeRADIUS
+- 3.12 The DNS filter: AdGuard Home
+- 3.13 Time: chrony
+- 3.14 Container images
+- 3.15 Log forwarding: Fluent Bit
+- 3.16 Disk encryption
+- 3.17 The function reference
 
-## [Volume 4 — Infrequent operations](volume_4_infrequent_ops/README.md)
+## [Volume 4 — Operations](volume_4_operations/README.md)
 
-- 4.1 Installation
-- 4.2 Joining an existing fabric
-- 4.3 Upgrades, rebuilds, reinstall, uninstall and restore
-- 4.4 Subordinate CA
-- 4.5 Disk encryption setup
-- 4.6 Host maintenance
-- 4.8 Testing
-- 4.9 Development
-
-## [Volume 5 — Notes and troubleshooting](volume_5_notes_and_troubleshooting/README.md)
-
-- 5.1 Manual alignment
-- 5.2 Stale-code register
-- 5.3 Review findings
-- 5.4 Blockers and deferred work
-- 5.5 Reasoning and trade-offs
-- 5.6 Troubleshooting
-- 5.7 Environments
+- 4.1 The product, and how it is built and released
+- 4.2 Architecture and the host
+- 4.3 fabricctl, setup and fabric-agent
+- 4.4 DNS: BIND
+- 4.5 Certificates: Step-CA
+- 4.6 Identity: the directory and sign-in
+- 4.7 Secrets: OpenBao
+- 4.8 The web UI
+- 4.9 Federation
+- 4.10 DHCP: Kea
+- 4.11 802.1X: FreeRADIUS
+- 4.12 The DNS filter: AdGuard Home
+- 4.13 Time: chrony
+- 4.14 Container images
+- 4.15 Log forwarding: Fluent Bit
+- 4.16 Disk encryption
+- 4.17 The function reference

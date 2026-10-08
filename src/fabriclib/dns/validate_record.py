@@ -38,7 +38,7 @@ def _host(value, field):
 
 
 def _link(form):
-    """Purpose: a record's landing-page link (manual 2.1.8.2, D118), from the form's link fields.
+    """Purpose: a record's landing-page link (manual 1.4.2.2, 2.1.4.2), from the form's link fields.
     Inputs:  form — dict: link ("on"/"true"/"1" to show the record on the landing page), link_label (≤ 60 printable
              characters without <, >, " or a backslash; default: the record's name), link_port (1-65535, optional),
              link_path (starting with "/", without spaces, quotes, backslashes or <>; optional).

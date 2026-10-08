@@ -4,7 +4,7 @@ from fabriclib.common.errors import ValidationError
 
 
 def finish_join(v, secrets, container="samba"):
-    """Purpose: after this site's DC joined the domain (manual 1.8.8.4, S8.2): delete the temporary join account at
+    """Purpose: after this site's DC joined the domain (manual 1.9.8.4, S8.2): delete the temporary join account at
              the DC it joined through, its parent's (it would expire within the hour anyway); the caller then forgets
              it (secrets ad_join).
     Inputs:  v — this site's vars (ad_join_server: the parent DC's address); secrets — fabric's secrets (ad_join:

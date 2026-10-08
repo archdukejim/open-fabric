@@ -1,4 +1,4 @@
-# S0 spike (manual 5.8.1.5) — throwaway, never merged into src/. A Samba AD DC from Debian's own packages on
+# S0 spike (manual 2.3.6.1.5) — throwaway, never merged into src/. A Samba AD DC from Debian's own packages on
 # fabric's pinned Debian base.
 ARG BASE_IMAGE=debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 FROM ${BASE_IMAGE}

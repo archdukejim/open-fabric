@@ -40,14 +40,18 @@ def _ask(group, changes, new):
             return answer.startswith("y")
 
 
-def ask_consent(config_dir, plan, interactive, approve=None, decline=None):
-    """Purpose: get an answer for every host change setup is about to make, before the first step (manual 2.7.1.4): one
+def ask_consent(config_dir, plan, interactive, approve=None, decline=None, stops=()):
+    """Purpose: get an answer for every host change setup is about to make, before the first step (manual 1.2.9.4): one
                 question per group, asked again only for changes not approved before.
     Inputs:  config_dir — the install's config folder (consent.yaml); plan — {group: [change, ...]} from
              plan_host_changes; interactive — False for --non-interactive (never asks); approve, decline — the
              --approve / --decline values (group names, comma-separated, or "all" for approve); they override
-             earlier answers. Env SUDO_USER/USER (recorded as who answered).
-    Returns: {group: "yes"|"no"} for the groups in plan. consent.yaml records each answer with the changes it
+             earlier answers; stops — groups whose "no" stops setup on this host though they are recommended (the
+             ports while ufw is on, 2.1.2.12). An earlier "no" that would stop setup (those, and required or choice
+             groups) is asked again in an interactive run, so a person is never stuck with it. Env SUDO_USER/USER
+             (recorded as who answered).
+    Returns: {group: "yes"|"no"|"skipped"} for the groups in plan ("skipped": not asked, a group it needs was
+             declined or skipped; nothing recorded for it). consent.yaml records each answer with the changes it
              covers (a yes keeps what was approved before too, so a later run that changes less still matches).
     Fails:   SetupError: an unknown group name; a non-interactive run with groups that have no answer (names
              them and the flag); a required or choice group answered no (says what that means). Answers given
@@ -63,14 +67,19 @@ def ask_consent(config_dir, plan, interactive, approve=None, decline=None):
     now = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
     who = os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
     for group, changes in plan.items():
+        needs = GROUPS[group].get("needs")
+        if needs in plan and answers.get(needs) in ("no", "skipped"):   # not asked once what it needs is declined
+            answers[group] = "skipped"                                    # (2.1.2.13); nor what needs this one
+            continue
         rec = groups.get(group) or {}
         new = [c for c in changes if c not in (rec.get("changes") or [])]
         if group in decline:
             yes = False
         elif group in approve or "all" in approve:
             yes = True
-        elif rec.get("answer") in ("yes", "no") and not new:
-            answers[group] = rec["answer"]
+        elif rec.get("answer") in ("yes", "no") and not new and not (
+                interactive and rec["answer"] == "no" and (GROUPS[group]["level"] != "recommended" or group in stops)):
+            answers[group] = rec["answer"]      # a "no" that would stop setup is asked again when someone is there
             continue
         elif not interactive:
             pending.append(group)

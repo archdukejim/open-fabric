@@ -12,7 +12,7 @@ from fabriclib.samba.run_converge import run_converge
 
 
 def converge_domain(v, federation_file, secrets, container="samba"):
-    """Purpose: bring the domain to what fabric wants (manual 2.11.2.15, S1.3): hand the wanted state to the converge
+    """Purpose: bring the domain to what fabric wants (manual 1.6.5.15, S1.3): hand the wanted state to the converge
              code inside the running DC (src/containers/samba/converge.py) and return what it changed. Every part is
              idempotent, so it runs after every start and apply.
     Inputs:  v — rendered vars: site_name, ad_password_policy, deploy_base_dir (the root CA under
@@ -42,13 +42,13 @@ def converge_domain(v, federation_file, secrets, container="samba"):
              "sso_spns": sso_spns(v)}
     state["sso_host"] = v["hostname_keycloak"] if state["sso_spns"] else ""
     state["rodc"] = not state["root"] and v.get("ad_dc_type") == "rodc"
-    if not state["root"]:                 # the AD site link to the parent (manual 1.8.8.5)
+    if not state["root"]:                 # the AD site link to the parent (manual 1.9.8.5)
         state["parent"] = (load_registry(federation_file).get("upstream") or {}).get("site_name") or ""
     return run_converge(state, container)
 
 
 def _lan_profile(v, root_ca):
-    """Purpose: the wired 802.1X profile the site's Windows baseline installs (manual 2.11.2.20): PEAP to this site's
+    """Purpose: the wired 802.1X profile the site's Windows baseline installs (manual 1.6.5.20): PEAP to this site's
              FreeRADIUS, checked against fabric's root CA.
     Inputs:  v — rendered vars (install_freeradius, radius_people, hostname_radius); root_ca — path of the root CA.
     Returns: str, the profile XML; "" while FreeRADIUS is off or no group is mapped (no password method on).

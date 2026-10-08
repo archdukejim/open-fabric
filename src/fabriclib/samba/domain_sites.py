@@ -7,7 +7,7 @@ from fabriclib.common.errors import ValidationError
 def domain_sites(container="samba"):
     """Purpose: every site in the domain as this site's DC holds it (manual 1.6.3.4, 1.6.3.9): read inside the DC
              from its own database (src/containers/samba/read_sites.py), so a block handed out anywhere in the domain
-             is seen, and a site that already exists (one moving here, D105) is recognised.
+             is seen, and a site that already exists (one moving here, 2.1.6.20) is recognised.
     Inputs:  container — this site's DC.
     Returns: list of {"site", "dn", "id_range"}.
     Fails:   ValidationError when the DC does not answer (a block must never be guessed).

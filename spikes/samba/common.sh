@@ -1,5 +1,5 @@
 #!/bin/bash
-# S0 spike (manual 5.8.1.5): shared setup. Throwaway: never merged into src/.
+# S0 spike (manual 2.3.6.1.5): shared setup. Throwaway: never merged into src/.
 # Everything is named s0-* (containers, network s0net, images s0/*) and lives in $W; nothing else is touched.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

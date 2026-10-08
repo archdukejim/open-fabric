@@ -14,7 +14,7 @@ def _cn(dn):
 
 def _site(dn):
     """Purpose: the site a person or group lives in: the OU enclosing its container (OU=people, OU=groups), since
-             sites nest (D105); "organisation" for the organisation's groups.
+             sites nest (2.1.6.20); "organisation" for the organisation's groups.
     Inputs:  dn — str.
     Returns: str, or "" outside OU=sites.
     Fails:   never.
@@ -29,7 +29,7 @@ def list_people(samdb, lp, site):
     """Purpose: the People page (manual 1.6.3): every person under OU=sites (service accounts left out) and the
              groups they may be in, never a password or a hash.
     Inputs:  samdb — SamDB (as the site's agent); lp — LoadParm (unused); site — str (unused: people are listed
-             across the domain, D90; who may change whom is AD's access control).
+             across the domain, 2.1.6.14; who may change whom is AD's access control).
     Returns: {"users": [{uid, name, mail, locked (disabled or locked out), groups [names], site, uidNumber}],
               "groups": [{name, members (count)}]}, both sorted by name.
     Fails:   ldb.LdbError from a search.

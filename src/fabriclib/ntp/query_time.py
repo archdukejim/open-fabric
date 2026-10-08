@@ -6,7 +6,7 @@ WRONG_BY = re.compile(r"System clock wrong by (-?[0-9.]+) seconds")
 
 
 def query_time(address, timeout=10):
-    """Purpose: how far this host's clock is from another NTP server, without changing anything (manual 2.5.1.4: a site
+    """Purpose: how far this host's clock is from another NTP server, without changing anything (manual 1.13.1.4: a site
                 compares itself with its upstream site).
     Inputs:  address — the server's IP address (str); timeout — seconds to wait.
     Returns: the offset in seconds (float, signed: positive when this clock is behind), or None when the server

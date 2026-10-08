@@ -1,6 +1,6 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# fabric's Samba AD DC (manual 2.11.2): provision the domain once, or join
+# fabric's Samba AD DC (manual 1.6.5): provision the domain once, or join
 # it as a DC or RODC (JOIN_ROLE), then converge the settings fabric owns in
 # smb.conf and run the DC in the foreground. A provisioned /data (its
 # .fabric-provisioned marker) is reused, so every later start only
@@ -48,6 +48,7 @@ elif [ -n "${JOIN_ROLE:-}" ]; then
     mkdir -p "$DATA/etc"
     samba-tool domain join "${REALM,,}" "$JOIN_ROLE" --server="$JOIN_SERVER" -A /run/secrets/join.auth \
         --targetdir="$DATA" --dns-backend=BIND9_DLZ --option="netbios name = $HOST_NAME" ${JOIN_SITE:+--site="$JOIN_SITE"} "${OPTS[@]}" \
+        --option="interfaces = $INTERFACES" --option="bind interfaces only = yes" \
         > /tmp/join.log 2>&1 || { show_log /tmp/join.log; exit 1; }
     rm -f /tmp/join.log
     touch "$DONE"
@@ -57,8 +58,11 @@ else
     clear_data
     # no --adminpass: provisioning makes a random one (and prints it: the log is discarded), replaced from the
     # secret file at once
+    # interfaces limited from the start: provisioning otherwise guesses the host's IPv6 addresses (host network) and
+    # publishes them as AAAA records the DC never answers on (2.1.6.29: IPv4 only)
     samba-tool domain provision --targetdir="$DATA" --server-role=dc --use-rfc2307 --dns-backend=BIND9_DLZ \
         --realm="$REALM" --domain="$NETBIOS" --host-name="$HOST_NAME" --host-ip="$HOST_IP" "${OPTS[@]}" \
+        --option="interfaces = $INTERFACES" --option="bind interfaces only = yes" \
         > /tmp/provision.log 2>&1 || { show_log /tmp/provision.log; exit 1; }
     rm -f /tmp/provision.log
     python3 /usr/local/bin/set_password.py "$CONF" Administrator /run/secrets/admin_password
@@ -89,14 +93,14 @@ set_global "rpc server dynamic port range" "$RPC_PORTS"
 set_global "ntlm auth" "mschapv2-and-ntlmv2-only"
 set_global "old password allowed period" "$OLD_PASSWORD_MINUTES"
 set_global "acl_xattr:security_acl_name" "user.NTACL"
-# LDAPS with fabric's Step-CA certificate (S6, D78); Samba's own CA stays off
+# LDAPS with fabric's Step-CA certificate (2.1.5.3); Samba's own CA stays off
 set_global "tls enabled" "yes"
 set_global "tls certfile" "/tls/fullchain.pem"
 set_global "tls keyfile" "/tls/privkey.pem"
 set_global "tls cafile" "/tls/root_ca.crt"
 set_global "ntp signd socket directory" "/run/samba/ntp_signd"
 set_global "winbindd socket directory" "/run/samba/winbindd"
-# never advertised (D94, the owner's condition): no mDNS; SYSVOL and NETLOGON left out of share lists (Windows
+# never advertised (2.1.6.16, the owner's condition): no mDNS; SYSVOL and NETLOGON left out of share lists (Windows
 # reads policy by its path, which hiding does not change)
 set_global "multicast dns register" "no"
 
@@ -112,7 +116,7 @@ set_share() {
 set_share sysvol browseable no
 set_share netlogon browseable no
 
-# Group Policy between sites (manual 1.8.8.15): every 5 minutes, the GPO folders this DC does not own, from the DC
+# Group Policy between sites (manual 1.9.8.15): every 5 minutes, the GPO folders this DC does not own, from the DC
 # that does (tini reaps it with the DC)
 (
     sleep 60

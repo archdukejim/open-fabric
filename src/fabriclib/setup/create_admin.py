@@ -118,7 +118,7 @@ def run(ctx):
         info(f"people are created at the root site: '{user}' signs in here once the root's directory has them "
              f"(in '{v.get('webui_admin_group', 'admins')}')")
 
-    if v.get("webui_client_cert"):            # the web console asks for one (D108: off by default)
+    if v.get("webui_client_cert"):            # the web console asks for one (2.1.8.2: off by default)
         _client_cert(ctx, v, user, folder, (uid, gid))
     else:
         ok("no client certificate: the web console does not ask for one (raise it in the Security page)")

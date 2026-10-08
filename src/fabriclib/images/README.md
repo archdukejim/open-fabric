@@ -1,6 +1,6 @@
 # fabriclib/images
 
-Container images on the host (design [2.6.2](../../../docs/volume_2_technologies_and_features/2.6.2-image-updates.md#2621-status), D21).
+Container images on the host (design [1.14.2](../../../docs/volume_1_description_and_architecture/1.14.2-image-updates.md#11421-status), 2.1.14.3).
 Every image is pinned by digest; the validated list is `config/images.lock.yaml`
 of the installed fabric. Nothing here runs on its own: a fabric upgrade keeps
 the images a host runs, and only `fabricctl images update` moves them.
@@ -18,6 +18,6 @@ the images a host runs, and only `fabricctl images update` moves them.
 | `rollback_image.py` | Back to the image before the last update |
 | `prune_images.py` | Remove old images of fabric's repositories: not pinned, not the rollback image, not used by any container |
 | `run_images_command.py` | `fabricctl images status / update / rollback / prune` |
-| `published_image.py` | The one rule: does this host run fabric's published image or build its own (ids must match, D80) |
+| `published_image.py` | The one rule: does this host run fabric's published image or build its own (ids must match, 2.1.14.5) |
 | `effective_service.py` | A managed service as this host runs it (published image: its own var, no local build) |
 | `verify_signature.py` | `cosign verify` (pinned image) of a published image against fabric's signer; verified digests remembered |
