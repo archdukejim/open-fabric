@@ -183,7 +183,8 @@ docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	b6785036169b3
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	f9ed085182112565297c4081d5b22809e277b416	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	b25e27b0c4aa25b8e712376182ed1b3c89d04bf5	2026-10-08	
-docs/volume_5_notes_and_troubleshooting/README.md	6b0682d8ccf1087defb672936a940a2c9895d68c	2026-10-07	
+docs/volume_5_notes_and_troubleshooting/5.8.3-manual-rebaseline.md	eda593788374bcdaf108a00150eaa8f6d25c75f6	2026-10-08	
+docs/volume_5_notes_and_troubleshooting/README.md	ab1c3d87c26cca3091cd376083e1ed6601cec7da	2026-10-08	
 docs/volume_5_notes_and_troubleshooting/assets/README.md	560bf77c616b708500d35030a5ddc8cc4caa08d7	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/assets/review-ledger.tsv	a0d4df6c7ced03292e742d4cf322ded25da1a379	2026-10-05	
 examples/README.md	8350c988c36d9098f3a1ae7945d585541264ea22	2026-10-03	
