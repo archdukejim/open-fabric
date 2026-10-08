@@ -41,13 +41,13 @@ def _ask(group, changes, new):
 
 
 def ask_consent(config_dir, plan, interactive, approve=None, decline=None, stops=()):
-    """Purpose: get an answer for every host change setup is about to make, before the first step (manual 2.7.1.4): one
+    """Purpose: get an answer for every host change setup is about to make, before the first step (manual 1.2.9.4): one
                 question per group, asked again only for changes not approved before.
     Inputs:  config_dir — the install's config folder (consent.yaml); plan — {group: [change, ...]} from
              plan_host_changes; interactive — False for --non-interactive (never asks); approve, decline — the
              --approve / --decline values (group names, comma-separated, or "all" for approve); they override
              earlier answers; stops — groups whose "no" stops setup on this host though they are recommended (the
-             ports while ufw is on, D119). An earlier "no" that would stop setup (those, and required or choice
+             ports while ufw is on, 2.1.2.12). An earlier "no" that would stop setup (those, and required or choice
              groups) is asked again in an interactive run, so a person is never stuck with it. Env SUDO_USER/USER
              (recorded as who answered).
     Returns: {group: "yes"|"no"|"skipped"} for the groups in plan ("skipped": not asked, a group it needs was
@@ -69,7 +69,7 @@ def ask_consent(config_dir, plan, interactive, approve=None, decline=None, stops
     for group, changes in plan.items():
         needs = GROUPS[group].get("needs")
         if needs in plan and answers.get(needs) in ("no", "skipped"):   # not asked once what it needs is declined
-            answers[group] = "skipped"                                    # (D121); nor what needs this one
+            answers[group] = "skipped"                                    # (2.1.2.13); nor what needs this one
             continue
         rec = groups.get(group) or {}
         new = [c for c in changes if c not in (rec.get("changes") or [])]

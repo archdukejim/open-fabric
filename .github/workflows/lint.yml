@@ -1,4 +1,4 @@
-# Lint (decision D34, manual 4.8.2): the same suite as `sudo tests/run-all.sh lint` — ruff and shellcheck from
+# Lint (decision 2.1.1.15, manual 3.1.2): the same suite as `sudo tests/run-all.sh lint` — ruff and shellcheck from
 # their images, pinned by digest. A change is not done while this fails.
 name: lint
 

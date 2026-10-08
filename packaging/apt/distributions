@@ -4,7 +4,7 @@ Suite: stable
 Codename: stable
 Architectures: amd64 arm64
 Components: main
-Description: fabric releases (manual 1.4.1.1, D7)
+Description: fabric releases (manual 1.3.1.1, 2.1.1.2)
 SignWith: default
 
 Origin: open-fabric
@@ -13,5 +13,5 @@ Suite: testing
 Codename: testing
 Architectures: amd64 arm64
 Components: main
-Description: fabric release candidates, for testing before a release (manual 4.7.1)
+Description: fabric release candidates, for testing before a release (manual 3.14.1)
 SignWith: default

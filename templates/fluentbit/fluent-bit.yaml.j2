@@ -1,4 +1,4 @@
-# Fluent Bit — rendered by fabricctl (fabric/jinja/fluentbit/fluent-bit.yaml.j2), design D20.
+# Fluent Bit — rendered by fabricctl (fabric/jinja/fluentbit/fluent-bit.yaml.j2), design 2.1.15.1.
 # Every destination is verified TLS; credentials come from secrets.env (from OpenBao).
 {% set lf = log_forwarding | default({}) %}
 {% set sl = lf.syslog | default({}) %}

@@ -1,4 +1,4 @@
-"""The `samba` suite, the ADMX editor (manual 2.11.2.20, S5.4): `fabricctl gpo` against a real DC with a real template
+"""The `samba` suite, the ADMX editor (manual 1.6.5.20, S5.4): `fabricctl gpo` against a real DC with a real template
 (Samba's own samba.admx, shipped in the DC's image) and fabric's starter template. Proves: templates loaded into the
 central store; policies listed with their elements; text, boolean and list policies written into the site's admin
 settings GPO as Windows' editor writes them (read back from SYSVOL), replaced, disabled and cleared; the GPO linked to
@@ -155,7 +155,7 @@ for name in ("admin settings", "controls"):
 """
 links = subprocess.run(["docker", "exec", "-i", DC, "python3", "-"], input=LINKS, capture_output=True, text=True).stdout
 check("a policy set as a control goes to lan's controls GPO, linked enforced (2), the admin settings GPO not "
-      "(0), and the admin settings keep their own value (D105)",
+      "(0), and the admin settings keep their own value (2.1.6.20)",
       code == 0 and ["Software\\Policies\\Example\\Starter", "ExampleText", 1, "locked"] in controls
       and "admin settings 0" in links and "controls 2" in links
       and ["Software\\Policies\\Example\\Starter", "ExampleText", 1, "hello"] in machine(), (out, links, controls))

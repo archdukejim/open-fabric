@@ -48,7 +48,7 @@ def _ensure_shape(kc, realm, alias):
         kc.call("DELETE", f"{base}/{flows[alias]['id']}")
         step(f"rebuilt the sign-in flow {alias} (its shape had changed)")
     kc.call("POST", base, {"alias": alias, "providerId": "basic-flow", "topLevel": True, "builtIn": False,
-                           "description": "fabric's sign-in (manual 5.8.2.6.2)"})
+                           "description": "fabric's sign-in (manual 2.3.6.2.6.2)"})
     parents = {0: alias}
     for level, what in _SHAPE[alias]:
         parent = parents[level]
@@ -107,7 +107,7 @@ def _unbind(kc, realm, flow_id):
 
 
 def ensure_signin_flows(kc, realm, v):
-    """Purpose: fabric's two sign-in flows (manual 5.8.2.6.2) and the realm settings they use: fabric-signin, the
+    """Purpose: fabric's two sign-in flows (manual 2.3.6.2.6.2) and the realm settings they use: fabric-signin, the
              realm's browser flow (every app), and fabric-admin-signin for the admin tools (the web console, OpenBao's
              UI, AdGuard's page), which never accepts the session cookie, so a sign-in without the admin tools' second
              factor never carries into them. Each: Kerberos (on with signin_kerberos) or the password form, then the

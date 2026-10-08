@@ -1,7 +1,7 @@
 # spikes/samba — the S0 spike (throwaway)
 
-Answers the questions of manual 5.8.1.5 (Samba AD replacing 389-DS) with real containers. Never merged into
-`src/` (global Rule 4); results are recorded in the manual (5.8.1.7).
+Answers the questions of manual 2.3.6.1.5 (Samba AD replacing 389-DS) with real containers. Never merged into
+`src/` (global Rule 4); results are recorded in the manual (2.3.6.1.7).
 
 Run in a Linux/WSL shell with Docker, from the repository root. Everything is named `s0-*` (containers, the
 network `s0net`, images `s0/*`) and kept in `/var/tmp/s0`; nothing else is touched.

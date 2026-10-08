@@ -40,7 +40,7 @@ def configure_keycloak(vars_path, secrets_path):
     realm_id = ensure_realm(kc, realm, v.get("friendly_name") or v["domain"])
     # fabric's directory, Samba AD (manual 1.6.3.11): people and groups
     writable = is_root_site(os.path.join(v["deploy_base_dir"], "fabric", "config", "federation.yaml"))
-    # Kerberos sign-in (manual 5.8.2.6.2) once the site's DC has exported its keytab (a read-only DC cannot make one)
+    # Kerberos sign-in (manual 2.3.6.2.6.2) once the site's DC has exported its keytab (a read-only DC cannot make one)
     kerberos = bool(v.get("signin_kerberos", True)) and os.path.exists(
         os.path.join(v["deploy_base_dir"], "keycloak", "kerberos", "sso.keytab"))
     ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s, writable, kerberos), v)

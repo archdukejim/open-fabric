@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- fabric's blank starter template (manual 3.15.4): copy it with `fabricctl gpo starter <folder>`, rename the files
+<!-- fabric's blank starter template (manual 4.6.8): copy it with `fabricctl gpo starter <folder>`, rename the files
      and the namespace, replace the example policy with your own, then `fabricctl gpo load <folder>`. Every policy
      writes under a key in Software\Policies\<your organisation>; the texts live in en-US/fabric-starter.adml. -->
 <policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

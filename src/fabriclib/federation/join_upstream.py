@@ -20,7 +20,7 @@ ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert
 
 def join_upstream(v, invitation, password, work_dir, domain, address, config_dir=None, audit_path=None,
                   http_port=80, https_port=443, replace=False, dns_port=53):
-    """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (manual 1.8.4.1 step
+    """Purpose: On a node being set up with `--join`: join the upstream that made the invitation (manual 1.9.4.1 step
                 2): make this site's CA key and request, fetch and pin the upstream's root,
              send the join over TLS verified against that root, check and stage the signed intermediate, and
              record the upstream.
@@ -43,7 +43,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had,
              "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller
              keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry), "domain": the domain
-             this site's DC joins ({} when the invitation named none; manual 1.8.8.4: the caller keeps its passwords
+             this site's DC joins ({} when the invitation named none; manual 1.9.8.4: the caller keeps its passwords
              in fabric's secrets and its settings in the vars)}.
     Fails:   ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the
              upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered

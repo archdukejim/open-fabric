@@ -18,16 +18,16 @@ def service_units(base, v):
         # fabric-unlock: OpenBao starts only when an unlock method gives its key; the key is wiped once unsealed.
         {'service': 'openbao', 'compose': 'openbao', 'folder': 'openbao', 'requires': [],
          'condition': f"{cli} vault unlock", 'post': [f"{cli} vault wipe-key"]},
-        # optional log forwarding (design D20)
+        # optional log forwarding (design 2.1.15.1)
         {'service': 'fluentbit', 'compose': 'fluentbit', 'folder': 'fluentbit', 'requires': []},
         # optional DHCP (design §5): kea-dhcp4 on the host network + kea-ddns
         {'service': 'kea', 'compose': 'kea-dhcp4', 'folder': 'kea', 'requires': ['bind9']},
         # optional 802.1X (design §6): asks the domain controller about every device
         {'service': 'freeradius', 'compose': 'freeradius', 'folder': 'freeradius', 'requires': []},
-        # the directory (manual 2.11.2): the Samba AD DC on the host network, on every install; no requires: BIND
+        # the directory (manual 1.6.5): the Samba AD DC on the host network, on every install; no requires: BIND
         # reads its database for the AD zone, but a DC restart must not take DNS down, nor a BIND restart the DC
         {'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []},
-        # optional DNS filter (manual 2.4.1): AdGuard Home on host_ip:53 in front of BIND, oauth2-proxy for its UI;
+        # optional DNS filter (manual 1.12.1): AdGuard Home on host_ip:53 in front of BIND, oauth2-proxy for its UI;
         # no requires: a BIND restart (every DNS apply) must not take the clients' DNS down with it
         {'service': 'adguard', 'compose': 'adguardhome', 'folder': 'adguard', 'requires': []},
         # its sign-in, a unit of its own: when it or Keycloak is down only AdGuard's UI is, never DNS

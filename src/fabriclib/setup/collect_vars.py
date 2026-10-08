@@ -38,7 +38,7 @@ HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9]
 
 def _valid(key, value):
     """Purpose: check one answer or vars value for a required or asked setting, as strictly as what uses it later, so a
-             bad answer is asked again at once instead of failing a later step (the owner's first install, 5.8.2.11).
+             bad answer is asked again at once instead of failing a later step (the owner's first install, 2.3.6.2.11).
     Inputs:  key — setting name (host_ip, lan_gateway, lan_cidr, webui_admin_user, domain, hostname, friendly_name, or
              other); value — str.
     Returns: True if valid: an IPv4 address; an IPv4 network; an admin username matching ADMIN_RE that no system or
@@ -144,7 +144,7 @@ def _join_defaults(ctx, data):
     data["site_name"], data["org_domain"], data["ldap_base_dn"] = inv["site"], inv["org_domain"], inv["ldap_base_dn"]
     if not data.get("domain"):
         data["domain"] = f"{inv['site']}.{inv['org_domain']}"
-    if inv["dc"]:                            # the organisation's domain: this site's DC joins it (manual 1.8.8.4)
+    if inv["dc"]:                            # the organisation's domain: this site's DC joins it (manual 1.9.8.4)
         data["ad_domain"], data["ad_password_policy"] = inv["ad_domain"], inv["ad_password_policy"]
         data["ad_dc_type"] = inv["dc"]
     info(f"joining {inv['upstream']} ({inv['org_domain']}) as site {inv['site']}, domain {data['domain']}")
@@ -193,7 +193,7 @@ def collect_vars(ctx):
         # Never on an existing install: it would undo later edits.
         user_file, user = repo_vars, _load(repo_vars)
     if user_file:
-        try:                                  # a --file never lowers a sign-in layer (D111): the command does
+        try:                                  # a --file never lowers a sign-in layer (2.1.6.24): the command does
             check_signin_lowering(_load(ctx.vars_file) if os.path.exists(ctx.vars_file) else {}, user)
         except ValidationError as e:
             raise SetupError(str(e))
@@ -230,15 +230,15 @@ def collect_vars(ctx):
         default = sudo_user if sudo_user != "root" and _valid("webui_admin_user", sudo_user) else "fabricadmin"
         data["webui_admin_user"] = default if ctx.non_interactive else _ask("webui_admin_user", default)
 
-    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (D87, D89)
+    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (2.1.6.11, 2.1.6.13)
     policy = data.get("ad_password_policy") or {}
     if not data.get("ad_domain") or not (set(POLICY_KEYS) | {"complexity"}) <= set(policy):
         if ctx.non_interactive:
             raise SetupError("missing in the vars file: ad_domain and every key of ad_password_policy (manual "
-                             "2.1.9.7: the directory's domain and password policy have no defaults)")
+                             "1.1.9.7: the directory's domain and password policy have no defaults)")
         ctx.vars = data
         ask_ad_domain(ctx)
-    # how much of this host fabric may use (D31, manual 1.3.4.2): measured, asked once
+    # how much of this host fabric may use (2.1.2.3, manual 1.2.4.2): measured, asked once
     ask_ram(ctx, data)
 
     data["deploy_base_dir"] = ctx.deploy_base

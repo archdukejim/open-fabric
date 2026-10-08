@@ -1,6 +1,6 @@
 services:
   oauth2-proxy:
-    # OIDC sign-in for AdGuard's UI (manual 2.4.1.6): nginx asks it before every request
+    # OIDC sign-in for AdGuard's UI (manual 1.12.1.6): nginx asks it before every request
     # (auth_request); people need the fabric:dns:filter permission. Secrets from secrets.env, never argv.
     # A unit of its own (adguard-auth), apart from AdGuard: when it or Keycloak is down only the UI is
     # unreachable, DNS keeps answering. Its files live in /opt/adguard/oauth2-proxy (deploy_adguard).

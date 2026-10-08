@@ -14,5 +14,5 @@ __pycache__/
 # built packages (packaging/deb/build-deb.sh)
 dist/
 
-# staged image build contexts (packaging/images/stage-contexts.sh, manual 4.7.1)
+# staged image build contexts (packaging/images/stage-contexts.sh, manual 3.14.1)
 /build/

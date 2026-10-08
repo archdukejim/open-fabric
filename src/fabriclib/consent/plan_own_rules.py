@@ -4,8 +4,8 @@ from fabriclib.security.ssh_ports import ssh_ports
 
 
 def plan_own_rules(v, config_dir):
-    """Purpose: the host's own ufw rules securing the host would remove (manual 2.7.1.3 `own_rules`, D121), one by one;
-             asked only after `firewall` is allowed.
+    """Purpose: the host's own ufw rules securing the host would remove (manual 1.2.9.3 `own_rules`, 2.1.2.13), one by
+             one; asked only after `firewall` is allowed.
     Inputs:  v — vars (security.firewall, default True; firewall_rules reads the rest); config_dir — the install's
              config folder.
     Returns: list of str ("ufw: remove <rule as ufw shows it> (the host's own)"); [] when there are none, or with

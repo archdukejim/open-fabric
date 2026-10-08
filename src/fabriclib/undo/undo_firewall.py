@@ -9,7 +9,7 @@ UNIT = "/etc/systemd/system/fabric-firewall.service"
 
 
 def undo_firewall(config_dir):
-    """Purpose: undo the `ports`, `firewall` and `own_rules` host changes (manual 2.7.1.5, D121): the ufw rules
+    """Purpose: undo the `ports`, `firewall` and `own_rules` host changes (manual 1.2.9.5, 2.1.2.13): the ufw rules
              fabric added, the host's own rules it removed put back, its DOCKER-USER rules and their boot unit; ufw
              switched off again if it was off before fabric. When ufw stays
              on (it was on before, or that is not known), fabric's SSH rules stay too: removing them would lock every
@@ -31,13 +31,13 @@ def undo_firewall(config_dir):
         for x in open(record).read().split():
             if kind == "ssh" and stays_on:
                 # ufw stays on with its default policy: without this rule nobody could SSH in again (the test Pi
-                # was locked out so, 5.8.1.27); it stays, and ufw's own `sudo ufw delete allow ...` removes it
+                # was locked out so, 2.3.6.1.27); it stays, and ufw's own `sudo ufw delete allow ...` removes it
                 done.append(f"ufw: fabric's SSH rule for {x} kept (ufw stays on; without it SSH would be refused)")
                 continue
             subprocess.run(["ufw", "delete", "allow", *ufw_rule(kind, x)], capture_output=True)
             done.append(f"ufw: fabric's {kind} rule for {x} removed")
         os.remove(record)
-    own = os.path.join(config_dir, OWN_RULES)          # the host's own rules fabric removed (D121): put back
+    own = os.path.join(config_dir, OWN_RULES)          # the host's own rules fabric removed (2.1.2.13): put back
     if os.path.exists(own):
         for rule in open(own).read().splitlines():
             if rule.startswith("ufw "):

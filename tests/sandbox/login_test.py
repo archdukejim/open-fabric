@@ -218,7 +218,7 @@ def vault_login(user, password):
 
 
 def adguard_login(user, password):
-    """AdGuard Home's UI behind oauth2-proxy (manual 2.4.1.6): the page sends a stranger to sign-in,
+    """AdGuard Home's UI behind oauth2-proxy (manual 1.12.1.6): the page sends a stranger to sign-in,
     Keycloak, the callback, then the page again. Returns (status, page) of that last request."""
     b = Browser()
     st, loc, page = b.request("GET", f"https://{ADG}/")
@@ -233,14 +233,14 @@ def adguard_login(user, password):
     return st, page
 
 
-# -- the default (D110, 0.6.1): no client certificate, a password only; then stop (SIGNIN_MODE=plain) --------------
+# -- the default (2.1.6.23, 0.6.1): no client certificate, a password only; then stop (SIGNIN_MODE=plain) --------------
 if os.environ.get("SIGNIN_MODE") == "plain":
     b = Browser()
     st, loc, _ = b.request("GET", f"https://{MGR}/")
     check("no certificate asked: a newcomer is sent to sign in (/login), not refused", st == 303 and
           loc.endswith("/login"), (st, loc))
     st, page, seen = login(b, ADMIN, read("initial-password.txt"))
-    check("the admin signs in with a password only: a new password asked, no TOTP (D110)",
+    check("the admin signs in with a password only: a new password asked, no TOTP (2.1.6.23)",
           st == 200 and "update-password" in seen and "configure-totp" not in seen and "otp" not in seen, (st, seen))
     st, _, page = b.request("GET", f"https://{MGR}/security")
     check("the Security page shows the layers to raise", st == 200 and "admin-2fa" in page, st)

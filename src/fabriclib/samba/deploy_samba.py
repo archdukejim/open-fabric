@@ -7,7 +7,7 @@ from fabriclib.samba.write_bind_dlz import write_bind_dlz
 
 
 def deploy_samba(v, secrets, jinja_env):
-    """Purpose: write the domain controller's files under <deploy_base>/samba during apply (manual 2.11.2): the
+    """Purpose: write the domain controller's files under <deploy_base>/samba during apply (manual 1.6.5): the
              Administrator's password for provisioning and the code that converges the domain inside the DC.
     Inputs:  v — the rendered vars: deploy_base_dir, host_ip, ad_domain. secrets — fabric's secrets
              (ad_admin_password).
@@ -35,14 +35,14 @@ def deploy_samba(v, secrets, jinja_env):
         os.makedirs(os.path.join(base, "data", sub), mode=0o755, exist_ok=True)
     # winbind's sockets, on the host so FreeRADIUS can reach them (PEAP through ntlm_auth); winbind makes the pipe
     ensure_dir(os.path.join(base, "winbindd"), 0o755, 0, 0)
-    # its time-signing socket (D100): root and chrony's group, 0750 (Samba checks the owner and the mode), so the
+    # its time-signing socket (2.1.13.1): root and chrony's group, 0750 (Samba checks the owner and the mode), so the
     # host's chrony signs Windows members' time
     ensure_dir(v["ad_ntp_signd_dir"], 0o750, 0, _chrony_gid())
     # BIND includes these when it starts: they must exist; turning DLZ on is for after the domain is converged
     if not os.path.exists(os.path.join(base, "bind", "dlz.conf")):
         write_bind_dlz(v)
     write_file_if_changed(os.path.join(base, "secrets", "admin_password"), secrets["ad_admin_password"] + "\n", 0o600)
-    # a site joining the root's domain (manual 1.8.8.4): the temporary join account as a credentials file, kept until
+    # a site joining the root's domain (manual 1.9.8.4): the temporary join account as a credentials file, kept until
     # the account is deleted after the join (finish_join)
     join, auth = secrets.get("ad_join") or {}, os.path.join(base, "secrets", "join.auth")
     if join.get("user"):
@@ -59,7 +59,7 @@ def deploy_samba(v, secrets, jinja_env):
     restart = write_file_if_changed(os.path.join(base, "resolv.conf"),
                                     f"nameserver {resolver}\nsearch {v['ad_domain']}\n", 0o644)
     src = os.path.join(jinja_env.loader.searchpath[0], "samba", "converge")
-    if not os.path.isdir(src):              # a checkout: the converge code lives in src/containers/ (manual 1.3.2)
+    if not os.path.isdir(src):              # a checkout: the converge code lives in src/containers/ (manual 1.2.2)
         src = os.path.join(os.path.dirname(jinja_env.loader.searchpath[0]), "src", "containers", "samba")
     converge = False
     for name in sorted(os.listdir(src)):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Nested sites and re-parenting (manual 1.8.5.1) with the real Step-CA image:
+"""Nested sites and re-parenting (manual 1.9.5.1) with the real Step-CA image:
 
 the root site `lan` (a root of path length 2: one level of nesting) invites `lab` with --nest 1; lab, now
 a site that may hold sites, invites `lab2` (nested under it); lab2 is then re-parented under the root.

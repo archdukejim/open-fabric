@@ -65,7 +65,7 @@ def install_service_units(paths, final_vars, units):
                 if context_changed or needs_rebuild(src_dc):
                     rebuild.add(folder)
                     changed = True
-            elif not _present(src_dc):      # fabric's published image (manual 2.6.3.3): pulled, not built
+            elif not _present(src_dc):      # fabric's published image (manual 1.14.3.3): pulled, not built
                 rebuild.add(folder)
         src_unit = os.path.join(out, "systemd", f"{name}.service")
         if os.path.exists(src_unit) and copy_if_changed(src_unit, f"/etc/systemd/system/{name}.service", 0o644):

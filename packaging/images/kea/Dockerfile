@@ -1,5 +1,5 @@
 # Kea DHCPv4 + DHCP-DDNS 3.0 LTS from ISC's own signed apt repository (Debian
-# trixie ships only 2.6; design D22), on the validated Debian base. The Kea
+# trixie ships only 2.6; design 2.1.1.5), on the validated Debian base. The Kea
 # version and the repository key's fingerprint come from images.lock.yaml:
 # the build fails if the key is not ISC's, and installs exactly that version.
 # The base is always given by the compose file (digest-pinned, no default).

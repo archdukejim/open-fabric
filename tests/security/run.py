@@ -1,4 +1,4 @@
-"""The `security` suite (manual 5.8.2.6.4, D111): fabric's sign-in layers changed on a scratch install's settings —
+"""The `security` suite (manual 2.3.6.2.6.4, 2.1.6.24): fabric's sign-in layers changed on a scratch install's settings —
 raises, lowerings only when asked for and recorded until raised back, Kerberos both ways, the audit entries, the
 relaxations status shows, setup refusing a lowering, and `fabricctl security` refusing a lowering without its typed
 confirmation. No services: the apply itself is the keycloak and host suites'.
@@ -62,10 +62,10 @@ def refused(fn, *a, **kw):
 
 set_layer = ssl_mod.set_signin_layer
 rows = {r["layer"]: r for r in signin_rows(state(), {})}
-check("status by default (D110): no second factor, no certificate, Kerberos on; raising offers the stronger values",
+check("status by default (2.1.6.23): no second factor, no certificate, Kerberos on; raising offers the stronger values",
       rows["admin-2fa"]["value"] == "none" and rows["client-cert"]["value"] == "off"
       and rows["kerberos"]["value"] == "on" and rows["admin-2fa"]["choices"] == ["any", "totp", "passkey"])
-check("status lists the password-only default as a relaxation (Rule 10, D110)",
+check("status lists the password-only default as a relaxation (Rule 10, 2.1.6.23)",
       any(r["setting"].startswith("signin_admin_second_factor: none")
           for r in relaxed_settings(state(), os.path.dirname(VARS))))
 res = set_layer("alice", "admin-2fa", "totp", "web", vars_file=VARS)

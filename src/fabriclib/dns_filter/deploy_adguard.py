@@ -23,13 +23,13 @@ def _domains(v, links):
     if (links or {}).get("upstream"):
         names.append(links["upstream"]["domain"])
     names += list(reverse_zones(v)["zones"])
-    # the Windows domain's zone (BIND serves it through DLZ): needed when it is not under fabric's domain (D87)
+    # the Windows domain's zone (BIND serves it through DLZ): needed when it is not under fabric's domain (2.1.6.11)
     names.append(v.get("ad_domain"))
     return list(dict.fromkeys(n for n in names if n))
 
 
 def deploy_adguard(v, secrets, links, jinja_env):
-    """Purpose: Write the DNS filter's files (manual 2.4.1): AdGuard Home's configuration (fabric's keys
+    """Purpose: Write the DNS filter's files (manual 1.12.1): AdGuard Home's configuration (fabric's keys
              merged into what AdGuard has), oauth2-proxy's settings and secrets, and the nginx snippet that signs
              requests into AdGuard after OIDC.
     Inputs:  v — rendered vars: deploy_base_dir, service_users (adguard, oauth2proxy, nginx), ip_bind9, host_ip,
@@ -91,6 +91,6 @@ def deploy_adguard(v, secrets, links, jinja_env):
     inc = os.path.join(v["deploy_base_dir"], "nginx", "config", "conf.d", "adguard-auth.inc")
     os.makedirs(os.path.dirname(inc), exist_ok=True)
     changed["nginx"] = write_file_if_changed(
-        inc, "# fabric: AdGuard Home's own login, sent only after OIDC sign-in (manual 2.4.1.6)\n"
+        inc, "# fabric: AdGuard Home's own login, sent only after OIDC sign-in (manual 1.12.1.6)\n"
              f'proxy_set_header Authorization "Basic {basic}";\n', 0o640, 0, n_gid)
     return changed

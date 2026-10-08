@@ -32,7 +32,7 @@ LOGIN=$("${SSH[@]}" whoami); HOSTNAME_=$("${SSH[@]}" 'hostname -s')
 echo "--- target: $TARGET ($("${SSH[@]}" 'uname -m; . /etc/os-release; echo $PRETTY_NAME' | tr '\n' ' '))"
 
 if [ -n "${APT_SUITE:-}" ]; then
-    # as users install it (manual 4.1.3): fabric's signed apt repository on GitHub Pages, suite stable or testing
+    # as users install it (manual 3.3.1): fabric's signed apt repository on GitHub Pages, suite stable or testing
     APT_URL="${APT_URL:-https://archdukejim.github.io/open-fabric}"
     R "wget -qO- $APT_URL/public.key | gpg --dearmor --yes -o /usr/share/keyrings/fabric-archive-keyring.gpg &&        echo 'deb [signed-by=/usr/share/keyrings/fabric-archive-keyring.gpg] $APT_URL $APT_SUITE main'        > /etc/apt/sources.list.d/fabric.list && apt-get update &&        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fabricctl" > "$OUT/apt.log" 2>&1
     check "fabric's apt repository ($APT_SUITE) is trusted by its key and installs fabricctl"         "R 'dpkg -s fabricctl' | grep -q '^Status: install ok installed' && ! grep -qiE 'NO_PUBKEY|not signed|GPG error' '$OUT/apt.log'"
@@ -84,7 +84,7 @@ check "LAN clients reach the certificate page over plain HTTP: http://$HOST_IP/c
 BIND_PORT=$(R "awk '/^bind_dns_port:/ {print \$2}' /opt/fabric/config/vars.yaml")    # 5053 behind the DNS filter
 R "bash /tmp/rfc2136_test.sh $HOST_IP $DOMAIN npm '$TSIG_SECRET' npm $BIND_PORT" > "$OUT/rfc2136.log" 2>&1
 check "RFC2136 to BIND's port ($BIND_PORT) with the embedded TSIG key (npm): allowed name only, wrong keys refused" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
-# the DNS filter is on by default (D112): AdGuard on 53 in front of BIND on 5053, Cloudflare upstream, AdGuard's list
+# the DNS filter is on by default (2.1.12.1): AdGuard on 53 in front of BIND on 5053, Cloudflare upstream, AdGuard's list
 check "DNS filter on by default: AdGuard on 53 answers fabric's names, BIND behind it on 5053" \
     "R 'dig +short @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP && R 'dig +short -p 5053 @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP"
 check "DNS filter: internet names through Cloudflare; an ad domain blocked by AdGuard's DNS filter (NXDOMAIN from AdGuard)" \
@@ -115,12 +115,12 @@ ADMIN=$(R "awk '/^webui_admin_user:/{print \$2}' /opt/fabric/config/vars.yaml")
 R "python3 /tmp/reset_user.py $ADMIN $KIT/initial-password.txt" > "$OUT/reset.log" 2>&1
 R "python3 /tmp/reset_user.py bob /root/fabric-test-bob-password" >> "$OUT/reset.log" 2>&1
 BOB_PW=$(R 'cat /root/fabric-test-bob-password; rm -f /root/fabric-test-bob-password')
-# 0.6.1's default (D110): no client certificate, a password only; the console's Security page there to raise them
+# 0.6.1's default (2.1.6.23): no client certificate, a password only; the console's Security page there to raise them
 R "SIGNIN_MODE=plain FABRIC_KIT=$KIT python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' ''" \
     > "$OUT/login-plain.log" 2>&1
-check "sign-in by default: no certificate asked, the admin in with a password only, a non-admin refused (D110)" \
+check "sign-in by default: no certificate asked, the admin in with a password only, a non-admin refused (2.1.6.23)" \
     "! grep -q '^FAIL' '$OUT/login-plain.log' && [ \"\$(grep -c '^PASS' '$OUT/login-plain.log')\" -ge 4 ]"
-check "status shows the password-only sign-in as a relaxation (Rule 10, D110)" \
+check "status shows the password-only sign-in as a relaxation (Rule 10, 2.1.6.23)" \
     "R 'fabricctl status' | grep -q 'signin_admin_second_factor: none'"
 
 echo "--- raising sign-in security (fabricctl security raise: the apply and Keycloak, as the Security page does)"

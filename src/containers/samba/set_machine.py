@@ -6,7 +6,7 @@ ACCOUNTDISABLE = 0x2
 
 
 def set_machine(samdb, lp, site, name, enabled):
-    """Purpose: disable a machine of the site, or enable it again (manual 2.10.2.6): a disabled machine's logons
+    """Purpose: disable a machine of the site, or enable it again (manual 1.6.7.6): a disabled machine's logons
              and its PEAP sign-in are refused, its account kept.
     Inputs:  samdb — SamDB (as the site's agent); lp — LoadParm (unused); site — str; name — the host name; enabled —
              bool.

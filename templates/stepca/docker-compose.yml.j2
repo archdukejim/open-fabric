@@ -3,7 +3,7 @@ services:
     # Thin local layer: drops the upstream binary's file capability so it can
     # run with no-new-privileges and no capabilities (see build/Dockerfile).
 {% set published = published_ref('stepca') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or 'fabric/stepca:local' }}
 {% if not published %}
     build:

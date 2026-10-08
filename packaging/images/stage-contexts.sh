@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
-# Stage the build contexts of fabric's own images (decision D41, manual
-# 4.7.1) exactly as a host has them: the installed tree is assembled
+# Stage the build contexts of fabric's own images (decision 2.1.1.21, manual
+# 3.14.1) exactly as a host has them: the installed tree is assembled
 # (assemble-tree.sh), each image's context is its jinja/<image>/build
 # folder, and the web UI's gets the app in app/ (as
 # deploy/install_service_units does on a host). packaging/docker-bake.hcl

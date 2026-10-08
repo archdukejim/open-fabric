@@ -1,13 +1,13 @@
 from fabriclib.common.errors import ValidationError
 
-# the password policy's keys (D89): every one is the admin's, none has a default
+# the password policy's keys (2.1.6.13): every one is the admin's, none has a default
 POLICY_KEYS = {"minimum_length": (0, 64), "history": (0, 24), "minimum_age_days": (0, 998),
                "maximum_age_days": (0, 999), "lockout_threshold": (0, 999), "lockout_minutes": (0, 99999),
                "lockout_window_minutes": (0, 99999)}
 
 
 def check_password_policy(policy):
-    """Purpose: the domain's password policy (D89) checked as AD will take it: every key there, in range, and the
+    """Purpose: the domain's password policy (2.1.6.13) checked as AD will take it: every key there, in range, and the
              rules between them — the minimum age below the maximum, and a lockout at least as long as the window
              after which failed sign-ins are forgotten (unless 0: locked until an admin unlocks).
     Inputs:  policy — dict: POLICY_KEYS and complexity.
@@ -17,7 +17,7 @@ def check_password_policy(policy):
              answered, so they are asked again at once)."""
     missing = sorted((set(POLICY_KEYS) | {"complexity"}) - set(policy))
     if missing:
-        raise ValidationError("the password policy is the admin's (D89), with no defaults: ad_password_policy "
+        raise ValidationError("the password policy is the admin's (2.1.6.13), with no defaults: ad_password_policy "
                               f"needs {', '.join(missing)}")
     unknown = sorted(set(policy) - set(POLICY_KEYS) - {"complexity"})
     if unknown:

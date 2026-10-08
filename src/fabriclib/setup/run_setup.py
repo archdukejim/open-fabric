@@ -110,7 +110,7 @@ def main(argv=None):
                                                                 os.path.join(ctx.source_dir, "jinja"), selected),
                               interactive=not ctx.non_interactive, approve=args.approve, decline=args.decline,
                               stops={"ports"} if ufw_active() else set())
-        # ufw already on blocks fabric's containers from the DC on this host unless fabric adds its rules (D119):
+        # ufw already on blocks fabric's containers from the DC on this host unless fabric adds its rules (2.1.2.12):
         # said now, before any step changes the host, not when Keycloak cannot reach the DC much later
         if answers.get("ports") == "no" and "firewall" in selected and ufw_active():
             raise SetupError("ufw is on, and without fabric's firewall rules it blocks fabric's own containers from "

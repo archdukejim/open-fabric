@@ -4,7 +4,7 @@ import os
 from fabriclib.common.errors import ValidationError
 from fabriclib.keycloak.signin_levels import LEVELS, admin_level, signin_level
 
-# The sign-in layers (manual 5.8.2.6.4, D111): raised in the web console's Security page (or `fabricctl security
+# The sign-in layers (manual 2.3.6.2.6.4, 2.1.6.24): raised in the web console's Security page (or `fabricctl security
 # raise`), lowered only with `sudo fabricctl security lower` on the host. Kerberos is a way to sign in, not a layer:
 # it changes both ways (`fabricctl security kerberos on|off`).
 LAYERS = {

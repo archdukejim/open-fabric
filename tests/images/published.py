@@ -1,9 +1,9 @@
-"""fabric's published images on hosts (manual 2.6.3): which image a host runs, rendered through the real templates.
+"""fabric's published images on hosts (manual 1.14.3): which image a host runs, rendered through the real templates.
 Run by tests/images/run.sh; no Docker needed.
 
 - the lock as it is: every image published, except those marked pending (with why), which build locally
 - a lock with digests: each names its published image and has no build section; the Kea check uses it too
-- custom ids for an account: that image is built locally again (D80); images without an account are not affected
+- custom ids for an account: that image is built locally again (2.1.14.5); images without an account are not affected
 - the lock's ids equal the Dockerfiles' defaults and vars.yaml.j2's default service accounts
 - the rule itself (published_image) and the relaxed-settings list
 """
@@ -103,7 +103,7 @@ try:
     # custom ids for the DNS account: bind9 is built locally (its ids are baked in); stepca (no account) is not
     users = {"bind": {"uid": 700, "gid": 700, "name": "fabric-dns"}}
     custom = render(os.path.join(tree, "templates"), os.path.join(work, "custom"), {"service_users": users})
-    check("custom ids for the bind account: bind9 builds locally again (D80)",
+    check("custom ids for the bind account: bind9 builds locally again (2.1.14.5)",
           builds(custom["bind9"]) and images_of(custom["bind9"]) == {"fabric/bind9:local"}
           and custom["bind9"]["bind9"]["build"]["args"]["BIND_UID"] == "700")
     check("custom bind ids leave the images without that account published",
@@ -148,7 +148,7 @@ try:
           "service_users": {"bind": {"uid": 600, "gid": 600}, "freeradius": {"uid": 610, "gid": 610}}}
     check("published_image: the DC's image in use when BIND's and FreeRADIUS's gids are the baked ones",
           published_image(dc, dc_entry) == refs["samba"])
-    check("published_image: the DC builds locally when a baked group's gid differs (D80)",
+    check("published_image: the DC builds locally when a baked group's gid differs (2.1.14.5)",
           published_image(dict(dc, service_users={**dc["service_users"], "bind": {"uid": 600, "gid": 700}}),
                           dc_entry) == "")
     svc = next(s for s in SERVICES if s["name"] == "bind9")

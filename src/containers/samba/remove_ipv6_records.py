@@ -6,9 +6,10 @@ AAAA = 28                                # dnsp.DNS_TYPE_AAAA
 
 
 def remove_ipv6_records(samdb):
-    """Purpose: keep the domain's DNS on IPv4 only (D120): remove every AAAA record from the AD zones (the domain's and
-             the forest's DNS partitions). The DC listens on IPv4 only (D98); provisioning on a host with IPv6 addresses
-             published them anyway, and Windows prefers them, so its joins and logons tried an address nothing answered.
+    """Purpose: keep the domain's DNS on IPv4 only (2.1.6.29): remove every AAAA record from the AD zones (the domain's
+             and the forest's DNS partitions). The DC listens on IPv4 only (2.1.6.18); provisioning on a host with IPv6
+             addresses published them anyway, and Windows prefers them, so its joins and logons tried an address nothing
+             answered.
     Inputs:  samdb — SamDB (system).
     Returns: list of str, the names whose AAAA records were removed.
     Fails:   ldb.LdbError for a change AD refuses.
@@ -30,8 +31,8 @@ def remove_ipv6_records(samdb):
                 msg["dnsRecord"] = ldb.MessageElement([bytes(v) for v in keep], ldb.FLAG_MOD_REPLACE, "dnsRecord")
             else:                            # nothing left: the node goes (a name with no records)
                 samdb.delete(node.dn)
-                done.append(f"{node.dn}: IPv6 record removed (D120)")
+                done.append(f"{node.dn}: IPv6 record removed (2.1.6.29)")
                 continue
             samdb.modify(msg)
-            done.append(f"{node.dn}: IPv6 record removed (D120)")
+            done.append(f"{node.dn}: IPv6 record removed (2.1.6.29)")
     return done

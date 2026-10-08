@@ -6,9 +6,9 @@ USE_NOTIFY = "1"
 
 
 def ensure_site_link(samdb, site, parent):
-    """Purpose: the AD site link between a site and its parent (manual 1.8.8.5, S8.3): cost 100, every 15 minutes and
+    """Purpose: the AD site link between a site and its parent (manual 1.9.8.5, S8.3): cost 100, every 15 minutes and
              on change notification, so AD's KCC builds replication both ways between their DCs; the link to an
-             earlier parent removed (a site that moved, D105).
+             earlier parent removed (a site that moved, 2.1.6.20).
     Inputs:  samdb — SamDB (as the system); site — the site; parent — its parent site.
     Returns: list of str, what changed.
     Fails:   ldb.LdbError for a change AD refuses (e.g. either AD site missing: ensure_ad_site makes them).
@@ -17,7 +17,7 @@ def ensure_site_link(samdb, site, parent):
     ip = f"CN=IP,CN=Inter-Site Transports,{sites}"
     dn = f"CN={parent}-{site},{ip}"
     removed = []
-    # a link fabric made to an earlier parent (CN=<other>-<site>, naming both AD sites) goes: the site moved (D105)
+    # a link fabric made to an earlier parent (CN=<other>-<site>, naming both AD sites) goes: the site moved (2.1.6.20)
     for link in samdb.search(base=ip, scope=ldb.SCOPE_ONELEVEL, expression="(objectClass=siteLink)",
                              attrs=["cn", "siteList"]):
         name = str(link["cn"][0])

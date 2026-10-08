@@ -3,7 +3,7 @@ import os
 
 def share_winbind(lp, gid):
     """Purpose: let FreeRADIUS (and only it) use winbind's privileged pipe, which `ntlm_auth` needs to have the DC
-             check PEAP's MS-CHAPv2 answers (manual 2.11.2.17, S3.3; spike Q8): the pipe's folder in FreeRADIUS's
+             check PEAP's MS-CHAPv2 answers (manual 1.6.5.17, S3.3; spike Q8): the pipe's folder in FreeRADIUS's
              group. Samba checks only the folder's owner (root) and mode (0750), so the group is fabric's to set.
     Inputs:  lp — LoadParm of the DC (its state directory); gid — int, FreeRADIUS's group id.
     Returns: list of str, what changed (empty when it already was so).

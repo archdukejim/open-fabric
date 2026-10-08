@@ -7,7 +7,7 @@ from fabriclib.system.apply_changes import apply_changes
 
 
 def apply_signin(actor, source="cli"):
-    """Purpose: make a sign-in change take effect (manual 5.8.2.6.4): the apply (nginx's client-certificate check, the
+    """Purpose: make a sign-in change take effect (manual 2.3.6.2.6.4): the apply (nginx's client-certificate check, the
              web app's webui.json; nginx and the web UI restart when they changed), then fabric's Keycloak
              configuration (the sign-in flows, Kerberos).
     Inputs:  actor — who asked (audit, through apply_changes); source — "cli" or "web".

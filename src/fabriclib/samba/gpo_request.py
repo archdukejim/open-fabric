@@ -5,7 +5,7 @@ from fabriclib.common.errors import ValidationError
 
 
 def gpo_request(request, container="samba"):
-    """Purpose: one ADMX-editor operation inside the DC (src/containers/samba/gpo_tool.py, manual 2.11.2.20 S5.4),
+    """Purpose: one ADMX-editor operation inside the DC (src/containers/samba/gpo_tool.py, manual 1.6.5.20 S5.4),
              the request on stdin.
     Inputs:  request — dict (gpo_tool's request: op, site, …); container — the DC's container (tests name their own).
     Returns: the operation's result (JSON-decoded).

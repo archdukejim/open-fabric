@@ -10,7 +10,7 @@ from fabriclib.samba.set_gpo_policy import set_gpo_policy
 
 
 def post_domain(route, actor, data):
-    """Purpose: the domain section of the Directory tab (manual 2.11.2.21 S7.4): the site's machines, POST
+    """Purpose: the domain section of the Directory tab (manual 1.6.5.21 S7.4): the site's machines, POST
              /v1/machines/..., and its admin settings GPO, POST /v1/gpo/....
     Inputs:  route — ["machines"] (body: name), ["machines", <name>, "enable"|"disable"|"delete"], ["gpo", "search"]
              (body: match), ["gpo", "set"] (body: policy, values {element: text}, enabled, control), ["gpo",

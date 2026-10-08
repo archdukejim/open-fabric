@@ -20,7 +20,7 @@ from fabriclib.system.apply_changes import apply_changes
 
 def reparent_site(ctx, actor, invitation):
     """Purpose: move this site under another parent — the root site or another site that may hold sites — with
-             an invitation from that parent (manual 1.8.5.1): for a nested site whose parent is gone
+             an invitation from that parent (manual 1.9.5.1): for a nested site whose parent is gone
              for good, or to change where a site hangs. The site keeps its name, directory part and data; it
              gets a new CA from the new parent.
     Inputs:  ctx — SetupContext with state loaded (vars, config_dir); actor — str (audit); invitation — the new
@@ -36,7 +36,7 @@ def reparent_site(ctx, actor, invitation):
              the same root), but people's web UI certificates must be re-issued (`fabricctl client-cert`):
              nginx now accepts this CA's chain only. The old parent still lists the site until it is removed
              there (`fabricctl federation remove`, which leaves the moved site's domain objects alone). In the
-             domain the new parent moves this site's OU under its own (D105, manual 1.8.8.14): this site saves its
+             domain the new parent moves this site's OU under its own (2.1.6.20, manual 1.9.8.14): this site saves its
              new place (ad_site_ou, ad_org_ou) and its convergence moves its AD site link; its joined Linux machines'
              sudo search bases are rewritten by running their installer again. Audited as FED_REPARENT."""
     v = ctx.vars
@@ -65,7 +65,7 @@ def reparent_site(ctx, actor, invitation):
         data = load_vars()
         data.update({k: new[k] for k in ("ica_crt_path", "ica_key_path", "ica_parents_path", "site_ca_depth")})
         dom = res.get("domain") or {}
-        if dom.get("moved"):                 # the new parent moved this site's OU under its own (D105)
+        if dom.get("moved"):                 # the new parent moved this site's OU under its own (2.1.6.20)
             data.update({"ad_site_ou": dom["site_ou"], "ad_org_ou": dom["org_ou"]})
         save_vars(data)
     subprocess.run(["systemctl", "restart", "stepca"], check=True)

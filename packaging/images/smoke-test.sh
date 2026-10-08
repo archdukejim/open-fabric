@@ -1,7 +1,7 @@
 #!/bin/bash
 # -----------------------------------------------------------------------
 # Smoke test one of fabric's own images before it is published (decision
-# D41, manual 4.7.1): its program runs under the settings fabric runs it
+# 2.1.1.21, manual 3.14.1): its program runs under the settings fabric runs it
 # with — its service account, every capability dropped, no-new-privileges,
 # a read-only root and no network — and the image carries the labels hosts
 # read (the base it was built FROM, the ids baked in). Whether each

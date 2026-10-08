@@ -1,5 +1,5 @@
 // Kea DHCP-DDNS — rendered by fabricctl (fabric/jinja/kea/kea-dhcp-ddns.conf.j2).
-// Only dhcp.<domain> is updated, with the dedicated kea-ddns TSIG key (design D16).
+// Only dhcp.<domain> is updated, with the dedicated kea-ddns TSIG key (design 2.1.4.1).
 {% set d = dhcp | default({}) %}
 {% set ddns_zone = (d.ddns_subdomain | default('dhcp')) ~ '.' ~ domain %}
 {

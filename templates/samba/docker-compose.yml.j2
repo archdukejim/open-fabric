@@ -1,13 +1,13 @@
 services:
-  # The Samba AD domain controller (manual 2.11.2). AD hands its own address to clients (DNS records, CLDAP, the
-  # RPC endpoint mapper), so it runs in the host network on the host's address (D98), bound to it and loopback
+  # The Samba AD domain controller (manual 1.6.5). AD hands its own address to clients (DNS records, CLDAP, the
+  # RPC endpoint mapper), so it runs in the host network on the host's address (2.1.6.18), bound to it and loopback
   # only. A DC runs as root in its container (it switches to each user's identity for file access): every
   # capability is dropped but the six it needs (SETUID, SETGID for sign-ins and shares; CHOWN, DAC_OVERRIDE,
   # FOWNER for Group Policy's ACLs on SYSVOL; NET_BIND_SERVICE for its low ports: in the host network Docker's
-  # unprivileged-port setting does not apply), with a read-only root and no-new-privileges. Inventory: 1.3.9.
+  # unprivileged-port setting does not apply), with a read-only root and no-new-privileges. Inventory: 1.2.7.
   samba:
 {% set published = published_ref('samba') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or image_samba }}
 {% if not published %}
     build:
@@ -44,7 +44,7 @@ services:
       RPC_PORTS: "{{ ad_rpc_ports }}"
       OLD_PASSWORD_MINUTES: "{{ ad_old_password_minutes }}"
 {% if ad_join_server %}
-      # a site's DC joins the root's domain instead of provisioning one (manual 1.8.8.4); once joined, unused
+      # a site's DC joins the root's domain instead of provisioning one (manual 1.9.8.4); once joined, unused
       JOIN_ROLE: "{{ 'RODC' if ad_dc_type == 'rodc' else 'DC' }}"
       JOIN_SERVER: "{{ ad_join_server_name or ad_join_server }}"
       JOIN_SITE: "{{ site_name }}"
@@ -60,7 +60,7 @@ services:
       - {{ deploy_base_dir }}/samba/converge:/fabric:ro
       # winbind's sockets on the host: FreeRADIUS mounts them for PEAP (ntlm_auth); the privileged pipe is in /data
       - {{ deploy_base_dir }}/samba/winbindd:/run/samba/winbindd
-      # its time-signing socket where the host's chrony signs Windows members' time (D100)
+      # its time-signing socket where the host's chrony signs Windows members' time (2.1.13.1)
       - {{ ad_ntp_signd_dir }}:/run/samba/ntp_signd
       # its resolver: the host's address, which knows the AD zone (the host's own resolver may not)
       - {{ deploy_base_dir }}/samba/resolv.conf:/etc/resolv.conf:ro

@@ -1,6 +1,6 @@
 # fabriclib/rbac
 
-Who may do what in fabric (design D19). Permissions are Keycloak realm roles
+Who may do what in fabric (design 2.1.6.1). Permissions are Keycloak realm roles
 (`fabric:<area>:<action>`); bundles are composite roles granted to directory
 groups. fabric-agent checks every web UI call against the signed-in person's
 token; the web UI only hides what they cannot use.

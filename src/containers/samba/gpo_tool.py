@@ -1,4 +1,4 @@
-"""fabric's ADMX editor inside the DC (manual 2.11.2.9, 2.11.2.20 S5.4), run as root on its own database and SYSVOL
+"""fabric's ADMX editor inside the DC (manual 1.6.5.9, 1.6.5.20 S5.4), run as root on its own database and SYSVOL
 (no credentials, no network) by fabriclib/samba/run_gpo_command:
     docker exec -i samba python3 /fabric/gpo_tool.py < request.json
 The request on stdin: {"op": "load"|"templates"|"policies"|"show"|"set"|"clear", "site", …}. Prints one JSON object:

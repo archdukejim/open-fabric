@@ -1,7 +1,8 @@
 def id_range(v):
-    """Purpose: this site's uid/gid block (D97, manual 1.6.3.9) as "first-last": the root site's starts where fabric's
-             people range always started (the users OU's uid_range, 5001 by default), so earlier numbers stay valid,
-             and is posix_id_block numbers long. A site that joined gets its block from the root (posix_id_range).
+    """Purpose: this site's uid/gid block (2.1.6.17, manual 1.6.3.9) as "first-last": the root site's starts where
+             fabric's people range always started (the users OU's uid_range, 5001 by default), so earlier numbers stay
+             valid, and is posix_id_block numbers long. A site that joined gets its block from the root
+             (posix_id_range).
     Inputs:  v — rendered vars: posix_id_range (a joined site's), ldap_organizational_units (the users OU's
              uid_range), posix_id_block.
     Returns: str "first-last".

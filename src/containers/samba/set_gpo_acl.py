@@ -12,7 +12,7 @@ import ldb
 def set_gpo_acl(samdb, lp, guid):
     """Purpose: the file ACLs of one GPO's SYSVOL folder from its AD object, as Samba's provisioning sets them, instead
              of `samba-tool ntacl sysvolreset`, which needs every GPO's folder: at a site's DC the domain's other GPO
-             folders are not there (SYSVOL's files do not replicate: manual 1.8.8.8, S8.4).
+             folders are not there (SYSVOL's files do not replicate: manual 1.9.8.8, S8.4).
     Inputs:  samdb — SamDB (as the system); lp — LoadParm (the SYSVOL path, the realm, smb.conf); guid — "{…}".
     Returns: None.
     Fails:   ldb.LdbError when the GPO has no object; OSError / NTSTATUSError setting an ACL.

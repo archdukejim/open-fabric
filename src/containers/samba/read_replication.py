@@ -1,4 +1,4 @@
-"""This DC's inbound replication, read from its own database (manual 1.8.8.5, 1.8.8.9): each partition's `repsFrom`
+"""This DC's inbound replication, read from its own database (manual 1.9.8.5, 1.9.8.9): each partition's `repsFrom`
 — the partner, the last success, the failures since — without an RPC sign-in, so a read-only DC can show it too.
     docker exec samba python3 /fabric/read_replication.py
 Prints one JSON object: {"neighbours": [{"partition", "from", "last_success", "failures", "message"}]}."""

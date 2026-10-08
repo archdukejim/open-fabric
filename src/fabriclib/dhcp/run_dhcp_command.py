@@ -125,7 +125,8 @@ def _keep(one, flag):
 
 def run_dhcp_command(v, argv):
     """Purpose: `fabricctl dhcp …` — the Kea tab's operations without the web UI: status, leases, reservations,
-             subnets (name, VLAN record, notes, router, pools), options at every level, client classes (manual 2.2.2.5).
+             subnets (name, VLAN record, notes, router, pools), options at every level, client classes (manual
+             1.10.2.5).
     Inputs:  v — the rendered vars (SetupContext.load_state().vars); argv — list of str after "dhcp" (default
              status); see USAGE. Every change applies at once unless --no-apply.
     Returns: exit status: 0 success; 1 a ValidationError, unreadable leases or a failed apply; 2 usage (printed to

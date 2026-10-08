@@ -16,7 +16,7 @@ PLAN = [
 
 
 def _ask_log_forwarding(ctx):
-    """Purpose: Advanced plan question: forward all logs with Fluent Bit (off by default, design D20).
+    """Purpose: Advanced plan question: forward all logs with Fluent Bit (off by default, design 2.1.15.1).
     Inputs:  ctx — SetupContext; reads and writes ctx.vars install_fluentbit and log_forwarding (syslog host/port,
              elastic url/user). Interactive (input()).
     Returns: None; ctx.vars updated. A syslog target without port uses 6514; the Elasticsearch password is set
@@ -98,7 +98,7 @@ def _ask_radius(ctx):
         print("    Add your switches and access points afterwards: sudo fabricctl radius add-client <name> <address>")
 
 
-CLOUDFLARE = ["https://1.1.1.1/dns-query", "https://1.0.0.1/dns-query"]     # vars.yaml.j2's default (D112)
+CLOUDFLARE = ["https://1.1.1.1/dns-query", "https://1.0.0.1/dns-query"]     # vars.yaml.j2's default (2.1.12.1)
 
 
 def _upstreams_text(ctx):
@@ -114,7 +114,7 @@ def _upstreams_text(ctx):
 
 
 def _ask_dns_filter(ctx):
-    """Purpose: Advanced plan question: the DNS filter, AdGuard Home (on by default, D112), and where it sends
+    """Purpose: Advanced plan question: the DNS filter, AdGuard Home (on by default, 2.1.12.1), and where it sends
              internet lookups.
     Inputs:  ctx — SetupContext; reads ctx.vars dns_filter, adguard_upstreams. Interactive.
     Returns: None; ctx.vars["dns_filter"] set ("adguard" or "none"), and adguard_upstreams when typed (they only
@@ -167,7 +167,7 @@ def choose_plan(ctx):
     Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
              webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
     Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
-             rendered), and dns_filter (AdGuard on unless set to none, D112); install_webui is forced off when
+             rendered), and dns_filter (AdGuard on unless set to none, 2.1.12.1); install_webui is forced off when
              Keycloak is off. deploy_config saves ctx.vars to
              fabric.yaml, so a --file can set all of these non-interactively.
     Fails:   SystemExit("setup cancelled") on Quit; EOFError from input(); errors of the _ask_* helpers.

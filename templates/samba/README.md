@@ -1,6 +1,6 @@
 # templates/samba
 
-The Samba AD domain controller (manual 2.11.2), deployed to `/opt/samba`.
+The Samba AD domain controller (manual 1.6.5), deployed to `/opt/samba`.
 
 | File | What |
 |---|---|

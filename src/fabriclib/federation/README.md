@@ -1,7 +1,7 @@
 # fabriclib/federation
 
 Sites joined into one fabric: an upstream that owns identity and the root CA, downstream sites with
-their own local network (design [1.8.1](../../../docs/volume_1_systems_and_services/1.8.1-sites.md#1811-status)).
+their own local network (design [1.9.1](../../../docs/volume_1_description_and_architecture/1.9.1-sites.md#1911-status)).
 
 | File | What |
 |---|---|
@@ -21,7 +21,7 @@ their own local network (design [1.8.1](../../../docs/volume_1_systems_and_servi
 | `set_federation_endpoint.py` | Turn the federation endpoint on or off (certificate first) and apply |
 | `deploy_federation_endpoint.py` | Deploy step: the `fabric-federation` unit and the socket directory nginx mounts (or their removal) |
 | `site_networks.py` | This site's networks for the address plan: the LAN and every DHCP subnet (name, VLAN, notes, overlap reason) |
-| `read_address_plan.py` | The address plan from the domain: every site's networks, written by convergence (2.2.2.8) |
+| `read_address_plan.py` | The address plan from the domain: every site's networks, written by convergence (1.10.2.8) |
 | `network_conflicts.py` | Which of this site's networks overlap another site's (and whether a reason allows it) |
 | `show_networks.py` | `fabricctl federation networks`: the plan and its overlaps |
 | `run_federation_command.py` | `fabricctl federation status / enable / disable / invite / invitations / revoke / networks` |

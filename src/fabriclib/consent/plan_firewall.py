@@ -4,10 +4,10 @@ from fabriclib.security.ufw_active import ufw_active
 
 
 def plan_firewall(v, config_dir, active=None):
-    """Purpose: securing the host (manual 2.7.1.3 `firewall`, D121), rule by rule, asked after the ports fabric needs
-             (plan_ports) are allowed: incoming denied by default, ufw on, SSH from the LAN, Docker-published ports
-             LAN-only — with the ports, the host is open to what fabric needs plus SSH. A new rule after a settings
-             change is a new question.
+    """Purpose: securing the host (manual 1.2.9.3 `firewall`, 2.1.2.13), rule by rule, asked after the ports fabric
+             needs (plan_ports) are allowed: incoming denied by default, ufw on, SSH from the LAN, Docker-published
+             ports LAN-only — with the ports, the host is open to what fabric needs plus SSH. A new rule after a
+             settings change is a new question.
     Inputs:  v — vars (security.firewall, default True; firewall_rules reads the rest); config_dir — the install's
              config folder; active — whether ufw was on before fabric (None: ufw_active, the record first), which
              only changes the first line's wording.

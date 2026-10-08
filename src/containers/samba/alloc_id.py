@@ -2,7 +2,7 @@ import ldb
 
 
 def alloc_id(samdb, site_dn):
-    """Purpose: the next uid/gid number of a site's block, never handed out twice (D97, manual 1.6.3.9): the site's
+    """Purpose: the next uid/gid number of a site's block, never handed out twice (2.1.6.17, manual 1.6.3.9): the site's
              high-water mark `fabricIdNext` is moved forward with one conditional change (delete the value read, add
              the next), so two writers cannot take the same number; a refused change is read and tried again.
     Inputs:  samdb — SamDB (the system's, or a connection as an account allowed to change the site's OU); site_dn —

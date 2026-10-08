@@ -9,7 +9,7 @@ MESSAGES = {"exists": "that name is already taken", "missing": "no such entry",
 
 
 def run_op(v, secrets, op, args=None, container="samba"):
-    """Purpose: one directory operation (manual 1.6.3, 2.11.2.16), run inside the DC by src/containers/samba/
+    """Purpose: one directory operation (manual 1.6.3, 1.6.5.16), run inside the DC by src/containers/samba/
              directory_op.py, signed in as this site's fabric-agent account — so AD's per-site limits apply to every
              change fabric-agent makes (1.6.3.6). The request, the account's password included, goes on stdin.
     Inputs:  v — rendered vars (site_name); secrets — fabric's secrets (ad_agent_password); op — str, an operation

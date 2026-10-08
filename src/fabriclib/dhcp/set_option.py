@@ -5,7 +5,7 @@ from fabriclib.dhcp.normalize_options import normalize_options
 
 def set_option(actor, option, data, subnet=None, client_class=None, mac=None, always_send=None, source="cli"):
     """Purpose: set any DHCP option (PXE, ZTP, NTP, vendor options…) for every subnet, one subnet, one client class
-             or one reservation (manual 2.2.2.3, §4); an option of the same name there is replaced.
+             or one reservation (manual 1.10.2.3, §4); an option of the same name there is replaced.
              Kea checks the name and data at the next apply (deploy_kea) and refuses what it cannot send.
     Inputs:  actor — who asks (audit); option — a Kea option name ("tftp-server-name") or code ("66", 1-254);
              data — its value (Kea's text form, e.g. "192.168.4.30" or "a, b"); subnet / client_class / mac — where

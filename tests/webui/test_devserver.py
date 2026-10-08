@@ -147,7 +147,7 @@ try:
     page = req("GET", "/directory?view=gpo&match=example")[3]
     check("Group Policy section (admin): what is set, a search with a set form per policy",
           "ExampleText" in page and "/directory/gpo/set" in page and "Example setting" in page)
-    check("...the site's enforced controls listed apart, and a policy may be set as a control (D105)",
+    check("...the site's enforced controls listed apart, and a policy may be set as a control (2.1.6.20)",
           "fabric: lan controls" in page and "ExampleLocked" in page and 'name="control"' in page)
     page = req("GET", "/federation")[3]
     check("Federation tab: sites with their DC type, replication with a failing neighbour, conflicts, limits, plan",

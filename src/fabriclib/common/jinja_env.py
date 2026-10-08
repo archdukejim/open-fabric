@@ -122,14 +122,14 @@ def jinja_env(template_dir):
     })
     env.tests["match"] = lambda value, pattern: bool(re.search(pattern, str(value)))
     env.globals["lookup"] = _lookup
-    # Kea (manual 2.2.2): fabric's option format to Kea's JSON, one helper per Kea list
+    # Kea (manual 1.10.2): fabric's option format to Kea's JSON, one helper per Kea list
     env.globals.update(kea_option_data=kea_option_data, kea_option_defs=kea_option_defs,
                        kea_client_classes=kea_client_classes)
     # image_* defaults: the validated, digest-pinned refs — fabric/images.lock.yaml on a host, config/ in the repository
     locks = lock_dir(template_dir)
     env.globals["images_lock"] = {k: e["ref"] for k, e in read_images_lock(locks).items()}
     env.globals["packages_lock"] = read_packages_lock(locks)
-    # fabric's own published images (manual 2.6.3): image_fabric_* defaults, and which one a host runs
+    # fabric's own published images (manual 1.14.3): image_fabric_* defaults, and which one a host runs
     published = (read_published_lock(locks) or {}).get("images") or {}
     env.globals["published_lock"] = {k: e["ref"] for k, e in published.items()}
     env.globals["published_ref"] = jinja2.pass_context(

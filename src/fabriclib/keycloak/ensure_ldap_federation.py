@@ -7,12 +7,12 @@ KEYTAB = "/etc/keycloak/kerberos/sso.keytab"   # inside the container (install_s
 
 
 def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True, kerberos=False):
-    """Purpose: the realm's user federation to fabric's directory, Samba AD (manual 1.6.3.11, 2.11.2.16 S2.5): AD mode,
+    """Purpose: the realm's user federation to fabric's directory, Samba AD (manual 1.6.3.11, 1.6.5.16 S2.5): AD mode,
              LDAPS to the DC at the host's address (verified against fabric's CA), bound as this site's
              fabric-keycloak account; people searched under OU=sites, admitted when they are in this site's
-             `<site>-users` or the organisation's admin group (D90); writable, so a password changed at sign-in lands
-             in AD. fabric creates people itself (directory/create_person): Keycloak does not. With kerberos it also
-             accepts a domain logon's ticket (SPNEGO, manual 5.8.2.6.2) with the site's fabric-sso keytab; any of
+             `<site>-users` or the organisation's admin group (2.1.6.14); writable, so a password changed at sign-in
+             lands in AD. fabric creates people itself (directory/create_person): Keycloak does not. With kerberos it
+             also accepts a domain logon's ticket (SPNEGO, manual 2.3.6.2.6.2) with the site's fabric-sso keytab; any of
              the keytab's principals (HTTP/sso.<domain>, HTTP/<host>.<domain>); passwords are still checked over
              LDAP.
     Inputs:  kc — Admin; realm — realm name; realm_id — parent id from ensure_realm; v — vars (ad_base_dn, ad_site_ou,

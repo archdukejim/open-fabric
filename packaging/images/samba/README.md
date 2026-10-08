@@ -1,6 +1,6 @@
 # packaging/images/samba
 
-fabric's Samba AD domain controller (manual 2.11.2): Debian's `samba-ad-dc` on the validated Debian base.
+fabric's Samba AD domain controller (manual 1.6.5): Debian's `samba-ad-dc` on the validated Debian base.
 
 | File | What |
 |---|---|

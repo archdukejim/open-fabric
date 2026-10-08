@@ -7,7 +7,7 @@ from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
 _LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")    # as check_samba_settings takes them
 
-# what each policy question asks (D89: nothing is preselected)
+# what each policy question asks (2.1.6.13: nothing is preselected)
 POLICY_QUESTIONS = [
     ("minimum_length", "Minimum password length (0–64)"),
     ("history", "Previous passwords remembered and refused again (0–24)"),
@@ -39,9 +39,9 @@ def _number(prompt, low, high, current):
 
 
 def ask_ad_domain(ctx):
-    """Purpose: the directory's questions (manual 1.6.3, 2.1.9.8), asked by setup when they are not set: the AD domain
-             (D87: chosen once, permanent; a sibling of fabric's domain suggested) and the whole password policy
-             (D89: asked, never preselected). Fabric's directory is a Samba AD domain on every install.
+    """Purpose: the directory's questions (manual 1.6.3, 1.1.9.8), asked by setup when they are not set: the AD domain
+             (2.1.6.11: chosen once, permanent; a sibling of fabric's domain suggested) and the whole password policy
+             (2.1.6.13: asked, never preselected). Fabric's directory is a Samba AD domain on every install.
     Inputs:  ctx — SetupContext; reads and sets ctx.vars ad_domain, ad_password_policy; domain for the suggestion.
              Interactive.
     Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is). A policy AD
@@ -69,7 +69,7 @@ def ask_ad_domain(ctx):
             break
         print(f"    {YELLOW}a domain of two labels or more (letters, digits, hyphens), not .local, not {domain} itself "
               f"nor a parent of it{NC}")
-    print("    The password policy is yours: nothing is preselected (D89).")
+    print("    The password policy is yours: nothing is preselected (2.1.6.13).")
     policy = dict(ctx.vars.get("ad_password_policy") or {})
     while True:                           # checked as AD takes it, so a bad pair is asked again here, not at deploy
         for key, question in POLICY_QUESTIONS:

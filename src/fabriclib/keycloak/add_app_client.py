@@ -27,7 +27,7 @@ def _redirects(urls):
 
 def add_app_client(kc, realm, v, name, redirects):
     """Purpose: register an app (Proxmox VE, TrueNAS, …) for single sign-on through this site's Keycloak (manual
-             3.8.2): a confidential OpenID Connect client, the authorization-code flow only, the given redirect
+             4.6.2): a confidential OpenID Connect client, the authorization-code flow only, the given redirect
              URLs exactly, sign-in through the realm's flow (fabric-signin: Kerberos or a password, and the second
              factor every sign-in needs), and the person's groups in a
              `groups` claim, for the app to map to its roles. Keycloak makes the client secret.

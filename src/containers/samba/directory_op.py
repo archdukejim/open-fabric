@@ -1,4 +1,4 @@
-"""Run one directory operation for fabric-agent (manual 1.6.3, 2.11.2.16), inside the DC, signed in over LDAP as the
+"""Run one directory operation for fabric-agent (manual 1.6.3, 1.6.5.16), inside the DC, signed in over LDAP as the
 site's fabric-agent account — so AD's per-site limits apply to it (1.6.3.6) — never as the system.
     docker exec -i samba python3 /fabric/directory_op.py < request.json
 The request on stdin (never a command line: it holds the account's password): {"op", "args" {…}, "site", "account",

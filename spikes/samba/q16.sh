@@ -1,5 +1,5 @@
 #!/bin/bash
-# S0 spike Q16: per-site logon rights (D90). A GPO on site house2's OU allows log-on (local and remote) to
+# S0 spike Q16: per-site logon rights (2.1.6.14). A GPO on site house2's OU allows log-on (local and remote) to
 # house2-users only; a house2 Linux machine enforces it through SSSD (ad_gpo_access_control). A house1 person is
 # refused until allowed explicitly; a blanket policy allows everyone. Needs q1-q2.sh and q4.sh (the DC and site OUs).
 #   sudo bash spikes/samba/q16.sh

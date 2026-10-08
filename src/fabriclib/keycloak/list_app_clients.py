@@ -3,7 +3,7 @@ from fabriclib.keycloak.quote import q
 
 
 def list_app_clients(kc, realm):
-    """Purpose: the apps registered for single sign-on (manual 3.8.2), never their secrets.
+    """Purpose: the apps registered for single sign-on (manual 4.6.2), never their secrets.
     Inputs:  kc — keycloak/admin_client Admin; realm — fabric's realm.
     Returns: list of {"name", "client_id", "redirects"}, by name.
     Fails:   SystemExit from kc.call.

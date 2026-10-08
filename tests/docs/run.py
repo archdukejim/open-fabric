@@ -2,7 +2,7 @@
 """The docs suite: the documentation says what the code does.
 
   - every product function has a structured docstring (check_docstrings.py)
-  - the function reference (manual 1.11) is what those docstrings say (scripts/docs/gen_lib_doc.py --check)
+  - the function reference (manual 1.17) is what those docstrings say (scripts/docs/gen_lib_doc.py --check)
   - docs and code agree on settings, commands, routes, permissions, suites,
     setup steps, READMEs and links (check_consistency.py)
   - every file in the repository has been reviewed (scripts/docs/review_ledger.py)
@@ -16,7 +16,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 TOOLS = os.path.join(os.path.dirname(os.path.dirname(HERE)), "scripts", "docs")   # the generator and the ledger
 STEPS = [("every function has a structured docstring", [os.path.join(HERE, "check_docstrings.py"), "--summary"]),
-         ("the function reference (manual 1.11) matches the code", [os.path.join(TOOLS, "gen_lib_doc.py"), "--check"]),
+         ("the function reference (manual 1.17) matches the code", [os.path.join(TOOLS, "gen_lib_doc.py"), "--check"]),
          ("docs and code agree", [os.path.join(HERE, "check_consistency.py")]),
          ("every file has been reviewed", [os.path.join(TOOLS, "review_ledger.py")])]
 

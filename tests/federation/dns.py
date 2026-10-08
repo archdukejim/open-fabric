@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""DNS between federation sites (manual 1.8 M4) with two real BIND servers (fabric's image):
+"""DNS between federation sites (manual 1.9 M4) with two real BIND servers (fabric's image):
 
 the root site `lan` (lan.test) and its site `lab` (lab.lan.test), each configured from fabric's own
 templates with the links dns_links derives from a federation registry and fabric's secrets: lan delegates

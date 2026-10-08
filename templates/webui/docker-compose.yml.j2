@@ -1,7 +1,7 @@
 services:
   webui:
 {% set published = published_ref('webui') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or image_webui }}
 {% if not published %}
     build:

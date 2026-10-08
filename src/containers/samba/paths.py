@@ -4,8 +4,8 @@ _found = {}
 
 
 def site_dn(samdb, site):
-    """Purpose: a site's OU, wherever it sits: sites nest, each in its parent's OU (D105, manual 1.6.3.4), so the OU is
-             found by its mark (the fabricSiteInfo class ensure_layout gives it) and its name, never built from them.
+    """Purpose: a site's OU, wherever it sits: sites nest, each in its parent's OU (2.1.6.20, manual 1.6.3.4), so the OU
+             is found by its mark (the fabricSiteInfo class ensure_layout gives it) and its name, never built from them.
     Inputs:  samdb — SamDB; site — str.
     Returns: str, e.g. "OU=lab,OU=lan,OU=sites,<domain>".
     Fails:   LookupError when no site OU has that name; ldb.LdbError from the search.
@@ -42,7 +42,7 @@ def organisation_dn(samdb):
 
 
 def ancestors(samdb, site):
-    """Purpose: the sites above a site, nearest first (its OU's enclosing site OUs, D105).
+    """Purpose: the sites above a site, nearest first (its OU's enclosing site OUs, 2.1.6.20).
     Inputs:  samdb — SamDB; site — str.
     Returns: list of str, site names ([] for the root).
     Fails:   as site_dn.
@@ -78,7 +78,7 @@ def devices_dn(samdb, site):
 
 
 def sites_dn(samdb):
-    """Purpose: everything fabric manages (D88).
+    """Purpose: everything fabric manages (2.1.6.12).
     Inputs:  samdb — SamDB.
     Returns: str "OU=sites,<domain>".
     Fails:   never.

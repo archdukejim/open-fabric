@@ -1,4 +1,4 @@
-"""Set a domain account's password from a file through Samba's own Python bindings (manual 2.11.2.5): the
+"""Set a domain account's password from a file through Samba's own Python bindings (manual 1.6.5.5): the
 password never reaches a command line or a process list.
     python3 set_password.py <smb.conf> <sAMAccountName> <password file>"""
 import sys

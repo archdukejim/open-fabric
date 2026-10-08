@@ -1,4 +1,4 @@
-# AdGuard Home without file capabilities (manual 2.4.1.5).
+# AdGuard Home without file capabilities (manual 1.12.1.5).
 #
 # The upstream binary carries file capabilities (net_bind_service, net_raw) so it can bind 53 as non-root.
 # fabric runs it on an unprivileged port inside the container with every capability dropped, and the

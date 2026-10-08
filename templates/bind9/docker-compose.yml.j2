@@ -3,7 +3,7 @@ services:
     # Built from Debian packages on the validated Debian base: bind uid/gid baked
     # in, runs as bind from the first instruction, no capabilities (build/Dockerfile).
 {% set published = published_ref('bind9') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or 'fabric/bind9:local' }}
 {% if not published %}
     build:
@@ -40,7 +40,7 @@ services:
       - {{ deploy_base_dir }}/bind9/log:/var/log
       - {{ deploy_base_dir }}/bind9/cache:/var/cache/bind
       - {{ deploy_base_dir }}/bind9/ssl:/etc/bind9/ssl:ro
-      # the Windows domain (manual 2.11.2.6): what fabric includes, the DC's DNS partition (DLZ writes members'
+      # the Windows domain (manual 1.6.5.6): what fabric includes, the DC's DNS partition (DLZ writes members'
       # updates there) and the DC's smb.conf (its paths)
       - {{ deploy_base_dir }}/samba/bind:/etc/bind-samba:ro
       - {{ deploy_base_dir }}/samba/data/bind-dns:/data/bind-dns

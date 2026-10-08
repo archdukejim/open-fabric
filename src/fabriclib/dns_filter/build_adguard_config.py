@@ -8,7 +8,7 @@ DNS_PORT, HTTP_PORT = 5300, 3000          # inside the container; Docker publish
 
 def build_adguard_config(current, base, v, domains, password_hash):
     """Purpose: AdGuard Home's configuration with fabric's keys set and everything else left to AdGuard's UI
-             (manual 2.4.1.4): out of the box AdGuard points at local DNS only (this site's BIND); the
+             (manual 1.12.1.4): out of the box AdGuard points at local DNS only (this site's BIND); the
              internet upstreams, bootstrap servers and filter lists are set up in AdGuard's UI after the OIDC
              sign-in, and survive every deploy.
     Inputs:  current — the parsed AdGuardHome.yaml AdGuard runs with (None on a first deploy); base — the parsed

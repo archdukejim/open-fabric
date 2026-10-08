@@ -25,9 +25,9 @@ def _ensure_ou(samdb, dn):
 
 
 def ensure_layout(samdb, site, root, parent=""):
-    """Purpose: everything fabric manages under OU=sites, one OU per site, each site's in its parent's (D88, D105,
-             manual 1.6.3.4), marked as a site OU (fabricSiteInfo) as it is made so it is found wherever it sits; and
-             AD's default containers for new users and computers pointed at the root site's OU=people and
+    """Purpose: everything fabric manages under OU=sites, one OU per site, each site's in its parent's (2.1.6.12,
+             2.1.6.20, manual 1.6.3.4), marked as a site OU (fabricSiteInfo) as it is made so it is found wherever it
+             sits; and AD's default containers for new users and computers pointed at the root site's OU=people and
              OU=machines (so nothing Windows' own tools create lands outside OU=sites).
     Inputs:  samdb — SamDB; site — str, this site's name; root — bool, this is the root site (its OU is directly
              under OU=sites, it also holds OU=organisation, and the defaults point at it); parent — str, a site's
@@ -37,7 +37,7 @@ def ensure_layout(samdb, site, root, parent=""):
              ldb.LdbError from an addition or modification AD refuses.
     Feeds:   converge.
     Notes:   a site OU that sits under another parent than `parent` is moved under it, with everything in it
-             (re-parenting, manual 1.8.8.14): AD keeps every object's SID and GUID, and the access its new parents
+             (re-parenting, manual 1.9.8.14): AD keeps every object's SID and GUID, and the access its new parents
              give is inherited at once."""
     base = str(samdb.domain_dn())
     done = []

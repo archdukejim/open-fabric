@@ -4,7 +4,7 @@ from fabriclib.samba.gpo_request import gpo_request
 
 def set_gpo_policy(v, actor, policy, values, enabled=True, source="cli", container="samba", control=False):
     """Purpose: set one policy in this site's admin settings GPO, or in its controls GPO (linked enforced: the sites
-             below cannot override it, D105) (manual 3.15.4): Enabled with its element values, or Disabled.
+             below cannot override it, 2.1.6.20) (manual 4.6.8): Enabled with its element values, or Disabled.
     Inputs:  v — fabric vars (site_name); actor — str, for the audit; policy — its name or title; values — {element id:
              text}; enabled — bool; source — audit source; container — the DC's container; control — bool, the
              controls GPO.

@@ -15,8 +15,8 @@ def _ticks(minutes):
 
 
 def set_password_policy(samdb, policy):
-    """Purpose: the domain's password policy as the admin set it (D89, manual 1.6.3.8), written on the domain object;
-             only what differs is written.
+    """Purpose: the domain's password policy as the admin set it (2.1.6.13, manual 1.6.3.8), written on the domain
+             object; only what differs is written.
     Inputs:  samdb — SamDB; policy — dict with every key of fabric's ad_password_policy (minimum_length, complexity,
              history, minimum_age_days, maximum_age_days (0: never expires), lockout_threshold (0: never locked),
              lockout_minutes (0: until an admin unlocks), lockout_window_minutes).

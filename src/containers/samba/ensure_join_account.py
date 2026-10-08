@@ -2,7 +2,7 @@ import time
 
 import ldb
 
-LIFETIME = 3600          # seconds: a join account is good for one hour (manual 1.8.8.4)
+LIFETIME = 3600          # seconds: a join account is good for one hour (manual 1.9.8.4)
 
 
 def _filetime(epoch):
@@ -15,7 +15,7 @@ def _filetime(epoch):
 
 
 def ensure_join_account(samdb, name, password):
-    """Purpose: the temporary account a new site's DC joins the domain with (manual 1.8.8.4, S8.1): a member of
+    """Purpose: the temporary account a new site's DC joins the domain with (manual 1.9.8.4, S8.1): a member of
              Domain Admins (Samba's DC join needs it), expiring one hour from now; the site deletes it once joined.
              Made again (password and expiry renewed) if the join is retried.
     Inputs:  samdb — SamDB (as the system, at the root); name — sAMAccountName (fabric-join-<site>); password — str.

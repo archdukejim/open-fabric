@@ -1,5 +1,5 @@
 #!/bin/bash
-# The lint suite (decision D34, manual 4.8.2): ruff for Python, shellcheck for shell scripts. Both run from
+# The lint suite (decision 2.1.1.15, manual 3.1.2): ruff for Python, shellcheck for shell scripts. Both run from
 # their published images, pinned by digest (nothing is installed on the host).
 #   sudo tests/run-all.sh lint
 set -uo pipefail

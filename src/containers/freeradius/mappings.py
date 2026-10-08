@@ -1,7 +1,7 @@
-"""Which `radius_people` mapping an account falls under (manual 1.6.3.10, D102): the same rule for people (EAP-TTLS,
+"""Which `radius_people` mapping an account falls under (manual 1.6.3.10, 2.1.11.3): the same rule for people (EAP-TTLS,
 PEAP) and domain machines (PEAP)."""
 
-# primary groups, which memberOf never lists: Domain Users (fabric's `users`, D95) and Domain Computers
+# primary groups, which memberOf never lists: Domain Users (fabric's `users`, 2.1.9.11) and Domain Computers
 PRIMARY_GROUPS = {"513": {"domain users", "users"}, "515": {"domain computers"}}
 
 

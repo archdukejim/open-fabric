@@ -1,7 +1,7 @@
 # Build the fabricctl .deb (Architecture: all — amd64 and arm64).
 # Every push (any branch) and PR: downloadable build artifact. A tag v<VERSION>: attached to
 # the GitHub Release, so hosts install it with `apt install ./fabricctl_*.deb`, and the signed apt
-# repository on GitHub Pages rebuilt (manual 1.4.1.1, D7): suite `stable` from every Release's .deb.
+# repository on GitHub Pages rebuilt (manual 1.3.1.1, 2.1.1.2): suite `stable` from every Release's .deb.
 # Run by hand with `apt_testing` on an rc/<version> branch: that branch's .deb goes to suite
 # `testing`, to try the apt path before the release.
 name: package
@@ -80,7 +80,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p released
-          # full releases only (from 0.6.1, D113: earlier ones are pre-releases, and v0.5.0 still carries the 1.5.0 it
+          # full releases only (from 0.6.1, 2.1.1.32: earlier ones are pre-releases, and v0.5.0 still carries the 1.5.0 it
           # was built as before the renumbering, which would outrank every 0.x), and only the .deb of the tag's own version
           for tag in $(gh release list --repo "${GITHUB_REPOSITORY}" --limit 100 --json tagName,isPrerelease                          --jq '.[] | select(.isPrerelease | not) | .tagName'); do
             gh release download "$tag" --repo "${GITHUB_REPOSITORY}" --pattern "fabricctl_${tag#v}_all.deb"               --dir released || true

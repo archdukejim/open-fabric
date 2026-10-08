@@ -19,7 +19,7 @@ def _move_files(dirs, old, new, flag, tool):
 def run(ctx):
     """Purpose: one fabric-* system user and group per service, in fabric's uid band (600-649), so bind-mounted
              files have the right owner; an install that still has the previous accounts (bind, nginx, ... with
-             their old ids) is moved to the new ones (manual 2.7.1.6). Asks nothing: the `accounts`
+             their old ids) is moved to the new ones (manual 1.2.9.6). Asks nothing: the `accounts`
              consent was given before the first step.
     Inputs:  ctx — SetupContext: vars.service_users, deploy_base, source_dir (jinja/), config_dir (consent.yaml).
     Returns: None; accounts exist (nologin, no home); files of a previous account belong to its new one, and the

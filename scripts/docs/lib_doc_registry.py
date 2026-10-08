@@ -1,11 +1,11 @@
-"""The numbers of the function reference (manual 1.11.1.2): given once, never reused."""
+"""The numbers of the function reference (manual 1.17.1.2): given once, never reused."""
 import os
 
 from product_code import REPO
 
 REGISTRY = os.path.join(REPO, "scripts", "docs", "lib_doc_numbers.tsv")
-FIRST_PAGE = 2                      # 1.11.1 is the hand-written chapter about the reference
-HEADER = "# fabric: numbers of the function reference (manual 1.11.1.2). Written by gen_lib_doc.py; never edit.\n"
+FIRST_PAGE = 2                      # 1.17.1 is the hand-written chapter about the reference
+HEADER = "# fabric: numbers of the function reference (manual 1.17.1.2). Written by gen_lib_doc.py; never edit.\n"
 
 
 def number_items(pages, removed_on, path=REGISTRY):

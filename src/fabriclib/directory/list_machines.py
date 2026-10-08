@@ -3,7 +3,7 @@ from fabriclib.secrets.load_secrets import load_secrets
 
 
 def list_machines(v, secrets=None, container="samba"):
-    """Purpose: this site's machines in the domain (manual 2.10.2.6, 2.11.2.21 S7.4), Windows and Linux alike.
+    """Purpose: this site's machines in the domain (manual 1.6.7.6, 1.6.5.21 S7.4), Windows and Linux alike.
     Inputs:  v — fabric vars (site_name); secrets — fabric's secrets (default: load_secrets()); container — the DC's
              container (tests name their own).
     Returns: list of {"name", "dns", "os", "enabled", "last_logon", "created", "dn"}, sorted by name.

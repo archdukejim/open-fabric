@@ -15,7 +15,7 @@
         <li><a href="https://{{ hostname_certs }}/#join" class="btn">Join a machine to the domain</a></li>
       </ul>
 
-      {# links from the site's DNS records marked for the landing page (manual 2.1.8.2, D118) #}
+      {# links from the site's DNS records marked for the landing page (manual 1.4.2.2, 2.1.4.2) #}
       {% set zone = (dns | default({})).get('dynamic_zone_var', {}) %}
       {% set marked = [] %}
       {% for rtype in ['A', 'AAAA', 'CNAME'] %}{% for r in zone.get(rtype, []) or [] %}

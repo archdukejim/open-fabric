@@ -1,4 +1,4 @@
-"""Start fabric's BIND beside a test DC, serving the AD zone from the DC's database through DLZ (manual 2.11.2.6), as an
+"""Start fabric's BIND beside a test DC, serving the AD zone from the DC's database through DLZ (manual 1.6.5.6), as an
 install runs it: fabric's BIND image, the files write_bind_dlz makes, mounted as the rendered compose file mounts
 them, around a minimal named.conf; BIND shares the DC's network (on an install both have the host's address)."""
 import os

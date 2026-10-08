@@ -98,7 +98,7 @@ radius_clients:
 </ol>
 </section>
 <section class="card"><h2>Windows in the domain: nothing to do (PEAP)</h2>
-<p>A PC joined to the domain gets the 802.1X profile from its site's <em>Windows baseline</em> policy: Wired AutoConfig on, PEAP to <code>{{ r.server_name }}</code> checked against the fabric CA — first as the machine (map <code>Domain Computers</code> or a group of machines), then as the person signed in. See the manual, 3.15.3.</p>
+<p>A PC joined to the domain gets the 802.1X profile from its site's <em>Windows baseline</em> policy: Wired AutoConfig on, PEAP to <code>{{ r.server_name }}</code> checked against the fabric CA — first as the machine (map <code>Domain Computers</code> or a group of machines), then as the person signed in. See the manual, 4.6.7.</p>
 </section>
 <section class="card"><h2>Windows outside the domain: people sign in with their user name and password (EAP-TTLS)</h2>
 <p>For PCs anyone may use: whoever sits down signs in to the network with their directory account. Only members of {% if g.people %}{% for grp in g.people %}<code>{{ grp }}</code>{{ ', ' if not loop.last }}{% endfor %}{% else %}a mapped group (none yet){% endif %} get in.</p>

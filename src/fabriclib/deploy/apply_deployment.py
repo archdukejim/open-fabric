@@ -97,7 +97,7 @@ def _deploy(paths, start_services):
     units = service_units(paths["base"], final_vars)
     reverse = reverse_zones(final_vars)    # reverse zones and their PTRs come from the forward A/AAAA records
     context["reverse_zone_names"] = list(reverse["zones"])
-    # federation (manual 1.8 M4): delegations, secondary zones and TSIG keys for the sites next to this one
+    # federation (manual 1.9 M4): delegations, secondary zones and TSIG keys for the sites next to this one
     context["federation_links"] = dns_links(final_vars, secrets, paths["federation"])
     print("Rendering Jinja2 templates...")
     render_templates(paths, jinja_env, context, final_vars, secrets, p["tsig_keys"], units, reverse)
@@ -161,7 +161,7 @@ def apply_deployment(start_services=True):
     try:
         if not allowed_to_change(paths["config"], "services", plan_services(), unasked_install=True):
             raise ValidationError("fabric's own services (systemd units) are not approved on this host: "
-                                  "`sudo fabricctl setup` asks (manual 2.7.1)")
+                                  "`sudo fabricctl setup` asks (manual 1.2.9)")
         return _deploy(paths, start_services)
     except ValidationError as e:
         print(f"Error: {e}")

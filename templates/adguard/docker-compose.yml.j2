@@ -1,12 +1,12 @@
 services:
   adguardhome:
-    # The DNS filter in front of BIND (manual 2.4.1): clients ask it on host_ip:53, it forwards
+    # The DNS filter in front of BIND (manual 1.12.1): clients ask it on host_ip:53, it forwards
     # fabric's zones to BIND and the rest over DNS-over-HTTPS/TLS. Built FROM the pinned digest without the
     # binary's file capabilities (build/Dockerfile): it runs with none, on 5300 inside; Docker publishes 53
     # to it. Its UI is reached only through nginx. The sign-in (oauth2-proxy) is a unit of its own
     # (jinja/adguard-auth): DNS never waits for, or goes down with, Keycloak or the sign-in.
 {% set published = published_ref('adguard') %}
-    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    # fabric's published image when this host can use it, else its own build (manual 1.14.3.3)
     image: {{ published or 'fabric/adguard:local' }}
 {% if not published %}
     build:

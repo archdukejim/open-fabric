@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Time (manual 2.5.1) with real containers: chrony (Debian's package on fabric's pinned Debian image) run from
+"""Time (manual 1.13.1) with real containers: chrony (Debian's package on fabric's pinned Debian image) run from
 the configuration deploy_chrony generates. A site serves its network and refuses others; a second site syncs
 from it as its upstream site (federation); time_status and query_time read real chrony. Includes what must be
 refused. The containers never set the clock (-x): they share the host's kernel clock.
@@ -116,7 +116,7 @@ conf = open(os.path.join(srv_root, "etc/chrony/chrony.conf")).read()
 check("deploy: chrony.conf written; answers the LAN only; own clock as the last resort",
       changed and f"allow {SUB_A}" in conf and SUB_B not in conf and "local stratum 10 orphan" in conf
       and "server " not in conf, conf)
-check("deploy: Windows members' time is signed through the DC's socket, in the folder AppArmor allows (D100)",
+check("deploy: Windows members' time is signed through the DC's socket, in the folder AppArmor allows (2.1.13.1)",
       "ntpsigndsocket /var/lib/samba/ntp_signd" in conf, conf)
 check("deploy: chrony is told never to set the clock here (-x)",
       '"-F 1 -x"' in open(os.path.join(srv_root, "etc/default/chrony")).read())

@@ -4,7 +4,7 @@ from fabriclib.samba.gpo_request import gpo_request
 
 def clear_gpo_policy(v, actor, policy, source="cli", container="samba", control=False):
     """Purpose: put one policy of this site's admin settings GPO, or of its controls GPO, back to "Not configured"
-             (manual 3.15.4).
+             (manual 4.6.8).
     Inputs:  v — fabric vars (site_name); actor — str, for the audit; policy — its name or title; source — audit
              source; container — the DC's container; control — bool, the controls GPO.
     Returns: list of str, what changed.

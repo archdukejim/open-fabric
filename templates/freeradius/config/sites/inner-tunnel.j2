@@ -4,7 +4,7 @@
 #   in authorize (it binds to the DC as the person).
 #   PEAP: EAP-MSCHAPv2, its answer checked by the domain (mschap: ntlm_auth
 #   through the DC's winbind); once accepted, fabric_policy decides in
-#   post-auth — a person, or a machine of this site, in a mapped group (D102).
+#   post-auth — a person, or a machine of this site, in a mapped group (2.1.11.3).
 server fabric-inner-tunnel {
 	authorize {
 		if (&EAP-Message) {

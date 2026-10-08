@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Kea 3.0 LTS (optional DHCP, design §5 / D16) on fabric's own image, from
+"""Kea 3.0 LTS (optional DHCP, design §5 / 2.1.4.1) on fabric's own image, from
 fabric's templates, with real DHCP clients: a client gets a pool address and
 its hostname lands in the DHCP subzone (BIND, fabric's zone and key
 templates); a reserved MAC gets its fixed address; another client cannot
@@ -230,7 +230,7 @@ check("kea-ddns: uid 915, no capabilities, read-only",
       insp["kt-ddns"]["Config"]["User"] == "915:915" and not hd.get("CapAdd") and hd["ReadonlyRootfs"])
 
 
-# ------------------------------------------------------------------ commands (manual 2.2.2.5)
+# ------------------------------------------------------------------ commands (manual 1.10.2.5)
 # The vars file is a scratch copy: edit_dhcp's load/save/lock/audit are pointed at it.
 import contextlib  # noqa: E402
 from fabriclib.dhcp.common import edit_dhcp as ed  # noqa: E402

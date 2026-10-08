@@ -4,7 +4,7 @@ from paths import sites_dn
 
 
 def read_networks(samdb, lp, site):
-    """Purpose: the address plan across sites (manual 2.2.2.8, S4.2): every site's networks, in one search over
+    """Purpose: the address plan across sites (manual 1.10.2.8, S4.2): every site's networks, in one search over
              OU=sites — every DC holds the whole domain, so nothing is gathered.
     Inputs:  samdb — SamDB (as the site's agent); lp — LoadParm (unused); site — str (unused: the plan is every
              site's).

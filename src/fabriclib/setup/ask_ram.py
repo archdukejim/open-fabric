@@ -2,11 +2,11 @@ from fabriclib.common.console import info
 from fabriclib.setup.errors import SetupError
 from fabriclib.system.host_ram_gb import host_ram_gb
 
-MIN_RAM_GB = 4                      # D31: a Raspberry Pi with 4 GB is the smallest host
+MIN_RAM_GB = 4                      # 2.1.2.3: a Raspberry Pi with 4 GB is the smallest host
 
 
 def _plan(gb):
-    """Purpose: what fabric's largest containers may use at a size, as the compose files set it (manual 1.3.4.2).
+    """Purpose: what fabric's largest containers may use at a size, as the compose files set it (manual 1.2.4.2).
     Inputs:  gb — int, host_ram_capacity.
     Returns: str, e.g. "Keycloak 2400 MB, the domain controller 1024 MB, Postgres 400 MB, BIND 256 MB".
     Fails:   never.
@@ -17,9 +17,9 @@ def _plan(gb):
 
 
 def ask_ram(ctx, data):
-    """Purpose: how much of this host fabric sizes itself for (D31, manual 1.3.4.2): setup measures the host's memory
-             and asks, the measured amount the default; less restricts fabric, leaving the rest to other work on the
-             host. Asked once: the answer is kept as host_ram_capacity (change it with `fabricctl edit` or a vars
+    """Purpose: how much of this host fabric sizes itself for (2.1.2.3, manual 1.2.4.2): setup measures the host's
+             memory and asks, the measured amount the default; less restricts fabric, leaving the rest to other work on
+             the host. Asked once: the answer is kept as host_ram_capacity (change it with `fabricctl edit` or a vars
              file).
     Inputs:  ctx — SetupContext (non_interactive); data — the settings so far (changed: host_ram_capacity).
     Returns: None.
@@ -28,7 +28,7 @@ def ask_ram(ctx, data):
     Feeds:   collect_vars."""
     have = host_ram_gb()
     if have and have < MIN_RAM_GB:
-        raise SetupError(f"this host has {have} GB of memory: fabric needs at least {MIN_RAM_GB} GB (D31)")
+        raise SetupError(f"this host has {have} GB of memory: fabric needs at least {MIN_RAM_GB} GB (2.1.2.3)")
     set_ = int(data.get("host_ram_capacity") or 0)
     if set_:
         if set_ < MIN_RAM_GB or (have and set_ > have):

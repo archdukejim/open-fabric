@@ -29,7 +29,7 @@ def _link(name, record, secret):
 
 
 def dns_links(v, secrets, registry_path):
-    """Purpose: the DNS links between this site and the sites next to it in the federation (manual 1.8 M4): what BIND
+    """Purpose: the DNS links between this site and the sites next to it in the federation (manual 1.9 M4): what BIND
                 delegates, transfers and keeps a secondary copy of.
     Inputs:  v — fabric vars: domain; secrets — fabric's secrets (federation_tsig: {site: secret} for each site
              that joined here, "upstream": secret for this site's own upstream); registry_path — the

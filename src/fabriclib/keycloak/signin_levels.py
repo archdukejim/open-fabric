@@ -1,6 +1,6 @@
 from fabriclib.common.errors import ValidationError
 
-# second-factor levels, weakest first (manual 5.8.2.6.1): "any" accepts whichever the person enrolled, so it is weaker
+# second-factor levels, weakest first (manual 2.3.6.2.6.1): "any" accepts whichever the person enrolled, so it is weaker
 # than requiring one; a passkey (unlocked on the device, bound to the site's name) is the strongest
 LEVELS = ("none", "any", "totp", "passkey")
 

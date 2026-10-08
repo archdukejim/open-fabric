@@ -72,7 +72,7 @@ ad_domain: ad.test
 ad_password_policy: {minimum_length: 14, complexity: true, history: 24, minimum_age_days: 0, maximum_age_days: 0, lockout_threshold: 10, lockout_minutes: 15, lockout_window_minutes: 15}
 install_keycloak: true
 install_webui: true
-# the raised sign-in (5.8.2.6): the strict login test below; the host suite proves the default and raising
+# the raised sign-in (2.3.6.2.6): the strict login test below; the host suite proves the default and raising
 webui_client_cert: true
 signin_admin_second_factor: totp
 install_freeradius: true
@@ -108,7 +108,7 @@ echo "--- doctor"
 in_box 'fabricctl doctor' 2>&1 | tee "$OUT/doctor.log"
 check "doctor: all checks pass" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 
-echo "--- fabric's own images (manual 2.6.3): published and signature-checked once the lock pins them"
+echo "--- fabric's own images (manual 1.14.3): published and signature-checked once the lock pins them"
 published=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
 print(sum(1 for e in r('$REPO/config')['images'].values() if e['ref']))")
 if [ "$published" -eq 8 ]; then
@@ -119,7 +119,7 @@ if [ "$published" -eq 8 ]; then
         "in_box 'stat -c %a /etc/fabric/images/verified.json' | grep -qx 600 \
          && [ \"\$(in_box \"grep -cE '^ +.at.: ' /etc/fabric/images/verified.json\")\" -ge 5 ]"
 else
-    # some published, some still pending (new or rebuilt on this branch, 4.7.1.4): the pending ones are built here
+    # some published, some still pending (new or rebuilt on this branch, 3.14.1.4): the pending ones are built here
     pending=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
 print(' '.join('fabric/' + {'webui': 'web'}.get(n, n) + ':local' for n, e in r('$REPO/config')['images'].items() if not e['ref']))")
     check "$published of 8 published: the pending ones are built here ($pending)" \
@@ -128,7 +128,7 @@ fi
 check "fabricctl status lists the relaxed security settings (none here)" \
     "in_box 'fabricctl status' | grep -A1 '^relaxed security settings:' | grep -qx '  none'"
 
-echo "--- undoing one host change (manual 2.7.1.5): trust, then approved again"
+echo "--- undoing one host change (manual 1.2.9.5): trust, then approved again"
 UFW_BEFORE=$(in_box 'cat /opt/fabric/config/host-originals/ufw.state' 2>/dev/null)
 check "the host's own files were kept before fabric first changed them (chrony's, ufw's state)" \
     "in_box 'test -f /opt/fabric/config/host-originals/etc/chrony/chrony.conf' && ! in_box 'grep -q \"^# fabric\" /opt/fabric/config/host-originals/etc/chrony/chrony.conf' && [ -n '$UFW_BEFORE' ]"
@@ -169,7 +169,7 @@ check "with Keycloak down the sign-in still starts and DNS answers through AdGua
     "in_box 'systemctl is-active adguard-auth' | grep -qx active && in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP"
 in_box 'systemctl start keycloak' >> "$OUT/adguard-no-keycloak.log" 2>&1
 
-echo "--- Time: chrony on the host serves the LAN (manual 2.5.1)"
+echo "--- Time: chrony on the host serves the LAN (manual 1.13.1)"
 BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
 check "time: chrony runs, configured by fabric, answering the LAN" \
     "in_box 'systemctl is-active chrony' | grep -qx active && in_box 'grep -q ^allow /etc/chrony/chrony.conf && grep -q fabric /etc/chrony/chrony.conf'"
@@ -196,7 +196,7 @@ check "kea: fabricctl dhcp leases lists the client's lease" "in_box 'fabricctl d
 in_box 'fabricctl dhcp reserve 02:00:00:00:77:01 10.77.0.50 sbxprinter' > "$OUT/dhcp-reserve.log" 2>&1
 check "kea: fabricctl dhcp reserve saves and applies; status lists it"     "grep -q 'applied' '$OUT/dhcp-reserve.log' && in_box 'fabricctl dhcp status' | grep -q '02:00:00:00:77:01  10.77.0.50'"
 check "kea: a reservation inside the pool is refused"     "! in_box 'fabricctl dhcp reserve 02:00:00:00:77:02 10.77.0.205 --no-apply' >/dev/null 2>&1"
-# DHCP management (manual 2.2.2): subnets with name/VLAN/notes, options, a client class, Kea's own check
+# DHCP management (manual 1.10.2): subnets with name/VLAN/notes, options, a client class, Kea's own check
 in_box 'fabricctl dhcp add-subnet 10.78.0.0/24 --name lab2 --vlan 78 --router 10.78.0.1 --pool "10.78.0.100 - 10.78.0.150" --notes "second lab"' > "$OUT/dhcp-subnet.log" 2>&1
 in_box 'fabricctl dhcp class add pxe-uefi --test "option[93].hex == 0x0007" --next-server 10.77.0.30 --boot-file ipxe.efi' >> "$OUT/dhcp-subnet.log" 2>&1
 in_box 'fabricctl dhcp option set tftp-server-name 10.77.0.30 --class pxe-uefi' >> "$OUT/dhcp-subnet.log" 2>&1

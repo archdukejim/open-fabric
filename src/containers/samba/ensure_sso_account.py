@@ -28,7 +28,7 @@ def _export(conf, realm, spns):
 
 
 def ensure_sso_account(samdb, lp, conf, site, spns):
-    """Purpose: the site's Kerberos sign-in account for Keycloak (manual 5.8.2.6.2): fabric-sso-<site> in the site's
+    """Purpose: the site's Kerberos sign-in account for Keycloak (manual 2.3.6.2.6.2): fabric-sso-<site> in the site's
              OU=service-accounts, holding exactly the given HTTP SPNs, AES keys only, its password random and never
              leaving the DC (nothing signs in with it: Keycloak only decrypts tickets with its keytab); the keytab
              exported to /data/sso.keytab when the account, its SPNs or its key types change, or the keytab is missing.

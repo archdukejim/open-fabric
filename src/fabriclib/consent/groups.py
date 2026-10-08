@@ -1,8 +1,8 @@
-"""The kinds of host change fabric asks about (manual 2.7.1.3), in the order setup asks.
+"""The kinds of host change fabric asks about (manual 1.2.9.3), in the order setup asks.
 
 level: "required" — declining stops setup; "recommended" — declining leaves that part unmanaged and shows a
 relaxation; "choice" — needed only because of a setting, declining asks for the other choice.
-needs: a group asked only when that group was answered yes (D121: the firewall's three questions)."""
+needs: a group asked only when that group was answered yes (2.1.2.13: the firewall's three questions)."""
 
 GROUPS = {
     "packages": {"title": "Packages", "level": "required", "step": "host",

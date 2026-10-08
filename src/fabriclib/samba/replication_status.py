@@ -3,7 +3,7 @@ import subprocess
 
 
 def replication_status(container="samba"):
-    """Purpose: how this site's DC replicates with the others (manual 1.8.8.5, 1.8.8.9): every inbound neighbour per
+    """Purpose: how this site's DC replicates with the others (manual 1.9.8.5, 1.9.8.9): every inbound neighbour per
              partition, when it last succeeded and how often it has failed since — AD's own record (`repsFrom`), read
              inside the DC from its database (src/containers/samba/read_replication.py), so a read-only DC shows it
              too.

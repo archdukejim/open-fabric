@@ -8,7 +8,7 @@ from fabriclib.images.verify_signature import verify_signature
 
 def verify_published_images(paths, final_vars):
     """Purpose: before anything is installed, check the signature of every published fabric image this deploy will
-             run (decisions D81, D85; manual 2.6.3.4); a refusal stops the deploy with nothing changed.
+             run (decisions 2.1.14.6, 2.1.14.10; manual 1.14.3.4); a refusal stops the deploy with nothing changed.
     Inputs:  paths — deploy_paths() (jinja: where the lock is found; render: the rendered compose files, so only
              services this host runs count); final_vars — rendered vars (image_fabric_*, service_users,
              image_cosign, image_signature_check).
