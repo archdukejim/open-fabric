@@ -62,7 +62,7 @@ docs/volume_1_description_and_architecture/1.17.30-fabriclib-samba.md	bb52b03216
 docs/volume_1_description_and_architecture/1.17.31-fabriclib-directory.md	233c5ccb89071a7ce1436b1a277a7754ae398034	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.4-fabricctl-lib.md	76bc845876c679778c0588d379f7246a12fae2d0	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.5-fabriclib-common.md	ca7ccce95ef791c4061d44c9caf30b68ef69d325	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.6-fabriclib-consent.md	6f18821746d85543c0be281447b333c3dec75eff	2026-10-08	
+docs/volume_1_description_and_architecture/1.17.6-fabriclib-consent.md	fac0dccbc79c6b304807039ef3e7dde8cec12ad9	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.7-fabriclib-core.md	5718624720787aedded89304f13dc5b1bfc6964d	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.8-fabriclib-deploy.md	4d3b5404ce28685de276472d763a2d67c93f0b0e	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.9-fabriclib-dhcp.md	785bddf3c5e6da8767dc26991c809f1bfaf14d75	2026-10-08	
@@ -77,7 +77,7 @@ docs/volume_1_description_and_architecture/1.2.5-templates.md	2f7631f271206f3065
 docs/volume_1_description_and_architecture/1.2.6-targets-and-hardening.md	b4d8884417247f21eb69307d27a3425ad932eae2	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.7-container-inventory.md	fbafe239829bf21ad663831f39ed6fd49a7f1345	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.8-security-defaults.md	7729eba2d5fdfd258eff5105b2684d346c401065	2026-10-08	
-docs/volume_1_description_and_architecture/1.2.9-host-consent.md	8728f78b4b6125b93974d5604a5c303475f92d3d	2026-10-08	
+docs/volume_1_description_and_architecture/1.2.9-host-consent.md	eb1592d0949a6cbaeb883852d3ab80a0c2eceab4	2026-10-08	
 docs/volume_1_description_and_architecture/1.3.1-host-package.md	4ee407c77ffcf8f1555c26c533edbaebd31493c2	2026-10-08	
 docs/volume_1_description_and_architecture/1.3.2-setup-design.md	c0e3955e70d4834403d534fed8d256fa2ad78e4a	2026-10-08	
 docs/volume_1_description_and_architecture/1.3.3-agent-api.md	64546b4434088f2e772dddc954c290e30d33d78e	2026-10-08	
@@ -232,7 +232,7 @@ scripts/README.md	dd36e9248260e4f936662417c4d10511c3cdb00a	2026-10-08
 scripts/docs/README.md	af834e1650d5a42ed93702d10180e09780634830	2026-10-08	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	7ff94cd622677c2a6040c2c75374a04e50cc48c4	2026-10-08	
-scripts/docs/lib_doc_numbers.tsv	bce09f0660230e4f244179579d1bd104b9ad006b	2026-10-08	
+scripts/docs/lib_doc_numbers.tsv	9c52d7eacc6ba29c8ef0ecb3fe52ce05f5bd2984	2026-10-08	
 scripts/docs/lib_doc_registry.py	a65ab5459802daaca963fac77a8b708397d42d89	2026-10-08	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	b3f307b4dbaba54a69cc93c993287d43c747ba8f	2026-10-08	
@@ -397,16 +397,17 @@ src/fabriclib/common/vars_lock.py	ef5e9180db88b7b8463ee71ef57527eff1373d2c	2026-
 src/fabriclib/common/wait_healthy.py	49398762700771632239134187736aae565a9677	2026-09-30	
 src/fabriclib/common/write_audit.py	8516ea4672c3e012afef683c44a19b54d2e5a104	2026-10-02	
 src/fabriclib/common/write_file_if_changed.py	09c71ae8e6c377ba060809cd368e489e8be4c2a7	2026-09-30	
-src/fabriclib/consent/README.md	2899452ef771c64d7ca9a7859e673163b0c53f47	2026-10-08	
+src/fabriclib/consent/README.md	7427c24b46e08bc60c6fb5c219290db817cbf3bd	2026-10-08	
 src/fabriclib/consent/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/consent/allowed_to_change.py	12cea0bae49169aa6bc07528ee3104b442338175	2026-10-08	
-src/fabriclib/consent/ask_consent.py	4b5e0e19b1d82c2058ffb8dd6e1ccabd3f8686ba	2026-10-08	
+src/fabriclib/consent/ask_consent.py	c44d966675eb3037729b952f952ddf4df22abe1e	2026-10-08	
+src/fabriclib/consent/carry_over_splits.py	ede99b370fb50e8c9fcff55c607cf42d007b21dd	2026-10-08	
 src/fabriclib/consent/check_consent.py	3cf60e271d1523ed7eb016a712c82fa333f4b7db	2026-10-02	
 src/fabriclib/consent/common/README.md	a9df0b3c91df330fee2484d09a9d85792b362e42	2026-10-02	
 src/fabriclib/consent/common/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/consent/common/consent_file.py	3582eaebf80e971fe851a52fab986f108383eb73	2026-10-08	
 src/fabriclib/consent/consent_status.py	9a3bbaa0f42815ffbf8305262f70cdf2647010f8	2026-10-08	
-src/fabriclib/consent/groups.py	8f0695f6561cdf0aca51f41a19aa6ea31be80a55	2026-10-08	
+src/fabriclib/consent/groups.py	2a2135f9d76d27cc59cd23f3c4d0c65377ce0bcc	2026-10-08	
 src/fabriclib/consent/load_consent.py	4e938d3a94daf64b06e340ad9d603597bf3e664f	2026-10-02	
 src/fabriclib/consent/plan_accounts.py	8ae9d6c7e5c7d1a603f3b854be36446546ba7ca1	2026-10-08	
 src/fabriclib/consent/plan_firewall.py	08c82a01b63bcde2a21d7297d883371b681a7c76	2026-10-08	
@@ -1169,7 +1170,7 @@ tests/README.md	1e827875c0e5dfa538343837ec101264008c6470	2026-10-08
 tests/adguard/README.md	203fc82e8a3eb847f7cae9f340e1aee798349768	2026-10-02	
 tests/adguard/run.py	a0195c2bdca420acdab883138c493c926b451dd7	2026-10-08	
 tests/consent/README.md	e145a0d2d43d16682fc9dda3e46179d6530c5a03	2026-10-08	
-tests/consent/run.py	979df4dd8d0c4471866b30a0ee42ef575a44b7b3	2026-10-08	
+tests/consent/run.py	eaecbd26d8b849f2b92b583fe117bc3080b025bb	2026-10-08	
 tests/docs/README.md	f75d52925a7afe800bee5b2989addb136e813402	2026-10-03	
 tests/docs/check_consistency.py	f73615e09406f36b652b51e06b93be0d02a0c486	2026-10-08	
 tests/docs/check_docstrings.py	525f95338347ff4ea65bdec1130f401d9e326460	2026-10-03	

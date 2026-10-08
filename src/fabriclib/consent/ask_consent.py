@@ -2,6 +2,7 @@ import datetime
 import os
 
 from fabriclib.common.console import BOLD, NC, YELLOW, heading
+from fabriclib.consent.carry_over_splits import carry_over_splits
 from fabriclib.consent.groups import GROUPS
 from fabriclib.consent.load_consent import load_consent
 from fabriclib.consent.save_consent import save_consent
@@ -61,6 +62,9 @@ def ask_consent(config_dir, plan, interactive, approve=None, decline=None, stops
     if "all" in decline:
         raise SetupError("--decline takes group names, not all")
     groups = load_consent(config_dir) or {}
+    carried = carry_over_splits(groups, plan)
+    if carried:
+        print(f"  {', '.join(carried)}: answered as before this release split the question they came from")
     if plan:
         heading("Changes to this host outside fabric's own folders — each needs your yes")
     pending, answers = [], {}
