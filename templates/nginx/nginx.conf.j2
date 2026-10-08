@@ -150,10 +150,58 @@ http {
         }
     }
 
-    # Fabric Landing Portal (Landing, Certificates, Manual); also at the host's own name (<host>.<domain>)
+    # The info page (decision 2.1.4.3) at info.<domain>: also over plain HTTP with no redirect, so a new device can
+    # fetch the CA (/certs/) and check its fingerprint before it trusts anything; the manual stays on HTTPS
+    server {
+        listen 80;
+        server_name {{ hostname_landing }};
+
+        location = /style.css {
+            alias /srv/www/shared/style.css;
+        }
+        location = /certs {
+            return 301 /certs/;
+        }
+        location /certs/ {
+            root /srv/www;
+            index index.html;
+{{ cert_file_types() }}        }
+        location /manual/ {
+            return 301 https://$host$request_uri;
+        }
+        location / {
+            alias /srv/www/landing/;
+            index index.html;
+            default_type text/html;
+        }
+    }
+
+{% set _old_names = ([domain, (hostname ~ '.' ~ domain) | lower] | unique | reject('equalto', hostname_landing) | list) %}
+{% if _old_names %}
+    # <domain> and the host's own name send people to the info page (2.1.4.3): HTTP to its HTTP page, HTTPS to HTTPS
+    server {
+        listen 80;
+        listen 443 ssl;
+        server_name {{ _old_names | join(' ') }};
+
+        ssl_certificate     /etc/nginx/certs/{{ hostname_landing }}/fullchain.pem;
+        ssl_certificate_key /etc/nginx/certs/{{ hostname_landing }}/privkey.pem;
+        ssl_protocols       TLSv1.2 TLSv1.3;
+
+        location /health {
+            access_log off;
+            return 200 'OK';
+        }
+        location / {
+            return 301 $scheme://{{ hostname_landing }}$request_uri;
+        }
+    }
+{% endif %}
+
+    # The info page over HTTPS (Landing, Certificates, Manual)
     server {
         listen 443 ssl;
-        server_name {{ hostname_landing }} {{ (hostname ~ '.' ~ domain) | lower }};
+        server_name {{ hostname_landing }};
 
         ssl_certificate     /etc/nginx/certs/{{ hostname_landing }}/fullchain.pem;
         ssl_certificate_key /etc/nginx/certs/{{ hostname_landing }}/privkey.pem;
@@ -178,6 +226,10 @@ http {
         location /certificates {
             return 301 https://{{ hostname_certs }}/;
         }
+        location /certs/ {
+            root /srv/www;
+            index index.html;
+{{ cert_file_types() }}        }
     }
 
     # CA certificates for every kind of system (published by fabricctl setup:

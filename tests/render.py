@@ -498,6 +498,21 @@ _db = env.get_template('bind9/data/zone.j2').render(**full, federation_links={},
 assert re.search(r"^host1\s+A\s+192\.168\.4\.21$", _db, re.M) and "8006" not in _db and "Proxmox" not in _db
 print('landing links from DNS records: only marked ones, https with port and path; the zone file unchanged (2.1.4.2)')
 _ngx = env.get_template('nginx/nginx.conf.j2').render(**full)
-assert f"server_name {v2['hostname_landing']} {(v2['hostname'] + '.' + v2['domain']).lower()};" in _ngx, \
-    "the landing page also answers at the host's own name"
-print("landing page at the host's own name too (no bare 404 at https://<host>.<domain>)")
+# the info page (2.1.4.3): info.<domain> by default, on HTTP with no redirect; <domain> and the host's name redirect
+_land = v2['hostname_landing']
+_blocks = re.split(r"\n    server \{", _ngx)
+_info80 = [b for b in _blocks if "listen 80;" in b and f"server_name {_land};" in b]
+assert _land == f"info.{v2['domain']}", _land
+assert _info80 and "return 301 https" not in _info80[0].split("location /manual/")[0] \
+    and "location /certs/" in _info80[0], "info.<domain> answers on plain HTTP, with the CA files, without a redirect"
+_redir = [b for b in _blocks if f"return 301 $scheme://{_land}$request_uri;" in b]
+assert _redir and v2['domain'] + " " in _redir[0] and (v2['hostname'] + '.' + v2['domain']).lower() in _redir[0] \
+    and "listen 80;" in _redir[0] and "listen 443 ssl;" in _redir[0], "<domain> and the host's name redirect, both"
+assert 'id="root-fp"' in _landing and "/certs/ca-certs.json" in _landing and f"https://{_land}/manual/" in _landing, \
+    "the page shows the root's fingerprint and links the manual over HTTPS"
+_db_apex = env.get_template('bind9/data/zone.j2').render(**full, federation_links={}, zone_name=v2['domain'],
+                                                         zone_records=_zone["dynamic_zone_var"])
+assert re.search(r"^@\s+A\s+", _db_apex, re.M) and re.search(r"^info\s+CNAME\s+", _db_apex, re.M), \
+    "the zone answers for <domain> (to redirect) and for info"
+print("the info page at info.<domain>: HTTP without a redirect, the CA and its fingerprint; <domain> and the host's "
+      "name redirect (2.1.4.3)")

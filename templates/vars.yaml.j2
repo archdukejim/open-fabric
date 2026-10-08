@@ -50,7 +50,8 @@ ip_openbao: {{ ip_openbao | default('10.255.0.90') }}
 # SERVICE HOSTNAMES
 # ============================================================
 cname_ca: {{ cname_ca | default('ca') }}
-landing_page_cname: {{ landing_page_cname | default('', true) }}
+# The info page's name (2.1.4.3): info.<domain> by default; <domain> and the host's own name redirect to it.
+landing_page_cname: {{ landing_page_cname | default('info', true) }}
 cname_dns: {{ cname_dns | default('dns') }}
 cname_sso: {{ cname_sso | default('sso') }}
 cname_mgr: {{ cname_mgr | default('fabric') }}
@@ -63,7 +64,7 @@ webui_hostname: {{ webui_hostname | default('', true) }}
 hostname_nginx: {{ hostname_nginx | default('nginx.' ~ domain) }}
 hostname_bind9: {{ hostname_bind9 | default((cname_dns | default('dns')) ~ '.' ~ domain) }}
 hostname_stepca: {{ hostname_stepca | default((cname_ca | default('ca')) ~ '.' ~ domain) }}
-hostname_landing: {{ hostname_landing | default((landing_page_cname ~ '.' ~ domain) if landing_page_cname | default('', true) else domain) }}
+hostname_landing: {{ hostname_landing | default((landing_page_cname | default('info', true)) ~ '.' ~ domain) }}
 hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~ '.' ~ domain) }}
 {% set _hostname_mgr = (webui_hostname | default('', true) or ((cname_mgr | default('fabric')) ~ '.' ~ domain)) | lower %}
 hostname_mgr: {{ _hostname_mgr }}
@@ -391,8 +392,8 @@ bind_acl_policies:
 {% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) and _mgr_label and _mgr_label != hostname %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': _mgr_label }) %}
 {% endif %}
-{% if landing_page_cname | default('', true) %}
-{% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname }) %}
+{% if landing_page_cname | default('info', true) %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname | default('info', true) }) %}
 {% endif %}
 {% if federation_endpoint | default(false) | bool %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_federation | default('federation') }) %}
@@ -408,7 +409,8 @@ bind_acl_policies:
 {% set default_a = [
   { 'ip': host_ip, 'name': hostname }
 ] %}
-{% if not landing_page_cname | default('', true) %}
+{# <domain> itself answers on this host (it redirects to the info page, 2.1.4.3) unless the admin's own records name it #}
+{% if '@' not in _own %}
 {% set _ = default_a.append({ 'ip': host_ip, 'name': '@' }) %}
 {% endif %}
 {% set _user_dns = dns | default({'dynamic_zone_var': {'zone_authority': true}}) %}

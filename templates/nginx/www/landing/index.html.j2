@@ -8,9 +8,22 @@
 
 {% block content %}
     <div class="card" style="margin-top: 2rem;">
-      <h2 class="section-title" style="margin-top: 0;">Documentation & Setup</h2>
+      {# a new device reads this over plain HTTP (2.1.4.3): it fetches the CA here and checks it before trusting it #}
+      <h2 class="section-title" style="margin-top: 0;">Trust this network</h2>
+      <p>Install this network's root certificate on a new device, then everything here opens over HTTPS.
+         Download it from <a href="/certs/">/certs/</a> (every system's format) and check that its
+         SHA-256 fingerprint is exactly:</p>
+      <p><code id="root-fp">(see /certs/ca-certs.json)</code></p>
+      <script>
+        fetch("/certs/ca-certs.json").then(r => r.json()).then(info => {
+          const root = info["root-ca"] || {};
+          if (root.sha256) document.getElementById("root-fp").textContent = root.sha256;
+        }).catch(() => {});
+      </script>
+
+      <h2 class="section-title">Documentation & Setup</h2>
       <ul class="link-list">
-        <li><a href="/manual/" class="btn">Infrastructure Manual (Documentation)</a></li>
+        <li><a href="https://{{ hostname_landing }}/manual/" class="btn">Infrastructure Manual (Documentation)</a></li>
         <li><a href="http://{{ hostname_certs }}/" class="btn">CA Certificates (every system) & Installers</a></li>
         <li><a href="https://{{ hostname_certs }}/#join" class="btn">Join a machine to the domain</a></li>
       </ul>

@@ -69,7 +69,7 @@ docs/volume_1_description_and_architecture/1.17.9-fabriclib-dhcp.md	785bddf3c5e6
 docs/volume_1_description_and_architecture/1.2.1-topology.md	7381d75b9f2d53e59aeb1abe6c7c94f969d4a117	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.10-global.md	e0e51a8c18359aac42f4c709fdff5a09fb9f36b5	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.11-networking.md	54f1f4a95ab50b0d6e348661254c94efa0dbada0	2026-10-08	
-docs/volume_1_description_and_architecture/1.2.12-docker.md	1a369f0db362e7f76746192d43b96346a9bd904c	2026-10-08	
+docs/volume_1_description_and_architecture/1.2.12-docker.md	c3be689bb6e8188bbd44aa734004d5e43bb7d39c	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.2-repository-layout.md	afe44af7f16034194a722297ed5782d865a82c6f	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.3-installed-layout.md	660bb6fe1409d3a45c2b0db3f90e9fbce6b40cf5	2026-10-08	
 docs/volume_1_description_and_architecture/1.2.4-containers.md	e76ff8ecf4c931d079f1b4491edac90d0ed69b55	2026-10-08	
@@ -82,8 +82,8 @@ docs/volume_1_description_and_architecture/1.3.1-host-package.md	4ee407c77ffcf8f
 docs/volume_1_description_and_architecture/1.3.2-setup-design.md	c0e3955e70d4834403d534fed8d256fa2ad78e4a	2026-10-08	
 docs/volume_1_description_and_architecture/1.3.3-agent-api.md	00b2747c224b2bdaa564c8f2332fdab2c70e800e	2026-10-08	
 docs/volume_1_description_and_architecture/1.4.1-dns-architecture.md	4ad86948358d808dc1ba3098fca753fab9d3397a	2026-10-08	
-docs/volume_1_description_and_architecture/1.4.2-landing-links.md	eaf027f7965321e360f96f4f1ebd6ca5840b8c3d	2026-10-08	
-docs/volume_1_description_and_architecture/1.5.1-pki-chain.md	18e545426bad44f46133d4bc7e65da676ca7353b	2026-10-08	
+docs/volume_1_description_and_architecture/1.4.2-landing-links.md	8a1ec469d476fdcd75f02f9bb1c27db2db3827d9	2026-10-08	
+docs/volume_1_description_and_architecture/1.5.1-pki-chain.md	3b1402c075aa15dadf39590a0dfd138bde0fbb4e	2026-10-08	
 docs/volume_1_description_and_architecture/1.5.2-pki.md	f9871fd3d52c1ab0cef250409db06f0d1c74d2c9	2026-10-08	
 docs/volume_1_description_and_architecture/1.6.1-directory.md	7fa9284225375dc046757b644311b8368d907462	2026-10-08	
 docs/volume_1_description_and_architecture/1.6.10-security.md	182a26ce4a322ffc7e958bec6e621a26506e474c	2026-10-08	
@@ -119,7 +119,7 @@ docs/volume_2_engineering_decisions/2.1.15-logs.md	b3fb9286ea0a6760a0ab597950d77
 docs/volume_2_engineering_decisions/2.1.16-disk-encryption.md	2c5f6832b676ea44d7f5e8a76a4717b35f4d3cd6	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.2-architecture.md	5d920ae8e230cfaaafeb6aa77fdd22753fb77227	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.3-fabricctl.md	82bfa9a0f44a376c8a1b49c2b5b49af11e86c60c	2026-10-08	
-docs/volume_2_engineering_decisions/2.1.4-dns.md	e9a72e46c54f146d414310d3a6c7af2f7d12c93c	2026-10-08	
+docs/volume_2_engineering_decisions/2.1.4-dns.md	e827fbf00a4d254ffa587b0fb4ed9a73412a7a2b	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.5-certificates.md	27794473bed64d08e3926cf76a3f0f3a89bd1e1b	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.6-identity.md	7daf1cbd3167a331ff320753f38ca7c1af6b992d	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.7-openbao.md	7fc2851b2b94f0fbef1409b6cd62e9ab77a88234	2026-10-08	
@@ -151,7 +151,7 @@ docs/volume_3_installation/3.2.2-docker-from-ubuntu.md	2d7250a68efefe0413b077ee6
 docs/volume_3_installation/3.2.3-deployed-structure.md	7e6cdc8cf16bfca41ab48a5b0e0dd7d69d0c29a2	2026-10-08	
 docs/volume_3_installation/3.2.4-reinstall-uninstall.md	5e505ebf5c9e308d960be3ac459cd9481e605fa1	2026-10-08	
 docs/volume_3_installation/3.3.1-running-setup.md	df576af3c656e1e71fb6b803a21e667c82664b34	2026-10-08	
-docs/volume_3_installation/3.3.2-after-setup.md	4acb14f546a8592695669eebadbf3b78556bc1dd	2026-10-08	
+docs/volume_3_installation/3.3.2-after-setup.md	cfd7652c4e1b5de64d600e52f095a4901f27c416	2026-10-08	
 docs/volume_3_installation/3.3.3-setup-steps.md	57600220891512062f049b4d88fc139dc09b2a86	2026-10-08	
 docs/volume_3_installation/3.3.4-rebuilding.md	89cf47b0a1e0594bdae8b4d684b4111123f5b76b	2026-10-08	
 docs/volume_3_installation/3.5.1-pki-before-install.md	fe4159103da796d8616041f0d1cd09f4b134db79	2026-10-08	
@@ -808,7 +808,7 @@ src/fabriclib/setup/harden_docker.py	1ad4aca818b8227f6566193c67503b8f12adae09	20
 src/fabriclib/setup/init_pki.py	e69ea46f2634b8f6500188d54d14cb16b15b1e57	2026-10-08	
 src/fabriclib/setup/join_federation.py	52dc92d225b9bffcc91c629181755499be20dc3c	2026-10-08	
 src/fabriclib/setup/mint_extra_certs.py	0e23e41edec381ab688dab5b8a06f9e39eb6a39e	2026-09-30	
-src/fabriclib/setup/mint_service_certs.py	a3a707f02dafd036cf8d5feef362dde818d2e0cd	2026-10-08	
+src/fabriclib/setup/mint_service_certs.py	8b33998e63792dcd05790adbfb60f5179118e3b1	2026-10-08	
 src/fabriclib/setup/preflight.py	1dab3cb2e38347e22324d1d8e0429aa6b089342f	2026-10-08	
 src/fabriclib/setup/read_join_invitation.py	c9d57c31ab06a15b431197add546184ac9694285	2026-10-01	
 src/fabriclib/setup/renew_service_certs.py	c04c15d5969cee73de7c246aade36a8ca9bccaee	2026-10-08	
@@ -1119,7 +1119,7 @@ templates/keycloak/README.md	0f57c1ade47d7e7b01e80580c90585d37215b40a	2026-10-03
 templates/keycloak/docker-compose.yml.j2	4eda5c7d7fafdc4ec5425e075404cb816842eda5	2026-10-08	
 templates/nginx/README.md	80829fdaf576808a7cd12322416620ccf66edfbd	2026-10-05	
 templates/nginx/docker-compose.yml.j2	0782ff161cfd7bc096af7468cbb4093be0b52a96	2026-10-06	
-templates/nginx/nginx.conf.j2	3a4ead845aa80a9752b42146c972b303423787c9	2026-10-08	
+templates/nginx/nginx.conf.j2	3a12f052def22a24b8ce594c8b0e196e73a349e1	2026-10-08	
 templates/nginx/www/README.md	f25fde1156693652cede612c785ab748faa24ae4	2026-10-05	
 templates/nginx/www/certs/README.md	970670cf8cc07afb6d30f2b595289748d5f6b6c4	2026-10-08	
 templates/nginx/www/certs/index.html.j2	bacff63a75c7727f2fe59f0f4f381761b14173f7	2026-10-06	
@@ -1130,7 +1130,7 @@ templates/nginx/www/certs/install-firefox-ubuntu.sh.j2	552f6e79216f6185a37f57a10
 templates/nginx/www/certs/install-python-ubuntu.sh.j2	79adb0592b0e95bf0f334b0e83b943c61dca9538	2026-09-30	
 templates/nginx/www/certs/join-linux.sh.j2	ebbaaad6f4adfe9fff16ce94bfea470d669c2221	2026-10-08	
 templates/nginx/www/landing/README.md	f6b22867e45e2bea4ff6d29d1287f5608a1607f7	2026-09-30	
-templates/nginx/www/landing/index.html.j2	3cd05de8c11ef8b7c58ec3abe9a1425aa93cf7c6	2026-10-08	
+templates/nginx/www/landing/index.html.j2	5cc39dbedf85df4dfe3e58f5ea272b95ea48606a	2026-10-08	
 templates/nginx/www/manual/README.md	dd081199d419d4573664d9de5bd9683235beb19d	2026-10-03	
 templates/nginx/www/manual/index.html.j2	bf9fe32f762d70d2545d1621dccfd5b6d09c2a7b	2026-10-08	
 templates/nginx/www/shared/README.md	6b427bd7c1c9230906cb0bef52f33b6b250a03c5	2026-10-03	
@@ -1158,7 +1158,7 @@ templates/systemd/fabric-certs.timer	44e3fbabc379dfe6e8922d52aff8112166f81273	20
 templates/systemd/fabric-federation.service.j2	5c33184dacfdbf2e4b6e37f5bdcf88acb191ca7a	2026-10-01	
 templates/systemd/fabric.target	b3b87d2c8db3fae16df3bbf548e09955f3d1a19e	2026-09-30	
 templates/systemd/wrapper.service.j2	3da88d27873cbcd446c3f41cca4309a71217063e	2026-10-08	
-templates/vars.yaml.j2	d5722b2bd7f7b60891f4b88a05913a775f5b8025	2026-10-08	
+templates/vars.yaml.j2	d31edf9f9181e9f04effc47087bc35b27200321f	2026-10-08	
 templates/webui-app/README.md	74f553164940db827f6e6d357934ebf2d8b03527	2026-10-07	
 templates/webui-app/apply.html	8b8fd4593d075794cc14f4a38d97874c4cc76c1d	2026-10-02	
 templates/webui-app/audit.html	92d66156a5052b3b375db22a3c8eb3b1f266cf83	2026-10-02	
@@ -1206,7 +1206,7 @@ tests/freeradius/run.py	67d873222d08c223be8cc151d62d90f1801760e5	2026-10-08
 tests/hardening/README.md	514afa897a841c34383af1ef74949610d5dd333d	2026-10-05	
 tests/hardening/run.sh	b4e3e81266e9980d1dc636d34260a2619c00220c	2026-10-05	
 tests/host/README.md	0ca6a906d5bddb7d03f4f92f65f0ef52ea61b9d0	2026-10-08	
-tests/host/installer.py	18d7954d602c0bc42e8ad904f3869aa31e3636f2	2026-10-08	
+tests/host/installer.py	be3e3cc5ef91041c871230510ecce4116854f1ed	2026-10-08	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
 tests/host/run.sh	f222ee28946ef4cf028b8ddf05910a75b2d9ce57	2026-10-08	
 tests/host/upgrade.sh	240f6c644c85b045e5300971ac2e5e23fa69a86a	2026-10-08	
@@ -1234,7 +1234,7 @@ tests/pki/renewal.py	6d7dfdde5ebc11c6a6d584ab0ed79e25944bd080	2026-10-08
 tests/pki/revocation.py	f36e8ad4b2ca0683d820802ee8a6b9fb7f97dc97	2026-10-08	
 tests/pki/run.py	8a8b78b3bcc320c5019eb4929129ae5d2b711a7c	2026-10-08	
 tests/pki/site_ca.py	6e71ca7798e1aa94ce0f43160716ac57302bec65	2026-10-08	
-tests/render.py	bfaa37180a8f5930d0518123dac2ce1ebbe0ddd0	2026-10-08	
+tests/render.py	94b842e97b2ceba76a92f323218dd24e9639d113	2026-10-08	
 tests/run-all.sh	355927e2123b3653128bb74eb12dbaea12ab86a2	2026-10-05	
 tests/samba/README.md	2988a9d373cd532a415df9f842180d12152d6271	2026-10-08	
 tests/samba/dc.py	0f64382093eea24d46e42d4bec5a3efbed186b86	2026-10-08	
