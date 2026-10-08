@@ -46,7 +46,9 @@ def ask_ad_domain(ctx):
     print(f"    The AD domain is {BOLD}permanent{NC}: it cannot be changed once the domain exists.")
     suggestion = current or suggested_ad_domain(domain)
     if suggested_ad_domain(domain):
-        print(f"    Suggested: {suggested_ad_domain(domain)}, beside fabric's domain, apart from the sites' names. "
+        where = ("beside fabric's domain, apart from the sites' names" if domain.count(".") >= 2
+                 else "under fabric's domain (it has no parent of its own to sit beside)")
+        print(f"    Suggested: {suggested_ad_domain(domain)}, {where}; press Enter to take it. "
               f"It cannot be {domain} itself.")
     while True:
         answer = input(f"    AD domain{f' [{suggestion}]' if suggestion else ''}: ").strip().lower()

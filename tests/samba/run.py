@@ -85,9 +85,12 @@ check("accepted: passwords that never expire (maximum 0) with any minimum age",
       not refused({**GOOD, "ad_password_policy": {**POLICY, "maximum_age_days": 0}}, ""))
 check("refused: an RPC range at or below 1024", refused({**GOOD, "ad_rpc_ports": "100-200"}, "ad_rpc_ports"))
 
-check("the suggestion is a sibling at the top of the organisation's name (D87)",
+check("the suggestion is a sibling at the top of the organisation's name (D87); a two-label domain gets ad.<it>",
       suggested_ad_domain("lan.j-j.family") == "ad.j-j.family" and suggested_ad_domain("pitest.home.arpa")
-      == "ad.home.arpa" and suggested_ad_domain("example.org") == "")
+      == "ad.home.arpa" and suggested_ad_domain("home.arpa") == "ad.home.arpa"
+      and suggested_ad_domain("example.org") == "ad.example.org" and suggested_ad_domain("lan") == "")
+check("the two-label suggestion is a valid AD domain (a sub-domain, never the domain or a parent)",
+      not refused({**GOOD, "domain": "home.arpa", "ad_domain": suggested_ad_domain("home.arpa")}, ""))
 check("accepted: a sub-domain of fabric's domain too", not refused({**GOOD, "ad_domain": "ad.lan.test"}, ""))
 check("accepted: the suggested sibling", not refused({**GOOD, "ad_domain": "ad.test2", "domain": "lan.test2"}, ""))
 

@@ -45,7 +45,7 @@ docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b52
 docs/volume_1_systems_and_services/1.11.28-installers.md	12802f7241c875662a6f6895defdfcd1e1ffe0d7	2026-10-03	
 docs/volume_1_systems_and_services/1.11.29-webui.md	be2308dda5aa5523c41cbf40c9c6fdd111792bdc	2026-10-07	
 docs/volume_1_systems_and_services/1.11.3-fabricctl-jinja.md	beec251abb14254e0b187368c52aa0a5344cad8f	2026-10-07	
-docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	88d62cf60fe3a5f5990e4c54bac2531411585f75	2026-10-07	
+docs/volume_1_systems_and_services/1.11.30-fabriclib-samba.md	e021e3a978510d578aab9954fce490e17c369bcb	2026-10-08	
 docs/volume_1_systems_and_services/1.11.31-fabriclib-directory.md	88f5a1dd9a9064ee6c0454dbf3e5a0d6cc49a5d2	2026-10-05	
 docs/volume_1_systems_and_services/1.11.4-fabricctl-lib.md	f87125b7cc4c2afdf5f8f7812f325344ab40fd33	2026-10-03	
 docs/volume_1_systems_and_services/1.11.5-fabriclib-common.md	25760b3c2b485007557304498815d16168bd0d74	2026-10-07	
@@ -78,7 +78,7 @@ docs/volume_1_systems_and_services/1.5.4-single-pane.md	45b3641de1d6a92294d235b6
 docs/volume_1_systems_and_services/1.5.5-rbac.md	0ca58cc55acd2a11fd5c7d64a476a8880f6c2e05	2026-10-03	
 docs/volume_1_systems_and_services/1.6.1-directory.md	7fa9284225375dc046757b644311b8368d907462	2026-10-05	
 docs/volume_1_systems_and_services/1.6.2-keycloak.md	baf10d7ac6bb2103113f3621eb8688b00f008dda	2026-10-07	
-docs/volume_1_systems_and_services/1.6.3-samba-directory.md	7003c9ccd8bf0cba98bbbe8dbee5d7afc43d1a03	2026-10-07	
+docs/volume_1_systems_and_services/1.6.3-samba-directory.md	7846ec35ade8ec98fa8873d606b46be87d8cc230	2026-10-08	
 docs/volume_1_systems_and_services/1.7.1-openbao.md	4e5541921d9a297fd23c64e21d9e142b64aa7f74	2026-10-05	
 docs/volume_1_systems_and_services/1.8.1-sites.md	d8c5aab29eac2914b74655d59b401741ea6c2d4a	2026-10-04	
 docs/volume_1_systems_and_services/1.8.2-ha-partners.md	588f1878e863eb8eb8f7e139ad1c389d4693b9fa	2026-10-05	
@@ -781,7 +781,7 @@ src/fabriclib/samba/run_gpo_command.py	b6fbd7deb78c7072e946ad32097bb5ded571c283	
 src/fabriclib/samba/set_domain_password_policy.py	6093c3a0763a249974936bbd00a688fd6cdb20a3	2026-10-05	
 src/fabriclib/samba/set_gpo_policy.py	58c327bc186301062f6f5116c5d6b92f3e21169b	2026-10-05	
 src/fabriclib/samba/sso_spns.py	d86a919f3d92b829b4a216521e0da3ef31ae6ff2	2026-10-07	
-src/fabriclib/samba/suggested_ad_domain.py	3f4ad4b31bdf0810027a1746eb378ae35167084e	2026-10-04	
+src/fabriclib/samba/suggested_ad_domain.py	46659565c358fc5cec28d0b6ddb2d6889f444a14	2026-10-08	
 src/fabriclib/samba/write_bind_dlz.py	45d52968d3e839a6b59e2bd381406e6da97f55b5	2026-10-04	
 src/fabriclib/secrets/README.md	cec50777a92fe186d18b336c151589b3e893b557	2026-10-04	
 src/fabriclib/secrets/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
@@ -812,7 +812,7 @@ src/fabriclib/security/ssh_ports.py	3859ae3af3751fd7b40409678ada25e3846fb239	202
 src/fabriclib/security/ufw_rule.py	069d2f9b40aaff56779a023f791f4983b316826c	2026-10-06	
 src/fabriclib/setup/README.md	281774cc5e7b1b19872305834149dcc0a1e2ec65	2026-10-06	
 src/fabriclib/setup/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
-src/fabriclib/setup/ask_ad_domain.py	a3af8d6da0d548e3e84e6242332fc90e6929ed86	2026-10-05	
+src/fabriclib/setup/ask_ad_domain.py	1a0e02fc2f277159b6af6991ca742a72d26979da	2026-10-08	
 src/fabriclib/setup/ask_ram.py	a4e0d00de827979da6afbadcbf9cb2b6085ec9a4	2026-10-06	
 src/fabriclib/setup/ask_windows_domain.py	1cc2ada60af664ab15578de1ecbbd3c356b5f526	2026-10-04	
 src/fabriclib/setup/backup_install.py	4c9118f583d651dd75d6afcaf3031061fecb1579	2026-10-06	
@@ -1289,7 +1289,7 @@ tests/samba/dc.py	8d932c3a357bed694561f143e3db9b64bbcfc2f2	2026-10-05
 tests/samba/devices.py	8b2d94d6ee0ebec716c8e40e02c2924746d589bc	2026-10-05	
 tests/samba/gpo.py	ffe2061c46e6c5fade95376baeb298052cd09fc8	2026-10-05	
 tests/samba/linux_join.py	216a7b4ae64b1aaf23edee3f10f1bd18807307cb	2026-10-07	
-tests/samba/run.py	509ded7cd6d5b34170cc03e00bdabbaf15d9883f	2026-10-07	
+tests/samba/run.py	20dd5332425bd768d33195b31e359f9b548e820c	2026-10-08	
 tests/samba/site_join.py	4be26d3ad75861aa8811ebc8a389a764c39e9941	2026-10-05	
 tests/samba/start_bind.py	d8c8a1cfc1d8fdb97f865ffd2e55b2747104339f	2026-10-05	
 tests/samba/start_dc.py	7b27f7dd10761bfa496929caf88a53bc7e3f3295	2026-10-05	
