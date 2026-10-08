@@ -813,7 +813,7 @@ src/fabriclib/security/ssh_ports.py	3859ae3af3751fd7b40409678ada25e3846fb239	202
 src/fabriclib/security/ufw_rule.py	069d2f9b40aaff56779a023f791f4983b316826c	2026-10-06	
 src/fabriclib/setup/README.md	281774cc5e7b1b19872305834149dcc0a1e2ec65	2026-10-06	
 src/fabriclib/setup/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
-src/fabriclib/setup/ask_ad_domain.py	b1519099a0054953c73e81802cb5eb40d47512c1	2026-10-08	
+src/fabriclib/setup/ask_ad_domain.py	9793f5bfc27d34e6378eeb586fd7629cb8b363d0	2026-10-08	
 src/fabriclib/setup/ask_ram.py	a4e0d00de827979da6afbadcbf9cb2b6085ec9a4	2026-10-06	
 src/fabriclib/setup/ask_windows_domain.py	1cc2ada60af664ab15578de1ecbbd3c356b5f526	2026-10-04	
 src/fabriclib/setup/backup_install.py	4c9118f583d651dd75d6afcaf3031061fecb1579	2026-10-06	

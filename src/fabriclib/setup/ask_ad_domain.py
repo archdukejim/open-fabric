@@ -9,9 +9,11 @@ POLICY_QUESTIONS = [
     ("history", "Previous passwords remembered and refused again (0–24)"),
     ("minimum_age_days", "Days before a new password may be changed again (0 = at once)"),
     ("maximum_age_days", "Days a password is valid (0 = it never expires)"),
-    ("lockout_threshold", "Failed sign-ins before an account is locked (0 = never locked)"),
-    ("lockout_minutes", "Minutes an account stays locked"),
-    ("lockout_window_minutes", "Minutes after which failed sign-ins are forgotten"),
+    # the lockout as one story, each answer building on the last (the owner was misled by the old order, 2026-10-08)
+    ("lockout_threshold", "Lock an account after how many failed sign-ins in a row (0 = never lock)"),
+    ("lockout_window_minutes", "  ...counting the failures over how many minutes (older ones are forgotten)"),
+    ("lockout_minutes", "  ...then keep it locked for how many minutes (at least the minutes above; "
+                        "0 = until an admin unlocks it)"),
 ]
 
 
@@ -63,6 +65,9 @@ def ask_ad_domain(ctx):
     policy = dict(ctx.vars.get("ad_password_policy") or {})
     while True:                           # checked as AD takes it, so a bad pair is asked again here, not at deploy
         for key, question in POLICY_QUESTIONS:
+            if key in ("lockout_window_minutes", "lockout_minutes") and policy.get("lockout_threshold") == 0:
+                policy[key] = 0           # never locked: neither the window nor the lock time applies
+                continue
             low, high = POLICY_KEYS[key]
             policy[key] = _number(question, low, high, policy.get(key))
         while True:
