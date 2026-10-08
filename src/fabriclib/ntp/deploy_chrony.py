@@ -1,6 +1,7 @@
 import os
 import subprocess
 
+from fabriclib.common.console import warn
 from fabriclib.common.keep_original import keep_original
 from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.ntp.chrony_settings import chrony_settings
@@ -26,7 +27,9 @@ def deploy_chrony(v, registry_path, jinja_env, root="/", manage_units=True, conf
     Notes:   /etc/default/chrony: -s sets the clock at start from the drift file's time when there is no RTC (a
              Pi), so it never starts in the past; -x (ntp_set_clock false) never touches the clock. systemd-timesyncd
              is stopped and disabled (chrony replaces it). chrony-wait gets a 90 s limit: services ordered after
-             time-sync.target start then even offline."""
+             time-sync.target start then even offline. After (re)starting chrony it waits up to 60 s for the clock
+             to settle within 0.5 s (`chronyc waitsync`), so setup's later steps (the CA, certificates, the domain)
+             never see the clock step under them; without a time source it warns and goes on."""
     def at(p):
         return os.path.join(root, p.lstrip("/"))
 
@@ -50,4 +53,12 @@ def deploy_chrony(v, registry_path, jinja_env, root="/", manage_units=True, conf
     subprocess.run(["systemctl", "enable", "chrony"], check=True, capture_output=True)
     subprocess.run(["systemctl", "enable", "chrony-wait"], capture_output=True)   # absent on some releases
     subprocess.run(["systemctl", "restart" if changed else "start", "chrony"], check=True)
+    # the clock settled before anything is stamped with it: chrony steps a wrong clock a little after it starts,
+    # and a step between the CA's root and intermediate left the root valid only hours later (manual 5.8.1.27)
+    if not v.get("ntp_set_clock", True):          # -x: chrony never corrects the clock, so nothing to wait for
+        return changed
+    waited = subprocess.run(["chronyc", "waitsync", "60", "0.5", "0", "1"], capture_output=True, text=True)
+    if waited.returncode != 0:
+        warn("the clock is not synchronised yet (no time source reached within 60 s): certificates and the domain "
+             "use this host's clock as it is — check it with `chronyc tracking`")
     return changed

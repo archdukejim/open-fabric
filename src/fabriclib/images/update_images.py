@@ -5,7 +5,7 @@ from fabriclib.images.switch_image import switch_image
 
 def update_images(ctx, names=None, force=False, actor="root", source="cli"):
     """Purpose: move services to their validated images (images.lock.yaml of the installed fabric).
-             Services sharing an image var (image_debian: bind9, dirsrv, kea, freeradius, fabric-web) move together.
+             Services sharing an image var (image_debian: bind9, kea, freeradius, samba, fabric-web) move together.
     Inputs:  ctx — SetupContext; names — list of service names, None = every service with an update;
              force — bool, also move images the admin set (state "held"); actor, source — for the audit log.
     Returns: list of (var, target ref, [service names moved]) in dependency order.

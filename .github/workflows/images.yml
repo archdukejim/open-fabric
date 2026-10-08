@@ -103,7 +103,7 @@ jobs:
       - name: Smoke test
         run: |
           fail=0
-          for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
+          for name in adguard bind9 freeradius kea keycloak samba stepca webui; do
             bash packaging/images/smoke-test.sh "$name" "$REGISTRY/$name:$TAG" || fail=1
           done
           exit "$fail"
@@ -111,7 +111,7 @@ jobs:
         if: needs.plan.outputs.publish == 'true'
         run: |
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
+          for name in adguard bind9 freeradius kea keycloak samba stepca webui; do
             docker tag "$REGISTRY/$name:$TAG" "$REGISTRY/$name:$TAG-${{ matrix.arch }}"
             docker push "$REGISTRY/$name:$TAG-${{ matrix.arch }}"
           done
@@ -136,7 +136,7 @@ jobs:
             >> "$GITHUB_STEP_SUMMARY"
           echo "| image | digest |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          for name in adguard bind9 dirsrv freeradius kea keycloak stepca webui; do
+          for name in adguard bind9 freeradius kea keycloak samba stepca webui; do
             docker buildx imagetools create -t "$REGISTRY/$name:$TAG" \
               "$REGISTRY/$name:$TAG-amd64" "$REGISTRY/$name:$TAG-arm64"
             digest="$(docker buildx imagetools inspect "$REGISTRY/$name:$TAG" --format '{{json .Manifest}}' \

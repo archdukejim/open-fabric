@@ -5,9 +5,8 @@ from fabriclib.common.copy_tree_with_perms import copy_tree_with_perms
 from fabriclib.common.ensure_dir import ensure_dir
 from fabriclib.common.service_user import service_user
 
-BASE_DIRS = ("fabric/config/certs", "nginx/www/certs", "nginx/www/shared", "nginx/www/landing", "nginx/www/manual/docs",
-             "nginx/www/ldap")
-WEB_FOLDERS = ("certs", "shared", "landing", "manual", "ldap")
+BASE_DIRS = ("fabric/config/certs", "nginx/www/certs", "nginx/www/shared", "nginx/www/landing", "nginx/www/manual/docs")
+WEB_FOLDERS = ("certs", "shared", "landing", "manual")
 
 
 def install_fabric_tree(paths, final_vars):

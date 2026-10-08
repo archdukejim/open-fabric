@@ -1,7 +1,7 @@
 """fabric's published images on hosts (manual 2.6.3): which image a host runs, rendered through the real templates.
 Run by tests/images/run.sh; no Docker needed.
 
-- the lock as it is (no digests): every one of the eight compose files builds locally, as before D41
+- the lock as it is: every image published, except those marked pending (with why), which build locally
 - a lock with digests: each names its published image and has no build section; the Kea check uses it too
 - custom ids for an account: that image is built locally again (D80); images without an account are not affected
 - the lock's ids equal the Dockerfiles' defaults and vars.yaml.j2's default service accounts
@@ -24,10 +24,10 @@ from fabriclib.common.read_published_lock import read_published_lock  # noqa: E4
 from fabriclib.dhcp.common.kea_image import kea_image  # noqa: E402
 from fabriclib.images.effective_service import effective_service  # noqa: E402
 from fabriclib.images.constants import SERVICES  # noqa: E402
-from fabriclib.images.published_image import published_image  # noqa: E402
+from fabriclib.images.published_image import GROUP_ACCOUNTS, published_image  # noqa: E402
 from fabriclib.system.relaxed_settings import relaxed_settings  # noqa: E402
 
-IMAGES = ["adguard", "bind9", "dirsrv", "freeradius", "kea", "keycloak", "stepca", "webui"]
+IMAGES = ["adguard", "bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
 PASS = FAIL = 0
 
 
@@ -60,7 +60,7 @@ def builds(services):
 
 work = tempfile.mkdtemp(prefix="fabric-published-")
 try:
-    # the lock as it is: nothing published yet in this checkout, every image built locally
+    # the lock as it is: every image published, or pending (built locally until its first publish)
     lock = read_published_lock(os.path.join(REPO, "config"))
     unpublished = [n for n in IMAGES if not lock["images"][n]["ref"]]
     plain = render(os.path.join(REPO, "templates"), os.path.join(work, "plain"))
@@ -69,7 +69,12 @@ try:
               all(builds(plain[n]) and all(i.startswith("fabric/") for i in images_of(plain[n])) for n in IMAGES),
               {n: sorted(images_of(plain[n])) for n in IMAGES})
     else:
-        check("the lock pins a published digest for every image (none half-published)", not unpublished, unpublished)
+        pending = [n for n in IMAGES if lock["images"][n].get("pending")]
+        check("the lock pins a published digest for every image not marked pending (none half-published)",
+              unpublished == pending, {"unpublished": unpublished, "pending": pending})
+        check("a pending image builds locally until it is published",
+              all(builds(plain[n]) and all(i.startswith("fabric/") for i in images_of(plain[n])) for n in pending),
+              {n: sorted(images_of(plain[n])) for n in pending})
 
     # a lock with every image published (fake digests: rendering never pulls)
     tree = os.path.join(work, "tree")
@@ -83,7 +88,7 @@ try:
     open(os.path.join(tree, "config", "images.lock.yaml"), "w").write(text)
     published = read_published_lock(os.path.join(tree, "config"))["images"]
     refs = {n: published[n]["ref"] for n in IMAGES}
-    check("the test lock pins all eight", all(refs.values()), refs)
+    check("the test lock pins every image", all(refs.values()), refs)
     pub = render(os.path.join(tree, "templates"), os.path.join(work, "published"))
     for n in IMAGES:
         check(f"{n}: a default host runs the published image ({refs[n].split('@')[0]}) and builds nothing",
@@ -102,7 +107,7 @@ try:
           builds(custom["bind9"]) and images_of(custom["bind9"]) == {"fabric/bind9:local"}
           and custom["bind9"]["bind9"]["build"]["args"]["BIND_UID"] == "700")
     check("custom bind ids leave the images without that account published",
-          images_of(custom["stepca"]) == {refs["stepca"]} and images_of(custom["dirsrv"]) == {refs["dirsrv"]})
+          images_of(custom["stepca"]) == {refs["stepca"]} and images_of(custom["kea"]) == {refs["kea"]})
 
     # the lock's ids are what the Dockerfiles bake in and what vars.yaml.j2 gives by default
     defaults = yaml.safe_load(open(os.path.join(work, "plain", "vars.yaml")))["service_users"]
@@ -111,10 +116,18 @@ try:
         e = published[n]
         dockerfile = open(os.path.join(REPO, "packaging", "images", n, "Dockerfile")).read()
         args = dict(re.findall(r"^ARG (\w+_[UG]ID)=(\d+)$", dockerfile, re.M))
-        baked = f"{next((v for k, v in args.items() if k.endswith('_UID')), '')}:" \
-                f"{next((v for k, v in args.items() if k.endswith('_GID')), '')}" if args else ""
+        uid = next((k for k in args if k.endswith("_UID")), None)
+        baked = f"{args[uid]}:{args.get(uid[:-4] + '_GID', '')}" if uid else ""
         if (e.get("ids") or "") != baked:
             wrong.append(f"{n}: lock {e.get('ids')!r}, Dockerfile {baked!r}")
+        # other services' groups (a *_GID without its *_UID): the lock's `groups`, the vars' default gids
+        groups = ",".join(f"{k}={args[k]}" for k in sorted(args) if k.endswith("_GID") and k[:-4] + "_UID" not in args)
+        if (e.get("groups") or "") != groups:
+            wrong.append(f"{n}: lock groups {e.get('groups')!r}, Dockerfile {groups!r}")
+        for pair in filter(None, groups.split(",")):
+            key, gid = pair.split("=")
+            if str(defaults[GROUP_ACCOUNTS[key]]["gid"]) != gid:
+                wrong.append(f"{n}: {key} {gid}, vars default {defaults[GROUP_ACCOUNTS[key]]['gid']}")
         if e.get("account"):
             u = defaults[e["account"]]
             if f"{u['uid']}:{u['gid']}" != e["ids"]:
@@ -130,6 +143,14 @@ try:
     check("published_image: refused for other ids or an unset var",
           published_image(dict(host, service_users={"bind": {"uid": 600, "gid": 601}}), e) == ""
           and published_image({"service_users": host["service_users"]}, e) == "")
+    dc_entry = published["samba"]
+    dc = {"image_fabric_samba": refs["samba"],
+          "service_users": {"bind": {"uid": 600, "gid": 600}, "freeradius": {"uid": 610, "gid": 610}}}
+    check("published_image: the DC's image in use when BIND's and FreeRADIUS's gids are the baked ones",
+          published_image(dc, dc_entry) == refs["samba"])
+    check("published_image: the DC builds locally when a baked group's gid differs (D80)",
+          published_image(dict(dc, service_users={**dc["service_users"], "bind": {"uid": 600, "gid": 700}}),
+                          dc_entry) == "")
     svc = next(s for s in SERVICES if s["name"] == "bind9")
     eff = effective_service(svc, host, published)
     check("fabricctl images sees bind9 on its published image (own var, no local build)",

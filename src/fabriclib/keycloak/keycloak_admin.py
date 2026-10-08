@@ -10,7 +10,7 @@ def keycloak_admin(v, s):
     Returns: (Admin (keycloak/admin_client) over a TLSClient to <ip_keycloak>:8443 verified against the fabric
              root CA for hostname_keycloak, realm name). No request is made yet (login on first call).
     Fails:   KeyError on missing vars or secrets; ImportError if webui.tlsclient cannot be imported.
-    Feeds:   create_person, reset_sign_in, require_password_change, user_has_role.
+    Feeds:   user_has_role; directory/reset_sign_in.
     """
     from webui.tlsclient import TLSClient     # fabric/lib/webui
     ca = os.path.join(v["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")

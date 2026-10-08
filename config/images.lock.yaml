@@ -74,7 +74,7 @@ images:
     digest: sha256:de9c65609e6bde17e6b48de485ee788407c9502fa08b8f4459f595b21f56cd00
     track: "v3.*"
     policy: manual                   # a verifier changes only by a reviewed decision
-  debian:                            # base of fabric/bind9:local, fabric/dirsrv:local, fabric/web:local,
+  debian:                            # base of fabric/bind9:local, fabric/web:local,
                                      # fabric/kea:local and fabric/freeradius:local
     var: image_debian
     repo: debian
@@ -84,7 +84,8 @@ images:
     policy: auto
 
 # fabric's own images, built and smoke tested in CI, signed and published (manual 2.6.3, 4.7.1; D41).
-# An empty digest: not published yet, and hosts build that image themselves. `ids` are the service
+# An empty digest: not published yet, and hosts build that image themselves; it needs `pending` (why),
+# which pin_published drops when it pins the image (the images suite refuses an unexplained gap). `ids` are the service
 # account ids baked into the published image (the Dockerfile's defaults): a host whose
 # service_users.<account> differ builds that image itself (D80).
 published:
@@ -93,14 +94,14 @@ published:
   signer: ^https://github\.com/archdukejim/open-fabric/\.github/workflows/images\.yml@refs/(heads/main|heads/rc/.+|tags/v.+)$
   issuer: https://token.actions.githubusercontent.com
   images:
-    adguard:    {var: image_fabric_adguard, tag: "1.5.0-rc.3", digest: "sha256:600da65296ceefdec893d4b5f18497c285bdd472bf1e4185f6c6909c2b0cabd2"}
-    bind9:      {var: image_fabric_bind9, tag: "1.5.0-rc.3", digest: "sha256:04ea9bbc6033774f2251b83b678f5d2ca6da61af969eb13e1f5cd937d42ed303", account: bind, ids: "600:600"}
-    dirsrv:     {var: image_fabric_dirsrv, tag: "1.5.0-rc.3", digest: "sha256:cfe6faa5c2c85b04c84b95a2a4221dc0e4e4a922415b844c6c2624d55a79d397", account: ldap, ids: "601:601"}
-    freeradius: {var: image_fabric_freeradius, tag: "1.5.0-rc.3", digest: "sha256:74319ea634bdb7c67d3c4b9361f984fa6adda95d065e4859c70314bd84de87d8", account: freeradius, ids: "610:610"}
-    kea:        {var: image_fabric_kea, tag: "1.5.0-rc.3", digest: "sha256:45c49a2c46f0f2fc6e3ec453ed628a790a85ba3d272f040a14424da7790ea53a", account: kea, ids: "609:609"}
-    keycloak:   {var: image_fabric_keycloak, tag: "1.5.0-rc.3", digest: "sha256:f9ff8d0124921b4c43136573fe406e97b086a6bbfde2d6db4ebec33c9119e257"}
-    stepca:     {var: image_fabric_stepca, tag: "1.5.0-rc.3", digest: "sha256:0d972a7279fbcd6d65b23b7300c890a2d3c06b3f3f3e7be1405d902882dddbaa"}
-    webui:      {var: image_fabric_webui, tag: "1.5.0-rc.3", digest: "sha256:e925f15216b6a97a20fdfe29dc33b328cf8b3a76a529aad2a14d029317180e24", account: webui, ids: "606:606"}
+    adguard:    {var: image_fabric_adguard, tag: "0.6.0-rc.35", digest: "sha256:61a2aa9411779691c4733f9efd92bb7a245616f06d8f5c5d15bef23745fd1714"}
+    bind9:      {var: image_fabric_bind9, tag: "0.6.0-rc.35", digest: "sha256:e777fc096a7f89786ba5e358c1f17406b843dbdc9da5e298a0b7bb8cd0f01092", account: bind, ids: "600:600"}
+    freeradius: {var: image_fabric_freeradius, tag: "0.6.0-rc.35", digest: "sha256:69bf1f18c4d968548ff6efb3a655909da95531fccc7e9e7b950a7c2526f9481b", account: freeradius, ids: "610:610"}
+    kea:        {var: image_fabric_kea, tag: "0.6.0-rc.35", digest: "sha256:e1debf4224aae371af3e15f141f5f8c63b7951d362719bf23cb761ed5e24ddba", account: kea, ids: "609:609"}
+    keycloak:   {var: image_fabric_keycloak, tag: "0.6.0-rc.35", digest: "sha256:23fe0fda993492906e0105fb601bf8d64310101954a5d9c8ea120215ae5f0cb2"}
+    samba:      {var: image_fabric_samba, tag: "0.6.0-rc.35", digest: "sha256:e9aeca75f0c03cb08aa29548f0ef087f4540ec184ddfde6ac20846834dc1ee14", groups: "BIND_GID=600,RADIUS_GID=610"}
+    stepca:     {var: image_fabric_stepca, tag: "0.6.0-rc.35", digest: "sha256:c3becf9b5671346bc45bb0725ffc5d31b8aae8d06c041815714803eb76fa0744"}
+    webui:      {var: image_fabric_webui, tag: "0.6.0-rc.35", digest: "sha256:77d8e9a9bb000dd5e8b0adf7b9f8e707f6e5bc42f6d68f7c6a9858eca54c6296", account: webui, ids: "606:606"}
 
 # Packages installed into fabric's own images from an upstream's signed apt
 # repository (not Debian's): the exact version and the signing key's

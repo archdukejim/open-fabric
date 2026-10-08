@@ -9,7 +9,6 @@ PLAN = [
      "Harden the Docker daemon (no-new-privileges, no inter-container traffic on the default bridge, "
      "no userland proxy, live-restore, bounded logs)",
      "containers may gain privileges via setuid binaries; logs can fill the disk"),
-    ("install_ldap", True, "389 Directory Server (LDAP for hosts and Keycloak)", "no central user directory"),
     ("install_keycloak", True, "Keycloak SSO (+ Postgres), required by the web UI", "no SSO and no web UI"),
     ("install_webui", True, "Fabric web UI at https://mgr.<domain> (mTLS client certificate + Keycloak login + TOTP)",
      "manage with fabricctl only"),
@@ -85,21 +84,53 @@ def _ask_dhcp(ctx):
 
 def _ask_radius(ctx):
     """Purpose: Advanced plan question: 802.1X with FreeRADIUS (off by default).
-    Inputs:  ctx — SetupContext; reads ctx.vars install_freeradius and install_ldap. Interactive.
-    Returns: None; ctx.vars["install_freeradius"] set — forced False when install_ldap is False (802.1X needs
-             389-DS). Switches are added later (`fabricctl radius add-client`).
+    Inputs:  ctx — SetupContext; reads ctx.vars install_freeradius. Interactive.
+    Returns: None; ctx.vars["install_freeradius"] set (it asks the site's DC, part of every install). Switches are
+             added later (`fabricctl radius add-client`).
     Fails:   EOFError from input().
     Feeds:   choose_plan (Advanced)."""
     on = bool(ctx.vars.get("install_freeradius"))
     answer = input(f"\n  Optional: 802.1X with FreeRADIUS (devices join by certificate or MAC, VLAN per role)? "
                    f"[{'Y/n' if on else 'y/N'}] ").strip().lower()
     on = answer.startswith("y") if answer else on
-    if on and ctx.vars.get("install_ldap") is False:
-        print(f"    {YELLOW}802.1X checks every device in the directory: it needs 389-DS (install_ldap).{NC}")
-        on = False
     ctx.vars["install_freeradius"] = on
     if on:
         print("    Add your switches and access points afterwards: sudo fabricctl radius add-client <name> <address>")
+
+
+CLOUDFLARE = ["https://1.1.1.1/dns-query", "https://1.0.0.1/dns-query"]     # vars.yaml.j2's default (D112)
+
+
+def _upstreams_text(ctx):
+    """Purpose: how the plan names the DNS filter's internet upstreams.
+    Inputs:  ctx — SetupContext; reads ctx.vars adguard_upstreams (None: the default).
+    Returns: "Cloudflare (DNS-over-HTTPS)", "local DNS only" or the upstreams joined by ", ".
+    Fails:   never.
+    Feeds:   choose_plan, _ask_dns_filter."""
+    ups = ctx.vars.get("adguard_upstreams")
+    if ups is None or list(ups) == CLOUDFLARE:
+        return "Cloudflare (DNS-over-HTTPS)"
+    return ", ".join(ups) or "local DNS only"
+
+
+def _ask_dns_filter(ctx):
+    """Purpose: Advanced plan question: the DNS filter, AdGuard Home (on by default, D112), and where it sends
+             internet lookups.
+    Inputs:  ctx — SetupContext; reads ctx.vars dns_filter, adguard_upstreams. Interactive.
+    Returns: None; ctx.vars["dns_filter"] set ("adguard" or "none"), and adguard_upstreams when typed (they only
+             seed a first deploy: afterwards AdGuard's own page owns them).
+    Fails:   EOFError from input().
+    Feeds:   choose_plan (Advanced)."""
+    on = ctx.vars.get("dns_filter", "adguard") == "adguard"
+    answer = input(f"\n  DNS filter: AdGuard Home answers the network's DNS (ads, trackers and malware blocked)? "
+                   f"[{'Y/n' if on else 'y/N'}] ").strip().lower()
+    on = answer.startswith("y") if answer else on
+    ctx.vars["dns_filter"] = "adguard" if on else "none"
+    if not on:
+        return
+    ups = input(f"    internet lookups go to (comma-separated DoH/DoT/IP upstreams) [{_upstreams_text(ctx)}] ").strip()
+    if ups:
+        ctx.vars["adguard_upstreams"] = [u.strip() for u in ups.split(",") if u.strip()]
 
 
 def _get(data, dotted, default):
@@ -131,11 +162,13 @@ def _set(data, dotted, value):
 
 def choose_plan(ctx):
     """Purpose: show what setup will do (every default is the hardened choice), then Proceed / Advanced / Quit.
-             Advanced walks each PLAN item, states the cost of relaxing it, and asks the optional services.
+             Advanced walks each PLAN item, states the cost of relaxing it, and asks the DNS filter and the optional
+             services.
     Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
              webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
     Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
-             rendered); install_webui is forced off when Keycloak is off. deploy_config saves ctx.vars to
+             rendered), and dns_filter (AdGuard on unless set to none, D112); install_webui is forced off when
+             Keycloak is off. deploy_config saves ctx.vars to
              fabric.yaml, so a --file can set all of these non-interactively.
     Fails:   SystemExit("setup cancelled") on Quit; EOFError from input(); errors of the _ask_* helpers.
     Feeds:   run_setup main (full runs only, after collect_vars)."""
@@ -152,6 +185,11 @@ def choose_plan(ctx):
                   "login kit in ~/fabric-admin")
         lf = ctx.vars.get("log_forwarding") or {}
         dests = [d for d in ((lf.get("syslog") or {}).get("host"), (lf.get("elastic") or {}).get("url")) if d]
+        if ctx.vars.get("dns_filter", "adguard") == "adguard":
+            print(f"  ✓ DNS filter: AdGuard Home answers DNS on port 53, internet lookups to {_upstreams_text(ctx)}, "
+                  "AdGuard's DNS filter; its page https://adguard.<domain>")
+        else:
+            print("  · Optional, off: DNS filter (AdGuard Home) — choose it in Advanced")
         if ctx.vars.get("install_kea"):
             subnets = ", ".join(s.get("subnet", "?") for s in (ctx.vars.get("dhcp") or {}).get("subnets") or [])
             print(f"  ✓ Optional: DHCP with Kea 3.0 on {subnets or '(no subnet yet)'}; hostnames in dhcp.<domain>")
@@ -171,6 +209,7 @@ def choose_plan(ctx):
     # gets rendered (template defaults differ, e.g. install_keycloak).
     for key, default, _, _ in PLAN:
         _set(ctx.vars, key, bool(_get(ctx.vars, key, default)))
+    ctx.vars["dns_filter"] = str(ctx.vars.get("dns_filter") or "adguard").lower()
     show()
     if ctx.non_interactive or ctx.assume_yes:
         return
@@ -191,6 +230,7 @@ def choose_plan(ctx):
                 _set(ctx.vars, key, on)
             if not _get(ctx.vars, "install_keycloak", True):
                 _set(ctx.vars, "install_webui", False)
+            _ask_dns_filter(ctx)
             _ask_dhcp(ctx)
             _ask_radius(ctx)
             _ask_log_forwarding(ctx)

@@ -35,7 +35,10 @@ def reparent_site(ctx, actor, invitation):
              certificates and device certificates from the old CA stay valid until they expire (they chain to
              the same root), but people's web UI certificates must be re-issued (`fabricctl client-cert`):
              nginx now accepts this CA's chain only. The old parent still lists the site until it is removed
-             there (`fabricctl federation remove`). Audited as FED_REPARENT."""
+             there (`fabricctl federation remove`, which leaves the moved site's domain objects alone). In the
+             domain the new parent moves this site's OU under its own (D105, manual 1.8.8.14): this site saves its
+             new place (ad_site_ou, ad_org_ou) and its convergence moves its AD site link; its joined Linux machines'
+             sudo search bases are rewritten by running their installer again. Audited as FED_REPARENT."""
     v = ctx.vars
     reg_path = os.path.join(ctx.config_dir, "federation.yaml")
     if not load_registry(reg_path)["upstream"]:
@@ -53,17 +56,17 @@ def reparent_site(ctx, actor, invitation):
                         audit_path=ctx.path("fabric", "archive", "audit.log"), replace=True,
                         dns_port=int(v.get("bind_dns_port") or 53))
     new = res["vars"]
-    if res.get("dns_secret"):                # the DNS and directory links to the new parent
+    if res.get("dns_secret"):                # the DNS link to the new parent
         stored = load_secrets(v=v)
-        update = {"federation_tsig": dict(stored.get("federation_tsig") or {}, upstream=res["dns_secret"])}
-        if res.get("replication_secret"):
-            update["federation_replication"] = dict(stored.get("federation_replication") or {},
-                                                    upstream=res["replication_secret"])
-        save_secrets(update, v=v)
+        save_secrets({"federation_tsig": dict(stored.get("federation_tsig") or {}, upstream=res["dns_secret"])},
+                     v=v)
     replace_site_ca(v, new)
     with vars_lock():
         data = load_vars()
         data.update({k: new[k] for k in ("ica_crt_path", "ica_key_path", "ica_parents_path", "site_ca_depth")})
+        dom = res.get("domain") or {}
+        if dom.get("moved"):                 # the new parent moved this site's OU under its own (D105)
+            data.update({"ad_site_ou": dom["site_ou"], "ad_org_ou": dom["org_ou"]})
         save_vars(data)
     subprocess.run(["systemctl", "restart", "stepca"], check=True)
     renew_service_certs(ctx, force=True)

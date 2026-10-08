@@ -38,6 +38,7 @@ Operator workflows and end-user procedures.
 ## 3.8 People and identities
 
 - [3.8.1 People and their identities](3.8.1-people.md)
+- [3.8.2 Single sign-on for your apps](3.8.2-single-sign-on.md)
 
 ## 3.9 Federation
 
@@ -67,3 +68,10 @@ Operator workflows and end-user procedures.
 - [3.14.1 Resource use](3.14.1-resources.md)
 - [3.14.2 Lifecycle commands](3.14.2-lifecycle.md)
 - [3.14.3 Service ports](3.14.3-ports.md)
+
+## 3.15 The directory
+
+- [3.15.1 The directory (Samba AD)](3.15.1-windows-domain.md)
+- [3.15.2 Joining Linux machines](3.15.2-linux-join.md)
+- [3.15.3 Joining Windows machines](3.15.3-windows-join.md)
+- [3.15.4 Group Policy from ADMX templates](3.15.4-group-policy.md)

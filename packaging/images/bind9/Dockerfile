@@ -5,7 +5,7 @@
 # chiselled images without a shell or package tools, so no layer can be
 # built on them, and its `latest` is a stale beta on an unsupported Ubuntu.
 # Debian ships BIND 9.20 with security updates; `fabricctl images update`
-# rebuilds this on the validated Debian base (like dirsrv and webui).
+# rebuilds this on the validated Debian base (like webui).
 #
 # Needs no capabilities: Docker sets net.ipv4.ip_unprivileged_port_start=0
 # inside the container's network namespace, so a non-root named can bind 53.
@@ -22,9 +22,15 @@ ARG BIND_GID=600
 LABEL org.fabric.ids="${BIND_UID}:${BIND_GID}"
 
 # bind9: named; bind9-utils: rndc (healthcheck, zone reloads) and named-checkzone.
+# samba-libs, samba-dsdb-modules: Samba's DLZ module, so BIND serves the AD zone from the domain controller's
+# database (manual 2.11.2.6); unused unless named.conf loads it. Its path names the architecture, so a fixed link
+# lets named.conf name it the same way on amd64 and arm64 (dlz_bind9_18 serves BIND 9.18 and 9.20).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends bind9 bind9-utils \
+ && apt-get install -y --no-install-recommends bind9 bind9-utils samba-libs samba-dsdb-modules \
  && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /usr/lib/fabric \
+ && ln -s "$(ls /usr/lib/*-linux-gnu/samba/bind9/dlz_bind9_18.so)" /usr/lib/fabric/dlz_bind9.so \
+ && test -e /usr/lib/fabric/dlz_bind9.so \
  && groupmod -o -g "$BIND_GID" bind \
  && usermod -o -u "$BIND_UID" -g "$BIND_GID" -d /nonexistent bind \
  && mkdir -p /run/named /var/cache/bind /var/lib/bind \

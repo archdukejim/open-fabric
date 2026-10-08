@@ -1,0 +1,74 @@
+services:
+  # The Samba AD domain controller (manual 2.11.2). AD hands its own address to clients (DNS records, CLDAP, the
+  # RPC endpoint mapper), so it runs in the host network on the host's address (D98), bound to it and loopback
+  # only. A DC runs as root in its container (it switches to each user's identity for file access): every
+  # capability is dropped but the six it needs (SETUID, SETGID for sign-ins and shares; CHOWN, DAC_OVERRIDE,
+  # FOWNER for Group Policy's ACLs on SYSVOL; NET_BIND_SERVICE for its low ports: in the host network Docker's
+  # unprivileged-port setting does not apply), with a read-only root and no-new-privileges. Inventory: 1.3.9.
+  samba:
+{% set published = published_ref('samba') %}
+    # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
+    image: {{ published or image_samba }}
+{% if not published %}
+    build:
+      context: {{ deploy_base_dir }}/samba/build
+      args:
+        BASE_IMAGE: "{{ image_debian }}"
+        BIND_GID: "{{ service_users.bind.gid }}"
+        RADIUS_GID: "{{ service_users.freeradius.gid }}"
+{% endif %}
+    container_name: samba
+    logging:
+      driver: journald
+      options:
+        tag: "{{ '{{.Name}}' }}"
+    network_mode: host
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
+    environment:
+      REALM: "{{ ad_realm }}"
+      NETBIOS: "{{ ad_netbios }}"
+      HOST_NAME: "{{ hostname | lower }}"
+      HOST_IP: "{{ host_ip }}"
+      INTERFACES: "127.0.0.1 {{ host_ip }}"
+      RPC_PORTS: "{{ ad_rpc_ports }}"
+      OLD_PASSWORD_MINUTES: "{{ ad_old_password_minutes }}"
+{% if ad_join_server %}
+      # a site's DC joins the root's domain instead of provisioning one (manual 1.8.8.4); once joined, unused
+      JOIN_ROLE: "{{ 'RODC' if ad_dc_type == 'rodc' else 'DC' }}"
+      JOIN_SERVER: "{{ ad_join_server_name or ad_join_server }}"
+      JOIN_SITE: "{{ site_name }}"
+{% endif %}
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+      - /run:size=16m
+      - /var/log/samba:size=16m
+    volumes:
+      - {{ deploy_base_dir }}/samba/data:/data
+      - {{ deploy_base_dir }}/samba/secrets:/run/secrets:ro
+      - {{ deploy_base_dir }}/samba/tls:/tls:ro
+      - {{ deploy_base_dir }}/samba/converge:/fabric:ro
+      # winbind's sockets on the host: FreeRADIUS mounts them for PEAP (ntlm_auth); the privileged pipe is in /data
+      - {{ deploy_base_dir }}/samba/winbindd:/run/samba/winbindd
+      # its time-signing socket where the host's chrony signs Windows members' time (D100)
+      - {{ ad_ntp_signd_dir }}:/run/samba/ntp_signd
+      # its resolver: the host's address, which knows the AD zone (the host's own resolver may not)
+      - {{ deploy_base_dir }}/samba/resolv.conf:/etc/resolv.conf:ro
+    mem_limit: {{ samba_mem_limit }}
+    healthcheck:
+      # the rootDSE over LDAP on loopback: the DC is up and answering
+      test: ["CMD", "ldbsearch", "-H", "ldap://127.0.0.1", "-s", "base", "-b", "", "dnsHostName"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s

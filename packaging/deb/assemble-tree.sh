@@ -12,8 +12,7 @@
 #   templates/webui-app, static/webui-app         -> <dest>/fabric/lib/webui/{templates,static}/
 #   templates/* (the service templates)           -> <dest>/fabric/jinja/
 #   packaging/images/<service>/                   -> <dest>/fabric/jinja/<service>/build/   (image build contexts)
-#   src/containers/dirsrv/seed.py, src/containers/freeradius/
-#                                                 -> <dest>/fabric/jinja/dirsrv/, …/freeradius/python/
+#   src/containers/freeradius/                    -> <dest>/fabric/jinja/freeradius/python/
 #   static/vendor/*.min.js, static/nginx/style.css -> <dest>/fabric/jinja/nginx/www/{manual,shared}/
 #   config/{VERSION,images.lock.yaml,link-vars-template.yaml}
 #                                                 -> <dest>/fabric/
@@ -61,13 +60,13 @@ copy 's,^src/ux/web/,fabric/lib/webui/,' src/ux/web/server.py src/ux/web/devserv
 copy 's,^templates/webui-app/,fabric/lib/webui/templates/,;s,^static/webui-app/,fabric/lib/webui/static/,' \
     templates/webui-app static/webui-app
 copy 's,^templates/,fabric/jinja/,' templates ':(exclude)templates/webui-app'
-for svc in adguard bind9 dirsrv freeradius kea keycloak stepca; do
+for svc in adguard bind9 freeradius kea keycloak samba stepca; do
     copy "s,^packaging/images/$svc/,fabric/jinja/$svc/build/," "packaging/images/$svc"
 done
 copy 's,^packaging/images/webui/,fabric/jinja/webui/build/,' packaging/images/webui/Dockerfile \
     packaging/images/webui/.dockerignore
-copy 's,^src/containers/dirsrv/,fabric/jinja/dirsrv/,;s,^src/containers/freeradius/,fabric/jinja/freeradius/python/,' \
-    src/containers/dirsrv/seed.py src/containers/freeradius
+copy 's,^src/containers/freeradius/,fabric/jinja/freeradius/python/,' src/containers/freeradius
+copy 's,^src/containers/samba/,fabric/jinja/samba/converge/,' src/containers/samba
 copy 's,^static/vendor/,fabric/jinja/nginx/www/manual/,;s,^static/nginx/,fabric/jinja/nginx/www/shared/,' \
     static/vendor/marked.min.js static/vendor/mermaid.min.js static/nginx/style.css
 copy 's,^config/,fabric/,' config/VERSION config/images.lock.yaml config/link-vars-template.yaml

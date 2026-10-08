@@ -66,3 +66,9 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `zone_detail.py` | One zone's records and BIND sync status, for the forward-zone view. Agent route: GET /v1/zones/<key> (dns:read). |
 | `relaxed_settings.py` | The security relaxations turned on, shown at the top of the overview. Agent route: GET /v1/relaxed-settings (status:read). |
 | `__init__.py` | Imports every function of this folder, so callers keep `module.function` |
+| `domain_overview.py` | The domain, its controller, the password policy and this site's machines. Agent route: GET /v1/domain (domain:read). |
+| `gpo_overview.py` | Group Policy: templates, the admin settings GPO, a policy search. Agent routes: GET /v1/gpo, POST /v1/gpo/search (domain:read). |
+| `gpo_change.py` | Set or clear a policy in the admin settings GPO. Agent routes: POST /v1/gpo/set, /v1/gpo/clear (gpo:admin). |
+| `add_machine.py` | Pre-create a machine with a one-time join password. Agent route: POST /v1/machines (machines:admin). |
+| `machine_action.py` | Enable, disable or remove a machine. Agent route: POST /v1/machines/<name>/<action> (machines:admin). |
+| `federation_overview.py` | The federation's sites, replication, conflicts, limits and address plan. Agent route: GET /v1/federation (federation:read). |

@@ -7,6 +7,7 @@ from fabriclib.common.console import ok, warn
 from fabriclib.setup.errors import SetupError
 
 SUPPORTED_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}
+SUPPORTED_UBUNTU = ("24.04", "26.04")  # host targets (D2, D28)
 PUBLISHED_PORTS = (53, 80, 443, 389, 636, 853)
 MIN_RAM_GB_WITH_KEYCLOAK = 3
 
@@ -85,8 +86,8 @@ def run(ctx):
         ok(f"architecture {SUPPORTED_ARCH[arch]}")
 
     rel = _os_release()
-    if rel.get("ID") not in ("ubuntu", "debian"):
-        warn(f"untested OS {rel.get('PRETTY_NAME', '?')} (reference: Ubuntu 24.04)")
+    if rel.get("ID") != "ubuntu" or rel.get("VERSION_ID") not in SUPPORTED_UBUNTU:
+        warn(f"untested OS {rel.get('PRETTY_NAME', '?')} (targets: Ubuntu {' and '.join(SUPPORTED_UBUNTU)} LTS, D2)")
     else:
         ok(rel.get("PRETTY_NAME", rel.get("ID")))
 

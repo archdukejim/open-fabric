@@ -116,6 +116,8 @@ conf = open(os.path.join(srv_root, "etc/chrony/chrony.conf")).read()
 check("deploy: chrony.conf written; answers the LAN only; own clock as the last resort",
       changed and f"allow {SUB_A}" in conf and SUB_B not in conf and "local stratum 10 orphan" in conf
       and "server " not in conf, conf)
+check("deploy: Windows members' time is signed through the DC's socket, in the folder AppArmor allows (D100)",
+      "ntpsigndsocket /var/lib/samba/ntp_signd" in conf, conf)
 check("deploy: chrony is told never to set the clock here (-x)",
       '"-F 1 -x"' in open(os.path.join(srv_root, "etc/default/chrony")).read())
 check("deploy: chrony-wait never blocks start-up forever",

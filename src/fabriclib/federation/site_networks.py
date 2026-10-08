@@ -9,7 +9,7 @@ def site_networks(v):
              per distinct network (a DHCP subnet that is the LAN itself is listed once, as the DHCP subnet with
              its name); names are unique (a subnet without a name is named by its network).
     Fails:   never for missing settings (an empty list); ValueError for a lan_cidr that is not a network.
-    Feeds:   federation/publish_site_networks, federation/join_upstream (sent at join), accept_join and
+    Feeds:   samba/converge_domain (written to the domain), federation/join_upstream (sent at join), accept_join and
              dhcp/common/edit_dhcp (overlap checks)."""
     out, seen = [], set()
     if v.get("install_kea"):

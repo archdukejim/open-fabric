@@ -3,7 +3,7 @@
 Optional 802.1X with FreeRADIUS (design §6): RADIUS clients in `vars.yaml`
 (`radius_clients`), their secrets in OpenBao (`radius_secrets`), the
 decisions from FreeRADIUS's journal. Who may join is the device RBAC in
-389-DS (`fabriclib/ldap`); the policy itself runs in the container
+the domain (`fabriclib/directory`); the policy itself runs in the container
 (`src/containers/freeradius`).
 
 | File | What |

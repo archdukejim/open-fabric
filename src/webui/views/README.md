@@ -11,7 +11,7 @@ Every page (Jinja2 templates in ../templates, autoescaped, no inline script or s
 | `constants.py` | What the pages show: tabs, sections, sub-menus, the permissions that show them. |
 | `continue_page.py` | The 'Signed in' page that moves on to the target with a meta refresh and a link. |
 | `css.py` | The whole stylesheet (static/webui-app/app.css), served as /static/app.css (light and dark colour schemes). |
-| `dirsrv.py` | The 389-DS tab: devices, one device, roles, one role, or people and groups. |
+| `directory.py` | The Directory tab: devices, one device, roles, one role, or people and groups. |
 | `error_page.py` | The error page: status, message and a 'Sign in again' link. |
 | `freeradius.py` | The FreeRADIUS tab: overview (server, people groups, RADIUS clients, recent decisions) or a setup guide for switches or Windows. |
 | `kea.py` | The Kea tab: subnets, reservations with add/remove forms, and leases — or how to turn DHCP on. |
@@ -24,3 +24,5 @@ Every page (Jinja2 templates in ../templates, autoescaped, no inline script or s
 | `stepca.py` | The Step-CA tab: CA details, sign a CSR, new key + certificate, inspect, convert, or the issued list. |
 | `tsig_result.py` | The page that shows a TSIG key's secret and RFC2136 client settings once. |
 | `__init__.py` | Imports every function of this folder, so callers keep `module.function` |
+| `machine_result.py` | The page that shows a pre-created machine's one-time join password once. |
+| `federation.py` | The Federation tab: sites, replication, conflicts, limits, the address plan. |

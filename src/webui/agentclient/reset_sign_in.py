@@ -11,6 +11,6 @@ def reset_sign_in(uid):
              PermissionDenied (403);
              ValidationError for an unknown user, or a fabric-group member when the caller lacks
              system:admin; KeyError if a 200 reply had no "password".
-    Feeds:   src/webui/routes/dirsrv_post (people/<uid>/reset -> views.person_result).
+    Feeds:   src/webui/routes/directory_post (people/<uid>/reset -> views.person_result).
     """
     return call_agent("POST", f"/v1/people/{quote_segment(uid)}/reset", {})["password"]

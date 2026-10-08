@@ -20,11 +20,9 @@ from fabriclib.deploy.deploy_paths import deploy_paths
 from fabriclib.deploy.finish_without_start import finish_without_start
 from fabriclib.deploy.generate_missing_secrets import generate_missing_secrets
 from fabriclib.deploy.install_bind9_files import install_bind9_files
-from fabriclib.deploy.install_dirsrv_seed import install_dirsrv_seed
 from fabriclib.deploy.install_fabric_tree import install_fabric_tree
 from fabriclib.deploy.install_nginx_config import install_nginx_config
 from fabriclib.deploy.install_openbao_config import install_openbao_config
-from fabriclib.deploy.install_directory_sync_timer import install_directory_sync_timer
 from fabriclib.deploy.install_runtime_dirs import install_runtime_dirs
 from fabriclib.deploy.install_service_units import install_service_units
 from fabriclib.deploy.install_stepca_templates import install_stepca_templates
@@ -39,7 +37,6 @@ from fabriclib.deploy.service_units import service_units
 from fabriclib.deploy.verify_published_images import verify_published_images
 from fabriclib.dns.reverse_zones import reverse_zones
 from fabriclib.federation.deploy_federation_endpoint import deploy_federation_endpoint
-from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.dns_links import dns_links
 from fabriclib.secrets.load_secrets import load_secrets
 from fabriclib.secrets.save_secrets import save_secrets
@@ -102,8 +99,6 @@ def _deploy(paths, start_services):
     context["reverse_zone_names"] = list(reverse["zones"])
     # federation (manual 1.8 M4): delegations, secondary zones and TSIG keys for the sites next to this one
     context["federation_links"] = dns_links(final_vars, secrets, paths["federation"])
-    # the parent site's admins may read this site's part where it is copied (30-aci, M5)
-    context["federation_parent"] = (load_registry(paths["federation"]).get("upstream") or {}).get("site_name") or ""
     print("Rendering Jinja2 templates...")
     render_templates(paths, jinja_env, context, final_vars, secrets, p["tsig_keys"], units, reverse)
     if verify_published_images(paths, final_vars):  # nothing installed yet: a refusal changes nothing
@@ -117,7 +112,6 @@ def _deploy(paths, start_services):
         restart.add("openbao")
     ngx = install_nginx_config(paths, final_vars)
     bind = install_bind9_files(paths, final_vars)
-    ldap_seed = install_dirsrv_seed(paths, final_vars)
     optional = deploy_optional_parts(paths, final_vars, secrets, jinja_env, context["federation_links"])
     restart |= optional["restart"]
     web = install_webui_files(paths, final_vars)
@@ -125,14 +119,12 @@ def _deploy(paths, start_services):
     if install_stepca_templates(paths, final_vars):
         restart.add("stepca")
     install_runtime_dirs(paths, final_vars, p["tsig_keys"])
-    posix_timer = install_directory_sync_timer(paths, final_vars)
 
     state = {"restart": restart, "rebuild": svc["rebuild"],
              "daemon_reload": svc["daemon_reload"] or ngx["daemon_reload"] or web["agent"]
-             or fed["unit_changed"] or fed["removed"] or posix_timer,
+             or fed["unit_changed"] or fed["removed"],
              "bind9_config": bind["config"], "zones": bind["zones"], "nginx": ngx["nginx"] or optional["nginx"],
-             "webui": web["webui"], "agent": web["agent"], "federation_unit": fed["unit_changed"],
-             "ldap_seed": ldap_seed}
+             "webui": web["webui"], "agent": web["agent"], "federation_unit": fed["unit_changed"]}
     bind_ids = service_user(final_vars, "bind")
     if not start_services:
         return finish_without_start(paths, state, bind_ids)
@@ -142,7 +134,8 @@ def _deploy(paths, start_services):
 def apply_deployment(start_services=True):
     """Purpose: the deploy engine: render every template from the vars file and secrets into /tmp/fabric-render, copy
              what changed into the deploy base and /etc/systemd/system, then reload or restart what is affected.
-             Missing secrets (CA, rndc, LDAP, Keycloak, Kea, OIDC, AdGuard, TSIG, RADIUS) are generated once and saved.
+             Missing secrets (CA, rndc, the domain's accounts, Keycloak, Kea, OIDC, AdGuard, TSIG, RADIUS) are
+             generated once and saved.
     Inputs:  start_services — bool, default True. False (first install, `fabricctl setup` via
              fabriclib/setup/deploy_config.py): files are deployed, changed images built and zones swapped safely, but
              no service is started, restarted or reloaded (certificates may not exist yet). Paths from deploy_paths()
@@ -152,7 +145,7 @@ def apply_deployment(start_services=True):
              (fabric-web and fabric-agent queued with --no-block); with False, the caller restarts them.
     Fails:   sys.exit(1) after an "Error: …" line for every refusal (ValidationError): secrets that cannot be loaded
              (OpenBao locked) or saved; invalid TSIG keys, ACL policies, RADIUS clients/people, DHCP or time settings,
-             dns_filter; install_freeradius without install_ldap; host_ram_capacity 1 or 2; site_name, org_domain or
+             dns_filter; host_ram_capacity under 4; site_name, org_domain or
              ldap_base_dn not valid or not what they were at install; a template that does not render; an image
              build that fails (start_services=False); BIND9 refusing `rndc reconfig`; a published image
              whose signature does not verify (verify_published_images); fabric's own units (the

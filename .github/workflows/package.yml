@@ -1,6 +1,9 @@
 # Build the fabricctl .deb (Architecture: all — amd64 and arm64).
 # Every push (any branch) and PR: downloadable build artifact. A tag v<VERSION>: attached to
-# the GitHub Release, so hosts install it with `apt install ./fabricctl_*.deb`.
+# the GitHub Release, so hosts install it with `apt install ./fabricctl_*.deb`, and the signed apt
+# repository on GitHub Pages rebuilt (manual 1.4.1.1, D7): suite `stable` from every Release's .deb.
+# Run by hand with `apt_testing` on an rc/<version> branch: that branch's .deb goes to suite
+# `testing`, to try the apt path before the release.
 name: package
 
 on:
@@ -9,6 +12,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      apt_testing:
+        description: Publish this branch's .deb to the apt repository's testing suite (rc branches)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -51,3 +59,51 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${GITHUB_REF_NAME}" ./*.deb --clobber --repo "${GITHUB_REPOSITORY}" ||
              gh release create "${GITHUB_REF_NAME}" ./*.deb --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}"
+
+  apt:
+    # the signed apt repository on GitHub Pages: on a release tag (after `release`), or by hand from an rc branch
+    # (testing; `release` is skipped then, which must not skip this job)
+    needs: [deb, release]
+    if: >-
+      !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/v')
+      || (github.event_name == 'workflow_dispatch' && inputs.apt_testing && startsWith(github.ref, 'refs/heads/rc/')))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency: apt-repository
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq reprepro >/dev/null
+      - name: Every released package (stable)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p released
+          for tag in $(gh release list --repo "${GITHUB_REPOSITORY}" --limit 100 --json tagName --jq '.[].tagName'); do
+            gh release download "$tag" --repo "${GITHUB_REPOSITORY}" --pattern 'fabricctl_*.deb' --dir released || true
+          done
+          ls released
+      - name: This branch's package (testing)
+        if: startsWith(github.ref, 'refs/heads/rc/')
+        uses: actions/download-artifact@v4
+        with:
+          name: fabricctl-deb
+          path: candidate
+      - name: Build the signed repository
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "::error::no repository signing key (secret GPG_PRIVATE_KEY): scripts/release/make-apt-key.sh"; exit 1
+          fi
+          bash packaging/apt/build-repo.sh site released "$( [ -d candidate ] && echo candidate || true )"
+      - name: Publish to gh-pages (only the repository)
+        # committed in its own repository, pushed through the checkout's own credentials (no token on a command line)
+        run: |
+          git -C site init -q -b gh-pages
+          git -C site -c user.name="github-actions[bot]"             -c user.email="41898282+github-actions[bot]@users.noreply.github.com" add -A
+          git -C site -c user.name="github-actions[bot]"             -c user.email="41898282+github-actions[bot]@users.noreply.github.com"             commit -q -m "apt repository: ${GITHUB_REF_NAME} (${GITHUB_SHA::7})"
+          git fetch -q "$PWD/site" gh-pages:gh-pages-publish
+          git push -q -f origin gh-pages-publish:gh-pages

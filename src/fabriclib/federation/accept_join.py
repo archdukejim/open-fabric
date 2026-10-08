@@ -14,10 +14,14 @@ from fabriclib.federation.common.save_registry import save_registry
 from fabriclib.federation.common.signing_capacity import signing_capacity
 from fabriclib.federation.constants import DOMAIN_RE, SITE_NAME_RE
 from fabriclib.federation.network_conflicts import network_conflicts
+from fabriclib.federation.next_id_block import next_id_block
 from fabriclib.federation.read_address_plan import read_address_plan
 from fabriclib.federation.site_networks import site_networks
 from fabriclib.pki.sign_site_ca import sign_site_ca
+from fabriclib.samba.domain_sites import domain_sites
+from fabriclib.samba.prepare_site import prepare_site
 from fabriclib.secrets.load_secrets import load_secrets
+from fabriclib.secrets.random_password import random_password
 from fabriclib.secrets.save_secrets import save_secrets
 
 _ORG_KEYS = ("friendly_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou")
@@ -54,7 +58,7 @@ def _check_networks(v, site, networks):
                      "allow_overlap": str(n.get("allow_overlap") or "")[:200]})
     try:
         plan = read_address_plan(v)
-    except (ValidationError, RuntimeError):      # 389-DS not answering: at least this site's own networks
+    except (ValidationError, RuntimeError):      # the DC not answering: at least this site's own networks
         plan = []
     plan += [{**n, "site": v.get("site_name")} for n in site_networks(v)]
     bad = [c for c in network_conflicts(mine, plan, site) if not c["allowed"]]
@@ -68,21 +72,21 @@ def accept_join(v, req, client_ip="", now=None):
              invitation, sign the site's intermediate CA with the root key, record the site and use up the
              invitation.
     Inputs:  v — fabric vars: domain, org_domain (default domain), ldap_base_dn, site_name, host_ip,
-             hostname_federation, hostname_ldap and
-             the organisation settings (friendly_name, cert_*), plus what sign_site_ca reads; req — the join
-             request {"id", "secret", "site", "csr", "domain" (the site's own domain), "address" (its IP),
-             optional "ldap_host" (its LDAPS name, default ldap.<domain>), optional "networks" (its LAN and DHCP
-             subnets: refused when they overlap another site's, _check_networks)};
+             hostname_federation and the organisation settings (friendly_name, cert_*), plus what sign_site_ca
+             reads; req — the join request {"id", "secret", "site", "csr", "domain" (the site's own domain),
+             "address" (its IP), optional "networks" (its LAN and DHCP subnets: refused when they overlap another
+             site's, _check_networks)};
              client_ip — str for the audit; now — epoch seconds, default time.time().
     Returns: {"root": PEM, "cert": PEM of the site's intermediate (path length: the invitation's nest), "chain":
              PEM of the CAs between it and the root ("" when this is the root site; this site's CA and its
              parents when this is a site and the new one is nested under it), "dns": {"key": "fed-<site>",
              "algorithm", "secret", "port"} — the TSIG key both sites sign zone transfers with (port: this
              site's published DNS port) (kept here in fabric's
-             secrets as federation_tsig[site]; manual 1.8 M4), "directory": {"secret", "ldap_host",
-             "ldap_port"} — the directory link's secret (replication both ways, kept here as
-             federation_replication[site]; §3.2a) and this site's LDAPS name, "org": {"org_domain", "ldap_base_dn",
-             friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}}.
+             secrets as federation_tsig[site]; manual 1.8 M4), "org": {"org_domain", "ldap_base_dn",
+             friendly_name, cert_*}, "upstream": {"site_name", "domain", "host", "address"}} and, for an invitation
+             that names a DC type (made on the root), "domain": {"ad_domain", "dc_type", "dc_host", "dc_address",
+             "id_range", "join_user", "join_password", "accounts" {agent, keycloak, radius}, "site_ou", "org_ou"}
+             (_prepare_domain).
     Fails:   ValidationError "the join request is incomplete"; overlapping networks (_check_networks, before
              anything is signed or recorded); "the site's domain/address is not valid" or
              "a site cannot use this site's domain"; REFUSED for an unknown, expired or wrong secret (one message,
@@ -98,7 +102,6 @@ def accept_join(v, req, client_ip="", now=None):
         raise ValidationError("the join request is incomplete")
     site, domain = req["site"].strip().lower(), req["domain"].strip().lower().rstrip(".")
     fed_host = str(req.get("federation_host") or "").strip().lower()
-    ldap_host = str(req.get("ldap_host") or "").strip().lower()
     if not SITE_NAME_RE.match(site) or not DOMAIN_RE.match(domain):
         raise ValidationError("the site's name or domain is not valid")
     if domain == v["domain"]:
@@ -120,15 +123,14 @@ def accept_join(v, req, client_ip="", now=None):
         if site in registry["sites"]:
             raise ValidationError(f"site {site} has joined already")
         _check_networks(v, site, req.get("networks") or [])     # invitation verified first: no probing the plan
+        domain_answer = _prepare_domain(v, site, entry.get("dc") or "", req.get("networks") or [], registry)
         cap = signing_capacity(v)
         signed = sign_site_ca(v, f"site:{site}", site, req["csr"], source="federation",
                               nest=int(entry.get("nest") or 0), as_parent=cap["as_parent"])
         tsig = base64.b64encode(os.urandom(32)).decode()       # the DNS link to this site (zone transfers)
-        repl = base64.b64encode(os.urandom(32)).decode()       # the directory link (replication both ways, M5)
         stored = load_secrets(v=v)
         save_secrets({"federation_invitations": {i: e for i, e in invites.items() if i != req["id"]},
-                      "federation_tsig": dict(stored.get("federation_tsig") or {}, **{site: tsig}),
-                      "federation_replication": dict(stored.get("federation_replication") or {}, **{site: repl})},
+                      "federation_tsig": dict(stored.get("federation_tsig") or {}, **{site: tsig})},
                      v=v)
         registry["sites"][site] = {
             "domain": domain, "address": req["address"],
@@ -136,8 +138,9 @@ def accept_join(v, req, client_ip="", now=None):
             "ca_serial": signed["info"]["serial"], "ca_not_after": signed["info"]["not_after"],
             "invited_by": entry.get("actor", ""), "parent": v.get("site_name"), "nest": int(entry.get("nest") or 0),
             "via": entry.get("via") or "", "dns_port": _port(req.get("dns_port")),
-            "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}",
-            "ldap_host": ldap_host if DOMAIN_RE.match(ldap_host) else f"ldap.{domain}", "ldap_port": 636}
+            "federation_host": fed_host if DOMAIN_RE.match(fed_host) else f"federation.{domain}"}
+        if domain_answer:
+            registry["sites"][site].update({"dc": domain_answer["dc_type"], "id_range": domain_answer["id_range"]})
         save_registry(registry)
     write_audit(f"site:{site}", "FED_JOIN", f"site={site} domain={domain} address={req['address']} "
                                             f"from={client_ip} ca_serial={signed['info']['serial']}", "federation")
@@ -146,7 +149,39 @@ def accept_join(v, req, client_ip="", now=None):
     return {"root": signed["root"], "cert": signed["cert"], "chain": signed["chain"], "org": org,
             "dns": {"key": f"fed-{site}", "algorithm": "hmac-sha256", "secret": tsig,
                     "port": int(v.get("bind_dns_port") or 53)},
-            "directory": {"secret": repl, "ldap_host": v.get("hostname_ldap") or f"ldap.{v['domain']}",
-                          "ldap_port": 636},
             "upstream": {"site_name": v.get("site_name"), "domain": v["domain"], "host": v["hostname_federation"],
-                         "address": v["host_ip"]}}
+                         "address": v["host_ip"]},
+            **({"domain": domain_answer} if domain_answer else {})}
+
+def _prepare_domain(v, site, dc_type, networks, registry):
+    """Purpose: at the parent (the root, or a site with a writable DC), the domain part of a join (manual 1.8.8.4,
+             S8.1, 1.8.8.14): converge the new site in the domain, in this site's OU,
+             (prepare_site) with fresh service-account passwords and the next id block, and a temporary join account.
+    Inputs:  v — this site's vars (ad_domain, hostname_dc, host_ip and what prepare_site reads); site — the new site;
+             dc_type — the invitation's ("writable", "rodc"; "" for none: nothing is prepared); networks — the join
+             request's; registry — load_registry()'s dict (the blocks handed out so far).
+    Returns: {"ad_domain", "dc_type", "dc_host", "dc_address", "id_range", "join_user", "join_password",
+             "accounts" {agent, keycloak, radius}, "site_ou" (its OU in this site's, D105), "org_ou"}; for a site
+             already in the domain (moving here) {"ad_domain", "dc_type", "id_range" (its own), "moved": True,
+             "site_ou", "org_ou"} (its OU moved, no join account, its service accounts keep their passwords); {}
+             without a DC type.
+    Fails:   ValidationError from prepare_site (the root's DC not running or refusing): the invitation is kept.
+    Feeds:   accept_join."""
+    if not dc_type:
+        return {}
+    held = {s["site"]: s for s in domain_sites()}
+    accounts = {kind: random_password() for kind in ("agent", "keycloak", "radius")}
+    if site in held:        # a site of the domain moving here (re-parenting, D105): its OU moves, its DC stays
+        block = held[site]["id_range"] or next_id_block(v, registry, sites=list(held.values()))
+        prepare_site(v, site, networks, block, {}, None)
+        site_ou = v.get("ad_site_ou") or f"OU={v['site_name']},OU=sites"
+        return {"ad_domain": v["ad_domain"], "dc_type": dc_type, "id_range": block, "moved": True,
+                "site_ou": f"OU={site},{site_ou}", "org_ou": v.get("ad_org_ou") or f"OU=organisation,{site_ou}"}
+    join_password = random_password()
+    block = next_id_block(v, registry, sites=list(held.values()))
+    prepare_site(v, site, networks, block, accounts, join_password)
+    site_ou = v.get("ad_site_ou") or f"OU={v['site_name']},OU=sites"     # this site's: the new one nests in it
+    return {"ad_domain": v["ad_domain"], "dc_type": dc_type, "dc_host": v["hostname_dc"], "dc_address": v["host_ip"],
+            "id_range": block, "join_user": f"fabric-join-{site}", "join_password": join_password,
+            "accounts": accounts, "site_ou": f"OU={site},{site_ou}",
+            "org_ou": v.get("ad_org_ou") or f"OU=organisation,{site_ou}"}

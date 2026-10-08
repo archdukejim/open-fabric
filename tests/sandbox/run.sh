@@ -68,8 +68,9 @@ host_ip: $IP
 lan_cidr: $SUBNET
 lan_gateway: 10.77.0.1
 friendly_name: Sandbox
+ad_domain: ad.test
+ad_password_policy: {minimum_length: 14, complexity: true, history: 24, minimum_age_days: 0, maximum_age_days: 0, lockout_threshold: 10, lockout_minutes: 15, lockout_window_minutes: 15}
 install_keycloak: true
-install_ldap: true
 install_webui: true
 install_freeradius: true
 install_kea: true
@@ -94,7 +95,7 @@ check "unattended setup without --approve changes nothing and names the groups t
      && ! in_box 'getent passwd fabric-dns'"
 in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all' 2>&1 | tee "$OUT/setup.log"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
-grep -q "fabric is ready" "$OUT/setup.log" || in_box 'journalctl --no-pager -u ldap | tail -60; docker logs dirsrv 2>&1 | tail -80' > "$OUT/setup-ldap.log" 2>&1   # diagnosis when setup fails
+grep -q "fabric is ready" "$OUT/setup.log" || in_box 'journalctl --no-pager -u samba | tail -60; docker logs samba 2>&1 | tail -80' > "$OUT/setup-dc.log" 2>&1   # diagnosis when setup fails
 check "setup did not shadow the package command" "! in_box 'test -e /usr/local/bin/fabricctl'"
 check "Docker comes from the Ubuntu archive, no apt source added" \
     "in_box 'dpkg -s docker.io docker-compose-v2 docker-buildx' | grep -c '^Status: install ok installed' | grep -qx 3 \
@@ -109,14 +110,17 @@ published=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_publis
 print(sum(1 for e in r('$REPO/config')['images'].values() if e['ref']))")
 if [ "$published" -eq 8 ]; then
     check "the core services run fabric's published images (pulled, not built here)" \
-        "in_box 'docker inspect -f {{.Config.Image}} bind9 dirsrv keycloak step-ca fabric-web' \
+        "in_box 'docker inspect -f {{.Config.Image}} bind9 samba keycloak step-ca fabric-web' \
          | grep -c '^ghcr.io/archdukejim/open-fabric/' | grep -qx 5 && ! in_box 'docker image inspect fabric/bind9:local' >/dev/null 2>&1"
     check "each was signature-checked before use (verified digests remembered, root-only)" \
         "in_box 'stat -c %a /etc/fabric/images/verified.json' | grep -qx 600 \
          && [ \"\$(in_box \"grep -cE '^ +.at.: ' /etc/fabric/images/verified.json\")\" -ge 5 ]"
 else
-    check "nothing published in this lock yet ($published of 8): the images are built here, as before" \
-        "in_box 'docker image inspect fabric/bind9:local fabric/web:local' >/dev/null"
+    # some published, some still pending (new or rebuilt on this branch, 4.7.1.4): the pending ones are built here
+    pending=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
+print(' '.join('fabric/' + {'webui': 'web'}.get(n, n) + ':local' for n, e in r('$REPO/config')['images'].items() if not e['ref']))")
+    check "$published of 8 published: the pending ones are built here ($pending)" \
+        "in_box 'docker image inspect $pending' >/dev/null"
 fi
 check "fabricctl status lists the relaxed security settings (none here)" \
     "in_box 'fabricctl status' | grep -A1 '^relaxed security settings:' | grep -qx '  none'"
@@ -140,12 +144,9 @@ check "setup --approve trust puts the CA back in the host trust store" \
 in_box 'fabricctl setup --undo accounts --non-interactive --yes' > "$OUT/undo-accounts.log" 2>&1
 check "setup --undo refuses what fabric needs (accounts), naming uninstall" "grep -q 'fabricctl uninstall' '$OUT/undo-accounts.log'"
 
-echo "--- POSIX identities (manual 2.10.1 step 1)"
-docker cp "$REPO/tests/sandbox/posix_check.py" "$NAME:/root/posix_check.py"
-check "the admin has a POSIX identity: uidNumber from the users range, group users, /home/<uid>" \
-    "in_box 'python3 /root/posix_check.py fabricadmin' | grep -qE '^(500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-4][0-9]{4}) 5000 /home/fabricadmin /bin/bash$'"
-check "fabricctl directory sync finds nothing left to do; its timer is enabled" \
-    "in_box 'fabricctl directory sync' | grep -q '0 added' && in_box 'systemctl is-enabled fabric-directory-sync.timer' | grep -qx enabled"
+echo "--- POSIX identities in the domain (manual 1.6.3.9)"
+check "the admin has fabric's POSIX identity in AD: a uid from the site's block, Domain Users' gid 5000" \
+    "in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=fabricadmin)' uidNumber gidNumber\" | grep -qE '^uidNumber: (500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-9][0-9]{4,5})$'"
 
 echo "--- DNS filter (AdGuard Home) in front of BIND"
 BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
@@ -265,13 +266,13 @@ check "federation: disable removes the unit, its socket and the vhost" \
 echo "--- systemd control: fabric.target"
 check "fabric.target enabled and active" "in_box 'systemctl is-enabled fabric.target && systemctl is-active fabric.target' >/dev/null"
 check "every unit is part of fabric.target" \
-    "[ \"\$(in_box 'systemctl list-dependencies --plain fabric.target' | grep -cE '(bind9|stepca|nginx|ldap|postgres|keycloak|fabric-agent|fabric-web)\\.service')\" -ge 8 ]"
+    "[ \"\$(in_box 'systemctl list-dependencies --plain fabric.target' | grep -cE '(bind9|stepca|nginx|samba|postgres|keycloak|fabric-agent|fabric-web)\\.service')\" -ge 8 ]"
 in_box 'fabricctl status' > "$OUT/status.log" 2>&1
 check "fabricctl status: target active, containers healthy" \
     "grep -qE '^fabric.target +active' '$OUT/status.log' && [ \"\$(grep -c ' healthy' '$OUT/status.log')\" -ge 7 ]"
 in_box 'fabricctl stop' > "$OUT/stop.log" 2>&1
 check "fabricctl stop: every service stopped" \
-    "! in_box 'systemctl is-active bind9 stepca nginx ldap postgres keycloak openbao fabric-web fabric-agent' | grep -qx active"
+    "! in_box 'systemctl is-active bind9 stepca nginx samba postgres keycloak openbao fabric-web fabric-agent' | grep -qx active"
 check "fabricctl stop: DNS no longer answers" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 check "fabricctl stop: the host keeps its time (chrony is not part of the stack)" \
     "in_box 'systemctl is-active chrony' | grep -qx active"
@@ -300,7 +301,7 @@ check "no plaintext fabric-secrets.yml after setup" "! in_box 'test -e /opt/fabr
 check "the marker says OpenBao is the source of truth" "in_box 'test -s /opt/fabric/config/secrets.openbao'"
 check "fabricctl vault status: secrets in OpenBao (fabric/secrets)" "in_box 'fabricctl vault status' | grep -q \"fabric's secrets: in OpenBao (fabric/secrets\""
 check "every generated secret is in OpenBao" \
-    "secrets_json | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(0 if all(s.get(k) for k in (\"ca_password\",\"rndc_secret\",\"ldap_admin_password\",\"keycloak_admin_password\",\"webui_oidc_secret\",\"ldap_device_admin_password\")) else 1)'"
+    "secrets_json | python3 -c 'import json,sys; s=json.load(sys.stdin); sys.exit(0 if all(s.get(k) for k in (\"ca_password\",\"rndc_secret\",\"ad_admin_password\",\"keycloak_admin_password\",\"webui_oidc_secret\",\"ad_agent_password\")) else 1)'"
 
 check "fabricctl secrets list: names only, no values" \
     "in_box 'fabricctl secrets list' | grep -qx keycloak_admin_password && ! in_box 'fabricctl secrets list' | grep -qF \"\$(secrets_json | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"keycloak_admin_password\"])')\""
@@ -349,30 +350,23 @@ check "core services start and serve while OpenBao is down" \
 in_box 'systemctl start openbao' > /dev/null 2>&1; sleep 10
 
 echo "--- restricted sign-in: HTTPS + client cert from this CA + Keycloak OIDC/TOTP + fabric-admin role"
-# A real directory user who is NOT in admins, with their own valid client certificate.
-BOB_PW=$(openssl rand -base64 18)
-cat > "$OUT/bob.py" <<'PY'
-import os, sys, yaml
-sys.path.insert(0, "/opt/fabric/lib")
-from fabriclib.ldap.ensure_admin_user import ensure_admin_user
-v = yaml.safe_load(open("/opt/fabric/config/vars.yaml"))
-print(ensure_admin_user(dict(v, webui_admin_group="users"), "bob", os.environ["BOB_PW"], "bob@lan.test"))
-PY
-docker cp "$OUT/bob.py" "$NAME:/root/bob.py"
-in_box "BOB_PW='$BOB_PW' python3 /root/bob.py" > "$OUT/bob.log" 2>&1
+# A person of the site who is NOT in admins (bob), and one in auditors (carol), each with a client certificate;
+# their one-time passwords from fabric's own reset, through a root-only file
+docker cp "$REPO/tests/sandbox/make_person.py" "$NAME:/root/make_person.py"
+docker cp "$REPO/tests/host/reset_user.py" "$NAME:/root/reset_user.py"
+in_box 'python3 /root/make_person.py bob' > "$OUT/bob.log" 2>&1
+in_box 'python3 /root/reset_user.py bob /root/bob-pw' >> "$OUT/bob.log" 2>&1
+BOB_PW=$(in_box 'cat /root/bob-pw; rm -f /root/bob-pw')
 BOB_P12_PW=$(in_box 'fabricctl client-cert bob' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
-check "second user bob (directory user, not an admin) with a client cert" "grep -q created '$OUT/bob.log' && [ -n '$BOB_P12_PW' ]"
-# carol: a member of the auditors group -> the fabric-auditor bundle (read-only)
-CAROL_PW=$(openssl rand -base64 18)
-sed 's/webui_admin_group="users"), "bob", os.environ\["BOB_PW"\], "bob@lan.test"/webui_admin_group="auditors"), "carol", os.environ["BOB_PW"], "carol@lan.test"/' "$OUT/bob.py" > "$OUT/carol.py"
-docker cp "$OUT/carol.py" "$NAME:/root/carol.py"
-in_box "BOB_PW='$CAROL_PW' python3 /root/carol.py" > "$OUT/carol.log" 2>&1
+check "second user bob (a person of the site, not an admin) with a client cert" "grep -q created '$OUT/bob.log' && [ -n '$BOB_P12_PW' ]"
+in_box 'python3 /root/make_person.py carol auditors' > "$OUT/carol.log" 2>&1
+in_box 'python3 /root/reset_user.py carol /root/carol-pw' >> "$OUT/carol.log" 2>&1
+CAROL_PW=$(in_box 'cat /root/carol-pw; rm -f /root/carol-pw')
 CAROL_P12_PW=$(in_box 'fabricctl client-cert carol' 2>&1 | sed -n 's/^.p12 password (shown once): //p')
 check "third user carol in the auditors group, with a client cert" "grep -q created '$OUT/carol.log' && [ -n '$CAROL_P12_PW' ]"
-# bob and carol were written straight into the directory (as people created outside fabric are)
-in_box 'fabricctl directory sync' > "$OUT/posix-sync.log" 2>&1
-check "sync gives people created outside fabric distinct POSIX identities" \
-    "grep -q '2 added' '$OUT/posix-sync.log' && [ \"\$(in_box 'python3 /root/posix_check.py bob' | cut -d' ' -f1)\" != \"\$(in_box 'python3 /root/posix_check.py carol' | cut -d' ' -f1)\" ]"
+BOB_UID=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=bob)' uidNumber" | grep ^uidNumber)
+CAROL_UID=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=carol)' uidNumber" | grep ^uidNumber)
+check "bob and carol have distinct uid numbers from the site's block" "[ -n '$BOB_UID' ] && [ '$BOB_UID' != '$CAROL_UID' ]"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
 in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
@@ -380,7 +374,7 @@ cat > "$OUT/reset_guard.py" <<'PY'
 import sys, yaml
 sys.path.insert(0, "/opt/fabric/lib")
 from fabriclib.common.errors import ValidationError
-from fabriclib.keycloak.reset_sign_in import reset_sign_in
+from fabriclib.directory.reset_sign_in import reset_sign_in
 v = yaml.safe_load(open("/opt/fabric/config/vars.yaml"))
 try:
     reset_sign_in(v, "helpdesk-test", "carol", privileged=False, source="test")
@@ -539,7 +533,9 @@ check "apt remove removes the command but not the running install" \
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > /dev/null 2>&1
 check "reinstalling the package gives the command back" "in_box 'fabricctl status' | grep -qE '^fabric.target +active'"
 
-echo "--- reinstall keeps fabric's secrets (backup exports them, setup re-imports and shreds)"
+echo "--- reinstall keeps fabric's secrets (backup exports them, setup re-imports and shreds) and the domain"
+in_box 'python3 /root/make_person.py keeper' > "$OUT/keeper.log" 2>&1
+SID_BEFORE=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=keeper)' objectSid" | sed -n 's/^objectSid: //p')
 in_box 'fabricctl reinstall --yes --non-interactive' > "$OUT/reinstall.log" 2>&1
 check "reinstall completes" "grep -q 'fabric is ready' '$OUT/reinstall.log'"
 check "reinstall re-imported the exported secrets into OpenBao and left no plaintext file" \
@@ -547,6 +543,7 @@ check "reinstall re-imported the exported secrets into OpenBao and left no plain
 check "after the reinstall the npm TSIG key still works" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
 in_box 'fabricctl doctor' > "$OUT/doctor-reinstall.log" 2>&1
 check "after the reinstall doctor passes" "! grep -q '✗' '$OUT/doctor-reinstall.log' && grep -q '✓' '$OUT/doctor-reinstall.log'"
+check "the domain survives the reinstall: a person made before it is still there, with the same SID (not a new domain)"     "[ -n '$SID_BEFORE' ] && in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=keeper)' objectSid\" | grep -q 'objectSid: $SID_BEFORE'"
 
 cat > "$OUT/argv_check.py" <<'PY'
 import glob, sys
@@ -567,17 +564,15 @@ check "no secret appears in any process's argv" "in_box 'python3 /root/argv_chec
 
 echo "--- fabricctl uninstall: export to a folder of your choice, remove fabric and the package"
 CA_FP=$(in_box 'openssl x509 -noout -fingerprint -sha256 -in /opt/stepca/data/certs/root_ca.crt')
-# a directory user made after the reinstall (which starts the directory fresh): only the export has her
-sed 's/webui_admin_group="users"), "bob", os.environ\["BOB_PW"\], "bob@lan.test"/webui_admin_group="users"), "erin", os.environ["BOB_PW"], "erin@lan.test"/' "$OUT/bob.py" > "$OUT/erin.py"
-docker cp "$OUT/erin.py" "$NAME:/root/erin.py"
-in_box "BOB_PW='$(openssl rand -base64 18)' python3 /root/erin.py" > "$OUT/erin.log" 2>&1
+# a person made after the reinstall (which starts the domain fresh): only the export has her
+in_box 'python3 /root/make_person.py erin' > "$OUT/erin.log" 2>&1
 in_box 'fabricctl uninstall --yes' > "$OUT/uninstall-refused.log" 2>&1
 check "unattended uninstall without an export choice is refused, nothing changed"     "grep -q 'choose --export DIR or --no-export' '$OUT/uninstall-refused.log' && in_box 'systemctl is-active fabric.target' | grep -qx active"
 in_box 'fabricctl uninstall --yes --export /opt/fabric/exported' > "$OUT/uninstall-refused2.log" 2>&1
 check "an export folder the uninstall would delete is refused"     "grep -q 'would be deleted by the uninstall' '$OUT/uninstall-refused2.log' && in_box 'systemctl is-active fabric.target' | grep -qx active"
 in_box 'fabricctl uninstall --yes --export /root/fabric-export --purge-package' > "$OUT/uninstall.log" 2>&1
 EX=/root/fabric-export
-check "export: config, secrets, CA, directory, Keycloak, the vault and its key, README (root 0700)"     "in_box 'test -s $EX/fabric/config/fabric-secrets.yml && test -d $EX/stepca/data && test -d $EX/dirsrv && test -d $EX/postgres && test -d $EX/openbao/data && test -f $EX/@root/etc/fabric/openbao/slots.json && test -f $EX/README.txt && [ \"\$(stat -c %a $EX)\" = 700 ]'"
+check "export: config, secrets, CA, directory, Keycloak, the vault and its key, README (root 0700)"     "in_box 'test -s $EX/fabric/config/fabric-secrets.yml && test -d $EX/stepca/data && test -d $EX/samba/data && test -d $EX/postgres && test -d $EX/openbao/data && test -f $EX/@root/etc/fabric/openbao/slots.json && test -f $EX/README.txt && [ \"\$(stat -c %a $EX)\" = 700 ]'"
 check "the package was purged too, and nothing was written to /var/backups"     "! in_box 'dpkg -s fabricctl' >/dev/null 2>&1 && ! in_box 'test -e /var/backups/fabric'"
 check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui|kea-dhcp4|kea-ddns|freeradius)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,kea,freeradius,fabric-agent}.service' >/dev/null 2>&1"
 check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /opt/kea /opt/freeradius /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl /etc/fabric /usr/lib/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id fabric-vault' >/dev/null 2>&1"
@@ -599,9 +594,8 @@ check "restore: the same CA (clients keep trusting it)" \
 check "restore: OpenBao unlocked with its own key, not re-initialised; fabric's secrets back in it" \
     "! grep -q 'OpenBao initialised' '$OUT/restore.log' && in_box 'fabricctl secrets list' | grep -q ca_password && ! in_box 'test -e /opt/fabric/config/fabric-secrets.yml'"
 check "restore: the embedded TSIG key still updates DNS" "[ \"\$(t2136 npm '$TSIG_SECRET' npm)\" = '4 passed, 0 failed' ]"
-docker cp "$REPO/tests/sandbox/ldap_has_users.py" "$NAME:/root/ldap_has_users.py"
-check "restore: the directory is back (erin, added after the reinstall, exists again)" \
-    "[ \"\$(in_box 'python3 /root/ldap_has_users.py dc=lan,dc=test erin')\" = 1 ]"
+check "restore: the domain is back (erin, added after the reinstall, exists again)" \
+    "in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=erin)' sAMAccountName\" | grep -qx 'sAMAccountName: erin'"
 in_box 'fabricctl doctor' > "$OUT/doctor-restore.log" 2>&1
 check "restore: doctor passes" "! grep -q '✗' '$OUT/doctor-restore.log' && grep -q '✓' '$OUT/doctor-restore.log'"
 

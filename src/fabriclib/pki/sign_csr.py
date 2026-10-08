@@ -4,8 +4,8 @@ import secrets
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
-from fabriclib.ldap.link_device_cert import link_device_cert
-from fabriclib.ldap.require_device import require_device
+from fabriclib.directory.link_device_cert import link_device_cert
+from fabriclib.directory.require_device import require_device
 from fabriclib.pki.common.artifacts_dir import artifacts_dir
 from fabriclib.pki.common.ca_chain_pem import ca_chain_pem
 from fabriclib.pki.common.describe_cert import describe_cert
@@ -28,7 +28,7 @@ def sign_csr(v, actor, csr, days, device="", source="web"):
              dict, "device"}.
     Fails:   ValidationError "cannot sign: <problems>"; describe_csr's messages; valid_days' messages; "no
              device named ..."; "step-ca refused: ..." (run_step); "refusing: the signed certificate would
-             be a CA"; link_device_cert / run_dirsrv errors (raised after signing); OSError.
+             be a CA"; link_device_cert / run_op errors (raised after signing); OSError.
     Feeds:   agent route POST /v1/pki/sign -> webui agentclient.sign_csr -> PKI page.
     Notes:   the leaf template sets serverAuth + clientAuth, the CSR's names and fabric's subject defaults;
              the CSR's own extensions are ignored. The CSR goes to a random-named artifact file (O_EXCL,

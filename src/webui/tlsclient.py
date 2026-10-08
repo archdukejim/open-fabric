@@ -52,7 +52,7 @@ class TLSClient:
         Returns: None (constructor).
         Fails:   never — it only stores the values; a bad CA path shows up on the first request.
         Feeds:   request; built by server.App.__init__, src/ux/cli/keycloak_bootstrap.py, fabriclib/keycloak/
-                 (keycloak_admin, require_password_change, user_has_role, verify_user_token) and
+                 (keycloak_admin, user_has_role, verify_user_token) and
                  tests/keycloak/verify.py, tests/host/reset_user.py.
         """
         self.ip, self.port, self.hostname, self.ca_file = ip, port, hostname, ca_file

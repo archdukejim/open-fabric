@@ -14,7 +14,8 @@ installs what changed and restarts or reloads what is affected.
 | `render_vars.py` | `vars.yaml.j2` rendered over the admin's vars and the secrets (the full settings); the RAM minimum |
 | `archive_vars.py` | Keep the deployed `vars.yaml` in `archive/` before it is replaced |
 | `check_fixed_identity.py` | `site_name`, `org_domain` and `ldap_base_dn` valid and unchanged since install (the markers in `config/`) |
-| `check_settings.py` | DHCP, time and `dns_filter` settings checked before anything is rendered |
+| `check_settings.py` | DHCP, time, `dns_filter` and Windows-domain settings checked before anything is rendered |
+| `check_samba_settings.py` | The Windows domain's settings: the AD domain, NetBIOS names, the whole password policy (D87, D89) |
 | `load_link_vars.py` | The landing page's links, rendered into the context (a bad file is reported, never fatal) |
 | `service_units.py` | fabric's container services and their wrapper units, with which are on |
 | `render_templates.py` | Every configuration file into the render folder |
@@ -23,10 +24,8 @@ installs what changed and restarts or reloads what is affected.
 | `install_openbao_config.py` | OpenBao's folders and config |
 | `install_nginx_config.py` | nginx's config and `fabric.target` |
 | `install_bind9_files.py` | BIND's folders and config; the zones whose records changed |
-| `install_dirsrv_seed.py` | 389-DS's seed files |
 | `install_webui_files.py` | The web UI's folders and config; fabric-agent's unit |
 | `install_stepca_templates.py` | Step-CA's certificate templates |
-| `install_directory_sync_timer.py` | The timer giving people created in Keycloak's console their POSIX identity |
 | `install_runtime_dirs.py` | Data folders services write; each TSIG key's `rfc2136.ini` |
 | `deploy_optional_parts.py` | Fluent Bit, the DNS filter, chrony, Kea, FreeRADIUS through their own deploy steps |
 | `finish_without_start.py` | Setup's ending: start nothing, swap zones safely, build images, return what to restart |

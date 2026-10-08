@@ -19,7 +19,7 @@
 | `sudo_owner.py` | Login, home, uid and gid of the account that ran `sudo` (files handed to the admin) |
 | `set_tsig_secrets.py` | Set or remove TSIG secrets in `fabric-secrets.yml` (kept `0600`) |
 | `write_file_if_changed.py` | Write a file atomically with its mode and owner, only if its content changed (Kea, FreeRADIUS configs) |
-| `one_time_password.py` | A random password for a person that 389-DS's password policy always accepts (every character kind) |
+| `one_time_password.py` | A random password for a person that the domain's password policy always accepts (every character kind) |
 | `keep_original.py` | Keep a host file (or its symlink target, or its absence) once, before fabric first changes it, in `config/host-originals/` |
 | `restore_original.py` | Put a kept host file back (or remove one fabric added) |
 | `copy_if_changed.py` | Install one file (mode, owner) when its content differs |

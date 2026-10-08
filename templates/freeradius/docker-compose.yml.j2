@@ -1,6 +1,6 @@
 services:
   # 802.1X (design §6): switches and access points ask here; fabric's policy
-  # answers from 389-DS. Non-root, no capabilities, read-only.
+  # answers from the site's DC (AD, LDAPS to the host's address). Non-root, no capabilities, read-only.
   freeradius:
 {% set published = published_ref('freeradius') %}
     # fabric's published image when this host can use it, else its own build (manual 2.6.3.3)
@@ -32,6 +32,11 @@ services:
       - {{ deploy_base_dir }}/freeradius/config:/etc/freeradius/fabric:ro
       - {{ deploy_base_dir }}/freeradius/certs:/etc/freeradius/certs:ro
       - {{ deploy_base_dir }}/freeradius/python:/etc/freeradius/python:ro
+      # PEAP: ntlm_auth asks the site's DC through its winbind — its sockets, its privileged pipe (FreeRADIUS's
+      # group only) and its smb.conf, all read-only
+      - {{ deploy_base_dir }}/samba/winbindd:/run/samba/winbindd:ro
+      - {{ deploy_base_dir }}/samba/data/state/winbindd_privileged:/data/state/winbindd_privileged:ro
+      - {{ deploy_base_dir }}/samba/data/etc:/etc/samba:ro
     ports:
       - "{{ host_ip }}:1812:1812/udp"
       - "{{ host_ip }}:1813:1813/udp"

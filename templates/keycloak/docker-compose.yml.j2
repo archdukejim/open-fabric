@@ -40,10 +40,8 @@ services:
       # Bootstrap admin (Keycloak 26+ names; KEYCLOAK_ADMIN* are deprecated)
       KC_BOOTSTRAP_ADMIN_USERNAME: "{{ keycloak_admin_user }}"
       KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
-{% if host_ram_capacity | default(0) | int >= 3 %}
-{% set kc_mem = 800 if (host_ram_capacity | default(0) | int) == 3 else (1200 * ((host_ram_capacity | default(0) | int) / 4)) | int %}
+{% set kc_mem = (1200 * ((host_ram_capacity | default(4) | int) / 4)) | int %}
       JAVA_OPTS_APPEND: "-Xmx{{ (kc_mem * 0.8) | int }}m"
-{% endif %}
     volumes:
       - {{ keycloak_data_dir }}:/opt/keycloak/data
       - {{ deploy_base_dir }}/keycloak/certs:/etc/keycloak/certs:ro
@@ -54,13 +52,11 @@ services:
           - "{{ hostname_keycloak }}"
           - "keycloak"
     restart: unless-stopped
-{% if host_ram_capacity | default(0) | int >= 3 %}
-{% set kc_mem = 800 if (host_ram_capacity | default(0) | int) == 3 else (1200 * ((host_ram_capacity | default(0) | int) / 4)) | int %}
+{% set kc_mem = (1200 * ((host_ram_capacity | default(4) | int) / 4)) | int %}
     deploy:
       resources:
         limits:
           memory: {{ kc_mem }}M
-{% endif %}
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
       interval: 15s

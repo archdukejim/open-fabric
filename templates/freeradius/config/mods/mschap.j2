@@ -1,0 +1,17 @@
+{# raw: FreeRADIUS's nested expansions look like Jinja tags #}
+{% raw %}# MS-CHAPv2 (PEAP's inner method) checked by the domain itself: ntlm_auth asks
+# the site's DC through its winbind (the sockets mounted from the DC, its
+# smb.conf read-only), so FreeRADIUS never sees a password or an NT hash
+# (manual 2.11.2.17, S3.3; spike Q8). mschap's User-Name is the account as AD
+# knows it: "DOMAIN\alice" becomes alice, a machine's host/ws1.<domain> ws1$.
+mschap {
+	use_mppe = yes
+	require_encryption = yes
+	require_strong = yes
+	with_ntdomain_hack = yes
+	ntlm_auth = "/usr/bin/ntlm_auth --configfile=/etc/samba/smb.conf --request-nt-key --allow-mschapv2 --username=%{mschap:User-Name} --challenge=%{%{mschap:Challenge}:-00} --nt-response=%{%{mschap:NT-Response}:-00}"
+	ntlm_auth_timeout = 5
+	passchange {
+	}
+}
+{% endraw %}

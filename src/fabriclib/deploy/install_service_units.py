@@ -11,7 +11,7 @@ from fabriclib.deploy.compose_builds import compose_builds
 from fabriclib.images.needs_rebuild import needs_rebuild
 
 # a service's folder -> the service user owning it (others: the folder's own name)
-OWNER = {"bind9": "bind", "stepca": "step", "dirsrv": "ldap"}
+OWNER = {"bind9": "bind", "stepca": "step"}
 
 
 def _present(compose_file):
@@ -32,14 +32,14 @@ def _present(compose_file):
 def install_service_units(paths, final_vars, units):
     """Purpose: install each service's compose file, local image build context and systemd wrapper.
     Inputs:  paths — deploy_paths() (base, fabric_dir, jinja, render); final_vars — rendered settings
-             (service_users, install_keycloak, install_ldap); units — service_units().
+             (service_users, install_keycloak); units — service_units().
     Returns: {"restart": set of units whose compose file, image or unit changed, "rebuild": set of folders whose
              image must be prepared: a local image to build (its build context changed, or its base is not the
              pinned one) or fabric's published image to pull (not on the host yet),
              "daemon_reload": bool}.
     Fails:   OSError from copying or setting owners.
     Feeds:   apply_deployment.
-    Notes:   every service gets its <base>/<folder> (owned by its service user) except Keycloak/Postgres and 389-DS
+    Notes:   every service gets its <base>/<folder> (owned by its service user) except Keycloak/Postgres
              when they are off; only rendered (enabled) services get files. The web UI's build context also carries
              its app code (fabric's lib/webui)."""
     base, out = paths["base"], paths["render"]
@@ -47,8 +47,6 @@ def install_service_units(paths, final_vars, units):
     for u in units:
         folder, name = u["folder"], u["service"]
         if folder in ("keycloak", "postgres") and not final_vars.get("install_keycloak"):
-            continue
-        if folder == "dirsrv" and not final_vars.get("install_ldap"):
             continue
         uid, gid = service_user(final_vars, OWNER.get(folder, folder))
         svc_dir = os.path.join(base, folder)

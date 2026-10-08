@@ -1,7 +1,9 @@
 # FreeRADIUS 3.2 (the supported upstream line; Debian trixie ships 3.2.7 with
-# security updates) on the validated Debian base, like bind9 and dirsrv.
+# security updates) on the validated Debian base, like bind9.
 # python3 + python3-ldap: fabric's policy (fabric/jinja/freeradius/python)
-# looks every device up in 389-DS. No capabilities: RADIUS ports are > 1024.
+# looks every device up in the site's DC (AD). winbind's ntlm_auth: PEAP's
+# MS-CHAPv2 checked by the DC through its winbind (sockets mounted from the
+# DC). No capabilities: RADIUS ports are > 1024.
 # The base is always given by the compose file (digest-pinned, no default).
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
@@ -14,7 +16,7 @@ ARG RADIUS_GID=610
 LABEL org.fabric.ids="${RADIUS_UID}:${RADIUS_GID}"
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends freeradius freeradius-python3 python3-ldap openssl \
+ && apt-get install -y --no-install-recommends freeradius freeradius-python3 python3-ldap openssl winbind \
  && rm -rf /var/lib/apt/lists/* \
  # fabric brings its whole configuration (mounted read-only); Debian's
  # example tree, test users and snake-oil certificates are not used.

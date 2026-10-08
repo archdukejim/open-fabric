@@ -84,7 +84,7 @@ class DevState:
         Inputs:  none (reads self.data["directory"]; needs fabriclib's list_devices).
         Returns: {"devices", "roles" (sorted by priority then name), "types", "permissions"}; None without fabriclib.
         Fails:   never in practice — anything list_devices raises propagates.
-        Feeds:   Handler.do_GET for /dirsrv and /stepca (device picker).
+        Feeds:   Handler.do_GET for /directory and /stepca (device picker).
         """
         if not list_devices:
             return None
@@ -101,7 +101,7 @@ class DevState:
         Returns: None; self.data["directory"] and role memberships are updated, an audit line is added.
         Fails:   ValidationError from check_device_fields / check_role_fields or for a bad new name. Only called when
                  fabriclib imported (NameError otherwise).
-        Feeds:   Handler.do_POST for /dirsrv/<kind>/<name> and /dirsrv/<kind>/_new.
+        Feeds:   Handler.do_POST for /directory/<kind>/<name> and /directory/<kind>/_new.
         """
         d = self.data["directory"]
         if kind == "devices":

@@ -66,7 +66,8 @@ def install(name, site, domain, password, extra=None):
     v = {"deploy_base_dir": tree, "image_stepca": IMAGE, "service_users": USERS, "site_name": site, "domain": domain,
          "org_domain": "lan.test", "ldap_base_dn": "dc=lan", "host_ip": "127.0.0.1",
          "hostname_federation": f"federation.{domain}", "federation_endpoint": True, "cert_intermediate_days": 1095,
-         "ldap_organizational_units": [{"name": "accounts"}, {"name": "groups"}], **(extra or {})}
+         "ldap_organizational_units": [{"name": "accounts"}, {"name": "groups"}], "ad_domain": "ad.lan.test",
+         "hostname_dc": f"dc.{domain}", "ad_password_policy": {"minimum_length": 14, "complexity": True, "history": 24, "minimum_age_days": 0, "maximum_age_days": 0, "lockout_threshold": 5, "lockout_minutes": 15, "lockout_window_minutes": 15}, **(extra or {})}
     with open(f"{tree}/fabric/config/vars.yaml", "w") as f:
         yaml.safe_dump(v, f)
     return tree, data, v

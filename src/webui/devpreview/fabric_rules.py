@@ -6,10 +6,10 @@ try:
     from fabriclib.common.errors import ValidationError  # noqa: F401
     from fabriclib.dns.ptr_for_ip import ptr_for_ip  # noqa: F401
     from fabriclib.dns.reverse_zones import reverse_zones  # noqa: F401
-    from fabriclib.ldap.common.check_device_fields import check_device_fields  # noqa: F401
-    from fabriclib.ldap.common.check_role_fields import check_role_fields  # noqa: F401
-    from fabriclib.ldap.constants import DEVICE_NAME_RE, DEVICE_TYPES, PERMISSIONS, ROLE_NAME_RE  # noqa: F401
-    from fabriclib.ldap.list_devices import list_devices  # noqa: F401
+    from fabriclib.directory.common.check_device_fields import check_device_fields  # noqa: F401
+    from fabriclib.directory.common.check_role_fields import check_role_fields  # noqa: F401
+    from fabriclib.directory.constants import DEVICE_NAME_RE, DEVICE_TYPES, PERMISSIONS, ROLE_NAME_RE  # noqa: F401
+    from fabriclib.directory.list_devices import list_devices  # noqa: F401
     from fabriclib.rbac.permissions import BUNDLES, PERMISSIONS as FABRIC_PERMISSIONS  # noqa: F401
 except ImportError:
     ValidationError = ValueError

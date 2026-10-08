@@ -6,8 +6,8 @@ import sys
 
 sys.path.insert(0, "/opt/fabric/lib")
 from fabriclib.common.load_vars import load_vars  # noqa: E402
-from fabriclib.ldap.add_device import add_device  # noqa: E402
-from fabriclib.ldap.update_role import update_role  # noqa: E402
+from fabriclib.directory.add_device import add_device  # noqa: E402
+from fabriclib.directory.update_role import update_role  # noqa: E402
 
 v = load_vars()
 update_role(v, "sandbox", "printers", {"permissions": ["network:mab"], "vlan": "30", "priority": 50,

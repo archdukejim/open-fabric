@@ -1,12 +1,13 @@
 from webui import views
-from webui.devpreview.sample_data import (RECORD_TYPES, SAMPLE_CA, SAMPLE_DEVICES, SAMPLE_DHCP, SAMPLE_RADIUS,
+from webui.devpreview.sample_data import (RECORD_TYPES, SAMPLE_CA, SAMPLE_DEVICES, SAMPLE_DHCP, SAMPLE_DOMAIN,
+                                          SAMPLE_FEDERATION, SAMPLE_GPO, SAMPLE_RADIUS,
                                           SAMPLE_VAULT)
 from webui.devpreview.sample_radius_guides import sample_radius_guides
 
 
 def dev_get_page(h, path, query):
     """Purpose: Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao,
-             /dirsrv, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks
+             /directory, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks
              like). No sign-in, no client certificate, no fabric-agent.
     Inputs:  h — the dev handler (send, state, ctx); path — the URL path; query — dict (msg, err, view, zone, device,
              slot, name).
@@ -39,14 +40,19 @@ def dev_get_page(h, path, query):
                                          slot_id=query.get("slot", ""), host="pi-core", live=True,
                                          msg=query.get("msg", ""), err=query.get("err", ""),
                                          add_live={"security-key": True, "usb": True, "hsm": True}))
-    if path == "/dirsrv":
-        view = query.get("view") if query.get("view") in ("device", "roles", "role", "people") else "devices"
+    if path == "/directory":
+        view = query.get("view") if query.get("view") in ("device", "roles", "role", "people", "domain", "machines",
+                                                          "gpo") else "devices"
         kw = {"msg": query.get("msg", ""), "err": query.get("err", "")}
+        if view in ("domain", "machines"):
+            return h.send(200, views.directory(ctx, view, domain=SAMPLE_DOMAIN, **kw))
+        if view == "gpo":
+            return h.send(200, views.directory(ctx, view, gpo={**SAMPLE_GPO, "match": query.get("match", "")}, **kw))
         if view == "people":
-            return h.send(200, views.dirsrv(ctx, view, people=state.data["people"], **kw))
+            return h.send(200, views.directory(ctx, view, people=state.data["people"], **kw))
         data = state.overview()
         if data is None:
-            return h.send(200, views.dirsrv(ctx, view, unavailable="dev preview from the image has no fabriclib; "
+            return h.send(200, views.directory(ctx, view, unavailable="dev preview from the image has no fabriclib; "
                                                                    "run it from a checkout", **kw))
         if view == "device":
             kw["device"] = next((d for d in data["devices"] if d["name"] == query.get("name")), None)
@@ -54,7 +60,9 @@ def dev_get_page(h, path, query):
         if view == "role":
             kw["role"] = next((r for r in data["roles"] if r["name"] == query.get("name")), None)
             view = view if kw["role"] else "roles"
-        return h.send(200, views.dirsrv(ctx, view, data=data, **kw))
+        return h.send(200, views.directory(ctx, view, data=data, **kw))
+    if path == "/federation":
+        return h.send(200, views.federation(ctx, SAMPLE_FEDERATION))
     if path == "/kea":
         return h.send(200, views.kea(ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
     if path == "/freeradius":

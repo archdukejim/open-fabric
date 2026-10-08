@@ -45,7 +45,7 @@ try:
             time.sleep(0.1)
     st, _, csp, page = req("GET", "/")
     check("overview renders with the DEV PREVIEW banner", st == 200 and "DEV PREVIEW" in page and "services healthy" in page, st)
-    tabs_ok = all(req("GET", f"/{t}")[0] == 200 for t in ("", "bind9", "kea", "stepca", "dirsrv", "freeradius",
+    tabs_ok = all(req("GET", f"/{t}")[0] == 200 for t in ("", "bind9", "kea", "stepca", "directory", "freeradius",
                                                           "openbao"))
     page = req("GET", "/freeradius")[3]
     check("FreeRADIUS tab: server, RADIUS clients, recent decisions, add form",
@@ -112,27 +112,43 @@ try:
     st, _, _, page = req("POST", "/bind9/tsig/create", {"csrf": "dev", "name": "preview-key", "zone": "home.arpa"})
     check("creating a TSIG key shows its secret and rfc2136.ini once",
           st == 200 and "dns_rfc2136_name = preview-key" in page and 'class="secret"' in page)
-    st, _, _, page = req("GET", "/dirsrv")
-    check("389-DS devices page: devices with status lights, roles and access",
+    st, _, _, page = req("GET", "/directory")
+    check("Directory devices page: devices with status lights, roles and access",
           st == 200 and "jims-laptop" in page and "VLAN 10" in page and 'class="light bad"' in page)
-    st, _, _, page = req("GET", "/dirsrv?view=device&name=jims-laptop")
+    st, _, _, page = req("GET", "/directory?view=device&name=jims-laptop")
     check("device page: effective permissions and linked certificate",
           "Join the network with its certificate" in page and "AB:AB:AB" in page and "Generate key + certificate" in page)
-    st, loc, _, _ = req("POST", "/dirsrv/devices/_new", {"csrf": "dev", "name": "nas", "type": "server",
+    st, loc, _, _ = req("POST", "/directory/devices/_new", {"csrf": "dev", "name": "nas", "type": "server",
                                                          "macs": "AA-BB-CC-00-00-01", "role_trusted": "1", "enabled": "1"})
-    page = req("GET", "/dirsrv?view=device&name=nas")[3]
+    page = req("GET", "/directory?view=device&name=nas")[3]
     check("adding a device (in memory, real validation): MAC normalised, role applied",
           st == 303 and "aa:bb:cc:00:00:01" in page and "VLAN" in page, (st, loc))
-    st, loc, _, _ = req("POST", "/dirsrv/devices/_new", {"csrf": "dev", "name": "dup", "macs": "aa:bb:cc:00:00:01"})
+    st, loc, _, _ = req("POST", "/directory/devices/_new", {"csrf": "dev", "name": "dup", "macs": "aa:bb:cc:00:00:01"})
     check("a MAC already in use is refused with the reason", "already+belongs" in (loc or "") or "already%20belongs" in (loc or ""), loc)
-    st, loc, _, _ = req("POST", "/dirsrv/roles/iot/delete", {"csrf": "dev"})
+    st, loc, _, _ = req("POST", "/directory/roles/iot/delete", {"csrf": "dev"})
     check("a role that still has devices cannot be deleted", "still+has" in (loc or ""), loc)
-    page = req("GET", "/dirsrv?view=roles")[3]
+    page = req("GET", "/directory?view=roles")[3]
     check("roles page lists roles with their grants", "quarantine" in page and "network:mab" in page)
-    page = req("GET", "/dirsrv?view=people")[3]
+    page = req("GET", "/directory?view=people")[3]
     check("people page (admin): people, add form, reset buttons, Keycloak link for fabric groups",
-          "jim@home.arpa" in page and "Keycloak admin console" in page and "/dirsrv/people/_new" in page
+          "jim@home.arpa" in page and "Keycloak admin console" in page and "/directory/people/_new" in page
           and "Reset sign-in" in page)
+    page = req("GET", "/directory?view=domain")[3]
+    check("domain section: the domain, its controller running, the password policy",
+          "ad.home.arpa" in page and "pi-core.ad.home.arpa" in page and "minimum length" in page, page[-600:])
+    page = req("GET", "/directory?view=machines")[3]
+    check("machines section (admin): machines with state, disable/enable and remove, the add form",
+          "host-1" in page and "/directory/machines/host-1/disable" in page and "/directory/machines/ws2404/enable" in page
+          and "/directory/machines/_new" in page)
+    page = req("GET", "/directory?view=gpo&match=example")[3]
+    check("Group Policy section (admin): what is set, a search with a set form per policy",
+          "ExampleText" in page and "/directory/gpo/set" in page and "Example setting" in page)
+    check("...the site's enforced controls listed apart, and a policy may be set as a control (D105)",
+          "fabric: lan controls" in page and "ExampleLocked" in page and 'name="control"' in page)
+    page = req("GET", "/federation")[3]
+    check("Federation tab: sites with their DC type, replication with a failing neighbour, conflicts, limits, plan",
+          "lab.home.arpa" in page and "read-only" in page and "WERR_BADFILE" in page and "CNF:" in page
+          and "192.168.20.0/24" in page and "fabric-agent-&lt;site&gt;" in page, page[-800:])
     page = req("GET", "/stepca?view=issue&device=printer")[3]
     check("Step-CA generate form offers devices, prefilled from the device page",
           "<option selected>printer</option>" in page and 'value="printer.home.arpa"' in page)
@@ -179,14 +195,14 @@ try:
             break
         except OSError:
             time.sleep(0.2)
-    page = req("GET", "/dirsrv?view=people")[3]
-    check("helpdesk: add form and reset buttons", "/dirsrv/people/_new" in page and "Reset sign-in" in page)
-    st, _, _, page = req("POST", "/dirsrv/people/_new", {"csrf": "dev", "uid": "dana", "first": "Dana", "last": "Lee",
+    page = req("GET", "/directory?view=people")[3]
+    check("helpdesk: add form and reset buttons", "/directory/people/_new" in page and "Reset sign-in" in page)
+    st, _, _, page = req("POST", "/directory/people/_new", {"csrf": "dev", "uid": "dana", "first": "Dana", "last": "Lee",
                                                          "email": "dana@home.arpa"})
     check("helpdesk: add a person -> one-time password shown once", st == 200 and "shown only now" in page and "dana" in page)
-    st, _, _, page = req("POST", "/dirsrv/people/sam/reset", {"csrf": "dev"})
+    st, _, _, page = req("POST", "/directory/people/sam/reset", {"csrf": "dev"})
     check("helpdesk: reset a plain user's sign-in", st == 200 and "sign-in reset" in page)
-    st, loc, _, _ = req("POST", "/dirsrv/people/jim/reset", {"csrf": "dev"})
+    st, loc, _, _ = req("POST", "/directory/people/jim/reset", {"csrf": "dev"})
     check("helpdesk: an admin's sign-in cannot be reset", st == 303 and "only%20an%20admin" in (loc or ""), loc)
 finally:
     proc.terminate()
@@ -204,9 +220,9 @@ try:
             time.sleep(0.2)
     page = req("GET", "/bind9")[3]
     check("--as fabric-auditor: records shown, no add form", "nas" in page and "/add" not in page and "as fabric-auditor" in page)
-    page = req("GET", "/dirsrv?view=people")[3]
+    page = req("GET", "/directory?view=people")[3]
     check("--as fabric-auditor: people listed, no add form or reset buttons",
-          "jim@home.arpa" in page and "/dirsrv/people/_new" not in page and "Reset sign-in" not in page)
+          "jim@home.arpa" in page and "/directory/people/_new" not in page and "Reset sign-in" not in page)
 finally:
     proc.terminate()
     proc.wait(timeout=5)

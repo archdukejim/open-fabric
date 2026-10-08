@@ -9,3 +9,4 @@
 | `render_template_file.py` | `fabricctl --render-jinja`: render one template with fabric's vars, for the caller |
 | `relaxed_settings.py` | The security relaxations turned on (e.g. `image_signature_check: false`), for status and the web UI (Rule 10) |
 | `show_relaxed_settings.py` | Prints them for `fabricctl status` |
+| `host_ram_gb.py` | This host's memory in GB, rounded (from /proc/meminfo) |

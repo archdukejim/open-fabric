@@ -18,8 +18,9 @@ arbitrary commands.
 | `post_network.py` | 802.1X settings, each applied at once |
 | `post_pki.py` | Manual PKI: describe or sign a CSR, issue, inspect, convert |
 | `post_vault.py` | OpenBao's unlock methods, rotating the vault key |
-| `post_directory.py` | Devices and device roles in 389-DS |
+| `post_directory.py` | Devices and device roles in the domain |
 | `read_text.py` / `read_strings.py` / `read_fields.py` | Checked fields of a request body |
 | `route_not_found.py` | `RouteNotFound`: the handler answers 404 |
 | `__init__.py` | Empty; makes `agent` a package |
 | `README.md` | This file |
+| `post_domain.py` | The domain section: the site's machines (pre-create, enable, disable, remove) and its admin settings GPO |

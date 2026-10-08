@@ -7,7 +7,8 @@ def needs_rebuild(compose_file):
     """Purpose: whether a compose file's locally built image must be rebuilt: missing, built FROM another
              base than its BASE_IMAGE build arg, (Kea) built with another pinned KEA_VERSION, from older build files
              (a BUILD_REV build arg against the org.fabric.rev label), or built for other
-             service account ids (a *_UID/*_GID build arg against the org.fabric.ids label).
+             service account ids (a *_UID/*_GID build arg against the org.fabric.ids label) or other services'
+             groups (a *_GID build arg without its *_UID against the org.fabric.groups label).
     Inputs:  compose_file — str, path to a rendered docker-compose.yml. Asks Docker via built_from.
     Returns: bool; False when no service has a build section with BASE_IMAGE, KEA_VERSION, BUILD_REV or *_UID.
     Fails:   OSError if the file cannot be read; yaml.YAMLError on invalid YAML; AttributeError if a service's
@@ -31,4 +32,9 @@ def needs_rebuild(compose_file):
             ids = f"{args[key]}:{args.get(key[:-4] + '_GID', '')}"
             if built_from(svc.get("image", ""), "org.fabric.ids") != ids:
                 return True
+        # other services' groups baked in (a *_GID with no *_UID, e.g. the DC's BIND_GID): org.fabric.groups
+        groups = sorted(k for k in args if k.endswith("_GID") and k[:-4] + "_UID" not in args)
+        wanted = ",".join(f"{k}={args[k]}" for k in groups)
+        if groups and built_from(svc.get("image", ""), "org.fabric.groups") != wanted:
+            return True
     return False

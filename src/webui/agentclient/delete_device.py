@@ -10,6 +10,6 @@ def delete_device(actor, name):
     Fails:   the call_agent exceptions: AgentError (down/timeout/other status), ValidationError (400), AuthError (401),
              PermissionDenied (403);
              ValidationError for an unknown device.
-    Feeds:   src/webui/routes/dirsrv_post (devices, delete).
+    Feeds:   src/webui/routes/directory_post (devices, delete).
     """
     return call_agent("POST", f"/v1/devices/{quote_segment(name)}/delete", {"actor": actor})

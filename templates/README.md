@@ -9,7 +9,6 @@ containers in `src/containers/`.
 |---|---|
 | `vars.yaml.j2` | Every setting with its default; rendered over the admin's `vars.yaml` |
 | [bind9/](bind9/) | Authoritative DNS: named.conf parts, zones |
-| [dirsrv/](dirsrv/) | 389 Directory Server: seed LDIF (server config, schema, tree, accounts, ACIs) |
 | [fluentbit/](fluentbit/) | Optional log forwarding |
 | [adguard/](adguard/) | Optional DNS filter: AdGuard Home in front of BIND, its configuration and oauth2-proxy's |
 | [adguard-auth/](adguard-auth/) | The DNS filter's sign-in (oauth2-proxy), a unit of its own |
@@ -20,6 +19,7 @@ containers in `src/containers/`.
 | [nginx/](nginx/) | Reverse proxy and the static pages: landing, certificates, LDAP guide, manual |
 | [openbao/](openbao/) | Secrets: compose file and server config |
 | [postgres/](postgres/) | Keycloak's database |
+| [samba/](samba/) | The Samba AD domain controller: compose file |
 | [stepca/](stepca/) | The CA: compose file, certificate templates |
 | [systemd/](systemd/) | The per-service wrapper unit, `fabric.target`, `fabric-agent.service` |
 | [webui/](webui/) | Deploying the web UI container: compose file and `webui.json` |

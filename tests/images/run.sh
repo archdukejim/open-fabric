@@ -13,7 +13,7 @@ set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 W="$OUT/images"
-IMAGES=(adguard bind9 dirsrv freeradius kea keycloak stepca webui)
+IMAGES=(adguard bind9 freeradius kea keycloak samba stepca webui)
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 rm -rf "$W"; mkdir -p "$W"
@@ -33,7 +33,7 @@ python3 tests/images/verify.py
 
 check "the build contexts stage from the assembled tree" "bash packaging/images/stage-contexts.sh \"\$CONTEXTS\" >/dev/null"
 "${BAKE[@]}" --print >"$W/plan.json" 2>/dev/null
-check "the build plan has the eight images" \
+check "the build plan has every image" \
     "python3 -c 'import json,sys; t=json.load(open(sys.argv[1]))[\"target\"]; sys.exit(sorted(t) != sys.argv[2:])' \
      \"\$W/plan.json\" ${IMAGES[*]}"
 
@@ -68,7 +68,7 @@ check "every image's build inputs match a default host's compose file: $(parity 
 check "an empty base refuses to build (nothing unpinned)" \
     "! BASE_DEBIAN= \"\${BAKE[@]}\" bind9 >\"\$W/unpinned.log\" 2>&1 && grep -q 'should not be blank' \"\$W/unpinned.log\""
 
-check "the eight images build" "\"\${BAKE[@]}\" --load >\"\$W/build.log\" 2>&1 || { tail -20 \"\$W/build.log\"; false; }"
+check "every image builds" "\"\${BAKE[@]}\" --load >\"\$W/build.log\" 2>&1 || { tail -20 \"\$W/build.log\"; false; }"
 for name in "${IMAGES[@]}"; do
     check "$name passes the smoke test" "bash packaging/images/smoke-test.sh $name $REGISTRY/$name:$TAG"
 done

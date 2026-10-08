@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block body %}
 <h1>{{ title }}</h1>
-{% if r.device %}<p class="flash ok">Linked to device <a href="/dirsrv?view=device&name={{ r.device | urlencode }}">{{ r.device }}</a>.</p>{% endif %}
+{% if r.device %}<p class="flash ok">Linked to device <a href="/directory?view=device&name={{ r.device | urlencode }}">{{ r.device }}</a>.</p>{% endif %}
 {% if r.key %}<p class="flash warn">This page is the only copy of the private key. It is not stored anywhere — download it now.</p>{% endif %}
 <section class="card"><h2>{{ r.info.subject }}</h2>
 <dl class="kv"><dt>Names</dt><dd>{{ r.info.sans | join(', ') or '—' }}</dd><dt>Key</dt><dd>{{ r.info.key }}</dd>

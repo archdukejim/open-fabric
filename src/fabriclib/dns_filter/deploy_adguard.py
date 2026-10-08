@@ -11,8 +11,10 @@ from fabriclib.dns_filter.build_adguard_config import build_adguard_config
 
 def _domains(v, links):
     """Purpose: the zones AdGuard forwards to this site's BIND and always allows: this site's domain, the
-             organisation's, the linked sites' (they are secondary zones on this BIND, M4) and the reverse zones.
-    Inputs:  v — fabric vars (domain, org_domain and what reverse_zones reads); links — dns_links' result.
+             organisation's, the linked sites' (they are secondary zones on this BIND, M4), the reverse zones and the
+             AD zone (which may sit beside fabric's domain, e.g. ad.<parent>).
+    Inputs:  v — fabric vars (domain, org_domain, ad_domain and what reverse_zones reads); links —
+             dns_links' result.
     Returns: list of zone names without duplicates, this site's domain first.
     Fails:   errors from reverse_zones on malformed records.
     Feeds:   deploy_adguard."""
@@ -21,6 +23,8 @@ def _domains(v, links):
     if (links or {}).get("upstream"):
         names.append(links["upstream"]["domain"])
     names += list(reverse_zones(v)["zones"])
+    # the Windows domain's zone (BIND serves it through DLZ): needed when it is not under fabric's domain (D87)
+    names.append(v.get("ad_domain"))
     return list(dict.fromkeys(n for n in names if n))
 
 

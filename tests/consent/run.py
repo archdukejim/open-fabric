@@ -154,6 +154,35 @@ check("one line per rule fabric adds, plus the default policy and the DOCKER-USE
       rules[0].startswith("ufw: deny incoming") and "ufw: allow 22/tcp (SSH) from 10.0.0.0/24" in rules
       and rules[-1].startswith("iptables DOCKER-USER"), rules)
 check("security.firewall false asks nothing", plan_firewall({**v, "security": {"firewall": False}}, cfg) == [])
+dc_rules = plan_firewall({**v, "ntp_serve": False, "ad_rpc_ports": "49152-49251"}, cfg)
+dc_lines = [r for r in dc_rules if "domain controller" in r]
+check("the DC's TCP ports (RPC range included) and UDP ports, from the LAN and fabric_net",
+      f"ufw: allow 88,135,389,445,464,636,3268,3269,49152:49251/tcp (the Windows domain controller) from "
+      f"{v['lan_cidr']}" in dc_lines
+      and f"ufw: allow 88,389,464/udp (the Windows domain controller) from {v['fabric_subnet']}" in dc_lines
+      and len(dc_lines) == 4, dc_lines)
+peer_cfg = tempfile.mkdtemp()
+with open(os.path.join(peer_cfg, "federation.yaml"), "w") as f:
+    yaml.safe_dump({"upstream": {"site_name": "lan", "address": "192.0.2.10"},
+                    "sites": {"edge": {"address": "198.51.100.7"}}}, f)
+peer_lines = [r for r in plan_firewall({**v, "ntp_serve": False}, peer_cfg) if "domain controller" in r]
+check("the DC's ports also from the federation's peers (its upstream and each joined site: replication, 1.8.8.5)",
+      any("from 192.0.2.10/32" in r and "/tcp" in r for r in peer_lines)
+      and any("from 198.51.100.7/32" in r and "/udp" in r for r in peer_lines) and len(peer_lines) == 8, peer_lines)
+check("the DC's ufw rule round-trips through its record form",
+      ufw_rule("ad", "tcp@10.0.0.0/24@88,445") == ["from", "10.0.0.0/24", "to", "any", "port", "88,445", "proto", "tcp"])
+check("SSH's rule carries sshd's port; a record from before names the network only and means port 22",
+      ufw_rule("ssh", "10.0.0.0/24@2222") == ["from", "10.0.0.0/24", "to", "any", "port", "2222", "proto", "tcp"]
+      and ufw_rule("ssh", "10.0.0.0/24") == ["from", "10.0.0.0/24", "to", "any", "port", "22", "proto", "tcp"])
+import fabriclib.security.ssh_ports as m_ports  # noqa: E402
+_real_run = m_ports.subprocess.run
+m_ports.subprocess.run = lambda *a, **k: type("R", (), {"stdout": "port 2222\nport 22\nlistenaddress 0.0.0.0:2222\n"})()
+two = m_ports.ssh_ports()
+m_ports.subprocess.run = lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError("sshd"))
+none = m_ports.ssh_ports()
+m_ports.subprocess.run = _real_run
+check("the ports sshd listens on are read from `sshd -T` (both of two); without sshd, 22", two == [22, 2222]
+      and none == [22], (two, none))
 final, _ = render_vars(jinja_env(JINJA), {}, {"domain": "lan.test", "hostname": "h", "host_ip": "10.0.0.5",
                                               "lan_cidr": "10.0.0.0/24", "lan_gateway": "10.0.0.1"})
 check("the settings render without secrets (a fresh install plans before anything exists)",

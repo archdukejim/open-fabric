@@ -42,9 +42,9 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
              friendly_name / cert_* —, "upstream": {"site_name",
              "domain", "host", "address"}, "joined": True if this call joined, False if an earlier run had,
              "dns_secret": the DNS link's TSIG secret from the upstream (only when this call joined; the caller
-             keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry),
-             "replication_secret": the directory link's secret (likewise, federation_replication["upstream"])}.
-             The upstream record keeps its LDAPS name and port (ldap_host, ldap_port) for replication.
+             keeps it in fabric's secrets as federation_tsig["upstream"], never in the registry), "domain": the domain
+             this site's DC joins ({} when the invitation named none; manual 1.8.8.4: the caller keeps its passwords
+             in fabric's secrets and its settings in the vars)}.
     Fails:   ValidationError from decode_invitation, make_site_ca_request, fetch_pinned_root, post_upstream ("the
              upstream refused: ..."), stage_site_ca; "this site's domain is not valid"; "the upstream answered
              with a different root"; "this node already joined <upstream>, not the invitation's ..."; OSError.
@@ -75,8 +75,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     answer = post_upstream(inv["address"], inv["host"], root, "/v1/join",
                            {"id": inv["id"], "secret": inv["secret"], "site": inv["site"], "csr": req["csr"],
                             "domain": domain, "address": address, "federation_host": f"federation.{domain}",
-                            "via": inv["via"], "dns_port": int(dns_port), "ldap_host": f"ldap.{domain}",
-                            "networks": site_networks(v)},
+                            "via": inv["via"], "dns_port": int(dns_port), "networks": site_networks(v)},
                            port=https_port)
     if not isinstance(answer, dict) or answer.get("root", "").strip() != root.strip():
         raise ValidationError("the upstream answered with a different root")
@@ -90,9 +89,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
           "joined": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
           "org": {k: org[k] for k in ORG_KEYS if org.get(k)},
           "dns_key": (answer.get("dns") or {}).get("key") or f"fed-{inv['site']}",
-          "dns_port": int((answer.get("dns") or {}).get("port") or 53),
-          "ldap_host": str((answer.get("directory") or {}).get("ldap_host") or ""),
-          "ldap_port": int((answer.get("directory") or {}).get("ldap_port") or 636)}
+          "dns_port": int((answer.get("dns") or {}).get("port") or 53)}
     if https_port != 443 and not inv["via"]:
         up["port"] = https_port                   # the upstream's endpoint is not on 443 (tests)
     if inv["via"]:                                # joined through a relay: later traffic goes the same way
@@ -106,7 +103,7 @@ def join_upstream(v, invitation, password, work_dir, domain, address, config_dir
     return {"vars": _vars(inv, up, work_dir), "upstream": {k: up.get(k) for k in ("site_name", "domain", "host",
                                                                                   "address")},
             "joined": True, "dns_secret": (answer.get("dns") or {}).get("secret"),
-            "replication_secret": (answer.get("directory") or {}).get("secret")}
+            "domain": answer.get("domain") or {}}
 
 
 def _vars(inv, up, work_dir):

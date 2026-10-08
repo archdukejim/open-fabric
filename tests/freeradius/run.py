@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""FreeRADIUS 802.1X (optional, design §6) on fabric's image and templates,
-against a real 389-DS seeded with fabric's schema and devices created by
-fabric's own directory functions:
+"""FreeRADIUS 802.1X (optional, design §6) on fabric's image and templates, against a real domain controller
+(manual 2.11.2.17, S3.2) with devices and roles created by fabric's own directory functions and people made the way
+fabric makes them:
 
   EAP-TLS (eapol_test): a certificate linked to an enabled device whose role
   grants network:eap-tls is accepted with the role's VLAN (lowest priority
@@ -10,11 +10,17 @@ fabric's own directory functions:
   once. MAB (radclient): a device's MAC with network:mab is accepted with its
   VLAN, without it refused. EAP-TTLS/PAP (people, eapol_test): members of a
   mapped group are accepted with the group's VLAN (lowest priority wins),
-  refused: a wrong password, a locked account (the directory's lockout), a
-  person in no mapped group, an unknown name, and a password sent outside
-  the tunnel. Refused before any policy: an unknown RADIUS
-  client, a wrong secret, a request without Message-Authenticator. The
-  directory down -> refused (fail closed). Container hardening.
+  refused: a wrong password, a locked account (the domain's lockout), a
+  disabled person, a person still on their one-time password, a person in no
+  mapped group, an unknown name, and a password sent outside the tunnel.
+  PEAP-MSCHAPv2 (eapol_test), checked by the DC through its winbind: a
+  person in a mapped group and a machine of this site (host/<name>, by its
+  Domain Computers mapping) accepted on their VLANs; refused: a wrong
+  password, a disabled person, a person in no mapped group, a machine
+  outside the site's OU=machines.
+  Refused before any policy: an unknown RADIUS client, a wrong secret, a
+  request without Message-Authenticator. The DC down -> refused (fail
+  closed), and back -> reconnected. Container hardening.
 
     sudo python3 tests/freeradius/run.py      (needs Docker, openssl, root)
 """
@@ -28,32 +34,28 @@ import time
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests")
 W = OUT + "/freeradius"
-NET, SUBNET, GW = "radtest_net", "10.254.24.0/24", "10.254.24.1"
-DS_IP, RADIUS_IP, SWITCH_IP, STRANGER_IP = "10.254.24.50", "10.254.24.98", "10.254.24.10", "10.254.24.11"
-DOMAIN, BASE = "lan.j-j.family", "dc=lan,dc=j-j,dc=family"       # tests/render.py's install
-LOCAL = f"ou=pi-core,{BASE}"                                       # its site part (a sub-suffix)
+NET, SUBNET = "radtest_net", "10.254.24.0/24"
+DC_IP, RADIUS_IP, SWITCH_IP, STRANGER_IP = "10.254.24.50", "10.254.24.98", "10.254.24.10", "10.254.24.11"
+DOMAIN = "lan.j-j.family"                                          # tests/render.py's install
+DC = "samba"                    # the product's own name: fabric's directory functions use it
 SECRET = "Sw1tchSecretForTests0123456789ab"
 FAILED = 0
-sys.path[0:0] = [os.path.join(REPO, "src"), REPO]
+sys.path[0:0] = [os.path.join(REPO, "src"), REPO, os.path.join(REPO, "tests", "samba")]
+from start_dc import start_dc  # noqa: E402
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.pki.install_cert import install_cert  # noqa: E402
 from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
-from fabriclib.ldap.ensure_default_device_roles import ensure_default_device_roles  # noqa: E402
-from fabriclib.ldap.list_roles import list_roles  # noqa: E402
-import fabriclib.ldap.add_device as add_device_mod  # noqa: E402
-import fabriclib.ldap.add_role as add_role_mod  # noqa: E402
-import fabriclib.ldap.common.run_dirsrv as run_dirsrv_mod  # noqa: E402
-import fabriclib.ldap.link_device_cert as link_mod  # noqa: E402
-import fabriclib.ldap.update_device as update_device_mod  # noqa: E402
-
-# fabric's directory functions, pointed at the test directory; no audit log on this machine
-run_dirsrv_mod.load_secrets = lambda: {"ldap_device_admin_password": "Da1"}
-for m in (add_device_mod, add_role_mod, link_mod, update_device_mod):
-    m.write_audit = lambda *a, **k: None
-V = {"ldap_base_dn": BASE, "ldap_local_dn": LOCAL, "dirsrv_container": "rt-ds"}
+from fabriclib.directory.ensure_default_device_roles import ensure_default_device_roles  # noqa: E402
+from fabriclib.directory.list_roles import list_roles  # noqa: E402
+from fabriclib.directory.run_op import run_op  # noqa: E402
+from fabriclib.secrets.random_password import random_password  # noqa: E402
+import fabriclib.directory.add_device as add_device_mod  # noqa: E402
+import fabriclib.directory.add_role as add_role_mod  # noqa: E402
+import fabriclib.directory.common.read_directory as read_mod  # noqa: E402
+import fabriclib.directory.link_device_cert as link_mod  # noqa: E402
 
 
 def check(name, cond, detail=""):
@@ -79,7 +81,7 @@ def until(pred, timeout=90):
 
 
 def cleanup():
-    sh("docker rm -f rt-ds rt-radius rt-switch rt-stranger >/dev/null 2>&1", ok=False)
+    sh(f"docker rm -f {DC} rt-radius rt-switch rt-stranger >/dev/null 2>&1", ok=False)
     sh(f"docker network rm {NET} >/dev/null 2>&1", ok=False)
 
 
@@ -99,6 +101,12 @@ def leaf(name, ca, eku="clientAuth", cn=None):
     return fp.strip().split("=", 1)[1].upper()
 
 
+def dc_healthy():
+    return sh(["docker", "inspect", "-f", "{{.State.Health.Status}}", DC], ok=False).stdout.strip() == "healthy"
+
+
+if sh(["docker", "inspect", "-f", "{{.Config.Image}}", DC], ok=False).stdout.strip() not in ("", "fabric/samba:test"):
+    sys.exit(f"a container named {DC} that is not a test DC runs here: not touching it")
 cleanup()
 shutil.rmtree(W, ignore_errors=True)
 os.makedirs(f"{W}/pki")
@@ -112,8 +120,6 @@ if build.returncode:
     sys.exit(1)
 version = sh("docker run --rm --entrypoint /usr/sbin/freeradius fabric/freeradius:test -v", ok=False).stdout
 check("FreeRADIUS 3.2 inside", "FreeRADIUS Version 3.2." in version, version[:120])
-sh(["docker", "build", "-q", "-t", "fabric/dirsrv:test", "--build-arg", f"BASE_IMAGE={DEBIAN}",
-    "--build-arg", "DS_UID=911", "--build-arg", "DS_GID=911", f"{REPO}/packaging/images/dirsrv"])
 os.makedirs(f"{W}/client-build")
 with open(f"{W}/client-build/Dockerfile", "w") as f:        # the test's switch: eapol_test + radclient
     f.write("FROM fabric/freeradius:test\nUSER root\nRUN apt-get update && apt-get install -y "
@@ -121,10 +127,17 @@ with open(f"{W}/client-build/Dockerfile", "w") as f:        # the test's switch:
             'ENTRYPOINT ["sleep", "infinity"]\n')
 sh(["docker", "build", "-q", "-t", "fabric/radius-client:test", f"{W}/client-build"])
 
-# ------------------------------------------------------------------ PKI (a stand-in for fabric's Step-CA)
-openssl("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "root.key", "-out", "root.crt", "-days", "2",
-        "-subj", "/CN=Test Root", "-addext", "basicConstraints=critical,CA:TRUE",
-        "-addext", "keyUsage=critical,keyCertSign,cRLSign")
+# ------------------------------------------------------------------ the DC, and a PKI under its root (as Step-CA's)
+dc = start_dc(f"{W}/dc", DC, NET, SUBNET, DC_IP, domain=DOMAIN)
+V, SECRETS = dc["v"], dc["secrets"]
+check("the site's DC is up and converged (its fabric-radius-lan account included)", dc_healthy())
+for mod in (add_device_mod, add_role_mod, read_mod, link_mod):   # fabric's secrets and audit log, stood in for
+    if hasattr(mod, "load_secrets"):
+        mod.load_secrets = lambda: SECRETS
+    if hasattr(mod, "write_audit"):
+        mod.write_audit = lambda *a, **k: None
+shutil.copy(dc["root_ca"], f"{W}/pki/root.crt")
+shutil.copy(dc["root_key"], f"{W}/pki/root.key")
 openssl("req", "-newkey", "rsa:2048", "-nodes", "-keyout", "int.key", "-out", "int.csr", "-subj", "/CN=Test Int")
 with open(f"{W}/pki/int.ext", "w") as f:
     f.write("basicConstraints=critical,CA:TRUE,pathlen:0\nkeyUsage=critical,keyCertSign,cRLSign\n")
@@ -132,73 +145,22 @@ openssl("x509", "-req", "-in", "int.csr", "-CA", "root.crt", "-CAkey", "root.key
         "-out", "int.crt", "-days", "2", "-extfile", "int.ext")
 openssl("req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", "foreign.key", "-out", "foreign.crt",
         "-days", "2", "-subj", "/CN=Foreign Root", "-addext", "basicConstraints=critical,CA:TRUE")
-leaf("ldap", "int", "serverAuth,clientAuth", f"ldap.{DOMAIN}")
 leaf("radius", "int", "serverAuth", f"radius.{DOMAIN}")
 FP = {d: leaf(d, "int") for d in ("laptop1", "laptop2", "laptop3", "printer1", "cam1")}
 FP["impostor"] = leaf("impostor", "foreign")
-for name in ("ldap", "radius"):          # chains as Step-CA hands them out
-    with open(f"{W}/pki/{name}.chain", "w") as f:
-        f.write(open(f"{W}/pki/{name}.crt").read() + open(f"{W}/pki/int.crt").read())
-
-# ------------------------------------------------------------------ 389-DS with fabric's seed
-sh([sys.executable, f"{REPO}/tests/render.py", f"{W}/rendered"])
-os.makedirs(f"{W}/ds/data/tls/ca")
-os.makedirs(f"{W}/ds/seed")
-shutil.copy(f"{W}/pki/ldap.crt", f"{W}/ds/data/tls/server.crt")
-shutil.copy(f"{W}/pki/ldap.key", f"{W}/ds/data/tls/server.key")
-for n in ("root.crt", "int.crt"):
-    shutil.copy(f"{W}/pki/{n}", f"{W}/ds/data/tls/ca/{n}")
-for n in os.listdir(f"{W}/rendered/dirsrv/seed"):
-    shutil.copy(f"{W}/rendered/dirsrv/seed/{n}", f"{W}/ds/seed/{n}")
-shutil.copy(f"{REPO}/src/containers/dirsrv/seed.py", f"{W}/ds/seed/seed.py")
-sh(f"chown -R 911:911 {W}/ds/data && chown -R 0:911 {W}/ds/seed && chmod 750 {W}/ds/seed && chmod 640 {W}/ds/seed/*")
-sh(f"docker network create --subnet {SUBNET} --gateway {GW} {NET}")
-
-
-def start_ds():
-    sh(["docker", "run", "-d", "--name", "rt-ds", "--network", NET, "--ip", DS_IP, "--network-alias", f"ldap.{DOMAIN}",
-        "--hostname", f"ldap.{DOMAIN}", "--user", "911:911", "--cap-drop", "ALL",
-        "--security-opt", "no-new-privileges:true", "-e", f"DS_SUFFIX_NAME={BASE}", "-e", f"DS_LOCAL_SUFFIX={LOCAL}", "-e", "DS_DM_PASSWORD=DmPass1",
-        "-v", f"{W}/ds/data:/data", "-v", f"{W}/ds/seed:/seed:ro",
-        "--health-cmd", "/usr/libexec/dirsrv/dscontainer -H", "--health-interval", "5s",
-        "--health-start-period", "120s", "fabric/dirsrv:test"])
-    return until(lambda: sh("docker inspect -f {{.State.Health.Status}} rt-ds", ok=False).stdout.strip() == "healthy",
-                 240)
-
-
-def seed():
-    for _ in range(12):
-        if sh("docker exec rt-ds sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF \"$DS_SUFFIX_NAME (\" "
-              "|| dsconf localhost backend create --suffix \"$DS_SUFFIX_NAME\" --be-name userroot'", ok=False).returncode == 0 \
-                and sh("docker exec rt-ds sh -c 'dsconf localhost backend suffix list 2>/dev/null | grep -qiF \"$DS_LOCAL_SUFFIX (\" "
-                       "|| dsconf localhost backend create --suffix \"$DS_LOCAL_SUFFIX\" --be-name sitelocal --parent-suffix \"$DS_SUFFIX_NAME\"'",
-                       ok=False).returncode == 0:
-            break
-        time.sleep(5)
-    return sh("docker exec rt-ds sh -c 'python3 /seed/seed.py /seed/*.ldif'", ok=False).stdout
-
-
-check("389-DS starts with fabric's seed (radius_reader account included)", start_ds())
-if "RESTART_REQUIRED" in seed():
-    sh("docker restart rt-ds")
-    until(lambda: sh("docker inspect -f {{.State.Health.Status}} rt-ds", ok=False).stdout.strip() == "healthy", 240)
-    seed()
+with open(f"{W}/pki/radius.chain", "w") as f:          # the chain as Step-CA hands it out
+    f.write(open(f"{W}/pki/radius.crt").read() + open(f"{W}/pki/int.crt").read())
 
 # setup's default device roles: created once; a deleted one is not brought back
 marker = f"{W}/default-device-roles"
-added = ensure_default_device_roles(V, marker, container="rt-ds")
+added = ensure_default_device_roles(V, SECRETS, marker, DC)
 roles = {r["name"]: r for r in list_roles(V)}
 check("default device roles created (six, no VLANs), MAB ones only network:mab",
       sorted(added) == ["iot", "network-gear", "phones-tablets", "printers", "servers", "workstations"]
       and all(not r["vlan"] for r in roles.values()) and roles["printers"]["permissions"] == ["network:mab"]
       and "network:eap-tls" in roles["workstations"]["permissions"], (added, roles))
-sh(["docker", "exec", "-i", "rt-ds", "python3", "-"], input=f"""
-import ldap
-c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
-c.simple_bind_s("cn=super_admin,ou=admins,{LOCAL}", "Sa1")
-c.delete_s("cn=iot,ou=device-roles,{BASE}")
-""")
-again = ensure_default_device_roles(V, marker, container="rt-ds")
+run_op(V, SECRETS, "remove_role", {"name": "iot"}, DC)
+again = ensure_default_device_roles(V, SECRETS, marker, DC)
 check("...a default role the admin deleted is not brought back on the next setup",
       again == [] and "iot" not in {r["name"] for r in list_roles(V)}, again)
 
@@ -216,36 +178,48 @@ add_device_mod.add_device(V, "test", "cam1", {"type": "camera", "roles": ["dns-o
 for d in ("laptop1", "laptop2", "laptop3", "cam1"):          # printer1's certificate stays unlinked
     link_mod.link_device_cert(V, "test", d, FP[d])
 
-# people and groups (as Keycloak writes them to 389-DS), made as the directory's super admin
+# people made the way fabric makes them (one-time password, <site>-users), then given a password of their own as
+# Keycloak's first sign-in would; groups as an admin makes them with AD's tools (not `guests`: AD has its own). newbie keeps the one-time password.
 PW = "Correct-Horse-9"
-PEOPLE = {"alice": ["staff"], "gina": ["staff", "guests"], "sam": ["contractors"], "nora": ["sales"],
-          "lockme": ["staff"]}
+ONE_TIME = "Ot-" + random_password(20)
+MACHINE_PW = "Mc-" + random_password(30)
+PEOPLE = {"alice": ["staff"], "gina": ["staff", "visitors"], "sam": ["contractors"], "nora": ["sales"],
+          "lockme": ["staff"], "dora": ["staff"], "newbie": ["staff"]}
+for uid in PEOPLE:
+    run_op(V, SECRETS, "create_person", {"uid": uid, "first": uid.title(), "last": "Test", "email": f"{uid}@{DOMAIN}",
+                                         "password": ONE_TIME, "gid": 5000, "home_base": "/home",
+                                         "shell": "/bin/bash"}, DC)
 seed_people = f"""
-import ldap, ldap.modlist
-c = ldap.initialize("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket")
-c.simple_bind_s("cn=super_admin,ou=admins,{LOCAL}", "Sa1")
+import sys
+sys.path.insert(0, "/fabric")
+from samba.dsdb import GTYPE_SECURITY_GLOBAL_GROUP
+from open_samdb import open_samdb
+samdb, lp = open_samdb("/data/etc/smb.conf")
 people = {PEOPLE!r}
 for uid in people:
-    c.add_s("uid=%s,ou=users,ou=accounts,{BASE}" % uid, ldap.modlist.addModlist({{
-        "objectClass": [b"top", b"person", b"organizationalPerson", b"inetOrgPerson"],
-        "uid": [uid.encode()], "cn": [uid.encode()], "sn": [uid.encode()], "userPassword": [b"{PW}"]}}))
+    if uid != "newbie":
+        samdb.setpassword("(sAMAccountName=%s)" % uid, {PW!r}, force_change_at_next_login=False)
+samdb.disable_account("(sAMAccountName=dora)")
+for machine, ou in (("ws1", "OU=machines,OU=lan,OU=sites"), ("ws9", "CN=Computers")):   # ws9: not this site's
+    samdb.newcomputer(machine, computerou=ou)
+    samdb.setpassword("(sAMAccountName=%s$)" % machine, {MACHINE_PW!r}, force_change_at_next_login=False)
 for group in sorted({{g for gs in people.values() for g in gs}}):
-    members = [("uid=%s,ou=users,ou=accounts,{BASE}" % u).encode() for u, gs in people.items() if group in gs]
-    c.add_s("cn=%s,ou=groups,{BASE}" % group, ldap.modlist.addModlist({{
-        "objectClass": [b"top", b"groupOfNames"], "cn": [group.encode()], "member": members}}))
+    samdb.newgroup(group, groupou="OU=groups,OU=lan,OU=sites", grouptype=GTYPE_SECURITY_GLOBAL_GROUP)
+    samdb.add_remove_group_members(group, [u for u, gs in people.items() if group in gs], add_members_operation=True)
 print("seeded")
 """
-check("people and groups in the directory", "seeded" in sh(["docker", "exec", "-i", "rt-ds", "python3", "-"],
-                                                           input=seed_people, ok=False).stdout)
+seeded = sh(["docker", "exec", "-i", DC, "python3", "-"], input=seed_people, ok=False)
+check("people and groups in the domain", "seeded" in seeded.stdout, seeded.stderr[-600:])
 
 # ------------------------------------------------------------------ FreeRADIUS from fabric's templates
 clients, embedded = normalize_radius_clients([{"name": "switch1", "address": SWITCH_IP, "secret": SECRET}])
 people_map = normalize_radius_people([{"group": "staff", "vlan": 20, "priority": 50},
-                                      {"group": "guests", "vlan": 50, "priority": 60},
-                                      {"group": "contractors", "priority": 70}])
-rv = {"deploy_base_dir": W, "ldap_base_dn": BASE, "ldap_local_dn": LOCAL, "hostname_ldap": f"ldap.{DOMAIN}", "radius_clients": clients,
-      "radius_people": people_map, "service_users": {"freeradius": {"uid": 610, "gid": 610}}}
-deploy_freeradius(rv, {"radius_secrets": embedded, "ldap_radius_password": "Rr1"},
+                                      {"group": "visitors", "vlan": 50, "priority": 60},
+                                      {"group": "contractors", "priority": 70},
+                                      {"group": "Domain Computers", "vlan": 40, "priority": 80}])
+rv = {**V, "deploy_base_dir": W, "radius_clients": clients, "radius_people": people_map,
+      "service_users": {"freeradius": {"uid": 610, "gid": 610}}}
+deploy_freeradius(rv, {"radius_secrets": embedded, "ad_radius_password": SECRETS["ad_radius_password"]},
                   jinja_env(os.path.join(REPO, "templates")))
 install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt", f"{W}/freeradius/certs", 610, 610,
              names=("server.pem", "server.key", None))
@@ -254,6 +228,8 @@ with open(f"{W}/freeradius/certs/ca.pem", "w") as f:       # as setup's certific
 check("config: clients.conf holds the client secret, mode 0640 (never world-readable)",
       oct(os.stat(f"{W}/freeradius/config/clients.conf").st_mode & 0o777) == "0o640"
       and SECRET in open(f"{W}/freeradius/config/clients.conf").read())
+check("config: the directory account's password file, mode 0640",
+      oct(os.stat(f"{W}/freeradius/config/ad-password").st_mode & 0o777) == "0o640")
 
 
 def start_radius():
@@ -262,7 +238,11 @@ def start_radius():
         "--tmpfs", "/tmp:noexec,nosuid,size=8m", "--tmpfs", "/run/freeradius:uid=610,gid=610,mode=0700,size=8m",
         "-v", f"{W}/freeradius/config:/etc/freeradius/fabric:ro",
         "-v", f"{W}/freeradius/certs:/etc/freeradius/certs:ro",
-        "-v", f"{W}/freeradius/python:/etc/freeradius/python:ro", "fabric/freeradius:test"])
+        "-v", f"{W}/freeradius/python:/etc/freeradius/python:ro",
+        # as the compose file mounts them: the DC's winbind for PEAP
+        "-v", f"{W}/dc/samba/winbindd:/run/samba/winbindd:ro",
+        "-v", f"{W}/dc/samba/data/state/winbindd_privileged:/data/state/winbindd_privileged:ro",
+        "-v", f"{W}/dc/samba/data/etc:/etc/samba:ro", "fabric/freeradius:test"])
     return until(lambda: "Ready to process requests" in logs(), 60)
 
 
@@ -390,16 +370,54 @@ check("EAP-TTLS: a wrong password is refused", not ok and "person=alice reason=w
 ok, _, out = eap_ttls("nora", PW)
 check("EAP-TTLS: a person in no mapped group is refused",
       not ok and "person=nora reason=in_no_group_mapped_for_802.1X" in logs(), logs()[-400:])
+ok, _, out = eap_ttls("dora", PW)
+check("EAP-TTLS: a person disabled in the domain is refused",
+      not ok and "person=dora reason=wrong_password_or_account_locked" in logs(), logs()[-400:])
+ok, _, out = eap_ttls("newbie", ONE_TIME)
+check("EAP-TTLS: a person still on their one-time password is refused (they change it at the web sign-in first)",
+      not ok and "person=newbie reason=wrong_password_or_account_locked" in logs(), logs()[-400:])
 ok, _, out = eap_ttls("nobody", PW)
 check("EAP-TTLS: an unknown name is refused", not ok and "person=nobody reason=no_such_person" in logs(),
       logs()[-400:])
 for _ in range(5):
     eap_ttls("lockme", "wrong-password")
 ok, _, out = eap_ttls("lockme", PW)
-check("EAP-TTLS: after 5 wrong passwords the directory locks the account: the right one is refused too", not ok,
+check("EAP-TTLS: after 5 wrong passwords the domain locks the account: the right one is refused too", not ok,
       logs()[-400:])
 code, _, out = mab("02:00:00:00:30:01", user="alice")
 check("a person's password sent outside the TLS tunnel (plain PAP) is refused", code == "Access-Reject", out[-300:])
+
+# ------------------------------------------------------------------ PEAP-MSCHAPv2 (people and machines)
+def eap_peap(user, password, mac="02:00:00:00:20:02"):
+    """(accepted, VLAN or None, output) for one PEAP-MSCHAPv2 login."""
+    conf = (f'network={{\n key_mgmt=IEEE8021X\n eap=PEAP\n identity="{user}"\n anonymous_identity="anonymous"\n'
+            f' password="{password}"\n phase1="peaplabel=0"\n phase2="auth=MSCHAPV2"\n ca_cert="/pki/root.crt"\n'
+            f' domain_suffix_match="radius.{DOMAIN}"\n eapol_flags=0\n}}\n')
+    res = sh(["docker", "exec", "-i", "rt-switch", "sh", "-c",
+              f"cat > /tmp/peap.conf && eapol_test -c /tmp/peap.conf -a {RADIUS_IP} -s '{SECRET}' -M {mac} -t 10 -r 0"],
+             ok=False, input=conf)
+    text = res.stdout + res.stderr
+    vlan = re.search(r"Attribute 81 \(Tunnel-Private-Group-Id\).*?\n\s*Value: ([0-9a-fA-F]+)", text)
+    return res.returncode == 0 and "SUCCESS" in text, bytes.fromhex(vlan.group(1)).decode() if vlan else None, text
+
+
+ok, vlan, out = eap_peap("alice", PW)
+check("PEAP: a person in a mapped group, checked by the DC's winbind -> accepted on the group's VLAN (20)",
+      ok and vlan == "20" and "ACCEPT method=peap group=staff vlan=20" in logs() and "person=alice" in logs(),
+      out[-800:] + logs()[-800:])
+ok, vlan, out = eap_peap(f"host/ws1.{V['ad_domain']}", MACHINE_PW)
+check("PEAP: a machine of this site (host/ws1 as ws1$) by its Domain Computers mapping -> accepted on VLAN 40",
+      ok and vlan == "40" and "machine=ws1$" in logs().rsplit("method=peap", 1)[-1], out[-800:] + logs()[-800:])
+ok, _, out = eap_peap(f"host/ws9.{V['ad_domain']}", MACHINE_PW)
+check("PEAP: a machine outside this site's OU=machines is refused",
+      not ok and "reason=not_a_machine_of_this_site" in logs(), logs()[-400:])
+ok, _, out = eap_peap("alice", "wrong-password")
+check("PEAP: a wrong password is refused by the domain", not ok, logs()[-400:])
+ok, _, out = eap_peap("nora", PW)
+check("PEAP: a person in no mapped group is refused",
+      not ok and "reason=in_no_group_mapped_for_802.1X" in logs().rsplit("method=peap", 1)[-1], logs()[-400:])
+ok, _, out = eap_peap("dora", PW)
+check("PEAP: a person disabled in the domain is refused", not ok, logs()[-400:])
 
 # ------------------------------------------------------------------ MAB
 code, vlan, out = mab("02-00-00-00-30-01")
@@ -422,14 +440,14 @@ check("a request without Message-Authenticator is dropped (BlastRADIUS)",
       code is None and "Message-Authenticator" in logs(), out[-300:] + logs()[-400:])
 
 # ------------------------------------------------------------------ fail closed
-sh("docker stop rt-ds")
+sh(f"docker stop {DC}")
 code, _, out = mab("02:00:00:00:30:01", timeout=12)
-check("389-DS down: refused, not let in (fail closed)",
+check("the DC down: refused, not let in (fail closed)",
       code == "Access-Reject" and "reason=directory_error" in logs(), out[-300:] + logs()[-400:])
-sh("docker start rt-ds")
-until(lambda: sh("docker inspect -f {{.State.Health.Status}} rt-ds", ok=False).stdout.strip() == "healthy", 240)
+sh(f"docker start {DC}")
+until(dc_healthy, 300)
 code, _, out = mab("02:00:00:00:30:01")
-check("389-DS back: FreeRADIUS reconnects by itself", code == "Access-Accept", out[-300:] + logs()[-400:])
+check("the DC back: FreeRADIUS reconnects by itself", code == "Access-Accept", out[-300:] + logs()[-400:])
 
 # ------------------------------------------------------------------ hardening
 import json  # noqa: E402
@@ -438,7 +456,8 @@ check("container: uid 610, no capabilities, read-only, no-new-privileges",
       h["Config"]["User"] == "610:610" and h["HostConfig"]["CapDrop"] == ["ALL"] and not h["HostConfig"].get("CapAdd")
       and h["HostConfig"]["ReadonlyRootfs"] and "no-new-privileges:true" in h["HostConfig"]["SecurityOpt"])
 check("no RADIUS secret and no person's password in the logs",
-      SECRET not in logs() and PW not in logs() and "wrong-password" not in logs())
+      SECRET not in logs() and PW not in logs() and ONE_TIME not in logs() and "wrong-password" not in logs()
+      and SECRETS["ad_radius_password"] not in logs() and MACHINE_PW not in logs())
 
 cleanup()
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")

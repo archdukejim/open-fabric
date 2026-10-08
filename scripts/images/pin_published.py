@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Pin fabric's published images in config/images.lock.yaml (manual 4.7.1.4, decision D40): for each of the eight
+"""Pin fabric's published images in config/images.lock.yaml (manual 4.7.1.4, decision D40): for each of the
 images, the multi-arch digest a publish produced under <tag>, after checking it has both architectures and a valid
 signature by fabric's images workflow (the same check hosts make, D81). Needs Docker and network access.
 
-    python3 scripts/images/pin_published.py <tag>        e.g. 1.5.0-rc.12
+    python3 scripts/images/pin_published.py <tag>        e.g. 0.6.0-rc.1
 
 Commit the changed lock (a reviewed commit): that is what hosts will run.
 """
@@ -44,7 +44,7 @@ def _index(ref):
 def pin_published(tag):
     """Purpose: write the tag and verified digest of every published fabric image into the lock's published section.
     Inputs:  tag — str, the tag a publish produced (the images workflow's summary names it).
-    Returns: dict {name: digest} as written.
+    Returns: dict {name: digest} as written; a pinned image loses its `pending` mark.
     Fails:   ValidationError if an image lacks a platform, its tag cannot be inspected or its signature does not
              verify (nothing is written then); OSError writing the lock.
     Feeds:   this script (the release procedure, 4.7.1.4)."""
@@ -66,6 +66,8 @@ def pin_published(tag):
         text, n = line.subn(rf'\g<1>tag: "{tag}", digest: "{digest}"', text)
         if n != 1:
             raise ValidationError(f"{name}: its line in the lock's published section was not found")
+        # a pending image (not published before) is pending no longer
+        text = re.sub(rf'^(    {name}: +\{{.*?), pending: "[^"]*"', r"\g<1>", text, flags=re.M)
     with open(LOCK, "w") as f:
         f.write(text)
     return pinned

@@ -10,7 +10,7 @@ Technologies, hardware, vendors and integrations.
 - [2.1.4 PKI and certificates](2.1.4-pki.md)
 - [2.1.5 Docker infrastructure](2.1.5-docker.md)
 - [2.1.6 Security contexts and features](2.1.6-security.md)
-- [2.1.7 389 Directory Server](2.1.7-directory.md)
+- [2.1.7 The organisation and its directory](2.1.7-directory.md)
 - [2.1.8 Landing page links](2.1.8-landing-links.md)
 - [2.1.9 Optional parts](2.1.9-optional-parts.md)
 - [2.1.10 Web UI](2.1.10-webui.md)
@@ -53,10 +53,12 @@ Technologies, hardware, vendors and integrations.
 ## 2.10 Joining Linux machines
 
 - [2.10.1 Joining Linux machines to the domain](2.10.1-domain-join.md)
+- [2.10.2 Joining Linux machines to AD (design)](2.10.2-linux-join-ad.md)
 
 ## 2.11 Windows domain: Samba AD
 
-- [2.11.1 Samba AD beside fabric's directory](2.11.1-samba-ad.md)
+- [2.11.1 [DEPRECATED] Samba AD beside fabric's directory](2.11.1-samba-ad.md)
+- [2.11.2 Samba AD: the domain controller (design)](2.11.2-samba-dc.md)
 
 ## 2.12 Third-party licences
 

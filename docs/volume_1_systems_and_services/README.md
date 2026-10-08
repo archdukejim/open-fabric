@@ -31,6 +31,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 - [1.3.6 PKI chain and certificate relay](1.3.6-pki-chain.md)
 - [1.3.7 Templates](1.3.7-templates.md)
 - [1.3.8 Targets and hardening](1.3.8-targets-and-hardening.md)
+- [1.3.9 Privileges inventory (D49)](1.3.9-container-inventory.md)
 
 ## 1.4 fabricctl and fabric-agent
 
@@ -47,8 +48,9 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 
 ## 1.6 Identity: directory and sign-in
 
-- [1.6.1 389 Directory Server](1.6.1-directory.md)
+- [1.6.1 *[DELETED]* 389 Directory Server](1.6.1-directory.md)
 - [1.6.2 Keycloak](1.6.2-keycloak.md)
+- [1.6.3 The directory on Samba AD (design)](1.6.3-samba-directory.md)
 
 ## 1.7 Secrets: OpenBao
 
@@ -63,6 +65,7 @@ Every decision that shapes fabric, with an identifier never reused (Rule 13). Re
 - [1.8.5 Attachment: flat, relay, nested](1.8.5-attachment.md)
 - [1.8.6 What changes in fabric](1.8.6-changes.md)
 - [1.8.7 Phases and milestones](1.8.7-milestones.md)
+- [1.8.8 Federation on Samba AD (design)](1.8.8-federation-on-ad.md)
 
 ## 1.9 Security defaults
 
@@ -80,7 +83,7 @@ The home chapter for security (5.8).
 
 - [1.11.1 About the function reference](1.11.1-about-the-reference.md)
 - [1.11.2 fabricctl-agent](1.11.2-fabricctl-agent.md) — fabric-agent: the permission-checked host API behind the web UI
-- [1.11.3 fabricctl-jinja](1.11.3-fabricctl-jinja.md) — Code that runs inside service containers (389-DS seeding, FreeRADIUS policy)
+- [1.11.3 fabricctl-jinja](1.11.3-fabricctl-jinja.md) — Code that runs inside service containers (the DC's converge code and operations, FreeRADIUS)
 - [1.11.4 fabricctl-lib](1.11.4-fabricctl-lib.md) — Entry points: the deploy engine, the vars editor, the Keycloak configuration
 - [1.11.5 fabriclib-common](1.11.5-fabriclib-common.md) — Shared helpers: paths, vars file, locking, audit, rendering, console output
 - [1.11.6 fabriclib-consent](1.11.6-fabriclib-consent.md)
@@ -92,7 +95,7 @@ The home chapter for security (5.8).
 - [1.11.12 fabriclib-federation](1.11.12-fabriclib-federation.md)
 - [1.11.13 fabriclib-images](1.11.13-fabriclib-images.md) — Container images: status, update with rollback, prune
 - [1.11.14 fabriclib-keycloak](1.11.14-fabriclib-keycloak.md) — Keycloak: people, roles, sign-in resets, token verification
-- [1.11.15 fabriclib-ldap](1.11.15-fabriclib-ldap.md) — 389-DS: devices, device roles, people, the admin user
+- [1.11.15 [DELETED] fabriclib-ldap](1.11.15-fabriclib-ldap.md)
 - [1.11.16 fabriclib-logs](1.11.16-fabriclib-logs.md) — Optional log forwarding (Fluent Bit)
 - [1.11.17 fabriclib-menu](1.11.17-fabriclib-menu.md) — The vars editor (fabricctl --interactive), --print and --apply
 - [1.11.18 fabriclib-ntp](1.11.18-fabriclib-ntp.md) — Time: chrony on the host, its settings and checks
@@ -107,4 +110,6 @@ The home chapter for security (5.8).
 - [1.11.27 fabriclib-vault](1.11.27-fabriclib-vault.md) — OpenBao: unlock methods (key slots), status, rotation, OIDC, break glass
 - [1.11.28 installers](1.11.28-installers.md) — The Debian package wrapper
 - [1.11.29 webui](1.11.29-webui.md) — Open Fabric web UI: server, pages, fabric-agent client, OIDC, CA-pinned TLS, dev preview
+- [1.11.30 fabriclib-samba](1.11.30-fabriclib-samba.md)
+- [1.11.31 fabriclib-directory](1.11.31-fabriclib-directory.md)
 <!-- end of generated 1.11 -->

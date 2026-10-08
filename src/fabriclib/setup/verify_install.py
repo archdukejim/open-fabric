@@ -31,37 +31,19 @@ def _curl(url, host, ip, port, root_ca, client_cert=False):
     return res.returncode, res.stdout
 
 
-def _ldap_bind(uri, dn, password):
-    """Purpose: try an LDAP simple bind from inside the dirsrv container.
-    Inputs:  uri — LDAP URI as seen in the container; dn — bind DN; password — passed via environment, never argv.
-    Returns: "BOUND" on success, otherwise the python-ldap exception name (e.g. "INVALID_CREDENTIALS",
-             "CONFIDENTIALITY_REQUIRED"), or "" if docker exec failed.
-    Fails:   never raises for bind errors; FileNotFoundError without docker.
-    Feeds:   checks."""
-    env = {**os.environ, "CHECK_URI": uri, "CHECK_DN": dn, "CHECK_PW": password}
-    code = ("import ldap, os; c = ldap.initialize(os.environ['CHECK_URI']);\n"
-            "try:\n c.simple_bind_s(os.environ['CHECK_DN'], os.environ['CHECK_PW']); print('BOUND')\n"
-            "except ldap.LDAPError as e: print(type(e).__name__)")
-    res = subprocess.run(["docker", "exec", "-e", "CHECK_URI", "-e", "CHECK_DN", "-e", "CHECK_PW", "dirsrv",
-                          "python3", "-c", code], capture_output=True, text=True, env=env)
-    return res.stdout.strip()
-
-
 def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
-             trust (unless the `trust` host change was declined), LDAPS, LDAP role binds and plaintext refusal, web UI
-             gates, fabric-agent socket, first admin
+             trust (unless the `trust` host change was declined), web UI gates, fabric-agent socket, first admin
              (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter
              (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off
              — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site),
              and every installed service.
-    Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, ip_ldap, ldap_base_dn, bind_dns_port,
-             install_ldap/webui/keycloak, federation_endpoint, install_adguard, webui_admin_user/role), secrets (LDAP
-             passwords, Keycloak), Step-CA
-             root, the agent socket, ~/fabric-admin of the sudo user.
+    Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, bind_dns_port, install_webui/keycloak,
+             federation_endpoint, install_adguard, webui_admin_user/role), secrets (Keycloak), Step-CA root, the
+             agent socket, ~/fabric-admin of the sudo user.
     Returns: list of (name, passed: bool, detail: str).
     Fails:   ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading
-             root_ca.crt; subprocess.TimeoutExpired from the LDAPS probe (15 s); struct.error/IndexError from
+             root_ca.crt; struct.error/IndexError from
              dns_query on a malformed reply. Check failures are results, not exceptions.
     Feeds:   run."""
     v, s = ctx.vars, ctx.secrets
@@ -132,20 +114,6 @@ def checks(ctx):
         rc, code = _curl(f"https://{v['hostname_landing']}/", v["hostname_landing"], v["ip_nginx"], 443, None)
         add("this host trusts the fabric CA (system store)", rc == 0, f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
 
-    if v.get("install_ldap", True):
-        res = subprocess.run(["openssl", "s_client", "-connect", f"{v['ip_ldap']}:3636",
-                              "-servername", v["hostname_ldap"], "-verify_hostname", v["hostname_ldap"],
-                              "-CAfile", root_ca], input="", capture_output=True, text=True, timeout=15)
-        add("LDAPS certificate", "Verify return code: 0 (ok)" in res.stdout)
-        local = v["ldap_local_dn"]                     # this install's service accounts
-        for role, secret in (("super_admin", "ldap_super_admin_password"), ("keycloak_admin",
-                                                                            "ldap_keycloak_password")):
-            add(f"LDAP {role} binds", _ldap_bind("ldapi://%2Fdata%2Frun%2Fslapd-localhost.socket",
-                                                 f"cn={role},ou=admins,{local}", s.get(secret, "")) == "BOUND")
-        add("LDAP refuses plaintext binds",
-            _ldap_bind("ldap://127.0.0.1:3389", f"cn=super_admin,ou=admins,{local}",
-                       s.get("ldap_super_admin_password", "")) == "CONFIDENTIALITY_REQUIRED")
-
     if v.get("install_webui"):
         rc, code = _curl(f"https://{v['hostname_mgr']}/", v["hostname_mgr"], v["ip_nginx"], 443, root_ca)
         add("web UI refuses requests without a client certificate", code == "400", f"HTTP {code}")
@@ -188,8 +156,8 @@ def checks(ctx):
                      root_ca)
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
-    for unit in ("bind9", "stepca", "nginx", "ldap", "postgres", "keycloak", "openbao", "kea", "freeradius",
-                 "fluentbit",
+    for unit in ("bind9", "stepca", "nginx", "samba", "postgres", "keycloak", "openbao", "kea", "freeradius",
+                 "samba", "fluentbit",
                  "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()

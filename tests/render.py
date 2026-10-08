@@ -15,10 +15,9 @@ from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
 # FABRIC_TEST_TEMPLATES: another templates folder (its lock beside it), e.g. one with published digests pinned
 env = jinja_env(os.environ.get('FABRIC_TEST_TEMPLATES') or os.path.join(REPO, 'templates'))
 
-secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=', ldap_admin_password='DmPass1', ldap_keycloak_password='KcPass1',
+secrets = dict(ca_password='x', rndc_secret='dGVzdC1vbmx5LXJuZGMtc2VjcmV0LTMyLWJ5dGVzISE=',
                keycloak_admin_user='admin', keycloak_admin_password='x', keycloak_db_password='x',
-               ldap_super_admin_password='Sa1', ldap_group_admin_password='Ga1',
-               ldap_user_creator_password='Uc1', ldap_user_modifier_password='Um1', ldap_device_admin_password='Da1', ldap_radius_password='Rr1',
+               ad_radius_password='Rr1',
                radius_secrets={'switch1': 'Sw1tchSecretSw1tchSecret', 'ap-old': 'OldApSecretOldApSecret'},
                webui_oidc_secret='OidcSecret1',
                tsig_secrets={'npm': 'bnBtLXRlc3Qtc2VjcmV0LTMyLWJ5dGVzLWxvbmch', 'acme_dns-01': 'YWNtZS10ZXN0LXNlY3JldA==',
@@ -80,7 +79,6 @@ diff = {k: (v1.get(k), v2.get(k)) for k in set(v1) | set(v2) if v1.get(k) != v2.
 assert not diff, diff
 print('project_containers', v2['project_containers'])
 print('service_dirs', [d['folder'] for d in v2['service_dirs']])
-print('ldap backends', v2['nginx_backend_ldap'], v2['nginx_backend_ldaps'])
 print('install_webui', v2['install_webui'], v2['hostname_mgr'])
 print('CNAMEs', [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']])
 
@@ -99,7 +97,7 @@ for tpl in sorted(env.list_templates()):
     if tpl.startswith('bind9/data/reverse'):
         extra = dict(reverse_zone_name='7.168.192.in-addr.arpa', ptr_records=rv['zones']['7.168.192.in-addr.arpa'])
     if tpl.startswith('systemd/'):
-        extra = dict(item={'service': 'ldap', 'compose': 'dirsrv', 'folder': 'dirsrv', 'requires': []})
+        extra = dict(item={'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []})
     if tpl.endswith('.json.j2'):
         json.loads(env.get_template(tpl).render(**full))
     text = env.get_template(tpl).render(**full, **extra)
@@ -155,15 +153,11 @@ assert f"--allow-uid {fed['service_users']['nginx']['uid']}" in unit and 'lib/fe
 site = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'domain': 'branch1.lan.j-j.family',
                                                                   'org_domain': 'lan.j-j.family', 'site_name': 'branch1'}))
 assert site['ldap_base_dn'] == v2['ldap_base_dn'] == 'dc=lan,dc=j-j,dc=family', site['ldap_base_dn']
-assert site['ldap_local_dn'] == 'ou=branch1,dc=lan,dc=j-j,dc=family' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
-# a chosen base DN (the root site's install, e.g. dc=lan): the site part sits under it; the seed's base entry
-# takes its first RDN (domain for dc=, organization for o=)
-for base, oc in (('dc=lan', 'objectClass: domain\ndc: lan'), ('o=acme,dc=lan', 'objectClass: organization\no: acme')):
+assert site['site_name'] == 'branch1' and site['hostname_federation'] == 'federation.branch1.lan.j-j.family'
+# a chosen base DN (the root site's install, e.g. dc=lan) is kept as given: it names the organisation
+for base in ('dc=lan', 'o=acme,dc=lan'):
     chosen = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'ldap_base_dn': base}))
-    assert chosen['ldap_base_dn'] == base and chosen['ldap_local_dn'] == f'ou=pi-core,{base}', chosen['ldap_local_dn']
-    tree = env.get_template('dirsrv/seed/10-tree.ldif.j2').render(**{**chosen, **secrets})
-    assert f'dn: {base}\nobjectClass: top\n{oc}' in tree, tree[:400]
-    assert f'dn: ou=pi-core,{base}\nobjectClass: top\nobjectClass: organizationalUnit\nou: pi-core' in tree
+    assert chosen['ldap_base_dn'] == base, chosen['ldap_base_dn']
 print('federation: endpoint vhost/mount/CNAME/unit only when on; a site shares the organisation suffix')
 # DNS links (manual 1.8 M4): none -> no transfers; with links -> keys, transfers, secondaries, delegation
 plain = env.get_template('bind9/config/named.conf.zones.j2').render(**full)
@@ -181,19 +175,26 @@ db = env.get_template('bind9/data/zone.j2').render(**full, federation_links=link
                                                    zone_records=v2['dns']['dynamic_zone_var'])
 assert 'lab                     NS      ns.lab.lan.j-j.family.' in db and 'ns.lab                  A       192.168.9.9' in db
 print('federation DNS: no links -> no transfers; links -> keys, signed transfers, secondaries, delegation with glue')
-# DNS filter (manual 2.4.1): off by default; on -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
+# DNS filter (manual 2.4.1): on by default (D112) -> AdGuard on 53, BIND on 5053 (even when vars.yaml had 53), CNAME,
 # the vhost (OIDC first), AdGuard's container without capabilities and its UI unpublished
-assert v2['dns_filter'] == 'none' and v2['install_adguard'] is False
-assert v2['bind_dns_port'] == user.get('bind_dns_port', 53), 'with the filter off the port is what vars say (53)'
+assert v2['dns_filter'] == user.get('dns_filter', 'adguard') and v2['install_adguard'] is (v2['dns_filter'] == 'adguard')
+off = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none',
+                                                                 'bind_dns_port': 53}))
+assert off['install_adguard'] is False and off['bind_dns_port'] == 53, 'with the filter off the port is what vars say (53)'
+dflt = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{k: w for k, w in copy.deepcopy(PRISTINE).items()
+                                                                 if not k.startswith(('dns_filter', 'adguard_'))}))
+assert dflt['install_adguard'] is True and dflt['adguard_upstreams'] == ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query'],     'on by default with Cloudflare (D112)'
+assert [f['name'] for f in dflt['adguard_filter_lists']] == ['AdGuard DNS filter'], dflt['adguard_filter_lists']
 adg = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'AdGuard',
                                                                  'bind_dns_port': 53}))
 assert adg['install_adguard'] is True and adg['bind_dns_port'] == 5053, (adg['install_adguard'], adg['bind_dns_port'])
-assert 'adguard' in [r['name'] for r in adg['dns']['dynamic_zone_var']['CNAME']] and adg['adguard_upstreams'] == []
-kept = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'bind_dns_port': 5053}))
+assert 'adguard' in [r['name'] for r in adg['dns']['dynamic_zone_var']['CNAME']] and adg['adguard_upstreams'] == ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query']
+kept = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none',
+                                                                  'bind_dns_port': 5053}))
 assert kept['bind_dns_port'] == 5053, 'with the filter off a chosen port is kept (an AdGuard of your own)'
 ngx = env.get_template('nginx/nginx.conf.j2').render(**{**secrets, **adg})
 assert 'server_name adguard.lan.j-j.family;' in ngx and 'auth_request /oauth2/auth;' in ngx
-assert 'include /etc/nginx/conf.d/adguard-auth.inc;' in ngx and 'adguard' not in env.get_template('nginx/nginx.conf.j2').render(**full)
+assert 'include /etc/nginx/conf.d/adguard-auth.inc;' in ngx and 'adguard' not in env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_adguard': False})
 comp = yaml.safe_load(env.get_template('adguard/docker-compose.yml.j2').render(**{**secrets, **adg}))['services']
 assert comp['adguardhome']['cap_drop'] == ['ALL'] and 'cap_add' not in comp['adguardhome']
 auth = yaml.safe_load(env.get_template('adguard-auth/docker-compose.yml.j2').render(**{**secrets, **adg}))['services']
@@ -227,7 +228,7 @@ for key, val in v2.items():
         # image_fabric_*: "" until the lock pins fabric's published image (manual 2.6.3)
         assert '@sha256:' in val or val.startswith('fabric/') and val.endswith(':local') or \
             (key.startswith('image_fabric_') and val == ''), f'{key} not pinned: {val}'
-for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
+for svc in ('nginx', 'bind9', 'stepca', 'samba', 'keycloak', 'postgres', 'webui', 'openbao', 'fluentbit'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     for name, spec in dc['services'].items():
         ref = ((spec.get('build') or {}).get('args') or {}).get('BASE_IMAGE') or spec.get('image', '')
@@ -251,7 +252,7 @@ assert outs["es"]["host"] == "es.lan" and outs["es"]["port"] == 9200 and outs["e
 assert fb["service"]["storage.path"] == "/buffer" and any(i["name"] == "systemd" for i in fb["pipeline"]["inputs"])
 none = yaml.safe_load(env.get_template('fluentbit/fluent-bit.yaml.j2').render(**{**v2, "hostname": "h"}))
 assert [o["name"] for o in none["pipeline"]["outputs"]] == ["null"], none
-for svc in ('nginx', 'bind9', 'stepca', 'dirsrv', 'keycloak', 'postgres', 'webui', 'openbao'):
+for svc in ('nginx', 'bind9', 'stepca', 'samba', 'keycloak', 'postgres', 'webui', 'openbao'):
     dc = yaml.safe_load(env.get_template(f'{svc}/docker-compose.yml.j2').render(**{**secrets, **v2}))
     assert all(sp.get("logging", {}).get("driver") == "journald" for sp in dc["services"].values()), svc
 print('Fluent Bit: verified TLS to syslog and Elasticsearch, password from the environment; containers log to the journal')
@@ -349,10 +350,10 @@ assert 'secret = "Sw1tchSecretSw1tchSecret"' in clients_conf and "ipaddr = 192.1
 assert clients_conf.count("require_message_authenticator = yes") == 1 and "require_message_authenticator = no" in clients_conf
 eap = env.get_template("freeradius/config/mods/eap.j2").render(**rv_)
 assert "default_eap_type = tls" in eap and "ca_file = ${certdir}/ca.pem" in eap and "enable = no" in eap \
-    and "virtual_server = fabric-check-eap-tls" in eap and not re.search(r"^\s*(peap|mschapv2|md5|leap|gtc)\s*\{", eap, re.M)
+    and "virtual_server = fabric-check-eap-tls" in eap and not re.search(r"^\s*(md5|leap|gtc)\s*\{", eap, re.M)
 assert "ttls {" in eap, "the default network groups are mapped: EAP-TTLS on"
 eap_none = env.get_template("freeradius/config/mods/eap.j2").render(**{**rv_, "radius_people": []})
-assert "ttls {" not in eap_none, "no password logins while no group is mapped"
+assert "ttls {" not in eap_none and "peap {" not in eap_none, "no password logins while no group is mapped"
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
 people = normalize_radius_people([{"group": "guests", "vlan": "50", "priority": 60}, {"group": "staff", "vlan": 20}])
 assert people[0]["group"] == "guests" and people[1] == {"group": "staff", "vlan": 20, "priority": 100}, people
@@ -365,21 +366,26 @@ for bad in ([{"group": "staff", "vlan": 5000}], [{"group": "staff"}, {"group": "
         pass
 eap_p = env.get_template("freeradius/config/mods/eap.j2").render(**{**rv_, "radius_people": people})
 assert "ttls {" in eap_p and "virtual_server = fabric-inner-tunnel" in eap_p and "use_tunneled_reply = yes" in eap_p
+assert "peap {" in eap_p and "default_eap_type = mschapv2" in eap_p and "mschapv2 {" in eap_p, eap_p   # S3.3
+mschap = env.get_template("freeradius/config/mods/mschap.j2").render(**rv_)
+assert "--username=%{mschap:User-Name}" in mschap and "--allow-mschapv2" in mschap and "require_strong = yes" in mschap
 frj_p = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**{**rv_, "radius_people": people}))
 assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
-assert frj["uri"] == "ldaps://ldap.lan.j-j.family:3636" and frj["bind_dn"].startswith("cn=radius_reader,")
+assert frj["uri"] == f"ldaps://{rv_['host_ip']}:636" and frj["bind_dn"] == f"fabric-radius-{rv_['site_name']}@{rv_['ad_domain']}" \
+    and frj["base"] == rv_["ad_base_dn"] and frj["site"] == rv_["site_name"], frj   # the site's DC (S3.2)
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
 assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "610:610", fc
+base_ = rv_["deploy_base_dir"]
+assert {f"{base_}/samba/winbindd:/run/samba/winbindd:ro",
+        f"{base_}/samba/data/state/winbindd_privileged:/data/state/winbindd_privileged:ro",
+        f"{base_}/samba/data/etc:/etc/samba:ro"} <= set(fc["volumes"]), fc["volumes"]   # PEAP through the DC's winbind
 assert fc["ports"] == [f"{v2['host_ip']}:1812:1812/udp", f"{v2['host_ip']}:1813:1813/udp"], fc["ports"]
-accounts = env.get_template("dirsrv/seed/20-accounts.ldif.j2").render(**{**v2, **secrets})
-assert "cn=radius_reader," in accounts and "userPassword: Rr1" in accounts
 assert v2["radius_people"] == [{"group": "network-staff", "vlan": None, "priority": 50},
                                {"group": "network-guests", "vlan": None, "priority": 100}], v2["radius_people"]
 kept_empty = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**ctx, **v1, "radius_people": []}))
 assert kept_empty["radius_people"] == [], "an empty mapping must stay empty (no defaults brought back)"
-tree = env.get_template("dirsrv/seed/10-tree.ldif.j2").render(**{**v2, **secrets})
-assert "dn: cn=network-staff,ou=groups," in tree and "dn: cn=network-guests,ou=groups," in tree
+assert {"network-staff", "network-guests"} <= {g["name"] for g in v2["ldap_groups"]}
 assert not any(g.get("bundle") for g in v2["ldap_groups"] if g["name"] in ("network-staff", "network-guests")),     "the network groups grant no fabric web access"
 print("FreeRADIUS: clients (secrets out of vars, bad ones refused), EAP-TLS, EAP-TTLS only for mapped groups, policy lookup, no capabilities")
 

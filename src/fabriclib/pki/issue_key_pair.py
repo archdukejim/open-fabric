@@ -6,8 +6,8 @@ import threading
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
-from fabriclib.ldap.link_device_cert import link_device_cert
-from fabriclib.ldap.require_device import require_device
+from fabriclib.directory.link_device_cert import link_device_cert
+from fabriclib.directory.require_device import require_device
 from fabriclib.pki.common.ca_chain_pem import ca_chain_pem
 from fabriclib.pki.common.describe_cert import describe_cert
 from fabriclib.pki.common.openssl import openssl
@@ -39,7 +39,7 @@ def issue_key_pair(v, actor, cn, sans=(), key_type="RSA-2048", days=365, device=
              alternative names: ..."; "key type must be one of ..."; valid_days' messages; "no device
              named ..." (require_device); "invalid certificate name: ..." from mint_offline_cert (an IPv6
              or e-mail CN with + or % passes valid_san but not CN_RE); "step-ca refused: ..." (run_step);
-             link_device_cert / run_dirsrv errors (raised after issuing); CalledProcessError from
+             link_device_cert / run_op errors (raised after issuing); CalledProcessError from
              export_p12; OSError.
     Feeds:   agent route POST /v1/pki/issue -> webui agentclient.issue_key_pair -> PKI page.
     Notes:   a module lock serialises minting because artifact file names derive from the CN; the

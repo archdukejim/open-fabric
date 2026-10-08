@@ -6,11 +6,14 @@ import yaml
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
+from fabriclib.deploy.check_samba_settings import POLICY_KEYS
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.decode_invitation import decode_invitation
 from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
+from fabriclib.setup.ask_ad_domain import ask_ad_domain
+from fabriclib.setup.ask_ram import ask_ram
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.upgrade_vars import upgrade_vars
 
@@ -22,7 +25,7 @@ LABELS = {
     "lan_cidr": "LAN subnet (CIDR)",
     "lan_gateway": "LAN gateway (router) IP",
     "friendly_name": "Organisation / network name (used in the CA name)",
-    "webui_admin_user": "Username of the first web UI admin (created in LDAP/Keycloak)",
+    "webui_admin_user": "Username of the first web UI admin (a person in the domain, signing in through Keycloak)",
 }
 ADMIN_RE = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}$")
 HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
@@ -80,7 +83,9 @@ def _join_defaults(ctx, data):
     """Purpose: settings a site joining an upstream (setup --join) starts from: the invitation's site name and
              organisation domain, and a domain of its own, by default <site>.<organisation domain>.
     Inputs:  ctx — SetupContext: join_invitation, vars_file, config_dir; data — the settings so far (changed).
-    Returns: None; data gets site_name, org_domain, ldap_base_dn and (unless set) domain.
+    Returns: None; data gets site_name, org_domain, ldap_base_dn, (unless set) domain and, from an invitation that
+             names the domain (any site with a writable DC makes one), ad_domain, ad_password_policy and ad_dc_type
+             (so setup asks neither).
     Fails:   SetupError when the invitation is damaged (decode_invitation), when this host already has a fabric
              that is not a member of that upstream (only fresh installs join: design F1), or when site_name is
              set to another name than the invitation's.
@@ -98,6 +103,9 @@ def _join_defaults(ctx, data):
     data["site_name"], data["org_domain"], data["ldap_base_dn"] = inv["site"], inv["org_domain"], inv["ldap_base_dn"]
     if not data.get("domain"):
         data["domain"] = f"{inv['site']}.{inv['org_domain']}"
+    if inv["dc"]:                            # the organisation's domain: this site's DC joins it (manual 1.8.8.4)
+        data["ad_domain"], data["ad_password_policy"] = inv["ad_domain"], inv["ad_password_policy"]
+        data["ad_dc_type"] = inv["dc"]
     info(f"joining {inv['upstream']} ({inv['org_domain']}) as site {inv['site']}, domain {data['domain']}")
 
 
@@ -111,9 +119,12 @@ def collect_vars(ctx):
              vars.yaml is the base and --file overrides the keys it sets; on a fresh install without --file a
              checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images
              (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required
-             values are asked for (defaults from detect_network); webui_admin_user is chosen once.
+             values are asked for (defaults from detect_network); webui_admin_user is chosen once; the AD domain
+             and the password policy are asked when missing (ask_ad_domain), and once the memory fabric may use
+             (ask_ram).
              Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
-    Fails:   SetupError for missing/invalid required values with --non-interactive, invalid tsig_keys, or a
+    Fails:   SetupError for missing/invalid required values (the AD domain and policy included) with
+             --non-interactive, invalid tsig_keys, or a
              secrets file that cannot be written (ValidationError converted); OSError/yaml errors on files.
     Feeds:   run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps
              before deploy; deploy_config renders from fabric.yaml."""
@@ -162,6 +173,17 @@ def collect_vars(ctx):
         sudo_user = os.environ.get("SUDO_USER", "")
         default = sudo_user if sudo_user != "root" and _valid("webui_admin_user", sudo_user) else "fabricadmin"
         data["webui_admin_user"] = default if ctx.non_interactive else _ask("webui_admin_user", default)
+
+    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (D87, D89)
+    policy = data.get("ad_password_policy") or {}
+    if not data.get("ad_domain") or not (set(POLICY_KEYS) | {"complexity"}) <= set(policy):
+        if ctx.non_interactive:
+            raise SetupError("missing in the vars file: ad_domain and every key of ad_password_policy (manual "
+                             "2.1.9.7: the directory's domain and password policy have no defaults)")
+        ctx.vars = data
+        ask_ad_domain(ctx)
+    # how much of this host fabric may use (D31, manual 1.3.4.2): measured, asked once
+    ask_ram(ctx, data)
 
     data["deploy_base_dir"] = ctx.deploy_base
     os.makedirs(ctx.config_dir, mode=0o750, exist_ok=True)

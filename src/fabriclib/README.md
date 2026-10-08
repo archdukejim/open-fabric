@@ -17,10 +17,11 @@ and import as `fabriclib.<domain>.<file>`.
 | [rbac/](rbac/) | Access control for people: permissions, bundles, what each fabric-agent route needs |
 | [dhcp/](dhcp/) | Optional DHCP (Kea 3.0): `dhcp:` checks, config, DDNS zone, reservations, leases, `fabricctl dhcp` |
 | [radius/](radius/) | Optional 802.1X (FreeRADIUS): RADIUS clients and their secrets, config, decisions log, `fabricctl radius` |
+| [directory/](directory/) | fabric's directory on Samba AD: people, groups and the rest, as the site's agent account (manual 1.6.3) |
+| [samba/](samba/) | Optional Windows domain (Samba AD domain controller, manual 2.11.2): its files and, from S1.3, the domain's convergence |
 | [logs/](logs/) | Optional log forwarding (Fluent Bit): config, credentials, status |
 | [images/](images/) | Container images: status against the validated list, update (health-gated, rollback), prune |
 | [keycloak/](keycloak/) | Keycloak over its admin REST API: people, sign-in resets, roles, token checks, the OpenBao OIDC client |
-| [ldap/](ldap/) | 389 Directory Server over LDAPI inside `dirsrv`: devices, device roles, certificate links, people and roles lists, admin user |
 | [vault/](vault/) | OpenBao: init, configure, status, unlock methods (key slots: USB, security key, KMIP), vault key rotation, root token |
 | [secrets/](secrets/) | fabric's own secrets: the 0600 file until the vault step, then OpenBao; load, save, import, export |
 | [dns_filter/](dns_filter/) | Optional DNS filter (AdGuard Home) in front of BIND: its configuration and deploy |

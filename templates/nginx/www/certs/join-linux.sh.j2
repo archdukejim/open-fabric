@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# Join this Linux machine (Ubuntu 24.04 or 26.04, Debian 12 or 13 — Proxmox VE 8 and 9 too) to fabric's domain
+# {{ ad_domain }} (manual 2.10.2, 3.15.2).
+#   sudo bash join-linux.sh <root CA SHA-256 fingerprint> --user <a site admin>   [--site <site>] [--name <name>]
+#   sudo bash join-linux.sh <root CA SHA-256 fingerprint> --one-time              [--site <site>] [--name <name>]
+# The fingerprint is shown on http://{{ hostname_certs }}/. The password - a site admin's, or with --one-time the
+# machine's one-time join password from `fabricctl domain add-machine <name>` - is asked on the terminal (or read
+# from standard input), never taken from the command line.
+set -euo pipefail
+
+AD_DOMAIN="{{ ad_domain }}"
+REALM="{{ ad_realm }}"
+BASE_DN="{{ ad_base_dn }}"
+DC="{{ hostname_dc }}"
+SITE="{{ site_name }}"
+CERTS="http://{{ hostname_certs }}"
+NTP="{{ hostname_ntp }}"
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+usage() { sed -n '2,7p' "$0" | cut -c3-; exit 2; }
+
+[[ $EUID -eq 0 ]] || die "run as root (sudo)"
+[[ $# -ge 1 ]] || usage
+FP=$(printf '%s' "$1" | tr -d ':' | tr 'a-f' 'A-F')
+shift
+[[ $FP =~ ^[0-9A-F]{64}$ ]] || die "the first argument is the root CA's SHA-256 fingerprint (64 hex digits), shown on $CERTS/"
+JOIN_USER=""
+ONE_TIME=0
+MACHINE=$(hostname -s | tr 'A-Z' 'a-z')
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --site) SITE="${2:-}"; shift 2 ;;
+        --user) JOIN_USER="${2:-}"; shift 2 ;;
+        --name) MACHINE="${2:-}"; shift 2 ;;
+        --one-time) ONE_TIME=1; shift ;;
+        *) usage ;;
+    esac
+done
+[[ $SITE =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || die "not a site name: $SITE"
+[[ $MACHINE =~ ^[a-z0-9]([a-z0-9-]{0,13}[a-z0-9])?$ ]] || die "the machine's name must be 1-15 letters, digits or dashes (--name): $MACHINE"
+[[ $ONE_TIME -eq 1 || -n $JOIN_USER ]] || die "give --user <a site admin>, or --one-time (from: sudo fabricctl domain add-machine $MACHINE)"
+
+# in a subshell: os-release's own variables (NAME, VERSION, …) must not overwrite this script's
+release=$(. /etc/os-release && echo "${ID:-}-${VERSION_ID:-}")
+case "$release" in
+    ubuntu-24.04|ubuntu-26.04|debian-12|debian-13) ;;
+    *) die "Ubuntu 24.04 or 26.04, or Debian 12 or 13 (Proxmox VE 8, 9) only (this is $release)" ;;
+esac
+
+# the password first, before anything on this machine changes
+if [[ $ONE_TIME -eq 1 ]]; then prompt="one-time join password for $MACHINE"; else prompt="password of $JOIN_USER"; fi
+if [[ -t 0 ]]; then
+    read -rsp "$prompt: " PASSWORD
+    echo
+else
+    IFS= read -r PASSWORD || true
+fi
+[[ -n $PASSWORD ]] || die "no password given"
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq ca-certificates curl openssl >/dev/null
+
+# fabric's root CA, fetched over plain HTTP (nothing is trusted yet) and kept only if its fingerprint matches
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+curl -fsS "$CERTS/root-ca.crt" -o "$tmp/root.crt" || die "cannot fetch $CERTS/root-ca.crt"
+got=$(openssl x509 -in "$tmp/root.crt" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':')
+[[ $got == "$FP" ]] || die "the root CA served is $got, not the fingerprint given: not trusting it, nothing changed"
+install -m 0644 "$tmp/root.crt" /usr/local/share/ca-certificates/fabric-root-ca.crt
+update-ca-certificates >/dev/null
+echo "trusted fabric's root CA ($FP)"
+
+# sudo itself too: Debian and Proxmox VE do not install it
+apt-get install -y -qq adcli sssd-ad sssd-tools libpam-sss libnss-sss libsss-sudo sudo krb5-user ldap-utils \
+    libsasl2-modules-gssapi-mit >/dev/null
+
+# Kerberos: the domain's realm; its KDCs from DNS, the site's DC when DNS has none
+cat > /etc/krb5.conf <<EOF
+[libdefaults]
+    default_realm = $REALM
+    dns_lookup_realm = false
+    dns_lookup_kdc = true
+    rdns = false
+
+[realms]
+    $REALM = {
+        kdc = $DC
+        admin_server = $DC
+    }
+
+[domain_realm]
+    .$AD_DOMAIN = $REALM
+    $AD_DOMAIN = $REALM
+EOF
+
+# where the site sits (sites nest, each in its parent's OU: manual 1.8.8.14): its OU, the sites above it and the
+# organisation's OU, read from the DC as the account that joins (a site admin, or the pre-created machine), signed in
+# with Kerberos, the password on stdin
+if [[ $ONE_TIME -eq 1 ]]; then PRINCIPAL="${MACHINE^^}\$@$REALM"; else PRINCIPAL="$JOIN_USER@$REALM"; fi
+export KRB5CCNAME="FILE:$tmp/ccache"
+printf '%s\n' "$PASSWORD" | kinit "$PRINCIPAL" >/dev/null 2>&1 || die "$PRINCIPAL could not sign in (the password?)"
+lookup() {
+    LDAPSASL_NOCANON=on ldapsearch -LLL -o ldif-wrap=no -Q -Y GSSAPI -H "ldap://$DC" -b "OU=sites,$BASE_DN" \
+        "$1" dn 2>/dev/null | sed -n 's/^dn: //p'
+}
+SITE_DN=$(lookup "(&(objectClass=fabricSiteInfo)(ou=$SITE))")
+[[ -n $SITE_DN && $SITE_DN != *$'\n'* ]] || die "no site $SITE in $AD_DOMAIN"
+ORG_DN=$(lookup "(&(objectClass=organizationalUnit)(ou=organisation))")
+[[ -n $ORG_DN && $ORG_DN != *$'\n'* ]] || die "no organisation OU in $AD_DOMAIN"
+# sudo rules: the site's own, each site's above it (their roles reach the sites below, D103), the organisation's
+SUDO_BASES=""
+dn=$SITE_DN
+while [[ ${dn^^} == OU=* && ${dn^^} != OU=SITES,* ]]; do
+    SUDO_BASES+="OU=sudoers,$dn?onelevel??"
+    dn=${dn#*,}
+done
+SUDO_BASES+="OU=sudoers,$ORG_DN?onelevel?"
+kdestroy >/dev/null 2>&1 || true
+
+# the join (the account's name in upper case, as Windows names them: SSSD looks for NAME$ in the keytab):
+# a computer account in the site's OU=machines (pre-created with --one-time), the password on stdin
+if [[ $ONE_TIME -eq 1 ]]; then
+    printf '%s' "$PASSWORD" | adcli join --domain="$AD_DOMAIN" --domain-realm="$REALM" --domain-controller="$DC" \
+        --computer-name="${MACHINE^^}" --login-type=computer --stdin-password --show-details >/dev/null \
+        || die "the join was refused (is $MACHINE pre-created with: fabricctl domain add-machine $MACHINE?)"
+else
+    printf '%s' "$PASSWORD" | adcli join --domain="$AD_DOMAIN" --domain-realm="$REALM" --domain-controller="$DC" \
+        --computer-name="${MACHINE^^}" --login-user="$JOIN_USER" --stdin-password \
+        --domain-ou="OU=machines,$SITE_DN" --show-details >/dev/null \
+        || die "the join was refused (a site admin of $SITE, and the right password?)"
+fi
+unset PASSWORD
+echo "joined $AD_DOMAIN as $MACHINE (site $SITE)"
+
+# SSSD (manual 2.10.2.4-2.10.2.5): fabric's own ids, who may log on from the site's GPO, sudo from the site's rules
+cat > /etc/sssd/sssd.conf <<EOF
+[sssd]
+domains = $AD_DOMAIN
+services = nss, pam, sudo
+
+[domain/$AD_DOMAIN]
+id_provider = ad
+access_provider = ad
+sudo_provider = ad
+ad_domain = $AD_DOMAIN
+krb5_realm = $REALM
+ad_server = _srv_, $DC
+ad_gpo_access_control = enforcing
+ldap_id_mapping = false
+use_fully_qualified_names = false
+fallback_homedir = /home/%u
+default_shell = /bin/bash
+cache_credentials = true
+enumerate = false
+ldap_sudo_search_base = $SUDO_BASES
+EOF
+chmod 0600 /etc/sssd/sssd.conf
+pam-auth-update --enable mkhomedir >/dev/null
+
+# sudo rules from the domain need sudo's own sss support: Ubuntu 26.04's default sudo-rs has none, so the classic
+# sudo it also ships becomes the default
+if [[ "$(readlink -f /usr/bin/sudo)" == */cargo/bin/sudo && -x /usr/bin/sudo.ws ]]; then
+    update-alternatives --set sudo /usr/bin/sudo.ws >/dev/null
+    echo "sudo: switched from sudo-rs to sudo (sudo-rs cannot read the domain's sudo rules)"
+fi
+
+# time from the site (Kerberos refuses more than 5 minutes of skew)
+if [[ -d /etc/systemd/timesyncd.conf.d || -f /etc/systemd/timesyncd.conf ]]; then
+    mkdir -p /etc/systemd/timesyncd.conf.d
+    printf '[Time]\nNTP=%s\n' "$NTP" > /etc/systemd/timesyncd.conf.d/fabric.conf
+    systemctl restart systemd-timesyncd 2>/dev/null || true
+fi
+# chrony instead (Proxmox VE's default): the site as a source of its own, beside the machine's others
+if [[ -d /etc/chrony/sources.d ]]; then
+    printf 'server %s iburst\n' "$NTP" > /etc/chrony/sources.d/fabric.sources
+    chronyc reload sources >/dev/null 2>&1 || true
+fi
+
+systemctl restart sssd
+systemctl enable sssd >/dev/null 2>&1 || true
+echo "done: people of $SITE can log on here (the site's log-on rights); sudo follows the site's rules"

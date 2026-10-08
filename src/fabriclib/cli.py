@@ -13,6 +13,11 @@
                                  DHCP (optional Kea): subnets, leases, reservations, options, client classes
   fabricctl radius status|log|add-client|rotate-secret|remove-client
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
+  fabricctl domain status|password-policy|add-machine
+                                 the domain (Samba AD): its DC, roles, password policy, machines to join
+  fabricctl gpo load|templates|list|show|set|clear|starter
+                                 Group Policy from ADMX templates for this site's machines and people
+  fabricctl sso add|list|remove  apps (Proxmox VE, TrueNAS, …) signing people in through Keycloak
   fabricctl federation status|enable|disable|invite|invitations|revoke|networks
                                  sites joining this install (setup --join on the new site)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
@@ -20,8 +25,6 @@
                                  log forwarding (optional Fluent Bit): destinations, sent, errors
   fabricctl images status|update|rollback|prune
                                  container images: validated versions, update, roll back, clean up
-  fabricctl directory sync
-                                 POSIX identities, replication links (also every 5 minutes)
   fabricctl secrets list|show <name>
                                  fabric's own secrets (in OpenBao); `show` is audited
   fabricctl client-cert <user> [--days N]
@@ -49,16 +52,18 @@ import subprocess
 import sys
 
 # Run as a script, Python puts fabriclib/ itself first on sys.path, where its
-# folders (dns/, ldap/, keycloak/) would shadow real packages. Use fabric/lib.
+# folders (dns/, keycloak/) would shadow real packages. Use fabric/lib.
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.consent.show_consent_status import show_consent_status  # noqa: E402
 from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
+from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
+from fabriclib.samba.run_gpo_command import run_gpo_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
+from fabriclib.keycloak.run_sso_command import run_sso_command  # noqa: E402
 from fabriclib.federation.run_federation_command import run_federation_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
-from fabriclib.ldap.run_directory_command import run_directory_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
 from fabriclib.pki.hand_out_client_cert import hand_out_client_cert  # noqa: E402
 from fabriclib.secrets.run_secrets_command import run_secrets_command  # noqa: E402
@@ -184,14 +189,16 @@ def main(argv):
         return run_logs_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "radius":
         return run_radius_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "domain":
+        return run_domain_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "gpo":
+        return run_gpo_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "federation":
         return run_federation_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "dhcp":
         return run_dhcp_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "images":
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
-    if cmd == "directory":
-        return run_directory_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":
@@ -220,6 +227,8 @@ def main(argv):
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)
+    if cmd == "sso":
+        return run_sso_command(args)
     if cmd == "acl":
         return run_acl_command(args)
     if cmd == "restore":

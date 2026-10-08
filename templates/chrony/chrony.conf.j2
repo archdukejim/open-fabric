@@ -19,6 +19,9 @@ rtcsync
 # still reach an authenticated source (the time it then gets is checked by NTS itself)
 nocerttimecheck 1
 
+# Windows members of the domain ask for time signed with their DC's key (D100): the DC signs through this socket
+ntpsigndsocket {{ ad_ntp_signd_dir }}
+
 # chronyc only from this host
 bindcmdaddress 127.0.0.1
 bindcmdaddress ::1

@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 from fabriclib.common.console import ok
 from fabriclib.common.write_file_if_changed import write_file_if_changed
@@ -11,13 +10,13 @@ from fabriclib.setup.mint_extra_certs import mint_extra_certs
 
 def _targets(ctx):
     """Purpose: the service certificates this install needs and where each one goes.
-    Inputs:  ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, ldap, keycloak, mgr,
-             radius, federation, adguard), domain, install_ldap (default True), install_keycloak, install_webui,
-             install_freeradius, federation_endpoint, install_adguard.
-    Returns: list of (cn, extra SANs, [(destination dir or "dirsrv-tls", service user or "freeradius:eap")],
+    Inputs:  ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, keycloak, mgr,
+             radius, federation, adguard, dc), domain, install_keycloak, install_webui,
+             install_freeradius, federation_endpoint, install_adguard, ad_domain.
+    Returns: list of (cn, extra SANs, [(destination dir, service user or "freeradius:eap")],
              services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP,
-             Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint and the DNS
-             filter's UI when on.
+             Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint, the DNS
+             filter's UI when on, and the domain controller.
     Fails:   KeyError for a missing hostname_* var.
     Feeds:   run."""
     v, p = ctx.vars, ctx.path
@@ -31,8 +30,6 @@ def _targets(ctx):
         (v["hostname_openbao"], ["openbao"], [nginx(v["hostname_openbao"]), (p("openbao", "certs"), "openbao")],
          ["nginx", "openbao"]),
     ]
-    if v.get("install_ldap", True):
-        t.append((v["hostname_ldap"], [], [("dirsrv-tls", "ldap")], ["ldap"]))
     if v.get("install_keycloak"):
         t.append((v["hostname_keycloak"], [], [nginx(v["hostname_keycloak"]), (p("keycloak", "certs"), "keycloak")],
                   ["nginx", "keycloak"]))
@@ -43,31 +40,13 @@ def _targets(ctx):
         t.append((v["hostname_federation"], [], [nginx(v["hostname_federation"])], ["nginx"]))
     if v.get("install_adguard"):
         t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
+    # the DC's LDAPS/TLS certificate (manual 2.11.2.7): Keycloak, FreeRADIUS and members verify it; Keycloak and
+    # FreeRADIUS reach it at the host's address, so it names that too
+    t.append((v["hostname_dc"], [v["ad_domain"], v["host_ip"]], [(p("samba", "tls"), "root")], ["samba"]))
     if v.get("install_freeradius"):
         # the EAP-TLS server certificate supplicants check (server.pem, server.key)
         t.append((v["hostname_radius"], [], [(p("freeradius", "certs"), "freeradius:eap")], ["freeradius"]))
     return t
-
-
-def _install_dirsrv_tls(ctx, crt, key, root_ca, intermediate):
-    """Purpose: install a certificate the way 389-DS imports it on start: /data/tls/server.{crt,key} and the
-             CA certificates in ca/.
-    Inputs:  ctx — SetupContext (service user ldap, install root); crt, key — minted files; root_ca,
-             intermediate — Step-CA certificate paths.
-    Returns: None; <deploy_base>/dirsrv/data/tls/server.key, server.crt (the leaf only) and ca/*.crt, owned by
-             the ldap user.
-    Fails:   CalledProcessError from `openssl x509`; OSError from install_cert/chown.
-    Feeds:   run."""
-    uid, gid = ctx.uid("ldap")
-    tls = ctx.path("dirsrv", "data", "tls")
-    install_cert(crt, key, root_ca, tls, uid, gid, names=(None, "server.key", None))
-    leaf = subprocess.run(["openssl", "x509", "-in", crt], capture_output=True, text=True, check=True).stdout
-    with open(os.path.join(tls, "server.crt"), "w") as f:
-        f.write(leaf)
-    os.chown(os.path.join(tls, "server.crt"), uid, gid)
-    for src in (root_ca, intermediate):
-        install_cert(src, key, root_ca, os.path.join(tls, "ca"), uid, gid,
-                     names=(os.path.basename(src), None, None))
 
 
 def run(ctx):
@@ -92,16 +71,13 @@ def run(ctx):
 
     for cn, sans, dests, services in _targets(ctx):
         first = dests[0][0]
-        check = ctx.path("dirsrv", "data", "tls", "server.crt") if first == "dirsrv-tls" \
-            else os.path.join(first, "server.pem" if dests[0][1] == "freeradius:eap" else "fullchain.pem")
+        check = os.path.join(first, "server.pem" if dests[0][1] == "freeradius:eap" else "fullchain.pem")
         if not ctx.force_certs and not needs_renewal(check, [cn, *sans], (root_ca, intermediate)):
             ok(f"{cn}: current")
             continue
         crt, key = mint_cert(ctx, cn, sans, cn.replace(".", "-"))
         for dest, user in dests:
-            if dest == "dirsrv-tls":
-                _install_dirsrv_tls(ctx, crt, key, root_ca, intermediate)
-            elif user == "freeradius:eap":
+            if user == "freeradius:eap":
                 install_cert(crt, key, root_ca, dest, *ctx.uid("freeradius"), names=("server.pem", "server.key", None))
             else:
                 install_cert(crt, key, root_ca, dest, *ctx.uid(user))
@@ -123,7 +99,7 @@ def run(ctx):
         ok("web UI client-certificate CA bundle")
     if ctx.vars.get("install_freeradius"):
         # EAP-TLS accepts client certificates from the fabric CA only; the same
-        # bundle verifies 389-DS for the policy's directory lookups
+        # bundle verifies the domain controller for the policy's directory lookups
         uid, gid = ctx.uid("freeradius")
         bundle = "".join(open(src).read() for src in (root_ca, *chain_cas))
         os.makedirs(ctx.path("freeradius", "certs"), mode=0o750, exist_ok=True)

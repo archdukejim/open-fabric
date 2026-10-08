@@ -13,6 +13,8 @@
 | `upgrade_vars.py` | Existing install's vars before re-render: new release's images (unless pinned) and service accounts (unless changed) |
 | `detect_network.py` | Guess hostname, host IP, gateway, LAN CIDR and interface from the default route |
 | `choose_plan.py` | Show the (hardened) default plan; Proceed / Advanced / Quit |
+| `ask_ad_domain.py` | The directory's AD domain (permanent; a sibling suggested) and the whole password policy (no defaults), asked when missing |
+| `ask_ram.py` | Setup measures the host's memory and asks how much fabric may use (all by default; 4 GB at least) |
 | `preflight.py` | Refuse a host without amd64/arm64, root, enough RAM or the cgroup memory controller; warn about untested OS and conflicting listeners |
 | `condition_host.py` | Host packages and Docker Engine (compose v2, buildx) from the Ubuntu archive; no apt source added |
 | `harden_docker.py` | Hardened `/etc/docker/daemon.json` (merged, not replaced), after the `runtime` consent |
@@ -26,11 +28,11 @@
 | `start_bootstrap.py` | Start bind9 + step-ca; validate every zone |
 | `mint_service_certs.py` | Issue/renew service certificates (only what is missing, expiring or wrong); web UI and FreeRADIUS CA bundles |
 | `mint_extra_certs.py` | `extra_certs` entries, when missing or due (part of the `certs` step) |
-| `start_services.py` | Retire renamed units; start the stack in order; seed 389-DS; configure Keycloak; fabric-agent + web UI; activate `fabric.target` |
+| `start_services.py` | Retire renamed units; start the stack in order; converge the domain; configure Keycloak; fabric-agent + web UI; activate `fabric.target` |
 | `start_unit.py` | Enable, start or restart one unit and wait until its container is healthy |
 | `setup_openbao.py` | `vault` step: vault key and unlock, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration, move fabric's secrets file into OpenBao |
-| `create_admin.py` | First web UI admin: LDAP user in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
-| `verify_install.py` | End-to-end checks (DNS, HTTPS chains, LDAPS, role binds, plaintext refused, web UI gates, services) |
+| `create_admin.py` | First web UI admin: a person in the domain, in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
+| `verify_install.py` | End-to-end checks (DNS, HTTPS chains, web UI gates, time, services) |
 | `retire_renamed_units.py` | Upgrade: stop and remove units/containers that were renamed (`webui` → `fabric-web`) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
 | `run_restore_command.py` | `fabricctl restore <export>`: put an export back and run setup on it (refused while installed) |

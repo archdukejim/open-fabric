@@ -5,7 +5,7 @@
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 {% if not r.enabled %}
 <section class="card"><h2>802.1X is off</h2>
-<p class="muted">FreeRADIUS 3.2 lets switches and access points ask fabric which devices may join: by their certificate (EAP-TLS) or, for printers and IoT, by MAC (MAB). Each device is checked against the directory (Devices and Roles on the 389-DS tab) and put on its role's VLAN. Turn it on in <code>vars.yaml</code> and re-run setup:</p>
+<p class="muted">FreeRADIUS 3.2 lets switches and access points ask fabric which devices may join: by their certificate (EAP-TLS) or, for printers and IoT, by MAC (MAB). Each device is checked against the directory (Devices and Roles on the Directory tab) and put on its role's VLAN. Turn it on in <code>vars.yaml</code> and re-run setup:</p>
 <pre>install_freeradius: true
 radius_clients:
   - { name: switch1, address: 192.168.4.2 }</pre></section>
@@ -16,9 +16,9 @@ radius_clients:
 {% if view == 'overview' %}
 <section class="card"><h2>Server</h2>
 <p>Switches and access points send RADIUS to <code>{{ r.host_ip }}</code> UDP 1812 (accounting 1813). Supplicants check the server certificate <code>{{ r.server_name }}</code>, issued by the fabric CA.</p>
-<p class="muted">Devices: decided per device on the 389-DS tab — a role with <code>network:eap-tls</code> (certificate linked to the device) or <code>network:mab</code> (the device's MAC), and optionally a VLAN. A disabled device, or an unlinked certificate, is refused at its next authentication. People: by user name and password (EAP-TTLS), only members of the groups below.</p>
+<p class="muted">Devices: decided per device on the Directory tab — a role with <code>network:eap-tls</code> (certificate linked to the device) or <code>network:mab</code> (the device's MAC), and optionally a VLAN. A disabled device, or an unlinked certificate, is refused at its next authentication. People and domain machines: by password (EAP-TTLS or PEAP, checked by the domain), only members of the groups below (for machines, e.g. <code>Domain Computers</code>).</p>
 </section>
-<section class="card"><h2>People <span class="muted">join by password (EAP-TTLS)</span></h2>
+<section class="card"><h2>People and domain machines <span class="muted">join by password (EAP-TTLS, PEAP)</span></h2>
 {% if r.people %}<table><thead><tr><th>Group</th><th>VLAN</th><th>Priority</th><th></th></tr></thead><tbody>
 {% for m in r.people %}<tr><td>{{ m.group }}</td><td>{{ m.vlan or 'port default' }}</td><td class="num">{{ m.priority }}</td>
 <td>{% if can('radius:admin') %}<div class="row-actions"><form method="post" action="/freeradius/people/{{ m.group | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger">Remove</button></form></div>{% endif %}</td></tr>{% endfor %}
@@ -68,7 +68,7 @@ radius_clients:
 </dl>
 <p>Per port, choose how the device on it proves who it is:</p>
 <ul>
-<li><strong>802.1X</strong> — laptops, desktops, phones: a certificate (EAP-TLS, device roles on the 389-DS tab) or a person's password (EAP-TTLS, mapped groups).</li>
+<li><strong>802.1X</strong> — laptops, desktops, phones: a certificate (EAP-TLS, device roles on the Directory tab) or a password checked by the domain (EAP-TTLS or PEAP, mapped groups).</li>
 <li><strong>MAC authentication (MAB)</strong> — printers, cameras, IoT without 802.1X: the device's MAC must belong to a device whose role grants <code>network:mab</code>.</li>
 <li><strong>Always open</strong> — uplinks, access points, <strong>the port this fabric host is on</strong>, and the port of the switch's own controller. Closing those locks the network (and you) out.</li>
 </ul>
@@ -90,14 +90,17 @@ radius_clients:
 <section class="card"><h2>Windows: this PC joins with its certificate (EAP-TLS)</h2>
 <p>For fabric's own PCs: the port opens with the computer's certificate, before anyone signs in.</p>
 <ol class="steps">
-<li><strong>389-DS → Devices → Add:</strong> the PC by name, in the <code>workstations</code> role (or any role with <code>network:eap-tls</code>).</li>
+<li><strong>Directory → Devices → Add:</strong> the PC by name, in the <code>workstations</code> role (or any role with <code>network:eap-tls</code>).</li>
 <li><strong>Step-CA → New key + certificate:</strong> CN = the PC's name, for that device (it is linked automatically). Download the <code>.p12</code> and keep its password.</li>
 <li>Copy the <code>.p12</code> and this script to the PC: <a class="btn" href="data:application/octet-stream;base64,{{ g.windows.tls.b64 }}" download="{{ g.windows.tls.filename }}">{{ g.windows.tls.filename }}</a></li>
 <li>In PowerShell <em>as Administrator</em>: <pre>powershell -ExecutionPolicy Bypass -File .\{{ g.windows.tls.filename }} -Pfx .\&lt;pc&gt;.p12</pre></li>
 <li>Plug the PC into an 802.1X port. Recent decisions shows <code>ACCEPT eap-tls</code> and its VLAN.</li>
 </ol>
 </section>
-<section class="card"><h2>Windows: people sign in with their user name and password (EAP-TTLS)</h2>
+<section class="card"><h2>Windows in the domain: nothing to do (PEAP)</h2>
+<p>A PC joined to the domain gets the 802.1X profile from its site's <em>Windows baseline</em> policy: Wired AutoConfig on, PEAP to <code>{{ r.server_name }}</code> checked against the fabric CA — first as the machine (map <code>Domain Computers</code> or a group of machines), then as the person signed in. See the manual, 3.15.3.</p>
+</section>
+<section class="card"><h2>Windows outside the domain: people sign in with their user name and password (EAP-TTLS)</h2>
 <p>For PCs anyone may use: whoever sits down signs in to the network with their directory account. Only members of {% if g.people %}{% for grp in g.people %}<code>{{ grp }}</code>{{ ', ' if not loop.last }}{% endfor %}{% else %}a mapped group (none yet){% endif %} get in.</p>
 <ol class="steps">
 <li>Put the person in a mapped group (Keycloak → Groups, e.g. <code>network-staff</code>).</li>
