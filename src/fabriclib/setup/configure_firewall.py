@@ -9,6 +9,7 @@ from fabriclib.consent.plan_firewall import plan_firewall
 from fabriclib.security.apply_docker_firewall import apply_docker_firewall
 from fabriclib.security.firewall_rules import firewall_rules
 from fabriclib.security.ssh_ports import ssh_ports
+from fabriclib.security.ufw_active import ufw_active
 from fabriclib.security.ufw_rule import RECORDS, ufw_rule
 from fabriclib.setup.errors import SetupError
 
@@ -92,11 +93,13 @@ def run(ctx):
              (existing ufw rules kept; SSH rules fabric added earlier for a CIDR no longer allowed are removed —
              config/.firewall-ssh-allowed records fabric's own; whether ufw was on before is recorded once for undo),
              UNIT written, enabled and restarted, DOCKER-USER
-             rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is).
+             rebuilt — only after the `firewall` consent (else a warning, the host firewall left as it is; with ufw
+             already on, a decline stops setup here, D119: ufw would block fabric's containers from the DC).
              Off: DOCKER-USER
              opened (apply_docker_firewall returns "disabled"), fabric-firewall disabled, a warning; ufw is left
              as it is.
-    Fails:   SetupError when the SSH client is outside every allowed CIDR (would lock the operator out);
+    Fails:   SetupError when the SSH client is outside every allowed CIDR (would lock the operator out), or when
+             the firewall step is declined while ufw is on (D119);
              CalledProcessError from ufw, systemctl or iptables; KeyError without lan_cidr; ValueError for an
              invalid CIDR.
     Feeds:   setup step `firewall`, run by run_setup via STEPS."""
@@ -115,6 +118,10 @@ def run(ctx):
                          f"firewall would lock you out. Add it to security.firewall_allow or connect from the LAN.")
 
     if not check_consent(ctx.config_dir, "firewall", plan_firewall(ctx.vars, ctx.config_dir)):
+        if ufw_active():          # ufw's own rules would block fabric's containers from the DC on this host (D119)
+            raise SetupError("ufw is on, and without fabric's rules it blocks fabric's own containers from this "
+                             "host's domain controller (Keycloak, FreeRADIUS): setup would fail later. fabric only "
+                             "adds its own ports beside your rules: sudo fabricctl setup --approve firewall")
         return
     _keep_ufw_state(ctx.config_dir)
     ports = ssh_ports()          # what sshd listens on, not a guessed 22

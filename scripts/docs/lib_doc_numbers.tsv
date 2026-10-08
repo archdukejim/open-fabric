@@ -67,6 +67,7 @@ file	fabricctl-jinja|src/containers/samba/read_networks.py	45
 file	fabricctl-jinja|src/containers/samba/read_replication.py	60	
 file	fabricctl-jinja|src/containers/samba/read_sites.py	65	
 file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
+file	fabricctl-jinja|src/containers/samba/remove_ipv6_records.py	67	
 file	fabricctl-jinja|src/containers/samba/remove_machine.py	55	
 file	fabricctl-jinja|src/containers/samba/remove_role.py	38	
 file	fabricctl-jinja|src/containers/samba/reset_password.py	33	
@@ -454,6 +455,7 @@ file	fabriclib-security|src/fabriclib/security/run_security_command.py	7
 file	fabriclib-security|src/fabriclib/security/set_signin_layer.py	8	
 file	fabriclib-security|src/fabriclib/security/signin_layers.py	9	
 file	fabriclib-security|src/fabriclib/security/ssh_ports.py	5	
+file	fabriclib-security|src/fabriclib/security/ufw_active.py	11	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
 file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	
@@ -839,6 +841,7 @@ function	fabricctl-jinja|src/containers/samba/read_replication.py|_when	1
 function	fabricctl-jinja|src/containers/samba/read_replication.py|read_replication	2	
 function	fabricctl-jinja|src/containers/samba/read_sites.py|read_sites	1	
 function	fabricctl-jinja|src/containers/samba/remove_device.py|remove_device	1	
+function	fabricctl-jinja|src/containers/samba/remove_ipv6_records.py|remove_ipv6_records	1	
 function	fabricctl-jinja|src/containers/samba/remove_machine.py|remove_machine	1	
 function	fabricctl-jinja|src/containers/samba/remove_role.py|remove_role	1	
 function	fabricctl-jinja|src/containers/samba/reset_password.py|reset_password	1	
@@ -1355,6 +1358,7 @@ function	fabriclib-security|src/fabriclib/security/signin_layers.py|rank	3
 function	fabriclib-security|src/fabriclib/security/signin_layers.py|read_lowered	5	
 function	fabriclib-security|src/fabriclib/security/signin_layers.py|signin_rows	4	
 function	fabriclib-security|src/fabriclib/security/ssh_ports.py|ssh_ports	1	
+function	fabriclib-security|src/fabriclib/security/ufw_active.py|ufw_active	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	

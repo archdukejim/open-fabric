@@ -149,10 +149,20 @@ check("previous defaults are dropped (the new accounts apply), an admin's own id
       old["service_users"] == {"nginx": {"uid": 1443, "gid": 1443}} and len(changes) == 1, (old, changes))
 
 print("--- the firewall question")
-rules = plan_firewall({**v, "ntp_serve": False}, cfg)
+rules = plan_firewall({**v, "ntp_serve": False}, cfg, active=False)
 check("one line per rule fabric adds, plus the default policy and the DOCKER-USER limit",
       rules[0].startswith("ufw: deny incoming") and "ufw: allow 22/tcp (SSH) from 10.0.0.0/24" in rules
       and rules[-1].startswith("iptables DOCKER-USER"), rules)
+on = plan_firewall({**v, "ntp_serve": False}, cfg, active=True)
+check("ufw on already (D119): the question says the host's rules stay and lists only fabric's ports beside them",
+      on[0].startswith("ufw is on already, with your own rules: they stay") and on[1:] == rules[1:], on[:2])
+_orig = os.path.join(cfg, "host-originals")
+os.makedirs(_orig, exist_ok=True)
+with open(os.path.join(_orig, "ufw.state"), "w") as f:
+    f.write("active\n")
+check("the wording follows ufw as it was before fabric (its record), so it does not change once fabric turns it on",
+      plan_firewall({**v, "ntp_serve": False}, cfg)[0].startswith("ufw is on already"))
+os.remove(os.path.join(_orig, "ufw.state"))
 check("security.firewall false asks nothing", plan_firewall({**v, "security": {"firewall": False}}, cfg) == [])
 dc_rules = plan_firewall({**v, "ntp_serve": False, "ad_rpc_ports": "49152-49251"}, cfg)
 dc_lines = [r for r in dc_rules if "domain controller" in r]

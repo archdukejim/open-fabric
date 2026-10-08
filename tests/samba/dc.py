@@ -159,6 +159,33 @@ first = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, containe
 check("converge: schema, layout, groups, access, AD site, policy and GPOs made", len(first) > 30, first)
 again = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
 check("converge again changes nothing (idempotent)", again == [], again)
+
+# D120: the AD zones keep no AAAA (the DC listens on IPv4 only); one published from the host's IPv6 goes at converge
+AAAA_PROBE = r"""
+import sys
+sys.path.insert(0, "/fabric")
+import ldb
+from samba.dcerpc import dnsp
+from samba.dnsserver import AAAARecord
+from samba.ndr import ndr_pack, ndr_unpack
+from open_samdb import open_samdb
+samdb, lp = open_samdb("/data/etc/smb.conf")
+base, realm = str(samdb.domain_dn()), lp.get("realm").lower()
+dn = f"DC=@,DC={realm},CN=MicrosoftDNS,DC=DomainDnsZones,{base}"
+node = samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=["dnsRecord"])[0]
+types = lambda n: sorted({ndr_unpack(dnsp.DnssrvRpcRecord, bytes(r)).wType for r in n.get("dnsRecord", [])})
+if sys.argv[1] == "add":
+    m = ldb.Message(node.dn)
+    m["dnsRecord"] = ldb.MessageElement([ndr_pack(AAAARecord("fd01::d034"))], ldb.FLAG_MOD_ADD, "dnsRecord")
+    samdb.modify(m)
+print(types(samdb.search(base=dn, scope=ldb.SCOPE_BASE, attrs=["dnsRecord"])[0]))
+"""
+added = dc("python3", "-", "add", stdin=AAAA_PROBE).stdout.strip()
+cleaned = converge_domain(v, os.path.join(W, "federation.yaml"), SECRETS, container=DC)
+after = dc("python3", "-", "show", stdin=AAAA_PROBE).stdout.strip()
+check("an IPv6 record in the AD zone (from the host's IPv6) is removed by the next converge; its A stays (D120)",
+      "28" in added and any("IPv6 record removed" in c for c in cleaned) and "28" not in after and "1" in after,
+      (added, cleaned, after))
 check("converge wrote the site's networks into its OU=networks (the address plan, S4.1)",
       "network lan added" in first and [(n["site"], n["name"], n["cidr"]) for n in read_address_plan(v, SECRETS, DC)]
       == [("lan", "lan", SUBNET)], first)

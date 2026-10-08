@@ -48,6 +48,7 @@ elif [ -n "${JOIN_ROLE:-}" ]; then
     mkdir -p "$DATA/etc"
     samba-tool domain join "${REALM,,}" "$JOIN_ROLE" --server="$JOIN_SERVER" -A /run/secrets/join.auth \
         --targetdir="$DATA" --dns-backend=BIND9_DLZ --option="netbios name = $HOST_NAME" ${JOIN_SITE:+--site="$JOIN_SITE"} "${OPTS[@]}" \
+        --option="interfaces = $INTERFACES" --option="bind interfaces only = yes" \
         > /tmp/join.log 2>&1 || { show_log /tmp/join.log; exit 1; }
     rm -f /tmp/join.log
     touch "$DONE"
@@ -57,8 +58,11 @@ else
     clear_data
     # no --adminpass: provisioning makes a random one (and prints it: the log is discarded), replaced from the
     # secret file at once
+    # interfaces limited from the start: provisioning otherwise guesses the host's IPv6 addresses (host network) and
+    # publishes them as AAAA records the DC never answers on (D120: IPv4 only)
     samba-tool domain provision --targetdir="$DATA" --server-role=dc --use-rfc2307 --dns-backend=BIND9_DLZ \
         --realm="$REALM" --domain="$NETBIOS" --host-name="$HOST_NAME" --host-ip="$HOST_IP" "${OPTS[@]}" \
+        --option="interfaces = $INTERFACES" --option="bind interfaces only = yes" \
         > /tmp/provision.log 2>&1 || { show_log /tmp/provision.log; exit 1; }
     rm -f /tmp/provision.log
     python3 /usr/local/bin/set_password.py "$CONF" Administrator /run/secrets/admin_password
