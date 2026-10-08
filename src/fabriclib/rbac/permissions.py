@@ -16,6 +16,7 @@ PERMISSIONS = {
     "pki:read": "see the CA and issued certificates; inspect a CSR or certificate",
     "pki:issue": "issue key + certificate pairs, convert to .p12",
     "pki:sign": "sign uploaded CSRs",
+    "pki:revoke": "revoke issued certificates (published in the CRL at once, 2.1.5.10)",
     "pki:link-device": "link a certificate to a device",
     "devices:read": "see devices and device roles",
     "devices:enroll": "add devices",
@@ -51,7 +52,8 @@ BUNDLES = {
     "fabric-equipment-operator": ["status:read", "dns:read", "pki:read", "pki:link-device", "devices:read",
                                   "devices:enroll", "devices:admin", "roles:admin", "radius:read", "radius:admin",
                                   "domain:read", "machines:admin"],
-    "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:link-device", "devices:read"],
+    "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:revoke", "pki:link-device",
+                           "devices:read"],
     "fabric-helpdesk": ["status:read", "dns:read", "pki:read", "devices:read", "devices:enroll", "people:read",
                         "people:create", "people:reset", "domain:read"],
 }

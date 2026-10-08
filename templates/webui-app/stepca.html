@@ -2,6 +2,7 @@
 {% macro device_select() %}{% if devices %}<label>For device (optional — links the certificate to it)<select name="device"><option value="">—</option>{% for d in devices %}<option{{ ' selected' if d.name == device }}>{{ d.name }}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
 {% block body %}
 <h1>Step-CA · PKI</h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 <nav class="subtabs">
 {% for v, label in menu %}<a href="/stepca?view={{ v }}" class="subtab{{ ' active' if v == view }}">{{ label }}</a>{% endfor %}
@@ -100,13 +101,13 @@
 
 {% elif view == 'issued' %}
 <section class="card"><h2>Issued by hand</h2>
-<p class="muted">Certificates signed from a CSR or generated here (newest first). Service certificates are managed by setup and not listed.</p>
+<p class="muted">Certificates signed from a CSR or generated here, client certificates and site CAs (newest first). Service certificates are managed by setup and not listed. A revoked certificate is refused by FreeRADIUS and the web console at once (the CRL on <code>certs.&lt;domain&gt;/crl/</code>).</p>
 {% if issued %}
-<table><thead><tr><th>Subject</th><th>Names</th><th>How</th><th>Expires</th><th>By</th></tr></thead><tbody>
+<table><thead><tr><th>Subject</th><th>Names</th><th>How</th><th>Expires</th><th>By</th>{% if can('pki:revoke') %}<th>Revoke</th>{% endif %}</tr></thead><tbody>
 {% for c in issued %}
-<tr><td>{{ c.subject }}</td><td>{{ (c.sans or []) | join(', ') }}</td><td>{{ 'CSR' if c.kind == 'csr' else 'key + cert' }}</td>
+<tr><td>{{ c.subject }}</td><td>{{ (c.sans or []) | join(', ') }}</td><td>{{ {'csr': 'CSR', 'keypair': 'key + cert', 'client': 'client certificate', 'site-ca': 'site CA'}.get(c.kind, c.kind) }}</td>
 <td><span class="pill {{ 'ok' if c.status == 'valid' else ('warn' if c.status == 'expires soon' else 'bad') }}">{{ c.status }}</span> <span class="muted">{{ c.not_after }}</span></td>
-<td>{{ c.actor }} <span class="muted">{{ c.when }}</span></td></tr>
+<td>{{ c.actor }} <span class="muted">{{ c.when }}</span></td>{% if can('pki:revoke') %}<td>{% if c.status in ('valid', 'expires soon') %}<form method="post" action="/stepca/revoke"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="target" value="{{ c.serial }}"><select name="reason" aria-label="Reason"><option>unspecified</option><option>keyCompromise</option><option>superseded</option><option>cessationOfOperation</option><option>affiliationChanged</option></select> <button class="danger">Revoke</button></form>{% endif %}</td>{% endif %}</tr>
 {% endfor %}</tbody></table>
 {% else %}<p class="blank">Nothing issued by hand yet.</p>{% endif %}
 </section>

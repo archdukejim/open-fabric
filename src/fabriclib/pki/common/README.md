@@ -17,4 +17,5 @@ Helpers shared by the manual PKI operations.
 | `artifacts_dir.py` | The step user's scratch directory `stepca/data/artifacts` (created 0750) |
 | `valid_san.py` | Classify a subject alternative name as DNS / IP / e-mail, or reject it |
 | `safe_name.py` | Download file name from a certificate name |
+| `revoked_serials.py` | The serials revoked so far; serials compared without colons or leading zeros |
 | `cert_dates.py` | A certificate's validity (not before, not after) |

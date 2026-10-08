@@ -8,6 +8,9 @@
   fabricctl certs [--force|--scheduled]
                                  renew service certificates that need it (--force: all; --scheduled:
                                  the daily timer's run, recorded for status and doctor)
+  fabricctl certs issued         certificates issued by hand, client certificates and site CAs
+  fabricctl certs revoke <serial|name> [--reason R]
+                                 revoke one: published in the CRL at once
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
@@ -78,7 +81,6 @@ from fabriclib.system.render_template_file import render_template_file  # noqa: 
 from fabriclib.setup import run_setup  # noqa: E402
 from fabriclib.setup.backup_install import backup_install  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
-from fabriclib.setup.renew_service_certs import renew_service_certs  # noqa: E402
 from fabriclib.setup.restore_install import restore_install  # noqa: E402
 from fabriclib.setup.run_restore_command import run_restore_command  # noqa: E402
 from fabriclib.setup.run_uninstall_command import run_uninstall_command  # noqa: E402
@@ -86,6 +88,7 @@ from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
+from fabriclib.pki.run_certs_command import run_certs_command  # noqa: E402
 from fabriclib.pki.show_cert_warnings import show_cert_warnings  # noqa: E402
 from fabriclib.system.show_relaxed_settings import show_relaxed_settings  # noqa: E402
 
@@ -208,12 +211,9 @@ def main(argv):
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "certs":
-        flags = [a for a in args if a.startswith("--") and a != "--deploy-base"]
-        if set(flags) - {"--force", "--scheduled"} or {"--force", "--scheduled"} <= set(flags):
-            print("usage: fabricctl certs [--force | --scheduled]", file=sys.stderr)
-            return 2
-        return renew_service_certs(SetupContext(deploy_base=_base(args)), force="--force" in args,
-                                   scheduled="--scheduled" in args)
+        at = args.index("--deploy-base") if "--deploy-base" in args else None
+        rest = args if at is None else args[:at] + args[at + 2:]
+        return run_certs_command(SetupContext(deploy_base=_base(args)), rest)
     if cmd == "client-cert" and args and not args[0].startswith("-"):
         days = int(args[args.index("--days") + 1]) if "--days" in args else 365
         p12, password = hand_out_client_cert(SetupContext(deploy_base=_base(args)).load_state().vars, args[0], days)

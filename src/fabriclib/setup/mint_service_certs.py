@@ -5,6 +5,7 @@ from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.pki.install_cert import install_cert
 from fabriclib.pki.mint_cert import mint_cert
 from fabriclib.pki.needs_renewal import needs_renewal
+from fabriclib.pki.publish_crl import publish_crl
 from fabriclib.setup.mint_extra_certs import mint_extra_certs
 
 
@@ -58,8 +59,9 @@ def run(ctx):
              force_certs (re-issue even when current), Step-CA certs under <deploy_base>/stepca/data/certs.
     Returns: None. Certificates that exist, cover their names, chain to this CA, are younger than
              cert_renew_after_days and live no longer than cert_service_days (manual 2.1.5.4, 2.1.5.7) are left
-             alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the
-             FreeRADIUS ca.pem and the DNS filter's oauth2-proxy root_ca.crt only when changed. Services whose
+             alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the CRLs
+             are published every run (publish_crl: FreeRADIUS's ca.pem with them); the DNS filter's oauth2-proxy
+             root_ca.crt only when changed. Services whose
              certificates changed are added to
              ctx.restart_services.
     Fails:   SetupError from mint_cert (step-ca refused); OSError/CalledProcessError installing files;
@@ -104,14 +106,14 @@ def run(ctx):
         os.chmod(bundle, 0o644)
         ok("web UI client-certificate CA bundle")
     if ctx.vars.get("install_freeradius"):
-        # EAP-TLS accepts client certificates from the fabric CA only; the same
-        # bundle verifies the domain controller for the policy's directory lookups
-        uid, gid = ctx.uid("freeradius")
-        bundle = "".join(open(src).read() for src in (root_ca, *chain_cas))
         os.makedirs(ctx.path("freeradius", "certs"), mode=0o750, exist_ok=True)
-        if write_file_if_changed(ctx.path("freeradius", "certs", "ca.pem"), bundle, 0o644, uid, gid):
-            restart.add("freeradius")
-            ok("FreeRADIUS CA bundle")
+        os.chown(ctx.path("freeradius", "certs"), *ctx.uid("freeradius"))
+    crl = publish_crl(ctx.vars)              # the CRLs, and FreeRADIUS's CA bundle with them (2.1.5.10)
+    if crl["changed"]:
+        restart.add("nginx")
+    if crl["radius_changed"]:
+        restart.add("freeradius")
+        ok("FreeRADIUS CA bundle and CRLs")
     if ctx.vars.get("install_adguard"):
         # oauth2-proxy verifies Keycloak against this CA; on a first install the deploy ran before the CA existed
         if write_file_if_changed(ctx.path("adguard", "oauth2-proxy", "root_ca.crt"), open(root_ca).read(),

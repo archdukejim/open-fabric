@@ -45,6 +45,7 @@ from start_dc import start_dc  # noqa: E402
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.pki.install_cert import install_cert  # noqa: E402
+from fabriclib.pki.publish_crl import _gencrl  # noqa: E402
 from fabriclib.radius.deploy_freeradius import deploy_freeradius  # noqa: E402
 from fabriclib.radius.normalize_radius_clients import normalize_radius_clients  # noqa: E402
 from fabriclib.radius.normalize_radius_people import normalize_radius_people  # noqa: E402
@@ -223,8 +224,20 @@ deploy_freeradius(rv, {"radius_secrets": embedded, "ad_radius_password": SECRETS
                   jinja_env(os.path.join(REPO, "templates")))
 install_cert(f"{W}/pki/radius.chain", f"{W}/pki/radius.key", f"{W}/pki/root.crt", f"{W}/freeradius/certs", 610, 610,
              names=("server.pem", "server.key", None))
-with open(f"{W}/freeradius/certs/ca.pem", "w") as f:       # as setup's certificate step writes it
-    f.write(open(f"{W}/pki/root.crt").read() + open(f"{W}/pki/int.crt").read())
+CRL_PW = f"{W}/pki/crl.pw"
+open(CRL_PW, "w").write("unused\n")                          # the test CA's key is not encrypted
+
+
+def write_ca_pem(revoked=()):
+    """FreeRADIUS's ca.pem as fabric's publish_crl writes it: the CA certificates, then the intermediate's CRL
+    (check_crl = yes, 2.1.5.10); revoked — serials in that CRL."""
+    entries = [{"serial": s, "when": "2026-10-08T10:00:00+00:00", "reason": "keyCompromise"} for s in revoked]
+    crl = _gencrl(f"{W}/pki/int.crt", f"{W}/pki/int.key", CRL_PW, entries)
+    with open(f"{W}/freeradius/certs/ca.pem", "w") as f:       # as setup's certificate step writes it
+        f.write(open(f"{W}/pki/root.crt").read() + open(f"{W}/pki/int.crt").read() + crl)
+
+
+write_ca_pem()
 check("config: clients.conf holds the client secret, mode 0640 (never world-readable)",
       oct(os.stat(f"{W}/freeradius/config/clients.conf").st_mode & 0o777) == "0o640"
       and SECRET in open(f"{W}/freeradius/config/clients.conf").read())
@@ -339,6 +352,18 @@ check("EAP-TLS: unlinking the certificate refuses it at the next authentication"
       not ok and "REJECT method=eap-tls device=- reason=no_device_has_it" in logs()
       and f"sha256={FP['laptop1']}" in logs().rsplit("REJECT method=eap-tls", 1)[-1], logs()[-400:])
 link_mod.link_device_cert(V, "test", "laptop1", FP["laptop1"])
+laptop1_serial = sh(["openssl", "x509", "-in", f"{W}/pki/laptop1.crt", "-noout", "-serial"]).stdout.strip().split("=")[1]
+write_ca_pem(revoked=[laptop1_serial])                       # revoked, still linked (2.1.5.10)
+sh("docker rm -f rt-radius", ok=False)
+start_radius()
+ok, _, out = eap_tls("laptop1")
+check("EAP-TLS: a revoked certificate is refused in the TLS handshake even while its device is linked (CRL)",
+      not ok, out[-400:])
+ok, vlan, _ = eap_tls("laptop3")
+check("EAP-TLS: …and a certificate that is not revoked still gets in", ok, logs()[-400:])
+write_ca_pem()
+sh("docker rm -f rt-radius", ok=False)
+start_radius()
 
 # ------------------------------------------------------------------ EAP-TTLS (people)
 def eap_ttls(user, password, mac="02:00:00:00:20:01"):

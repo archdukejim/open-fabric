@@ -349,6 +349,8 @@ http {
         # nested site (site_ca_depth). Leaves under a subordinate CA minted
         # with --intermediate-ca are one level deeper and fail.
         ssl_client_certificate /etc/nginx/certs/client-ca/ca-bundle.pem;
+        # revoked client certificates refused (2.1.5.10): ssl_crl, written by fabriclib/pki/publish_crl.py
+        include /etc/nginx/conf.d/client-crl.inc;
         ssl_verify_depth {{ 2 + (site_ca_depth | default(0) | int) }};
 {% if webui_client_cert | default(false) | bool %}
         ssl_verify_client on;

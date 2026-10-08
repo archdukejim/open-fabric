@@ -23,7 +23,8 @@ eap {
 		ecdh_curve = ""
 		fragment_size = 1024
 		include_length = yes
-		check_crl = no
+		# revoked certificates refused (2.1.5.10): the CRLs are in ca.pem (fabriclib/pki/publish_crl.py)
+		check_crl = yes
 		# No session resumption: every connection is checked against the
 		# directory, so a disabled device or an unlinked certificate is out
 		# at its next authentication.

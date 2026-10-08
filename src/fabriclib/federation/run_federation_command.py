@@ -27,7 +27,7 @@ USAGE = """usage: fabricctl federation status                 this install's pla
        fabricctl federation relay direct           on a site: stop using its relay node, talk to the upstream
        fabricctl federation invitations            open invitations
        fabricctl federation networks               the address plan: every site's networks, VLANs, notes, overlaps
-       fabricctl federation remove <site>          forget a site that joined here (its CA stays valid until it expires)
+       fabricctl federation remove <site>          forget a site that joined here (its CA revoked)
        fabricctl federation reparent [@FILE|-]     on a site: move under the parent whose invitation you paste
        fabricctl federation revoke <id|site>       withdraw an open invitation
   On the new site: sudo fabricctl setup --join   (a fresh install; paste the invitation at the prompt)"""
@@ -112,10 +112,10 @@ def run_federation_command(ctx, argv):
             print(f"relay {relay.get('site')} dropped: this site talks to its upstream directly")
             return 0
         if cmd == "remove" and len(args) == 1:
-            remove_site("root", args[0], v=v)
+            gone = remove_site("root", args[0], v=v)
             ok, output = apply_changes("root", "cli")
-            print(f"{args[0]} removed (its delegation and secondary zone too); its CA stays valid until it expires "
-                  "(revocation is not built yet)" if ok else output[-2000:])
+            print(f"{args[0]} removed (its delegation and secondary zone too); {gone['revoked'] or 'it had no CA'}"
+                  if ok else output[-2000:])
             return 0 if ok else 1
         if cmd == "reparent" and len(args) <= 1:
             res = reparent_site(ctx, "root", read_join_invitation(args[0] if args else ""))

@@ -378,6 +378,7 @@ file	fabriclib-pki|src/fabriclib/pki/common/cert_dates.py	38
 file	fabriclib-pki|src/fabriclib/pki/common/describe_cert.py	7	
 file	fabriclib-pki|src/fabriclib/pki/common/openssl.py	8	
 file	fabriclib-pki|src/fabriclib/pki/common/record_issued.py	9	
+file	fabriclib-pki|src/fabriclib/pki/common/revoked_serials.py	41	
 file	fabriclib-pki|src/fabriclib/pki/common/run_step.py	10	
 file	fabriclib-pki|src/fabriclib/pki/common/safe_name.py	11	
 file	fabriclib-pki|src/fabriclib/pki/common/to_pem.py	12	
@@ -399,7 +400,10 @@ file	fabriclib-pki|src/fabriclib/pki/mint_offline_cert.py	27
 file	fabriclib-pki|src/fabriclib/pki/needs_renewal.py	28	
 file	fabriclib-pki|src/fabriclib/pki/pick_up_cert.py	39	
 file	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py	29	
+file	fabriclib-pki|src/fabriclib/pki/publish_crl.py	42	
 file	fabriclib-pki|src/fabriclib/pki/replace_site_ca.py	30	
+file	fabriclib-pki|src/fabriclib/pki/revoke_cert.py	43	
+file	fabriclib-pki|src/fabriclib/pki/run_certs_command.py	44	
 file	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py	31	
 file	fabriclib-pki|src/fabriclib/pki/run_service_cert_command.py	32	
 file	fabriclib-pki|src/fabriclib/pki/show_cert_warnings.py	40	
@@ -615,6 +619,7 @@ file	webui|src/webui/agentclient/remove_reservation.py	35
 file	webui|src/webui/agentclient/remove_subnet.py	36	
 file	webui|src/webui/agentclient/reset_sign_in.py	37	
 file	webui|src/webui/agentclient/reverse_zones.py	38	
+file	webui|src/webui/agentclient/revoke_cert.py	137	
 file	webui|src/webui/agentclient/rotate_radius_secret.py	39	
 file	webui|src/webui/agentclient/rotate_tsig_key.py	40	
 file	webui|src/webui/agentclient/save_device.py	41	
@@ -1264,6 +1269,8 @@ function	fabriclib-pki|src/fabriclib/pki/common/cert_dates.py|cert_dates	1
 function	fabriclib-pki|src/fabriclib/pki/common/describe_cert.py|describe_cert	1	
 function	fabriclib-pki|src/fabriclib/pki/common/openssl.py|openssl	1	
 function	fabriclib-pki|src/fabriclib/pki/common/record_issued.py|record_issued	1	
+function	fabriclib-pki|src/fabriclib/pki/common/revoked_serials.py|norm_serial	1	
+function	fabriclib-pki|src/fabriclib/pki/common/revoked_serials.py|revoked_serials	2	
 function	fabriclib-pki|src/fabriclib/pki/common/run_step.py|run_step	1	
 function	fabriclib-pki|src/fabriclib/pki/common/safe_name.py|safe_name	1	
 function	fabriclib-pki|src/fabriclib/pki/common/to_pem.py|to_pem	1	
@@ -1290,7 +1297,16 @@ function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|_info	2
 function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|_openssl	1	
 function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|_write_if_changed	3	
 function	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py|publish_ca_certs	4	
+function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|_gencrl	3	
+function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|_index_line	2	
+function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|_owner	6	
+function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|_revoked	1	
+function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|_site_crls	4	
+function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|publish_crl	5	
 function	fabriclib-pki|src/fabriclib/pki/replace_site_ca.py|replace_site_ca	1	
+function	fabriclib-pki|src/fabriclib/pki/revoke_cert.py|_issuer_of	1	
+function	fabriclib-pki|src/fabriclib/pki/revoke_cert.py|revoke_cert	2	
+function	fabriclib-pki|src/fabriclib/pki/run_certs_command.py|run_certs_command	1	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_ask	1	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_show	2	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|run_mint_certs_command	3	
@@ -1634,6 +1650,7 @@ function	webui|src/webui/agentclient/remove_reservation.py|remove_reservation	1
 function	webui|src/webui/agentclient/remove_subnet.py|remove_subnet	1	
 function	webui|src/webui/agentclient/reset_sign_in.py|reset_sign_in	1	
 function	webui|src/webui/agentclient/reverse_zones.py|reverse_zones	1	
+function	webui|src/webui/agentclient/revoke_cert.py|revoke_cert	1	
 function	webui|src/webui/agentclient/rotate_radius_secret.py|rotate_radius_secret	1	
 function	webui|src/webui/agentclient/rotate_tsig_key.py|rotate_tsig_key	1	
 function	webui|src/webui/agentclient/save_device.py|save_device	1	
