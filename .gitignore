@@ -16,3 +16,6 @@ dist/
 
 # staged image build contexts (packaging/images/stage-contexts.sh, manual 4.7.1)
 /build/
+
+# packages downloaded for inspection never belong in the repository
+/*.deb
