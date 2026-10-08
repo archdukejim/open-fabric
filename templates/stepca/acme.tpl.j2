@@ -1,0 +1,16 @@
+{# Step-CA x509 template for the ACME provisioner (manual 2.1.5.8): machines on the LAN get names under fabric's
+   domain only, never an address. A self-hosted Step-CA enforces policies only for the whole authority (which would
+   also bind fabric's own service certificates), so the ACME provisioner's template refuses the rest itself.
+   Rendered by Jinja; Go template directives are in raw blocks for step-ca. #}
+{% raw %}{{- range .SANs }}{{- if ne .Type "dns" }}{{ fail "ACME: names only, no addresses (fabric 2.1.5.8)" }}{{- end }}{% endraw %}
+{% raw %}{{- if not (or (eq .Value "{% endraw %}{{ domain }}{% raw %}") (hasSuffix ".{% endraw %}{{ domain }}{% raw %}" .Value)) }}{{ fail (printf "ACME: %s is not under {% endraw %}{{ domain }}{% raw %} (fabric 2.1.5.8)" .Value) }}{{- end }}{{- end }}{% endraw %}
+{
+    "subject": {
+        "commonName": {% raw %}{{ if .Subject.CommonName }}{{ toJson .Subject.CommonName }}{{ else if .Insecure.CR.DNSNames }}{{ toJson (index .Insecure.CR.DNSNames 0) }}{{ else }}""{{ end }}{% endraw %},
+        "organization": ["{{ cert_org }}"]
+    },
+    "sans": {% raw %}{{ toJson .SANs }}{% endraw %},
+    "keyUsage": ["digitalSignature", "keyEncipherment"],
+    "extKeyUsage": ["serverAuth", "clientAuth"],
+    "crlDistributionPoints": ["http://{{ hostname_certs }}/crl/intermediate.crl"]
+}

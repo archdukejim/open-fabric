@@ -8,6 +8,7 @@ Certificates from fabric's Step-CA.
 | `check_cert_lifetimes.py` | Refuses certificate lifetimes that cannot work (2.1.5.4, 2.1.5.6) |
 | `publish_crl.py` | Publish the CRLs (the intermediate's; the root's where its key is here) to the certs host, nginx and FreeRADIUS (2.1.5.10) |
 | `revoke_cert.py` | Revoke a certificate fabric issued, by serial or name; the CRLs published at once |
+| `run_acme_command.py` | `fabricctl acme`: the ACME directory for LAN machines, their DNS-01 keys (2.1.5.8) |
 | `run_certs_command.py` | `fabricctl certs`: renewal, the issued list, revocation |
 | `pick_up_cert.py` | How a service takes a renewed certificate: a reload, by itself, or a restart (2.1.5.4) |
 | `needs_renewal.py` | True if a cert is missing, expires within 30 days, lacks a required DNS/IP name, or is not from the current CA |

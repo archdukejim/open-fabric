@@ -9,6 +9,8 @@
                                  renew service certificates that need it (--force: all; --scheduled:
                                  the daily timer's run, recorded for status and doctor)
   fabricctl certs issued         certificates issued by hand, client certificates and site CAs
+  fabricctl acme info|enroll|list|remove
+                                 ACME from fabric's CA for machines on the LAN (DNS-01 keys)
   fabricctl certs revoke <serial|name> [--reason R]
                                  revoke one: published in the CRL at once
   fabricctl tsig list|add|update|set-secret|rotate|remove
@@ -88,6 +90,7 @@ from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
+from fabriclib.pki.run_acme_command import run_acme_command  # noqa: E402
 from fabriclib.pki.run_certs_command import run_certs_command  # noqa: E402
 from fabriclib.pki.show_cert_warnings import show_cert_warnings  # noqa: E402
 from fabriclib.system.show_relaxed_settings import show_relaxed_settings  # noqa: E402
@@ -101,6 +104,16 @@ def _base(args):
     Fails:   IndexError if --deploy-base is the last argument (no value follows).
     Feeds:   main (the SetupContext of every command, restore and uninstall)."""
     return args[args.index("--deploy-base") + 1] if "--deploy-base" in args else "/opt"
+
+
+def _without_base(args):
+    """Purpose: a subcommand's arguments without "--deploy-base DIR" (the commands that check their arguments).
+    Inputs:  args — list of str.
+    Returns: list of str.
+    Fails:   never.
+    Feeds:   main (acme, certs)."""
+    at = args.index("--deploy-base") if "--deploy-base" in args else None
+    return args if at is None else args[:at] + args[at + 2:]
 
 
 def _confirm(prompt, args):
@@ -210,10 +223,10 @@ def main(argv):
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "acme":
+        return run_acme_command(SetupContext(deploy_base=_base(args)), _without_base(args))
     if cmd == "certs":
-        at = args.index("--deploy-base") if "--deploy-base" in args else None
-        rest = args if at is None else args[:at] + args[at + 2:]
-        return run_certs_command(SetupContext(deploy_base=_base(args)), rest)
+        return run_certs_command(SetupContext(deploy_base=_base(args)), _without_base(args))
     if cmd == "client-cert" and args and not args[0].startswith("-"):
         days = int(args[args.index("--days") + 1]) if "--days" in args else 365
         p12, password = hand_out_client_cert(SetupContext(deploy_base=_base(args)).load_state().vars, args[0], days)

@@ -403,6 +403,7 @@ file	fabriclib-pki|src/fabriclib/pki/publish_ca_certs.py	29
 file	fabriclib-pki|src/fabriclib/pki/publish_crl.py	42	
 file	fabriclib-pki|src/fabriclib/pki/replace_site_ca.py	30	
 file	fabriclib-pki|src/fabriclib/pki/revoke_cert.py	43	
+file	fabriclib-pki|src/fabriclib/pki/run_acme_command.py	45	
 file	fabriclib-pki|src/fabriclib/pki/run_certs_command.py	44	
 file	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py	31	
 file	fabriclib-pki|src/fabriclib/pki/run_service_cert_command.py	32	
@@ -949,6 +950,7 @@ function	fabriclib-core|src/fabriclib/cli.py|_base	1
 function	fabriclib-core|src/fabriclib/cli.py|_confirm	2	
 function	fabriclib-core|src/fabriclib/cli.py|_flags	4	
 function	fabriclib-core|src/fabriclib/cli.py|_version	3	
+function	fabriclib-core|src/fabriclib/cli.py|_without_base	6	
 function	fabriclib-core|src/fabriclib/cli.py|main	5	
 function	fabriclib-deploy|src/fabriclib/deploy/apply_deployment.py|_deploy	2	
 function	fabriclib-deploy|src/fabriclib/deploy/apply_deployment.py|_prepare	1	
@@ -1306,6 +1308,8 @@ function	fabriclib-pki|src/fabriclib/pki/publish_crl.py|publish_crl	5
 function	fabriclib-pki|src/fabriclib/pki/replace_site_ca.py|replace_site_ca	1	
 function	fabriclib-pki|src/fabriclib/pki/revoke_cert.py|_issuer_of	1	
 function	fabriclib-pki|src/fabriclib/pki/revoke_cert.py|revoke_cert	2	
+function	fabriclib-pki|src/fabriclib/pki/run_acme_command.py|_info	1	
+function	fabriclib-pki|src/fabriclib/pki/run_acme_command.py|run_acme_command	2	
 function	fabriclib-pki|src/fabriclib/pki/run_certs_command.py|run_certs_command	1	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_ask	1	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_show	2	

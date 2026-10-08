@@ -26,16 +26,17 @@ def _chown_tree(path, uid, gid):
 
 def _configure_ca_json(ca_json, v):
     """Purpose: converge Step-CA's ca.json after `step ca init`: bring-your-own chain paths, DNS names,
-             certificate lifetimes, an ACME provisioner with fabric's leaf template.
-    Inputs:  ca_json — path to ca.json; v — vars: byoc, hostname_stepca, stepca_cert_max_lifetime_hours
-             (default 131400h), stepca_cert_allow_subordinate_ca, cert_acme_lifetime_hours (default 2160h).
-    Returns: None; ca.json rewritten (tab-indented); with byoc its crt is certs/intermediate_chain.crt (the
+             certificate lifetimes, an ACME provisioner with fabric's ACME template.
+    Inputs:  ca_json — path to ca.json; v — vars: byoc, hostname_stepca, domain, stepca_cert_max_lifetime_hours
+             (default 131400h), stepca_cert_allow_subordinate_ca, cert_acme_lifetime_hours (default 1128h).
+    Returns: True if ca.json changed (rewritten, tab-indented; restart Step-CA). The ACME provisioner's template issues
+             for names under the domain only (2.1.5.8, acme.tpl). With byoc its crt is certs/intermediate_chain.crt (the
              intermediate followed by its parent CAs, so a nested site's certificates carry the whole chain).
              With stepca_cert_allow_subordinate_ca the JWK provisioner
              may issue the basicConstraints extension (2.5.29.19).
     Fails:   OSError/json.JSONDecodeError reading ca.json; KeyError without hostname_stepca or
              "authority" in ca.json.
-    Feeds:   run."""
+    Feeds:   run (the first initialisation, and every later run so existing installs converge)."""
     with open(ca_json) as f:
         cfg = json.load(f)
     if v.get("byoc"):
@@ -52,11 +53,19 @@ def _configure_ca_json(ca_json, v):
         if p.get("type") == "JWK" and v.get("stepca_cert_allow_subordinate_ca"):
             p.setdefault("options", {}).setdefault("x509", {})["allowedExtensions"] = ["2.5.29.19"]
         if p.get("type") == "ACME":
-            life = str(v.get("cert_acme_lifetime_hours", "2160h"))
+            life = str(v.get("cert_acme_lifetime_hours", "1128h"))
             p.setdefault("claims", {}).update({"defaultTLSCertDuration": life, "maxTLSCertDuration": life})
-            p.setdefault("options", {})["x509"] = {"templateFile": "/home/step/templates/certs/leaf.tpl"}
+            # LAN machines get names under fabric's domain only, never an address (2.1.5.8): acme.tpl refuses the
+            # rest (a self-hosted Step-CA enforces policies only for the whole authority)
+            p.setdefault("options", {})["x509"] = {"templateFile": "/home/step/templates/certs/acme.tpl"}
+            p.pop("policy", None)
+    text = json.dumps(cfg, indent="\t")
+    with open(ca_json) as f:
+        if f.read() == text:
+            return False
     with open(ca_json, "w") as f:
-        json.dump(cfg, f, indent="\t")
+        f.write(text)
+    return True
 
 
 def _single_intermediate(path):
@@ -216,6 +225,10 @@ def run(ctx):
     uid, gid = ctx.uid("step")
     if os.path.exists(ca_json):
         _check_root_lifetime(v, os.path.join(data, "certs"))
+        if _configure_ca_json(ca_json, v):
+            _chown_tree(os.path.join(data, "config"), uid, gid)
+            ctx.restart_services.add("stepca")
+            ok("Step-CA's configuration converged (lifetimes, ACME for names under the domain)")
         if _single_intermediate(os.path.join(data, "certs", "intermediate_ca.crt")):
             ctx.restart_services.add("stepca")
             ok("intermediate_ca.crt: the intermediate alone (the root it carried is in root_ca.crt)")
