@@ -582,7 +582,7 @@ check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'dock
 check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /opt/kea /opt/freeradius /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl /etc/fabric /usr/lib/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id fabric-vault' >/dev/null 2>&1"
 check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 check "uninstall listed every host change first (removed, undone, kept)" \
-    "grep -qE 'Host firewall +undone' '$OUT/uninstall.log' && grep -qE 'Docker daemon settings +kept' '$OUT/uninstall.log' && grep -qE 'Service accounts +removed' '$OUT/uninstall.log'"
+    "grep -qE 'Secure this host +undone' '$OUT/uninstall.log' && grep -qE 'Ports fabric needs +undone' '$OUT/uninstall.log' && grep -qE 'Docker daemon settings +kept' '$OUT/uninstall.log' && grep -qE 'Service accounts +removed' '$OUT/uninstall.log'"
 check "uninstall put chrony's own configuration back and left ufw as it was before fabric ($UFW_BEFORE)" \
     "! in_box 'grep -q \"^# fabric\" /etc/chrony/chrony.conf' && ! in_box 'ufw status' | grep -qE '22/tcp|123/udp' \
      && in_box 'ufw status' | grep -q \"Status: $UFW_BEFORE\""

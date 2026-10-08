@@ -1312,7 +1312,7 @@ tests/sandbox/posix_check.py	4aa85de6fc7fc9b21dc141f19d92bb1f42c60bc8	2026-10-02
 tests/sandbox/radius_device.py	12b3e1127a0cc5966846fe0554dc84da7a2e5449	2026-10-05	
 tests/sandbox/radius_mab.py	c9575e9fd8e3c3d52dbd77b879b9ef9a6bd148d5	2026-09-30	
 tests/sandbox/rfc2136_test.sh	21e1a72cdc0eb36df39f8f49725d5476048d3a28	2026-10-02	
-tests/sandbox/run.sh	6df301d97c30f07a0e93f4803ec7fb057cb6ec98	2026-10-07	
+tests/sandbox/run.sh	98769bbc1cb4a2abda17e5cbb4ce65b502dfc15d	2026-10-08	
 tests/sandbox/set_lock.py	3f76da2458bc18d18fbf3efb8b176900a0984ae7	2026-09-30	
 tests/security/README.md	5181e9d08a03731704c2b1580b9901a2206849ad	2026-10-07	
 tests/security/run.py	a364941c08bcfbf13803c1a1cf6e6f908fc95b66	2026-10-07	
