@@ -6,7 +6,7 @@ import yaml
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
-from fabriclib.deploy.check_samba_settings import POLICY_KEYS
+from fabriclib.samba.check_password_policy import POLICY_KEYS
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.decode_invitation import decode_invitation

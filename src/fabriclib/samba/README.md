@@ -28,3 +28,4 @@ itself is a container (`templates/samba`, `packaging/images/samba`); what conver
 | `replication_status.py` | This DC's inbound replication per partition, read from its own `repsFrom` inside the DC |
 | `domain_sites.py` | Every site in the domain, read inside this site's DC (the next id block a join hands out; a site moving here) |
 | `list_conflicts.py` | AD's `CNF:` objects: names made on two DCs while apart |
+| `check_password_policy.py` | The password policy as AD takes it (ranges, minimum age below maximum, lockout at least its window); setup asks again at once, deploy refuses |

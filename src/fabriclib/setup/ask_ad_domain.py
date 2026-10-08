@@ -1,5 +1,6 @@
 from fabriclib.common.console import BOLD, NC, YELLOW
-from fabriclib.deploy.check_samba_settings import POLICY_KEYS
+from fabriclib.common.errors import ValidationError
+from fabriclib.samba.check_password_policy import POLICY_KEYS, check_password_policy
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
 # what each policy question asks (D89: nothing is preselected)
@@ -37,7 +38,8 @@ def ask_ad_domain(ctx):
              (D89: asked, never preselected). Fabric's directory is a Samba AD domain on every install.
     Inputs:  ctx — SetupContext; reads and sets ctx.vars ad_domain, ad_password_policy; domain for the suggestion.
              Interactive.
-    Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is).
+    Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is). A policy AD
+             would refuse (check_password_policy) is explained and asked again, its answers kept as defaults.
     Fails:   EOFError from input().
     Feeds:   setup/collect_vars."""
     print("\n  fabric's directory is a Samba AD domain (people, groups, devices; Windows and Linux machines may join).")
@@ -59,16 +61,22 @@ def ask_ad_domain(ctx):
         print(f"    {YELLOW}a domain of two labels or more, not {domain} itself nor a parent of it{NC}")
     print("    The password policy is yours: nothing is preselected (D89).")
     policy = dict(ctx.vars.get("ad_password_policy") or {})
-    for key, question in POLICY_QUESTIONS:
-        low, high = POLICY_KEYS[key]
-        policy[key] = _number(question, low, high, policy.get(key))
-    while True:
-        hint = {True: " [y]", False: " [n]"}.get(policy.get("complexity"), "")
-        answer = input(f"    Require letters of both cases, digits or symbols (complexity) [y/n]{hint}: ")
-        answer = answer.strip().lower()
-        if not answer and isinstance(policy.get("complexity"), bool):
+    while True:                           # checked as AD takes it, so a bad pair is asked again here, not at deploy
+        for key, question in POLICY_QUESTIONS:
+            low, high = POLICY_KEYS[key]
+            policy[key] = _number(question, low, high, policy.get(key))
+        while True:
+            hint = {True: " [y]", False: " [n]"}.get(policy.get("complexity"), "")
+            answer = input(f"    Require letters of both cases, digits or symbols (complexity) [y/n]{hint}: ")
+            answer = answer.strip().lower()
+            if not answer and isinstance(policy.get("complexity"), bool):
+                break
+            if answer[:1] in ("y", "n"):
+                policy["complexity"] = answer.startswith("y")
+                break
+        try:
+            check_password_policy(policy)
             break
-        if answer[:1] in ("y", "n"):
-            policy["complexity"] = answer.startswith("y")
-            break
+        except ValidationError as e:
+            print(f"    {YELLOW}{e}{NC}\n    Again (Enter keeps an answer):")
     ctx.vars["ad_password_policy"] = policy
