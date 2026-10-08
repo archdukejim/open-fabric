@@ -24,7 +24,8 @@ def check_samba_settings(v):
     if not ad:
         raise ValidationError("ad_domain is required: the directory's AD domain, chosen once (manual 2.1.9.8; "
                               f"suggested: {suggested_ad_domain(domain) or 'ad.<parent of ' + domain + '>'})")
-    if len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253:
+    if (len(labels) < 2 or not all(_LABEL.match(x) for x in labels) or len(ad) > 253
+            or labels[-1] in ("local", "localhost")):
         raise ValidationError(f"ad_domain {ad!r} is not a valid DNS domain of two labels or more")
     if ad == domain:
         raise ValidationError(f"ad_domain cannot be fabric's own domain ({ad}): the AD zone is always a zone of its "

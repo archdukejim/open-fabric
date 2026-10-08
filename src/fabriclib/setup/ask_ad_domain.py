@@ -1,7 +1,11 @@
+import re
+
 from fabriclib.common.console import BOLD, NC, YELLOW
 from fabriclib.common.errors import ValidationError
 from fabriclib.samba.check_password_policy import POLICY_KEYS, check_password_policy
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
+
+_LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")    # as check_samba_settings takes them
 
 # what each policy question asks (D89: nothing is preselected)
 POLICY_QUESTIONS = [
@@ -57,10 +61,14 @@ def ask_ad_domain(ctx):
     while True:
         answer = input(f"    AD domain{f' [{suggestion}]' if suggestion else ''}: ").strip().lower()
         chosen = answer or suggestion
-        if chosen and chosen != domain and "." in chosen and not domain.endswith("." + chosen):
+        labels = chosen.split(".")
+        if (chosen and chosen != domain and len(labels) >= 2 and all(_LABEL.match(x) for x in labels)
+                and len(chosen) <= 253 and not domain.endswith("." + chosen)
+                and labels[-1] not in ("local", "localhost")):
             ctx.vars["ad_domain"] = chosen
             break
-        print(f"    {YELLOW}a domain of two labels or more, not {domain} itself nor a parent of it{NC}")
+        print(f"    {YELLOW}a domain of two labels or more (letters, digits, hyphens), not .local, not {domain} itself "
+              f"nor a parent of it{NC}")
     print("    The password policy is yours: nothing is preselected (D89).")
     policy = dict(ctx.vars.get("ad_password_policy") or {})
     while True:                           # checked as AD takes it, so a bad pair is asked again here, not at deploy

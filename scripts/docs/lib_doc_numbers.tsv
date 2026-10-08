@@ -1379,6 +1379,7 @@ function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|choose_plan	6
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_ask	3	
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_join_defaults	4	
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_load	2	
+function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_network_problem	6	
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|_valid	1	
 function	fabriclib-setup|src/fabriclib/setup/collect_vars.py|collect_vars	5	
 function	fabriclib-setup|src/fabriclib/setup/common/docker_ready.py|docker_ready	1	

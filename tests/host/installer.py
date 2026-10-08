@@ -1,0 +1,212 @@
+"""The installer test (manual 4.8.2): `sudo fabricctl setup` driven through a real terminal on a test host, as a
+person who gets things wrong would — every question first given answers it must refuse, each refusal checked by its
+message, then the good answer. Two runs:
+  1. a fresh host with ufw already on: every refusal, then the host firewall declined — setup must stop before any
+     step, saying why (D119), with nothing started;
+  2. the same host again: valid answers (an invalid plan choice and consent answer first), everything allowed —
+     setup must finish, then doctor, and the checks a person would make (the domain on IPv4 only, D120; the landing
+     page at the host's own name; the host's own ufw rules kept beside fabric's).
+The host is left installed for a person to look at. Run from a Linux machine that reaches the host with a key:
+    TARGET=tempuser@192.168.5.57 KEY=~/.ssh/fabric-test_ed25519 HOST_IP=192.168.5.57 DOMAIN=home.arpa \\
+        python3 tests/host/installer.py
+The host needs fabricctl installed (apt) and nothing of fabric's set up (the script uninstalls a previous install).
+"""
+import os
+import pty
+import re
+import select
+import subprocess
+import sys
+import time
+
+TARGET, KEY = os.environ["TARGET"], os.path.expanduser(os.environ["KEY"])
+HOST_IP, DOMAIN = os.environ["HOST_IP"], os.environ.get("DOMAIN", "home.arpa")
+FOREIGN_IP = os.environ.get("FOREIGN_IP", "192.168.7.250")    # in the host's subnet, but not one of its addresses
+OUT = os.environ.get("OUT", "/tmp/fabric-tests/installer")
+SSH = ["ssh", "-o", "BatchMode=yes", "-i", KEY, TARGET]
+PASS = FAIL = 0
+
+
+def check(name, ok, detail=""):
+    global PASS, FAIL
+    PASS, FAIL = PASS + bool(ok), FAIL + (not ok)
+    print(("PASS " if ok else "FAIL ") + name + ("" if ok else f"  -> {str(detail)[-600:]}"), flush=True)
+
+
+def R(cmd):
+    """A command on the host as root; its output."""
+    return subprocess.run(SSH + [f"sudo -n bash -lc {subprocess.list2cmdline([cmd])}"], capture_output=True,
+                          text=True).stdout
+
+
+# (question, the end of its prompt) — matched against the last characters on the screen
+PROMPTS = [
+    ("domain", r"DNS domain for this network.*\]: $"),
+    ("hostname", r"Name of this host.*\]: $"),
+    ("host_ip", r"LAN IP address of this host.*\]: $"),
+    ("lan_cidr", r"LAN subnet \(CIDR\).*\]: $"),
+    ("lan_gateway", r"LAN gateway \(router\) IP.*\]: $"),
+    ("friendly_name", r"Organisation / network name.*\]: $"),
+    ("admin", r"Username of the first web UI admin.*\]: $"),
+    ("ad_domain", r"AD domain( \[[^\]]*\])?: $"),
+    ("min_length", r"Minimum password length.*: $"),
+    ("history", r"Previous passwords remembered.*: $"),
+    ("min_age", r"Days before a new password may be changed.*: $"),
+    ("max_age", r"Days a password is valid.*: $"),
+    ("threshold", r"Lock an account after how many failed sign-ins.*: $"),
+    ("window", r"counting the failures over how many minutes.*: $"),
+    ("lock", r"then keep it locked for how many minutes.*: $"),
+    ("complexity", r"\(complexity\) \[y/n\].*: $"),
+    ("memory", r"GB of memory fabric may use \[\d+\]: $"),
+    ("plan", r"\[P\]roceed, \[A\]dvanced, or \[Q\]uit\? $"),
+    ("consent", r"Allow these changes\? \[y/n\] $"),
+]
+
+
+def drive(answers, consent, log):
+    """Run `sudo fabricctl setup` in a terminal, answering each question from answers[name] in turn ("" = Enter
+    when a list runs out; consent(title) for the host-change questions). Returns (exit status, transcript, the
+    questions in the order asked)."""
+    pid, fd = pty.fork()
+    if pid == 0:
+        os.execvp("ssh", ["ssh", "-tt", "-o", "BatchMode=yes", "-i", KEY, TARGET, "sudo fabricctl setup"])
+    screen, transcript, asked, last = "", "", [], time.time()
+    with open(log, "w") as out:
+        while True:
+            r, _, _ = select.select([fd], [], [], 1)
+            if r:
+                try:
+                    data = os.read(fd, 4096).decode("utf-8", "replace")
+                except OSError:
+                    break
+                if not data:
+                    break
+                screen += data
+                transcript += data
+                out.write(data)
+                out.flush()
+                last = time.time()
+                tail = re.sub(r"\x1b\[[0-9;]*m", "", screen[-500:])
+                for name, pattern in PROMPTS:
+                    if re.search(pattern, tail):
+                        if name == "consent":
+                            title = re.findall(r"\n  (\S[^\n(]*?) \((?:required|recommended|optional|choice)",
+                                               re.sub(r"\x1b\[[0-9;]*m", "", screen))
+                            answer = consent(title[-1].strip() if title else "")
+                        else:
+                            queue = answers.get(name, [])
+                            answer = queue.pop(0) if queue else ""
+                        asked.append((name, answer))
+                        os.write(fd, (answer + "\r").encode())
+                        screen = ""
+                        break
+            elif time.time() - last > 900:
+                print("no output for 15 minutes: stopped", flush=True)
+                os.kill(pid, 9)
+                break
+    _, status = os.waitpid(pid, 0)
+    return os.waitstatus_to_exitcode(status), re.sub(r"\x1b\[[0-9;]*m", "", transcript), asked
+
+
+os.makedirs(OUT, exist_ok=True)
+print("--- the host: a previous install removed, ufw on with the owner's own rules, fabricctl installed", flush=True)
+R("fabricctl uninstall --yes --no-export >/dev/null 2>&1; apt-get update -qq; "
+  "apt-get install -y -qq fabricctl >/dev/null 2>&1")
+own_rules = R("ufw status | grep -iE 'ALLOW|DENY' | grep -v '(v6)'")
+check("the host is clean and ufw is on with rules of its own",
+      "Status: active" in R("ufw status") and own_rules.strip()
+      and not R("ls /opt/fabric/config/vars.yaml 2>/dev/null"),
+      own_rules)
+guess_host = R("hostname -s").strip()
+guess_net = R("ip -4 route show default").split()
+
+# ---- run 1: every wrong answer refused, then the firewall declined
+bad = {
+    "domain": ["lan", "home.local", "bad_name.arpa", "-x.arpa", DOMAIN],
+    "hostname": ["has.dot", "averyveryverylonghostname", "localhost", "bad_name", ""],
+    "host_ip": ["999.1.1.1", "abc", FOREIGN_IP, "", ""],
+    "lan_cidr": ["192.168.4.0/33", "nope", "", "", ""],
+    "lan_gateway": ["300.1.1.1", "", HOST_IP, ""],
+    "friendly_name": ['a"quote', "<b>", "x" * 41, "Fabric Installer Test"],
+    "admin": ["administrator", "root", "fabric-agent", "Bad User", ""],
+    "ad_domain": [DOMAIN, DOMAIN.split(".")[-1], "ad.local", "ad_x." + DOMAIN, ""],
+    "min_length": ["65", "abc", "12", ""],
+    "history": ["25", "5", ""],
+    "min_age": ["999", "0", ""],
+    "max_age": ["0", ""],
+    "threshold": ["5", ""],
+    "window": ["15", ""],
+    "lock": ["5", "30"],
+    "complexity": ["maybe", "y", ""],
+    "memory": ["3", "99", "x", ""],
+    "plan": ["x", "p"],
+}
+consent_seen = []
+
+
+def decline_firewall(title):
+    consent_seen.append(title)
+    if len(consent_seen) == 1:
+        return "maybe"                 # not y or n: asked again
+    return "n" if title == "Host firewall" else "y"
+
+
+code, text, asked = drive(bad, decline_firewall, f"{OUT}/run1.log")
+EXPECT = [
+    ("a single label, .local, an underscore, a leading hyphen: refused as a domain", "not a valid domain", 4),
+    ("a dot, 25 characters (over NetBIOS's 15), localhost, an underscore: refused as the host name",
+     "not a valid hostname", 4),
+    ("an impossible address, text: refused as the host's address", "not a valid host_ip", 2),
+    ("a /33, text: refused as the subnet", "not a valid lan_cidr", 2),
+    ("an impossible gateway: refused", "not a valid lan_gateway", 1),
+    ("an address this machine does not have: the network asked again", "is not an address of this machine", 1),
+    ("the gateway given as the host's own address: the network asked again", "are both", 1),
+    ("a quote, <>, 41 characters: refused as the organisation's name", "not a valid friendly_name", 3),
+    ("administrator, root, a fabric- name, a capital and a space: refused as the first admin",
+     "not a valid webui_admin_user", 4),
+    ("fabric's own domain, its parent, .local, an underscore: refused as the AD domain",
+     "a domain of two labels or more", 4),
+    ("65 and text for the minimum length, 25 remembered, 999 days: refused (each its range)", "a whole number from", 4),
+    ("a lockout shorter than its window: explained and the policy asked again", "AD needs the lock", 1),
+    ("3 GB, more than the host has, text: refused as the memory", "a whole number from 4 to", 3),
+]
+for name, needle, count in EXPECT:
+    check(name, text.count(needle) >= count, (text.count(needle), needle))
+names = [n for n, _ in asked]
+check("the complexity question asked again after 'maybe'", names.count("complexity") >= 3, names.count("complexity"))
+check("the plan asked again after an answer that is no choice", names.count("plan") == 2, names.count("plan"))
+check("a consent question asked again after an answer that is not y or n",
+      len(consent_seen) >= 2 and consent_seen[0] == consent_seen[1], consent_seen[:3])
+check("the Enter defaults: the suggested AD domain ad.<domain> and the host name it found",
+      f"ad.{DOMAIN}" in text and guess_host in text, guess_host)
+check("declining the host firewall with ufw on stops setup before any step, saying why (D119)",
+      code != 0 and "ufw is on, and without fabric's firewall rules it blocks" in text and "[preflight]" not in text,
+      (code, text[-800:]))
+check("…and nothing was started or changed: no containers, ufw's rules as they were",
+      R("docker ps -q | wc -l").strip() == "0"
+      and R("ufw status | grep -iE 'ALLOW|DENY' | grep -v '(v6)'") == own_rules)
+
+# ---- run 2: valid answers, everything allowed; the install finished and looked at
+good = {
+    "domain": [DOMAIN], "friendly_name": ["Fabric Installer Test"], "min_length": ["12"], "history": ["5"],
+    "min_age": ["0"], "max_age": ["0"], "threshold": ["5"], "window": ["15"], "lock": ["30"], "complexity": ["y"],
+    "plan": ["p"],
+}
+code, text, asked = drive(good, lambda title: "y", f"{OUT}/run2.log")
+check("with everything allowed, setup finishes (fabric is ready)", code == 0 and "fabric is ready" in text,
+      (code, text[-1500:]))
+doctor = R("fabricctl doctor 2>&1")
+check("doctor passes", "✗" not in doctor and "✓" in doctor, doctor[-1500:])
+aaaa = R(f"dig +short AAAA ad.{DOMAIN} @{HOST_IP}; dig +short AAAA $(hostname -s).ad.{DOMAIN} @{HOST_IP}")
+check("the domain on IPv4 only: no AAAA for the AD domain or its DC, though the host has IPv6 (D120)",
+      aaaa.strip() == "" and R(f"dig +short A ad.{DOMAIN} @{HOST_IP}").strip() == HOST_IP,
+      (aaaa, R("ip -6 addr show scope global | grep inet6")))
+landing = R(f"curl -s --resolve {guess_host}.{DOMAIN}:443:{HOST_IP} https://{guess_host}.{DOMAIN}/ "
+            "--cacert /opt/stepca/data/certs/root_ca.crt")
+check("the landing page at the host's own name, trusted (not a bare 404)", "Fabric Landing Portal" in landing,
+      landing[:300])
+after = R("ufw status | grep -iE 'ALLOW|DENY' | grep -v '(v6)'")
+check("the host's own ufw rules kept beside fabric's", all(line in after for line in own_rules.splitlines()),
+      after)
+print(f"\n{PASS} passed, {FAIL} failed")
+sys.exit(1 if FAIL else 0)

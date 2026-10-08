@@ -37,8 +37,8 @@ docs/volume_1_systems_and_services/1.11.2-fabricctl-agent.md	6307d486cbc8b3d5028
 docs/volume_1_systems_and_services/1.11.20-fabriclib-radius.md	e44023135e6b1c14eb823eee8bad8145caba93f1	2026-10-05	
 docs/volume_1_systems_and_services/1.11.21-fabriclib-rbac.md	dabab7b062a86503a251685eead7b38886b023f1	2026-10-03	
 docs/volume_1_systems_and_services/1.11.22-fabriclib-secrets.md	fb2aa34db73f483bd0cb941ee69599d092ef7fe9	2026-10-06	
-docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	ae78a87c24f6de2b78252cc33fba0e7e6e1fc1ee	2026-10-08	
-docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	9f918e16f119b4a7c5aad8e991af96dd48c20b7b	2026-10-08	
+docs/volume_1_systems_and_services/1.11.23-fabriclib-security.md	4c14e566400c06fd1a570f95f4f8fce116045379	2026-10-08	
+docs/volume_1_systems_and_services/1.11.24-fabriclib-setup.md	3f144d54abf96cb3bbda8df7a5c6786682b27812	2026-10-08	
 docs/volume_1_systems_and_services/1.11.25-fabriclib-system.md	152adc848c96b665ea39e0e7bf9d250635ea259a	2026-10-07	
 docs/volume_1_systems_and_services/1.11.26-fabriclib-undo.md	3fdd5d1f96f6ff62bf381c864305d0292fc2e4bf	2026-10-06	
 docs/volume_1_systems_and_services/1.11.27-fabriclib-vault.md	f046717875a2b94b527dab1778bf98f07d5d667a	2026-10-03	
@@ -179,7 +179,7 @@ docs/volume_5_notes_and_troubleshooting/5.5.2-references.md	49e24e286eb08331648d
 docs/volume_5_notes_and_troubleshooting/5.5.3-rejected-options.md	614a28afd980fe9471b235eb98fbd752932e963f	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.6.1-webui-troubleshooting.md	87131ff0cb329b5eb5083ccf154c15b706deda6a	2026-10-03	
 docs/volume_5_notes_and_troubleshooting/5.6.2-keycloak-gotchas.md	7a3561cd82181c94a8031c69bf37e5b34d3bf116	2026-10-03	
-docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	ffd641ef2536161898b1f3f54f745ce960ebba45	2026-10-04	
+docs/volume_5_notes_and_troubleshooting/5.7.1-test-environments.md	b6785036169b3995a99ea25d0f01b1cb2c262606	2026-10-08	
 docs/volume_5_notes_and_troubleshooting/5.7.2-owner-network.md	e794e59d28aa0a22002532b94b40faa4d5bf10ff	2026-10-04	
 docs/volume_5_notes_and_troubleshooting/5.8.1-samba-replaces-389ds.md	f9ed085182112565297c4081d5b22809e277b416	2026-10-07	
 docs/volume_5_notes_and_troubleshooting/5.8.2-sign-in-on-the-domain.md	3334557447a7752448b784ce398db2ba746fc446	2026-10-08	
@@ -234,7 +234,7 @@ scripts/README.md	23cb6230c47dfd247f8392899418f3bcce8a9b24	2026-10-06
 scripts/docs/README.md	135dc47f8819d75e217e1865d89d48c256983310	2026-10-03	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	5c811285602805f04add0a71a678dc5cc1c8a9b4	2026-10-05	
-scripts/docs/lib_doc_numbers.tsv	9fc85d136bd1667d29cae9650bf5faa2fbfbbf1d	2026-10-08	
+scripts/docs/lib_doc_numbers.tsv	2db962b41a7b24cd565cbb214836d41044201b1a	2026-10-08	
 scripts/docs/lib_doc_registry.py	b9ba7c37a7d79fddfb748007b51c784401c1c523	2026-10-03	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	dcc1443ffea75ca92c2d7883424c0b8b91679151	2026-10-03	
@@ -431,7 +431,7 @@ src/fabriclib/deploy/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-1
 src/fabriclib/deploy/apply_deployment.py	71053508c3f70ec9e69d1aaf134ea19797f04773	2026-10-06	
 src/fabriclib/deploy/archive_vars.py	512658f15cee9e1f34ad065538d701c567971aca	2026-10-02	
 src/fabriclib/deploy/check_fixed_identity.py	35cc05d2938150eeee1fc248702cbfecfc889e3e	2026-10-02	
-src/fabriclib/deploy/check_samba_settings.py	aeff738d8d574999aad96d4bb75eb6998ce2da7f	2026-10-08	
+src/fabriclib/deploy/check_samba_settings.py	c67687423df670ff2c93e2432b9433282fef1494	2026-10-08	
 src/fabriclib/deploy/check_settings.py	97d0908647056847312e32201b3871a4c89aed25	2026-10-07	
 src/fabriclib/deploy/compose_builds.py	b9216391412415e425319fefc5e8e75b380bdd5a	2026-10-04	
 src/fabriclib/deploy/deploy_optional_parts.py	bbf679890fad39517e8dcc62bf709f44088f4123	2026-10-05	
@@ -815,13 +815,13 @@ src/fabriclib/security/ufw_active.py	4df4d7a717e39337e43b1533756dae584621aaea	20
 src/fabriclib/security/ufw_rule.py	069d2f9b40aaff56779a023f791f4983b316826c	2026-10-06	
 src/fabriclib/setup/README.md	281774cc5e7b1b19872305834149dcc0a1e2ec65	2026-10-06	
 src/fabriclib/setup/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
-src/fabriclib/setup/ask_ad_domain.py	9793f5bfc27d34e6378eeb586fd7629cb8b363d0	2026-10-08	
+src/fabriclib/setup/ask_ad_domain.py	151d09855fe38c368eb65e53ebaf18579acef0c9	2026-10-08	
 src/fabriclib/setup/ask_ram.py	a4e0d00de827979da6afbadcbf9cb2b6085ec9a4	2026-10-06	
 src/fabriclib/setup/ask_windows_domain.py	1cc2ada60af664ab15578de1ecbbd3c356b5f526	2026-10-04	
 src/fabriclib/setup/backup_install.py	4c9118f583d651dd75d6afcaf3031061fecb1579	2026-10-06	
 src/fabriclib/setup/check_export_dir.py	418170a13dff61353dedf91b3e251156af4f931b	2026-09-30	
 src/fabriclib/setup/choose_plan.py	05149f170e5412fe8e8e652db61bb603421e9555	2026-10-07	
-src/fabriclib/setup/collect_vars.py	257412be234d278b6bddc6c64616e95d2f365ebe	2026-10-08	
+src/fabriclib/setup/collect_vars.py	5b69575dcfd27eb5342011e55151aed4a60750db	2026-10-08	
 src/fabriclib/setup/common/README.md	16aa541284a94b46b1d5b3e8e83f97f40c3785af	2026-10-02	
 src/fabriclib/setup/common/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/setup/common/docker_ready.py	7ce2f1a3817b4999483d585129e8621c4c30f8cf	2026-10-02	
@@ -849,7 +849,7 @@ src/fabriclib/setup/renew_service_certs.py	9174b30e616a13df93801310514719d1f59d7
 src/fabriclib/setup/restore_install.py	66a6597b738c8087fd3b5959149daba6597f47f6	2026-09-30	
 src/fabriclib/setup/retire_renamed_units.py	14549e4b24368029d893797999207f5a4ca38965	2026-09-30	
 src/fabriclib/setup/run_restore_command.py	25ef79f819a8dfe5fbbdda2f0cba3e15c7b60993	2026-10-02	
-src/fabriclib/setup/run_setup.py	b7158f385ec6e145e80f192bb3e44939babaf6df	2026-10-07	
+src/fabriclib/setup/run_setup.py	619aeaccf83f515e98c81fb23bd4e44d3c4c6939	2026-10-08	
 src/fabriclib/setup/run_uninstall_command.py	c410030db560f90a8d21c7d58052855da93e7159	2026-10-06	
 src/fabriclib/setup/setup_openbao.py	226047644c4e027209806f6cbec82deeecbdd866	2026-10-03	
 src/fabriclib/setup/stage_source.py	fc569e4dbbec1547cbf74bb155ad3d2498c21c6b	2026-09-30	
@@ -1260,7 +1260,8 @@ tests/freeradius/README.md	600f32a9a49ba4f3cfb048328c7c27969dc0d8d7	2026-10-05
 tests/freeradius/run.py	f828cfb0a5afce734cc2b2db9e207eea4c4db9e8	2026-10-05	
 tests/hardening/README.md	514afa897a841c34383af1ef74949610d5dd333d	2026-10-05	
 tests/hardening/run.sh	b4e3e81266e9980d1dc636d34260a2619c00220c	2026-10-05	
-tests/host/README.md	560b70e7b9a2008627d864d4b8833d6942c64406	2026-09-30	
+tests/host/README.md	3231dcd396eb33e4c8b341523e25d9f7e71fbca7	2026-10-08	
+tests/host/installer.py	86cd950f91fc68b3f27e4afe27cbc5f0c4c06ab8	2026-10-08	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
 tests/host/run.sh	1701ad766e0c0db2e7838008f51a99fa6a026ba9	2026-10-07	
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
