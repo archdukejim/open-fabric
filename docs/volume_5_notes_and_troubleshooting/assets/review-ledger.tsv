@@ -13,7 +13,7 @@ THIRD_PARTY_NOTICES	458e3061e4bf3d43a927cb3cdb4530fb263fd5a3	2026-10-03
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	8ab7d73da2b01a35bbd1bbe4046e53dbf1d37c23	2026-10-03	
 config/VERSION	8f0916f768f0487bcf8d33827ce2c8dcecb645c1	2026-10-04	
-config/images.lock.yaml	6f1ce8432ea8e60bdf40880136c4b6c6fc06a252	2026-10-07	
+config/images.lock.yaml	30cc153c08dbf90dc42eecaa41b9bb70a59aef56	2026-10-08	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	3ea4341d9e12bbce96c415215829d423e07c65a5	2026-10-05	
 docs/volume_1_systems_and_services/1.1.1-what-fabric-is.md	bfc2eae75273b58cb8a931a9496c0fa9f91e2257	2026-10-03	
