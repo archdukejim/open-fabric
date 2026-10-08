@@ -4,6 +4,7 @@ from agent.post_domain import post_domain
 from agent.post_dns import post_dns
 from agent.post_network import post_network
 from agent.post_pki import post_pki
+from agent.post_security import post_security
 from agent.post_vault import post_vault
 from agent.read_text import read_text
 from agent.route_not_found import RouteNotFound
@@ -42,6 +43,8 @@ def post_route(route, actor, data, perms):
         return post_directory(route, actor, data)
     if area in (["machines"], ["gpo"]):
         return post_domain(route, actor, data)
+    if area == ["security"]:
+        return post_security(route, actor, data)
     if route == ["apply"]:
         ok, output = apply_changes(actor, source="web")
         return {"ok": ok, "output": output}

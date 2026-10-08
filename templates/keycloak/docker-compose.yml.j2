@@ -41,10 +41,13 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: "{{ keycloak_admin_user }}"
       KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
 {% set kc_mem = (1200 * ((host_ram_capacity | default(4) | int) / 4)) | int %}
-      JAVA_OPTS_APPEND: "-Xmx{{ (kc_mem * 0.8) | int }}m"
+      JAVA_OPTS_APPEND: "-Xmx{{ (kc_mem * 0.8) | int }}m -Djava.security.krb5.conf=/etc/keycloak/kerberos/krb5.conf"
     volumes:
       - {{ keycloak_data_dir }}:/opt/keycloak/data
       - {{ deploy_base_dir }}/keycloak/certs:/etc/keycloak/certs:ro
+      # Kerberos sign-in (manual 5.8.2.6.2): the site's keytab and krb5.conf (install_sso_keytab); the folder is made
+      # by setup before the first start, empty until the DC has exported the keytab
+      - {{ deploy_base_dir }}/keycloak/kerberos:/etc/keycloak/kerberos:ro
     networks:
       fabric_net:
         ipv4_address: "{{ ip_keycloak }}"

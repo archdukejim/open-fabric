@@ -18,6 +18,8 @@
   fabricctl gpo load|templates|list|show|set|clear|starter
                                  Group Policy from ADMX templates for this site's machines and people
   fabricctl sso add|list|remove  apps (Proxmox VE, TrueNAS, …) signing people in through Keycloak
+  fabricctl security [raise|lower|kerberos]
+                                 sign-in layers: second factors, the web console's client certificate
   fabricctl federation status|enable|disable|invite|invitations|revoke|networks
                                  sites joining this install (setup --join on the new site)
   fabricctl vault status         OpenBao: sealed?, version, seal key, secret engines
@@ -62,6 +64,7 @@ from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
 from fabriclib.samba.run_gpo_command import run_gpo_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.keycloak.run_sso_command import run_sso_command  # noqa: E402
+from fabriclib.security.run_security_command import run_security_command  # noqa: E402
 from fabriclib.federation.run_federation_command import run_federation_command  # noqa: E402
 from fabriclib.images.run_images_command import run_images_command  # noqa: E402
 from fabriclib.logs.run_logs_command import run_logs_command  # noqa: E402
@@ -229,6 +232,8 @@ def main(argv):
         return run_tsig_command(args)
     if cmd == "sso":
         return run_sso_command(args)
+    if cmd == "security":
+        return run_security_command(args)
     if cmd == "acl":
         return run_acl_command(args)
     if cmd == "restore":

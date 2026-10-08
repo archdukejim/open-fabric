@@ -14,7 +14,8 @@ from webui.security.token_perms import token_perms
 def finish_login(h, cert, query):
     """Purpose: Finish a Keycloak sign-in: check the attempt, verify the tokens, check the person against the
              certificate and their fabric roles, and create the session.
-    Inputs:  h — the request handler (app, headers, send, deny); cert — dict from verified_client_cert; query — dict
+    Inputs:  h — the request handler (app, headers, send, deny); cert — dict from verified_client_cert (NO_CERT while
+             the web console requires no certificate: the CN check is skipped); query — dict
              with state, code or error; reads the __Host-webui-login cookie and App.pending.
     Returns: 200 'Signed in' page (meta refresh to the stored next path) that sets __Host-webui (the session id,
              Max-Age session_max) and clears the login cookie; the session gets a new CSRF token, the tokens, perms
@@ -45,7 +46,7 @@ def finish_login(h, cert, query):
 
     user = claims.get("preferred_username", "")
     actions.set_token(id_token)          # the audit calls below go to fabric-agent as this user
-    if user != cert["cn"]:
+    if cert["cn"] is not None and user != cert["cn"]:          # gate 5, while a certificate is required
         actions.audit(user or "unknown", "LOGIN_DENIED", f"cert CN {cert['cn']!r} does not match user")
         return h.deny(403, "Your client certificate does not belong to this user.")
     perms = token_perms(claims)
@@ -60,8 +61,8 @@ def finish_login(h, cert, query):
         app.sessions[sid] = {"user": user, "fp": cert["fp"], "csrf": secrets.token_urlsafe(32),
                              "id_token": id_token, "refresh_token": refresh_token, "perms": perms,
                              "exp": float(claims.get("exp") or now), "created": now, "last": now,
-                             # when the person last proved password + TOTP (step-up for vault changes)
+                             # when the person last signed in (step-up for vault changes and raising security)
                              "auth_at": min(float(claims.get("auth_time") or now), now)}
-    actions.audit(user, "LOGIN", f"cert={cert['fp'][:16]}")
+    actions.audit(user, "LOGIN", f"cert={cert['fp'][:16]}" if cert["fp"] else "no client certificate")
     h.send(200, views.continue_page(pending.get("next") or "/"), headers=[
         cookie_header(SESSION_COOKIE, sid, app.max_age), cookie_header(LOGIN_COOKIE, "", 0, "Lax")])

@@ -26,3 +26,4 @@ Every page (Jinja2 templates in ../templates, autoescaped, no inline script or s
 | `__init__.py` | Imports every function of this folder, so callers keep `module.function` |
 | `machine_result.py` | The page that shows a pre-created machine's one-time join password once. |
 | `federation.py` | The Federation tab: sites, replication, conflicts, limits, the address plan. |
+| `security.py` | The Security page: the sign-in layers and their raises |

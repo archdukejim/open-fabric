@@ -8,6 +8,7 @@ file	fabricctl-agent|src/agent/post_domain.py	14
 file	fabricctl-agent|src/agent/post_network.py	6	
 file	fabricctl-agent|src/agent/post_pki.py	7	
 file	fabricctl-agent|src/agent/post_route.py	8	
+file	fabricctl-agent|src/agent/post_security.py	15	
 file	fabricctl-agent|src/agent/post_vault.py	9	
 file	fabricctl-agent|src/agent/read_fields.py	10	
 file	fabricctl-agent|src/agent/read_strings.py	11	
@@ -47,6 +48,7 @@ file	fabricctl-jinja|src/containers/samba/ensure_service_accounts.py	26
 file	fabricctl-jinja|src/containers/samba/ensure_site_acl.py	19	
 file	fabricctl-jinja|src/containers/samba/ensure_site_info.py	27	
 file	fabricctl-jinja|src/containers/samba/ensure_site_link.py	58	
+file	fabricctl-jinja|src/containers/samba/ensure_sso_account.py	66	
 file	fabricctl-jinja|src/containers/samba/ensure_sudo_rule.py	47	
 file	fabricctl-jinja|src/containers/samba/find_machine.py	53	
 file	fabricctl-jinja|src/containers/samba/get_person.py	31	
@@ -295,13 +297,15 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py	3	0.5.0 / 2026-1
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py	4	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_group_mapper.py	5	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_ldap_federation.py	6	
-file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_mfa_flow.py	7	
+file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_mfa_flow.py	7	0.6.0 / 2026-10-07
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_openbao_client.py	8	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_rbac_roles.py	9	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_realm.py	10	
+file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py	26	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_webui_client.py	11	
 file	fabriclib-keycloak|src/fabriclib/keycloak/fabric_groups.py	12	
 file	fabriclib-keycloak|src/fabriclib/keycloak/grant_role_to_group.py	13	
+file	fabriclib-keycloak|src/fabriclib/keycloak/install_sso_keytab.py	27	
 file	fabriclib-keycloak|src/fabriclib/keycloak/keycloak_admin.py	14	
 file	fabriclib-keycloak|src/fabriclib/keycloak/list_app_clients.py	23	
 file	fabriclib-keycloak|src/fabriclib/keycloak/quote.py	15	
@@ -309,6 +313,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py	24
 file	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py	16	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py	25	
+file	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py	28	
 file	fabriclib-keycloak|src/fabriclib/keycloak/step.py	18	
 file	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py	19	
 file	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py	20	
@@ -426,6 +431,7 @@ file	fabriclib-samba|src/fabriclib/samba/run_domain_command.py	4
 file	fabriclib-samba|src/fabriclib/samba/run_gpo_command.py	10	
 file	fabriclib-samba|src/fabriclib/samba/set_domain_password_policy.py	5	
 file	fabriclib-samba|src/fabriclib/samba/set_gpo_policy.py	14	
+file	fabriclib-samba|src/fabriclib/samba/sso_spns.py	22	
 file	fabriclib-samba|src/fabriclib/samba/suggested_ad_domain.py	7	
 file	fabriclib-samba|src/fabriclib/samba/write_bind_dlz.py	6	
 file	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py	1	
@@ -439,8 +445,13 @@ file	fabriclib-secrets|src/fabriclib/secrets/run_secrets_command.py	7
 file	fabriclib-secrets|src/fabriclib/secrets/save_secrets.py	8	
 file	fabriclib-secrets|src/fabriclib/secrets/secrets_in_openbao.py	9	
 file	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py	1	
+file	fabriclib-security|src/fabriclib/security/apply_signin.py	6	
+file	fabriclib-security|src/fabriclib/security/check_signin_lowering.py	10	
 file	fabriclib-security|src/fabriclib/security/firewall_rules.py	2	
 file	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py	3	
+file	fabriclib-security|src/fabriclib/security/run_security_command.py	7	
+file	fabriclib-security|src/fabriclib/security/set_signin_layer.py	8	
+file	fabriclib-security|src/fabriclib/security/signin_layers.py	9	
 file	fabriclib-security|src/fabriclib/security/ssh_ports.py	5	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
@@ -581,6 +592,7 @@ file	webui|src/webui/agentclient/map_radius_group.py	28
 file	webui|src/webui/agentclient/quote_segment.py	29	
 file	webui|src/webui/agentclient/radius_guides.py	30	
 file	webui|src/webui/agentclient/radius_overview.py	31	
+file	webui|src/webui/agentclient/raise_signin_layer.py	132	
 file	webui|src/webui/agentclient/read_audit.py	32	
 file	webui|src/webui/agentclient/relaxed_settings.py	120	
 file	webui|src/webui/agentclient/remove_client_class.py	33	
@@ -593,6 +605,7 @@ file	webui|src/webui/agentclient/rotate_radius_secret.py	39
 file	webui|src/webui/agentclient/rotate_tsig_key.py	40	
 file	webui|src/webui/agentclient/save_device.py	41	
 file	webui|src/webui/agentclient/save_role.py	42	
+file	webui|src/webui/agentclient/security_layers.py	133	
 file	webui|src/webui/agentclient/service_status.py	43	
 file	webui|src/webui/agentclient/set_option.py	44	
 file	webui|src/webui/agentclient/sign_csr.py	45	
@@ -637,6 +650,7 @@ file	webui|src/webui/routes/openbao_page.py	82
 file	webui|src/webui/routes/post_action.py	83	
 file	webui|src/webui/routes/radius_post.py	84	
 file	webui|src/webui/routes/saved_and_applied.py	85	
+file	webui|src/webui/routes/security_post.py	134	
 file	webui|src/webui/routes/stepca_page.py	86	
 file	webui|src/webui/routes/stepca_post.py	87	
 file	webui|src/webui/routes/tsig_post.py	88	
@@ -671,6 +685,7 @@ file	webui|src/webui/views/person_result.py	114
 file	webui|src/webui/views/pki_result.py	115	
 file	webui|src/webui/views/radius_secret.py	116	
 file	webui|src/webui/views/render_page.py	117	
+file	webui|src/webui/views/security.py	135	
 file	webui|src/webui/views/stepca.py	118	
 file	webui|src/webui/views/tsig_result.py	119	
 function	fabricctl-agent|src/agent/get_route.py|get_route	1	
@@ -693,6 +708,7 @@ function	fabricctl-agent|src/agent/post_domain.py|post_domain	1
 function	fabricctl-agent|src/agent/post_network.py|post_network	1	
 function	fabricctl-agent|src/agent/post_pki.py|post_pki	1	
 function	fabricctl-agent|src/agent/post_route.py|post_route	1	
+function	fabricctl-agent|src/agent/post_security.py|post_security	1	
 function	fabricctl-agent|src/agent/post_vault.py|post_vault	1	
 function	fabricctl-agent|src/agent/read_fields.py|read_fields	1	
 function	fabricctl-agent|src/agent/read_strings.py|read_strings	1	
@@ -781,6 +797,8 @@ function	fabricctl-jinja|src/containers/samba/ensure_site_acl.py|_sid	3	0.5.0 / 
 function	fabricctl-jinja|src/containers/samba/ensure_site_acl.py|ensure_site_acl	2	
 function	fabricctl-jinja|src/containers/samba/ensure_site_info.py|ensure_site_info	1	
 function	fabricctl-jinja|src/containers/samba/ensure_site_link.py|ensure_site_link	1	
+function	fabricctl-jinja|src/containers/samba/ensure_sso_account.py|_export	1	
+function	fabricctl-jinja|src/containers/samba/ensure_sso_account.py|ensure_sso_account	2	
 function	fabricctl-jinja|src/containers/samba/ensure_sudo_rule.py|_exists	2	
 function	fabricctl-jinja|src/containers/samba/ensure_sudo_rule.py|ensure_sudo_rule	1	
 function	fabricctl-jinja|src/containers/samba/find_machine.py|find_machine	1	
@@ -1049,6 +1067,7 @@ function	fabriclib-dns|src/fabriclib/dns/sync_status.py|sync_status	1
 function	fabriclib-dns|src/fabriclib/dns/update_tsig_key.py|update_tsig_key	1	
 function	fabriclib-dns|src/fabriclib/dns/validate_record.py|_host	2	
 function	fabriclib-dns|src/fabriclib/dns/validate_record.py|_int	1	
+function	fabriclib-dns|src/fabriclib/dns/validate_record.py|_link	4	
 function	fabriclib-dns|src/fabriclib/dns/validate_record.py|validate_record	3	
 function	fabriclib-dns|src/fabriclib/dns/zone_content_changed.py|zone_content_changed	1	
 function	fabriclib-dns|src/fabriclib/dns/zone_detail.py|zone_detail	1	
@@ -1130,16 +1149,23 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|_q	1
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|ensure_adguard_client	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_group_mapper.py|ensure_group_mapper	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_ldap_federation.py|ensure_ldap_federation	1	
-function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_mfa_flow.py|ensure_mfa_flow	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_mfa_flow.py|ensure_mfa_flow	1	0.6.0 / 2026-10-07
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_openbao_client.py|_q	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_openbao_client.py|ensure_openbao_client	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_rbac_roles.py|_q	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_rbac_roles.py|_role	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_rbac_roles.py|ensure_rbac_roles	3	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_realm.py|ensure_realm	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py|_ensure_shape	3	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py|_shape	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py|_unbind	5	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py|_wanted	4	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py|_what	2	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_signin_flows.py|ensure_signin_flows	6	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_webui_client.py|ensure_webui_client	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/fabric_groups.py|fabric_groups	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/grant_role_to_group.py|grant_role_to_group	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/install_sso_keytab.py|install_sso_keytab	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/keycloak_admin.py|keycloak_admin	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/list_app_clients.py|list_app_clients	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/quote.py|q	1	
@@ -1148,6 +1174,8 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py|re
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|reset_sign_in	2	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py|run_sso_command	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py|admin_level	2	
+function	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py|signin_level	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/step.py|step	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py|user_has_role	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/verify_user_token.py|_client	1	
@@ -1289,6 +1317,7 @@ function	fabriclib-samba|src/fabriclib/samba/run_gpo_command.py|_files	1
 function	fabriclib-samba|src/fabriclib/samba/run_gpo_command.py|run_gpo_command	2	
 function	fabriclib-samba|src/fabriclib/samba/set_domain_password_policy.py|set_domain_password_policy	1	
 function	fabriclib-samba|src/fabriclib/samba/set_gpo_policy.py|set_gpo_policy	1	
+function	fabriclib-samba|src/fabriclib/samba/sso_spns.py|sso_spns	1	
 function	fabriclib-samba|src/fabriclib/samba/suggested_ad_domain.py|suggested_ad_domain	1	
 function	fabriclib-samba|src/fabriclib/samba/write_bind_dlz.py|write_bind_dlz	1	
 function	fabriclib-secrets|src/fabriclib/secrets/common/read_vault_secrets.py|read_vault_secrets	1	
@@ -1305,8 +1334,24 @@ function	fabriclib-secrets|src/fabriclib/secrets/save_secrets.py|save_secrets	1
 function	fabriclib-secrets|src/fabriclib/secrets/secrets_in_openbao.py|secrets_in_openbao	1	
 function	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py|_rules	1	
 function	fabriclib-security|src/fabriclib/security/apply_docker_firewall.py|apply_docker_firewall	2	
+function	fabriclib-security|src/fabriclib/security/apply_signin.py|apply_signin	1	
+function	fabriclib-security|src/fabriclib/security/check_signin_lowering.py|check_signin_lowering	1	
 function	fabriclib-security|src/fabriclib/security/firewall_rules.py|firewall_rules	1	
 function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|hardened_daemon_settings	1	
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_actor	2	
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_confirm	3	
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_lowered	1	0.6.0 / 2026-10-07
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_wait_web	6	
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|_web_started	5	
+function	fabriclib-security|src/fabriclib/security/run_security_command.py|run_security_command	4	
+function	fabriclib-security|src/fabriclib/security/set_signin_layer.py|_mark	2	
+function	fabriclib-security|src/fabriclib/security/set_signin_layer.py|set_signin_layer	1	
+function	fabriclib-security|src/fabriclib/security/set_signin_layer.py|show	3	
+function	fabriclib-security|src/fabriclib/security/signin_layers.py|layer_value	2	
+function	fabriclib-security|src/fabriclib/security/signin_layers.py|on_off	1	
+function	fabriclib-security|src/fabriclib/security/signin_layers.py|rank	3	
+function	fabriclib-security|src/fabriclib/security/signin_layers.py|read_lowered	5	
+function	fabriclib-security|src/fabriclib/security/signin_layers.py|signin_rows	4	
 function	fabriclib-security|src/fabriclib/security/ssh_ports.py|ssh_ports	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
@@ -1352,6 +1397,8 @@ function	fabriclib-setup|src/fabriclib/setup/context.py|SetupContext.uid	9
 function	fabriclib-setup|src/fabriclib/setup/context.py|SetupContext.vars_file	3	
 function	fabriclib-setup|src/fabriclib/setup/create_accounts.py|_move_files	1	
 function	fabriclib-setup|src/fabriclib/setup/create_accounts.py|run	2	
+function	fabriclib-setup|src/fabriclib/setup/create_admin.py|_client_cert	4	
+function	fabriclib-setup|src/fabriclib/setup/create_admin.py|_readme	3	
 function	fabriclib-setup|src/fabriclib/setup/create_admin.py|_write	1	
 function	fabriclib-setup|src/fabriclib/setup/create_admin.py|run	2	
 function	fabriclib-setup|src/fabriclib/setup/deploy_config.py|_packaged	1	
@@ -1542,6 +1589,7 @@ function	webui|src/webui/agentclient/map_radius_group.py|map_radius_group	1
 function	webui|src/webui/agentclient/quote_segment.py|quote_segment	1	
 function	webui|src/webui/agentclient/radius_guides.py|radius_guides	1	
 function	webui|src/webui/agentclient/radius_overview.py|radius_overview	1	
+function	webui|src/webui/agentclient/raise_signin_layer.py|raise_signin_layer	1	
 function	webui|src/webui/agentclient/read_audit.py|read_audit	1	
 function	webui|src/webui/agentclient/relaxed_settings.py|relaxed_settings	1	
 function	webui|src/webui/agentclient/remove_client_class.py|remove_client_class	1	
@@ -1554,6 +1602,7 @@ function	webui|src/webui/agentclient/rotate_radius_secret.py|rotate_radius_secre
 function	webui|src/webui/agentclient/rotate_tsig_key.py|rotate_tsig_key	1	
 function	webui|src/webui/agentclient/save_device.py|save_device	1	
 function	webui|src/webui/agentclient/save_role.py|save_role	1	
+function	webui|src/webui/agentclient/security_layers.py|security_layers	1	
 function	webui|src/webui/agentclient/service_status.py|service_status	1	
 function	webui|src/webui/agentclient/set_option.py|set_option	1	
 function	webui|src/webui/agentclient/sign_csr.py|sign_csr	1	
@@ -1637,6 +1686,7 @@ function	webui|src/webui/routes/post_action.py|_segments	1
 function	webui|src/webui/routes/post_action.py|post_action	3	
 function	webui|src/webui/routes/radius_post.py|radius_post	1	
 function	webui|src/webui/routes/saved_and_applied.py|saved_and_applied	1	
+function	webui|src/webui/routes/security_post.py|security_post	1	
 function	webui|src/webui/routes/stepca_page.py|stepca_page	1	
 function	webui|src/webui/routes/stepca_post.py|stepca_post	1	
 function	webui|src/webui/routes/tsig_post.py|tsig_post	1	
@@ -1674,6 +1724,7 @@ function	webui|src/webui/views/person_result.py|person_result	1
 function	webui|src/webui/views/pki_result.py|pki_result	1	
 function	webui|src/webui/views/radius_secret.py|radius_secret	1	
 function	webui|src/webui/views/render_page.py|render_page	1	
+function	webui|src/webui/views/security.py|security	1	
 function	webui|src/webui/views/stepca.py|stepca	1	
 function	webui|src/webui/views/tsig_result.py|tsig_result	1	
 page	fabricctl-agent	2	

@@ -334,7 +334,7 @@ http {
 {% endif %}
 {% if install_webui | default(false) | bool %}
 
-    # webui management UI — mutual TLS, then Keycloak OIDC in the app.
+    # webui management UI — Keycloak OIDC in the app; with webui_client_cert, mutual TLS first (manual 5.8.2.6.3)
     server {
         listen 443 ssl;
         server_name {{ hostname_mgr }};
@@ -349,8 +349,14 @@ http {
         # nested site (site_ca_depth). Leaves under a subordinate CA minted
         # with --intermediate-ca are one level deeper and fail.
         ssl_client_certificate /etc/nginx/certs/client-ca/ca-bundle.pem;
-        ssl_verify_client on;
         ssl_verify_depth {{ 2 + (site_ca_depth | default(0) | int) }};
+{% if webui_client_cert | default(false) | bool %}
+        ssl_verify_client on;
+{% else %}
+        # webui_client_cert off (D108): a certificate is only asked for, never required; the web app skips its
+        # certificate gates and reads one only before turning the setting on (the admin's own, manual 5.8.2.6.4)
+        ssl_verify_client optional;
+{% endif %}
 
         add_header Strict-Transport-Security "max-age=31536000" always;
         client_max_body_size 64k;

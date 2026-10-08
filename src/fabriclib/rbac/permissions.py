@@ -34,6 +34,7 @@ PERMISSIONS = {
     "vault:unlock": "add, test, remove unlock methods; rotate the vault key",
     "audit:read": "read the audit log",
     "system:admin": "services, updates and settings",
+    "security:raise": "raise sign-in security: second factors, the web console's client certificate (D116)",
 }
 
 _READ = ["status:read", "dns:read", "dhcp:read", "pki:read", "devices:read", "radius:read", "people:read",

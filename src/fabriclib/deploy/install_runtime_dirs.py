@@ -22,6 +22,8 @@ def install_runtime_dirs(paths, final_vars, tsig_keys):
                    *service_user(final_vars, "postgres"))
         ensure_dir(final_vars.get("keycloak_data_dir", os.path.join(base, "keycloak/data")), 0o750,
                    *service_user(final_vars, "keycloak"))
+        # Kerberos sign-in's keytab and krb5.conf (install_sso_keytab): root's folder, Keycloak's group reads it
+        ensure_dir(os.path.join(base, "keycloak/kerberos"), 0o750, 0, service_user(final_vars, "keycloak")[1])
     for key in tsig_keys:
         src = os.path.join(paths["render"], "rfc2136", key["name"], "rfc2136.ini")
         dst = key.get("out") or os.path.join(base, key["name"], "rfc2136.ini")

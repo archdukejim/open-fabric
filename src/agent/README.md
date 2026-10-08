@@ -24,3 +24,4 @@ arbitrary commands.
 | `__init__.py` | Empty; makes `agent` a package |
 | `README.md` | This file |
 | `post_domain.py` | The domain section: the site's machines (pre-create, enable, disable, remove) and its admin settings GPO |
+| `post_security.py` | POST /v1/security/raise and /kerberos: raise a sign-in layer or turn Kerberos sign-in on or off, then apply |

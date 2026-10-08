@@ -12,6 +12,7 @@ from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.decode_invitation import decode_invitation
 from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
+from fabriclib.security.check_signin_lowering import check_signin_lowering
 from fabriclib.setup.ask_ad_domain import ask_ad_domain
 from fabriclib.setup.ask_ram import ask_ram
 from fabriclib.setup.errors import SetupError
@@ -123,7 +124,8 @@ def collect_vars(ctx):
              and the password policy are asked when missing (ask_ad_domain), and once the memory fabric may use
              (ask_ram).
              Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
-    Fails:   SetupError for missing/invalid required values (the AD domain and policy included) with
+    Fails:   SetupError for a --file that would lower a sign-in layer (check_signin_lowering), for missing/invalid
+             required values (the AD domain and policy included) with
              --non-interactive, invalid tsig_keys, or a
              secrets file that cannot be written (ValidationError converted); OSError/yaml errors on files.
     Feeds:   run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps
@@ -151,6 +153,10 @@ def collect_vars(ctx):
         # Never on an existing install: it would undo later edits.
         user_file, user = repo_vars, _load(repo_vars)
     if user_file:
+        try:                                  # a --file never lowers a sign-in layer (D111): the command does
+            check_signin_lowering(_load(ctx.vars_file) if os.path.exists(ctx.vars_file) else {}, user)
+        except ValidationError as e:
+            raise SetupError(str(e))
         data.update(user)
         info(f"overrides from {user_file}")
 

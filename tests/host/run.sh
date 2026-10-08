@@ -115,15 +115,44 @@ ADMIN=$(R "awk '/^webui_admin_user:/{print \$2}' /opt/fabric/config/vars.yaml")
 R "python3 /tmp/reset_user.py $ADMIN $KIT/initial-password.txt" > "$OUT/reset.log" 2>&1
 R "python3 /tmp/reset_user.py bob /root/fabric-test-bob-password" >> "$OUT/reset.log" 2>&1
 BOB_PW=$(R 'cat /root/fabric-test-bob-password; rm -f /root/fabric-test-bob-password')
+# 0.6.1's default (D110): no client certificate, a password only; the console's Security page there to raise them
+R "SIGNIN_MODE=plain FABRIC_KIT=$KIT python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' ''" \
+    > "$OUT/login-plain.log" 2>&1
+check "sign-in by default: no certificate asked, the admin in with a password only, a non-admin refused (D110)" \
+    "! grep -q '^FAIL' '$OUT/login-plain.log' && [ \"\$(grep -c '^PASS' '$OUT/login-plain.log')\" -ge 4 ]"
+check "status shows the password-only sign-in as a relaxation (Rule 10, D110)" \
+    "R 'fabricctl status' | grep -q 'signin_admin_second_factor: none'"
+
+echo "--- raising sign-in security (fabricctl security raise: the apply and Keycloak, as the Security page does)"
+R 'fabricctl security raise admin-2fa totp && fabricctl security raise client-cert on' > "$OUT/raise.log" 2>&1
+check "raise: TOTP for the admin tools and the client certificate, applied" \
+    "[ \"\$(grep -c '^done: ' '$OUT/raise.log')\" -eq 2 ] && R 'fabricctl security' | grep -qE '^admin-2fa +totp' && \
+     R 'fabricctl security' | grep -qE '^client-cert +on'"
+
+echo "--- re-run and restart"
+R 'fabricctl setup --non-interactive --yes' > "$OUT/setup2.log" 2>&1
+check "setup re-run converges (no certificate re-issued); the kit gets the admin's .p12 now the console asks for one" \
+    "grep -q 'fabric is ready' '$OUT/setup2.log' && ! grep -q ': issued' '$OUT/setup2.log' && \
+     R 'test -s $KIT/$ADMIN.p12 && test -s $KIT/p12-password.txt'"
+R "python3 /tmp/reset_user.py $ADMIN $KIT/initial-password.txt" >> "$OUT/reset.log" 2>&1
+R "python3 /tmp/reset_user.py bob /root/fabric-test-bob-password" >> "$OUT/reset.log" 2>&1
+BOB_PW=$(R 'cat /root/fabric-test-bob-password; rm -f /root/fabric-test-bob-password')
 R "FABRIC_KIT=$KIT NEW_PERSON=dave$(date +%s) python3 /tmp/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" > "$OUT/login.log" 2>&1
-check "sign-in: admin in; HTTP, missing/foreign certs, non-admin and borrowed certs refused" \
+check "sign-in raised: admin in with TOTP; HTTP, missing/foreign certs, non-admin and borrowed certs refused" \
     "! grep -q '^FAIL' '$OUT/login.log' && [ \"\$(grep -c '^PASS' '$OUT/login.log')\" -ge 11 ]"
 check "login kit in the admin's home ($KIT), secrets 0600" \
     "[ \"\$(R 'stat -c %a $KIT/p12-password.txt $KIT/initial-password.txt' | sort -u)\" = 600 ]"
 
-echo "--- re-run and restart"
-R 'fabricctl setup --non-interactive --yes' > "$OUT/setup2.log" 2>&1
-check "setup re-run converges (no certificate re-issued)" "grep -q 'fabric is ready' '$OUT/setup2.log' && ! grep -q ': issued' '$OUT/setup2.log'"
+echo "--- lowering (only on the host, the layer's name typed back at a terminal)"
+R "printf 'nope\n' | script -qec 'fabricctl security lower client-cert' /dev/null; fabricctl security" > "$OUT/lower1.log" 2>&1
+check "lower: a wrong name typed back changes nothing" "grep -qE '^client-cert +on' '$OUT/lower1.log'"
+R "fabricctl security lower client-cert --yes" > "$OUT/lower2.log" 2>&1
+check "lower: --yes is refused" "grep -q 'never by --yes' '$OUT/lower2.log'"
+R "printf 'client-cert\n' | script -qec 'fabricctl security lower client-cert' /dev/null" > "$OUT/lower3.log" 2>&1
+R 'fabricctl doctor' > "$OUT/doctor-lowered.log" 2>&1
+check "lower: the name typed back lowers it; doctor warns about it (and still passes)" \
+    "grep -q '^done: ' '$OUT/lower3.log' && grep -q 'client-cert lowered: on -> off' '$OUT/doctor-lowered.log' && \
+     ! grep -q '✗' '$OUT/doctor-lowered.log' && R \"grep -q 'SECURITY_LOWER' /opt/fabric/archive/audit.log\""
 R 'fabricctl stop' > /dev/null 2>&1
 check "fabricctl stop: DNS goes quiet" "! R 'dig +time=2 +tries=1 +short @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP"
 R 'fabricctl start' > /dev/null 2>&1

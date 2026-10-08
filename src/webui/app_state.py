@@ -14,11 +14,12 @@ class App:
 
     def __init__(self, cfg):
         """Purpose: Hold the web UI's shared state.
-        Inputs:  cfg — dict from webui.json: public_url, ca_file, intermediate_ca, admin_role, session_idle (default
+        Inputs:  cfg — dict from webui.json: public_url, ca_file, intermediate_ca, admin_role, client_cert (default
+                 true: a client certificate is required; false when webui_client_cert is off), session_idle (default
                  900 s), session_max (default 28800 s), keycloak {ip, port (default 8443), hostname, realm,
                  client_id, client_secret}.
-        Returns: None (constructor); sets oidc, sso_origin, admin_role, issuer_dn, idle, max_age, sessions {sid:
-                 session}, pending {state: login}, lock.
+        Returns: None (constructor); sets oidc, sso_origin, admin_role, client_cert, issuer_dn, idle, max_age,
+                 sessions {sid: session}, pending {state: login}, lock.
         Fails:   KeyError for a missing required config key; ValueError from int() on bad session limits;
                  CalledProcessError from cert_subject_rfc2253. All stop the server at start.
         Feeds:   server.main, which sets it as Handler.app for every request.
@@ -35,6 +36,7 @@ class App:
             redirect_uri=f"{self.public_url}/oidc/callback")
         self.sso_origin = f"https://{kc['hostname']}"
         self.admin_role = cfg["admin_role"]
+        self.client_cert = bool(cfg.get("client_cert", True))     # absent = the stricter way (0.6.0's)
         self.issuer_dn = parse_dn(cert_subject_rfc2253(cfg["intermediate_ca"]))
         self.idle = int(cfg.get("session_idle", 900))
         self.max_age = int(cfg.get("session_max", 28800))

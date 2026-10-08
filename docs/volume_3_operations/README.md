@@ -62,6 +62,7 @@ Operator workflows and end-user procedures.
 - [3.13.1 Tabs and features](3.13.1-features.md)
 - [3.13.2 Device access](3.13.2-device-access.md)
 - [3.13.3 First-time setup](3.13.3-first-sign-in.md)
+- [3.13.4 Sign-in security](3.13.4-sign-in-security.md)
 
 ## 3.14 Lifecycle, status and ports
 

@@ -6,10 +6,10 @@ CLIENT_ID = "fabric-webui"
 
 def ensure_webui_client(kc, realm, v, s, role_reps, flow_id):
     """Purpose: create or update the confidential OIDC client "fabric-webui" for the web UI: code flow with PKCE S256,
-             exact redirect https://<hostname_mgr>/oidc/callback, no direct/implicit grants, the TOTP flow bound, a
-             "roles" claim in the ID token, and every given realm role in its scope.
+             exact redirect https://<hostname_mgr>/oidc/callback, no direct/implicit grants, the admin sign-in flow
+             bound, a "roles" claim in the ID token, and every given realm role in its scope.
     Inputs:  kc — Admin; realm — realm name; v — vars (hostname_mgr); s — secrets (webui_oidc_secret); role_reps — list
-             of role representations to put in scope; flow_id — from ensure_mfa_flow.
+             of role representations to put in scope; flow_id — the admin sign-in flow (ensure_signin_flows).
     Returns: None. Existing attributes are merged; missing scope roles are added (none are removed).
     Fails:   SystemExit from Admin.call; KeyError if hostname_mgr or webui_oidc_secret is missing.
     Feeds:   configure_keycloak (when install_webui)."""

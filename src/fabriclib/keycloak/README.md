@@ -15,7 +15,8 @@ client these files use.
 | `fabric_groups.py` | The directory groups that carry a fabric bundle |
 | `user_has_role.py` | Whether Keycloak grants a user a realm role (directly or through a group) |
 | `verify_user_token.py` | fabric-agent: verify a signed-in person's ID token itself (signature, issuer, audience, expiry) |
-| `configure_keycloak.py` | Configure Keycloak idempotently (what `lib/keycloak_bootstrap.py` runs): realm, LDAP, roles, TOTP flow, clients |
+| `configure_keycloak.py` | Configure Keycloak idempotently (what `lib/keycloak_bootstrap.py` runs): realm, LDAP (with Kerberos once the keytab is in place), roles, sign-in flows, clients |
+| `install_sso_keytab.py` | The DC's Kerberos keytab and a `krb5.conf` into Keycloak's folder (after every converge) |
 | `admin_client.py` | `Admin`: the admin REST client (logs in as the master-realm admin, TLS pinned to the fabric root CA) |
 | `quote.py` | `q`: URL-quote one path or query component |
 | `step.py` | One progress line of the configuration |
@@ -23,7 +24,8 @@ client these files use.
 | `ensure_ldap_federation.py` | The user federation to the domain (AD mode, LDAPS to the site's DC; created, or updated in place) |
 | `ensure_group_mapper.py` | The LDAP group mapper, and a sync of the directory's groups |
 | `grant_role_to_group.py` | Give a group a realm role if it does not have it |
-| `ensure_mfa_flow.py` | The browser flow with TOTP required for everyone |
+| `ensure_signin_flows.py` | fabric's sign-in flows: Kerberos or a password, then the second factor of each scope |
+| `signin_levels.py` | The second-factor levels and the admin tools' effective one |
 | `ensure_webui_client.py` | The web UI's OIDC client (PKCE, exact redirect, TOTP flow, roles claim) |
 | `app_client_id.py` | An app's Keycloak client id for single sign-on (`app-<name>`), its name checked |
 | `add_app_client.py` | `fabricctl sso add`: an app's confidential OIDC client (exact redirects, fabric's TOTP sign-in, a groups claim); its secret returned once |

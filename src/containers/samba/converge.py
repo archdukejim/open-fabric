@@ -3,9 +3,9 @@ database: no credentials, no network. Run after every start and apply by fabricl
     docker exec -i samba python3 /fabric/converge.py < state.json
 The wanted state comes on stdin as JSON: {"site", "root" (bool), "password_policy" {…}, "networks" [site_networks
 items], "root_ca_pem", "id_range", "groups" [{name, gidNumber, description}], "admin_group", "accounts" {name:
-password}, "radius_gid", "lan_profile", optional "parent", "rodc", "join_account" and "moving"} (stdin, never a command
-line: it holds the service accounts' passwords). Prints one JSON object: {"changed": [what changed, …]}. Exits 1
-with the error on stderr."""
+password}, "radius_gid", "lan_profile", optional "parent", "rodc", "join_account", "moving" and "sso_spns"} (stdin,
+never a command line: it holds the service accounts' passwords). Prints one JSON object: {"changed": [what changed,
+…]}. Exits 1 with the error on stderr."""
 import json
 import sys
 
@@ -22,6 +22,7 @@ from ensure_service_accounts import ensure_service_accounts
 from ensure_site_acl import ensure_site_acl
 from ensure_site_info import ensure_site_info
 from ensure_site_link import ensure_site_link
+from ensure_sso_account import ensure_sso_account
 from ensure_sudo_rule import ensure_sudo_rule
 from logon_rights_policy import BUILTIN_ADMINISTRATORS, EXTENSIONS as LOGON_EXTENSIONS, logon_rights_policy
 from open_samdb import open_samdb
@@ -50,7 +51,9 @@ def converge(state):
              only winbind's pipe is converged), join_account ({name, password}, optional: at the root, the
              temporary account a new site's DC joins with), moving (bool, optional: at a new parent, a site with its
              own DC moving here: its OU and links only, never its GPOs, which its own DC owns), lan_profile (str:
-             the Windows wired 802.1X profile the baseline installs, "" without one).
+             the Windows wired 802.1X profile the baseline installs, "" without one), sso_spns (list, optional: the
+             HTTP SPNs of the site's Kerberos sign-in account; none, no account), sso_host (str, optional: Keycloak's
+             name, which the Windows baseline lets browsers use Kerberos for; "" or none, no allowlist).
     Returns: list of str, what changed.
     Fails:   KeyError for a missing state key; whatever a part raises (ldb.LdbError, OSError, CalledProcessError).
     Feeds:   this script's main."""
@@ -64,6 +67,7 @@ def converge(state):
     changed += ensure_site_info(samdb, site, state["id_range"])
     changed += ensure_groups(samdb, site, root, state["groups"])
     changed += ensure_service_accounts(samdb, lp, site, state["accounts"])
+    changed += ensure_sso_account(samdb, lp, CONF, site, state.get("sso_spns") or [])
     changed += ensure_site_acl(samdb, site, root)
     changed += ensure_networks(samdb, site, state["networks"])
     changed += ensure_sudo_rule(samdb, site, state["admin_group"], root)
@@ -89,7 +93,7 @@ def converge(state):
     changed += ensure_gpo(samdb, lp, f"fabric: {site} log-on rights", site_dn, LOGON_EXTENSIONS,
                           {"Machine/Microsoft/Windows NT/SecEdit/GptTmpl.inf": logon_rights_policy(sids, local_admins)})
     changed += ensure_gpo_admins(samdb, lp, site)
-    extensions, files = windows_baseline_policy(state.get("lan_profile") or "")
+    extensions, files = windows_baseline_policy(state.get("lan_profile") or "", state.get("sso_host") or "")
     changed += ensure_gpo(samdb, lp, f"fabric: {site} Windows baseline", site_dn, extensions,
                           files)
     if state.get("join_account"):         # at the root, preparing a new site's DC join (manual 1.8.8.4)

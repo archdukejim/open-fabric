@@ -217,7 +217,7 @@ ntp_set_clock: {{ ntp_set_clock | default(true) | bool | lower }}
 # syslog: {host, port (6514), tls (true), ca_file}; elastic: {url, index, user, ca_file}.
 # The Elasticsearch password lives in OpenBao: sudo fabricctl logs set-password elastic
 log_forwarding: {{ log_forwarding | default({}, true) | to_json }}
-# Web management UI (mTLS + Keycloak OIDC). Requires Keycloak.
+# Web management UI (Keycloak OIDC; a client certificate when webui_client_cert). Requires Keycloak.
 install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) }}
 webui_realm: {{ webui_realm | default(domain) }}
 webui_admin_role: {{ webui_admin_role | default('fabric-admin') }}
@@ -226,6 +226,13 @@ webui_admin_group: {{ webui_admin_group | default('admins') }}
 webui_admin_user: {{ webui_admin_user | default('fabricadmin', true) }}
 webui_admin_email: {{ webui_admin_email | default('', true) }}
 webui_client_cert_days: {{ webui_client_cert_days | default(365) }}
+# Sign-in (manual 5.8.2.6.1, D110): a password by default; raised in the web console's Security page, lowered only
+# with `sudo fabricctl security lower` (D111). Second factors: none | any (TOTP or a passkey) | totp | passkey.
+signin_kerberos: {{ signin_kerberos | default(true) | bool | lower }}
+signin_admin_second_factor: {{ signin_admin_second_factor | default('none', true) | lower }}
+signin_everyone_second_factor: {{ signin_everyone_second_factor | default('none', true) | lower }}
+# The web console asks for a client certificate from fabric's CA (D108: off by default)
+webui_client_cert: {{ webui_client_cert | default(false) | bool | lower }}
 
 # ============================================================
 # SECURITY (fabricctl setup; relaxations are shown by fabricctl status)

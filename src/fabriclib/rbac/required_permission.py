@@ -12,9 +12,11 @@ GET = {
     ("people",): "people:read",
     ("domain",): "domain:read", ("gpo",): "domain:read", ("federation",): "federation:read",
     ("vault",): "vault:status", ("vault", "slots"): "vault:status", ("vault", "devices"): "vault:status",
+    ("security",): "security:raise",
 }
 POST = {
     ("events",): "session",
+    ("security", "raise"): "security:raise", ("security", "kerberos"): "security:raise",
     ("zones", "*", "records"): "dns:write", ("zones", "*", "records", "delete"): "dns:write",
     ("apply",): "dns:write",
     ("pki", "describe-csr"): "pki:read", ("pki", "inspect"): "pki:read",

@@ -3,7 +3,7 @@ import shutil
 import stat
 import subprocess
 
-from fabriclib.common.console import err, ok
+from fabriclib.common.console import err, ok, warn
 from fabriclib.common.dns_query import dns_query
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.consent.allowed_to_change import allowed_to_change
@@ -14,6 +14,7 @@ from fabriclib.ntp.chrony_settings import chrony_settings
 from fabriclib.ntp.query_time import query_time
 from fabriclib.ntp.time_status import time_status
 from fabriclib.setup.errors import SetupError
+from fabriclib.system.relaxed_settings import relaxed_settings
 from fabriclib.vault.vault_status import vault_status
 
 
@@ -34,10 +35,10 @@ def _curl(url, host, ip, port, root_ca, client_cert=False):
 def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
              trust (unless the `trust` host change was declined), web UI gates, fabric-agent socket, first admin
-             (Keycloak role, client certificate), OpenBao state, the federation endpoint and the DNS filter
-             (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and under 1 s off
-             — or this host's own clock when no source is set —, and at a site within 1 s of its upstream site),
-             and every installed service.
+             (Keycloak role, the client certificate while one is required), OpenBao state, the federation endpoint and
+             the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and
+             under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its
+             upstream site), and every installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, bind_dns_port, install_webui/keycloak,
              federation_endpoint, install_adguard, webui_admin_user/role), secrets (Keycloak), Step-CA root, the
              agent socket, ~/fabric-admin of the sudo user.
@@ -116,7 +117,10 @@ def checks(ctx):
 
     if v.get("install_webui"):
         rc, code = _curl(f"https://{v['hostname_mgr']}/", v["hostname_mgr"], v["ip_nginx"], 443, root_ca)
-        add("web UI refuses requests without a client certificate", code == "400", f"HTTP {code}")
+        if v.get("webui_client_cert"):          # the web console asks for a client certificate (D108)
+            add("web UI refuses requests without a client certificate", code == "400", f"HTTP {code}")
+        else:                                   # no certificate asked: the web app sends a newcomer to sign in
+            add("web UI answers and sends a newcomer to sign in", code == "303", f"HTTP {code}")
         sock = ctx.path("webui", "agent", "agent.sock")
         st = os.stat(sock) if os.path.exists(sock) else None
         add("fabric-agent socket 0660, webui group only",
@@ -131,7 +135,7 @@ def checks(ctx):
             except (SystemExit, OSError) as e:
                 add(f"Keycloak grants {admin} {role}", False, str(e))
             crt = os.path.join(sudo_owner()[1], "fabric-admin", f"{admin}.crt")
-            if os.path.exists(crt):
+            if v.get("webui_client_cert") and os.path.exists(crt):
                 certs = ctx.path("stepca", "data", "certs")
                 chain = os.path.join(certs, "intermediate_chain.crt")     # byoc: the intermediate + parent CAs
                 res = subprocess.run(["openssl", "verify", "-CAfile", os.path.join(certs, "root_ca.crt"),
@@ -169,12 +173,18 @@ def run(ctx):
     """Purpose: check the running install end to end and fail setup if anything is wrong (same checks as
              `fabricctl doctor`).
     Inputs:  ctx — SetupContext with state loaded (see checks).
-    Returns: None; each check printed as ok or error.
+    Returns: None; each check printed as ok or error, then a warning for each sign-in layer lowered below a level
+             it had.
     Fails:   SetupError("<n> check(s) failed"); exceptions from checks propagate.
     Feeds:   setup step `verify`, run by run_setup via STEPS; run_setup main for `fabricctl doctor`."""
     failed = 0
     for name, passed, detail in checks(ctx):
         (ok if passed else err)(f"{name}" + (f" — {detail}" if detail else ""))
         failed += not passed
+    # sign-in layers lowered with `fabricctl security lower` stay in view until raised again (D111): warnings, which
+    # do not fail the checks
+    for row in relaxed_settings(ctx.vars, ctx.config_dir):
+        if " lowered: " in row["setting"]:
+            warn(f"sign-in {row['setting']} — {row['effect']}")
     if failed:
         raise SetupError(f"{failed} check(s) failed")

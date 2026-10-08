@@ -593,6 +593,45 @@ audit_tail = open(f"{W}/fabric/archive/audit.log").read().splitlines()[-1] if os
     f"{W}/fabric/archive/audit.log") else ""
 check("the audit log names the token's user, not the actor the request claims",
       " 200 " in out and "alice" in audit_tail and "mallory" not in audit_tail, (out, audit_tail))
+# ---------------------------------------------- without a client certificate (webui_client_cert off, manual 5.8.2.6.3)
+json.dump({**cfg, "client_cert": False}, open(f"{W}/config/webui.json", "w"))
+os.remove(f"{W}/run/web.sock")
+sh("docker restart cwebui >/dev/null")
+for _ in range(100):
+    if os.path.exists(f"{W}/run/web.sock"):
+        break
+    time.sleep(0.2)
+st, hd, *_ = req("GET", "/")
+check("certificate off: no certificate, no session -> redirect to /login (not 403)",
+      st == 303 and hd.get("Location") == "/login", (st, hd))
+(st, hd, sc, _), _, _ = login(cert={}, user="dave")
+sess = cookie_val(sc, "__Host-webui")
+check("certificate off: a Keycloak sign-in alone makes the session (no CN to match)", st == 200 and sess, (st, sc))
+st, _, _, body = req("GET", "/", cookie=sess)
+check("certificate off: the session cookie opens the console", st == 200 and "dave" in body, st)
+st, hd, *_ = req("GET", "/")
+check("certificate off: still no way in without a session", st == 303, st)
+(st, *_), _, _ = login(cert={}, user="erin", roles=())
+check("certificate off: a person without a fabric role is still refused", st == 403, st)
+audit_tail = open(f"{W}/fabric/archive/audit.log").read() if os.path.exists(f"{W}/fabric/archive/audit.log") else ""
+check("certificate off: the sign-in is audited as made without a certificate",
+      "dave" in audit_tail and "no client certificate" in audit_tail, audit_tail[-300:])
+# the Security page (manual 5.8.2.6.4): admins only; turning the certificate on needs this browser's own certificate
+csrf = req("GET", "/", cookie=sess)[3].split('name="csrf" value="')[1].split('"')[0]
+st, _, _, page = req("GET", "/security", cookie=sess)
+check("Security page: the admin sees each layer and its raises", st == 200 and "admin-2fa" in page
+      and 'action="/security/raise"' in page, (st, page[:300]))
+st, hd, *_ = req("POST", "/security/raise", {"Origin": "https://mgr.test"},
+                 {"csrf": csrf, "layer": "client-cert", "value": "on"}, cookie=sess)
+check("refused: turning the client certificate on while this browser presents none (never locks the admin out)",
+      st == 303 and "did+not+present" in hd.get("Location", "").replace("%20", "+"), (st, hd.get("Location")))
+out = agent_call("GET", "/v1/security", "carol", AUDITOR_ROLES)
+check("auditor token: may not read or raise sign-in security (403, security:raise)",
+      " 403 " in out and "security:raise" in out, out)
+out = agent_call("GET", "/v1/security", "alice", ADMIN_ROLES)
+check("admin token: may read the layers", " 200 " in out, out)
+out = agent_call("POST", "/v1/security/raise", "alice", ADMIN_ROLES, {"layer": "admin-2fa", "value": "sms"})
+check("refused through the agent: a value that is no level (400)", " 400 " in out, out)
 subprocess.run("docker rm -f cwebui >/dev/null; docker network rm cwnet >/dev/null; docker rmi fabric/webui:test >/dev/null",
                shell=True)
 agent.terminate()

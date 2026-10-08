@@ -13,7 +13,8 @@ def find_session(app, headers, cert):
              verified_client_cert.
     Returns: a copy of the session plus 'sid': {user, fp, csrf, id_token, refresh_token, perms, exp, created, last,
              auth_at, sid}; None when there is no cookie, the id is unknown, the session is idle or too old, the
-             certificate fingerprint or CN differs (the session is then deleted), or renewal failed.
+             certificate fingerprint or CN differs (the session is then deleted; without a required certificate both
+             are NO_CERT's), or renewal failed.
     Fails:   OIDC refusals are a None return (via renew_session); OSError / ssl.SSLError from the Keycloak refresh
              propagate to handle_request (500).
     Feeds:   handler.Handler.handle_request (None → redirect to /login; else the ID token goes to agentclient and the
@@ -30,7 +31,8 @@ def find_session(app, headers, cert):
         if not s:
             return None
         if (now - s["last"] > app.idle or now - s["created"] > app.max_age
-                or not hmac.compare_digest(s["fp"], cert["fp"]) or s["user"] != cert["cn"]):
+                or not hmac.compare_digest(s["fp"], cert["fp"])
+                or (cert["cn"] is not None and s["user"] != cert["cn"])):
             del app.sessions[sid]
             return None
         s["last"] = now

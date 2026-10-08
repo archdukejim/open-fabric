@@ -35,9 +35,16 @@
 <label>Priority (MX / SRV)<input name="priority" inputmode="numeric" placeholder="10"></label>
 <label>Weight (SRV)<input name="weight" inputmode="numeric"></label>
 <label>Port (SRV)<input name="port" inputmode="numeric"></label>
+<fieldset><legend>Landing page (A / AAAA / CNAME)</legend>
+<label><input type="checkbox" name="link" value="on"> Show on the landing page</label>
+<label>Label<input name="link_label" maxlength="60" placeholder="Proxmox host1"></label>
+<label>Port<input name="link_port" inputmode="numeric" placeholder="8006"></label>
+<label>Path<input name="link_path" placeholder="/"></label></fieldset>
 <div><button>Add record</button></div>
 </form>{% endif %}
-<p class="muted">A and AAAA records with a private address get their PTR record automatically — see Reverse zones.</p></section>
+<p class="muted">A and AAAA records with a private address get their PTR record automatically — see Reverse zones.
+A record shown on the landing page links to https://&lt;name&gt;.&lt;domain&gt; with its port and path (to change a link,
+delete the record and add it again).</p></section>
 {% else %}<section class="card"><p class="blank">No forward zones.</p></section>{% endif %}
 
 {% elif section == 'reverse' %}

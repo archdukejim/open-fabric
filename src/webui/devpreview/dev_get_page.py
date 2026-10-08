@@ -1,7 +1,7 @@
 from webui import views
 from webui.devpreview.sample_data import (RECORD_TYPES, SAMPLE_CA, SAMPLE_DEVICES, SAMPLE_DHCP, SAMPLE_DOMAIN,
                                           SAMPLE_FEDERATION, SAMPLE_GPO, SAMPLE_RADIUS,
-                                          SAMPLE_VAULT)
+                                          SAMPLE_SECURITY, SAMPLE_VAULT)
 from webui.devpreview.sample_radius_guides import sample_radius_guides
 
 
@@ -72,6 +72,8 @@ def dev_get_page(h, path, query):
                                             guides))
     if path == "/audit":
         return h.send(200, views.audit(ctx, state.data["audit"]))
+    if path == "/security":
+        return h.send(200, views.security(ctx, SAMPLE_SECURITY, query.get("msg", ""), query.get("err", "")))
     if path == "/preview/denied":       # what a refused sign-in looks like
         return h.send(403, views.error_page(403, "Your account is missing the 'fabric-admin' role."))
     return h.send(404, views.error_page(404, "Not found."))

@@ -89,6 +89,10 @@ try:
     check("apply is a no-op that says so", st == 200 and "nothing was rendered or reloaded" in page)
     st, _, _, page = req("GET", "/audit")
     check("audit log shows the preview's actions", "DNS_ADD" in page and "in memory" in page)
+    st, _, _, page = req("GET", "/security")
+    check("the Security page: each layer, its raises, a lowering shown with who did it, no lower button",
+          st == 200 and 'action="/security/raise"' in page and "lowered from any" in page
+          and "fabricctl security lower" in page and "Lower</button>" not in page and "Turn off" in page)
     pages = [req("GET", f"/stepca?view={v}") for v in ("ca", "sign", "issue", "inspect", "convert", "issued")]
     check("every Step-CA menu page renders", all(p[0] == 200 for p in pages) and "Fabric Root CA" in pages[0][3]
           and "switch-core.home.arpa" in pages[5][3])

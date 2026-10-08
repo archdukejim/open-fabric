@@ -10,6 +10,7 @@ from webui.routes.radius_post import radius_post
 from webui.routes.saved_and_applied import saved_and_applied
 from webui.routes.stepca_post import stepca_post
 from webui.routes.tsig_post import tsig_post
+from webui.routes.security_post import security_post
 from webui.routes.vault_post import vault_post
 from webui.routes.zone_post import zone_post
 from webui.session.page_context import page_context
@@ -65,6 +66,8 @@ def post_action(h, sess, path, form):
         return stepca_post(h, sess, path[len("/stepca/"):], form)
     if path.startswith("/openbao/"):
         return vault_post(h, sess, _segments(path, 2), form)
+    if path.startswith("/security/"):
+        return security_post(h, sess, _segments(path, 2), form)
     if path.startswith("/directory/"):
         return directory_post(h, sess, _segments(path, 2), form)
     if path.startswith("/kea/"):
