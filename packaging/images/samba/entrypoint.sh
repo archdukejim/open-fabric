@@ -86,6 +86,8 @@ set_global() {
 set_global "interfaces" "$INTERFACES"
 set_global "bind interfaces only" "yes"
 set_global "server services" "-dns"
+# the DC's own DNS records name the LAN address only, never fabric_net's gateway it also listens on (2.1.2.15)
+set_global "dns update command" "/usr/sbin/samba_dnsupdate --current-ip=$HOST_IP"
 # AD needs no NetBIOS: nothing binds 137-139
 set_global "disable netbios" "yes"
 set_global "rpc server dynamic port range" "$RPC_PORTS"

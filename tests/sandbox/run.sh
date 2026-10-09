@@ -151,6 +151,12 @@ echo "--- POSIX identities in the domain (manual 1.6.3.9)"
 check "the admin has fabric's POSIX identity in AD: a uid from the site's block, Domain Users' gid 5000" \
     "in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=fabricadmin)' uidNumber gidNumber\" | grep -qE '^uidNumber: (500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-9][0-9]{4,5})$'"
 
+echo "--- traffic stays on the host (2.1.2.15): containers reach the DC on fabric_net's gateway"
+DC_NAME=$(in_box "python3 -c 'import yaml; print(yaml.safe_load(open(\"/opt/fabric/config/vars.yaml\"))[\"hostname_dc\"])'")
+check "the DC listens for LDAPS on fabric_net's gateway (10.255.0.1) as well as the LAN address"     "in_box 'ss -ltn' | grep -q '10.255.0.1:636' && in_box 'ss -ltn' | grep -q '$IP:636'"
+check "Keycloak's LDAP federation and FreeRADIUS's LDAPS go to the gateway, never the LAN address" "in_box \"docker exec postgres psql -tA -U keycloak -d keycloak -c \\\"SELECT value FROM component_config WHERE name = 'connectionUrl'\\\"\" | grep -qx 'ldaps://10.255.0.1:636' && { ! in_box 'systemctl is-enabled freeradius' >/dev/null 2>&1 || in_box 'grep -q ldaps://10.255.0.1:636 /opt/freeradius/config/fabric-radius.json'; }"
+check "the DC's name in DNS is the LAN address only (the gateway it listens on never published)"     "[ \"\$(in_box 'dig +short @$IP $DC_NAME A' | sort -u)\" = '$IP' ]"
+
 echo "--- DNS filter (AdGuard Home) in front of BIND"
 BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
 check "AdGuard answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \

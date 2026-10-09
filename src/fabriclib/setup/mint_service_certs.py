@@ -36,7 +36,9 @@ def _targets(ctx):
     if v.get("install_keycloak"):
         t.append((v["hostname_keycloak"], [], [nginx(v["hostname_keycloak"]), (p("keycloak", "certs"), "keycloak")],
                   ["nginx", "keycloak"]))
-        t.append(("postgres", [f"postgres.{v['domain']}"], [(p("postgres", "certs"), "postgres")], ["postgres"]))
+        # only ever reached on fabric_net by its alias (Keycloak, and OpenBao's database engine: 2.1.7.4); 5432 is
+        # not published
+        t.append(("postgres", [], [(p("postgres", "certs"), "postgres")], ["postgres"]))
     if v.get("install_webui"):
         t.append((v["hostname_mgr"], [], [nginx(v["hostname_mgr"])], ["nginx"]))
     if v.get("federation_endpoint"):
@@ -45,7 +47,9 @@ def _targets(ctx):
         t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
     # the DC's LDAPS/TLS certificate (manual 1.6.5.7): Keycloak, FreeRADIUS and members verify it; Keycloak and
     # FreeRADIUS reach it at the host's address, so it names that too
-    t.append((v["hostname_dc"], [v["ad_domain"], v["host_ip"]], [(p("samba", "tls"), "root")], ["samba"]))
+    # fabric_net's gateway too: containers reach the DC there (2.1.2.15)
+    t.append((v["hostname_dc"], [v["ad_domain"], v["host_ip"], v.get("ip_fabric_gateway", "10.255.0.1")],
+              [(p("samba", "tls"), "root")], ["samba"]))
     if v.get("install_freeradius"):
         # the EAP-TLS server certificate supplicants check (server.pem, server.key)
         t.append((v["hostname_radius"], [], [(p("freeradius", "certs"), "freeradius:eap")], ["freeradius"]))

@@ -372,7 +372,7 @@ assert "--username=%{mschap:User-Name}" in mschap and "--allow-mschapv2" in msch
 frj_p = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**{**rv_, "radius_people": people}))
 assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
-assert frj["uri"] == f"ldaps://{rv_['host_ip']}:636" and frj["bind_dn"] == f"fabric-radius-{rv_['site_name']}@{rv_['ad_domain']}" \
+assert frj["uri"] == f"ldaps://{rv_['ip_fabric_gateway']}:636" and frj["bind_dn"] == f"fabric-radius-{rv_['site_name']}@{rv_['ad_domain']}" \
     and frj["base"] == rv_["ad_base_dn"] and frj["site"] == rv_["site_name"], frj   # the site's DC (S3.2)
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
 assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "610:610", fc

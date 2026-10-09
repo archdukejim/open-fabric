@@ -151,7 +151,8 @@ check("host network (2.1.6.18), read-only, no-new-privileges, every capability d
 check("exactly the six capabilities of the inventory (1.2.7)",
       sorted(dc["cap_add"]) == ["CHOWN", "DAC_OVERRIDE", "FOWNER", "NET_BIND_SERVICE", "SETGID", "SETUID"],
       dc["cap_add"])
-check("bound to loopback and the host's address only", dc["environment"]["INTERFACES"] == "127.0.0.1 192.168.7.53")
+check("bound to loopback, the host's address and fabric_net's gateway only (containers reach it there, 2.1.2.15)",
+      dc["environment"]["INTERFACES"] == "127.0.0.1 192.168.7.53 10.255.0.1", dc["environment"]["INTERFACES"])
 check("no secret in its environment (the Administrator's password comes as a file)",
       not any(k.endswith(("PASSWORD", "SECRET", "PASS")) for k in dc["environment"]), sorted(dc["environment"]))
 check("its resolver is fabric's file (the host's address), not the host's resolver",

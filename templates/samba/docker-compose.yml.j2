@@ -40,7 +40,9 @@ services:
       NETBIOS: "{{ ad_netbios }}"
       HOST_NAME: "{{ hostname | lower }}"
       HOST_IP: "{{ host_ip }}"
-      INTERFACES: "127.0.0.1 {{ host_ip }}"
+      # loopback, the LAN, and fabric_net's gateway: containers (Keycloak, FreeRADIUS) reach it on the bridge
+      # (2.1.2.15); its DNS records name the LAN address only (HOST_IP)
+      INTERFACES: "127.0.0.1 {{ host_ip }} {{ ip_fabric_gateway | default('10.255.0.1') }}"
       RPC_PORTS: "{{ ad_rpc_ports }}"
       OLD_PASSWORD_MINUTES: "{{ ad_old_password_minutes }}"
 {% if ad_join_server %}

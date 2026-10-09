@@ -29,7 +29,7 @@ def firewall_rules(v, config_dir):
     ssh = [v["lan_cidr"]] + list(security.get("firewall_allow") or [])
     ad = []
     rpc = str(v.get("ad_rpc_ports") or "49152-49251").replace("-", ":")
-    # Keycloak and FreeRADIUS reach the DC at the host's address from fabric_net; the DCs of the sites next to this
+    # Keycloak and FreeRADIUS reach the DC at fabric_net's gateway (2.1.2.15); the DCs of the sites next to this
     # one replicate with it (manual 1.9.8.5): its upstream's and each joined site's address
     registry = load_registry(os.path.join(config_dir, "federation.yaml"))
     peers = [p["address"] for p in [registry.get("upstream") or {}, *registry.get("sites", {}).values()]

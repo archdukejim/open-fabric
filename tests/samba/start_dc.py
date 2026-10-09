@@ -55,7 +55,9 @@ def start_dc(work, container, network, subnet, ip, domain="lan.j-j.family", ad_d
     v = yaml.safe_load(env.get_template("vars.yaml.j2").render(
         domain=domain, hostname=hostname, host_ip=ip, lan_cidr=subnet, lan_gateway=subnet.rsplit(".", 1)[0] + ".1",
         site_name=site, ad_domain=ad_domain, ad_password_policy=POLICY, deploy_base_dir=work,
-        ad_ntp_signd_dir=os.path.join(work, "ntp_signd"), **(extra_vars or {})))       # never the host's own
+        ad_ntp_signd_dir=os.path.join(work, "ntp_signd"),
+        ip_fabric_gateway=ip,                # on a test network the clients reach the DC at its own address
+        **(extra_vars or {})))               # never the host's own
     root_ca, root_key = os.path.join(certs, "root_ca.crt"), os.path.join(certs, "root.key")
     _sh(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", root_key, "-out", root_ca, "-days", "2",
          "-subj", "/CN=Test Root", "-addext", "basicConstraints=critical,CA:TRUE",

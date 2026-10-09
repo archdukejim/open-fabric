@@ -39,7 +39,8 @@ def ensure_ldap_federation(kc, realm, realm_id, v, s, writable=True, kerberos=Fa
         "rdnLDAPAttribute": ["cn"],
         "uuidLDAPAttribute": ["objectGUID"],
         "userObjectClasses": ["person, organizationalPerson, user"],
-        "connectionUrl": [f"ldaps://{v['host_ip']}:636"],
+        # the DC on fabric_net's gateway: the traffic stays on the bridge (2.1.2.15)
+        "connectionUrl": [f"ldaps://{v.get('ip_fabric_gateway', '10.255.0.1')}:636"],
         "usersDn": [f"OU=sites,{base}"],
         "searchScope": ["2"],
         "customUserSearchFilter": [admitted],

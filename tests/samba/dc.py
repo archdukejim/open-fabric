@@ -313,6 +313,11 @@ check("and fabric's own zone, unchanged", client("dig", "+short", f"@{BIND_IP}",
 upd = dc("samba_dnsupdate", "-s", "/data/etc/smb.conf", "--all-names")
 check("the DC's signed (GSS-TSIG) updates are accepted through BIND",
       upd.returncode == 0 and "Failed update" not in upd.stdout + upd.stderr, (upd.stdout + upd.stderr)[-400:])
+cmd = dc("testparm", "-s", "--parameter-name=dns update command", "/data/etc/smb.conf").stdout.strip()
+pinned = dc("sh", "-c", f"{cmd} -s /data/etc/smb.conf --all-names")
+a_rec = client("dig", "+short", f"@{BIND_IP}", "A", "dc1.ad.lan.test").stdout.split()
+check("the DC's own DNS updates name its LAN address only, never fabric_net's gateway it also listens on (2.1.2.15)",
+      f"--current-ip={IP}" in cmd and pinned.returncode == 0 and a_rec == [IP], (cmd, a_rec, pinned.stderr[-300:]))
 evil = unsigned_update("ad.lan.test")
 check("refused: an unsigned update to the AD zone", "REFUSED" in evil.stdout + evil.stderr, evil.stderr[-200:])
 evil = unsigned_update("lan.test")

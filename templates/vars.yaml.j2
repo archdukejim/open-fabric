@@ -38,6 +38,9 @@ host_ip: {{ host_ip }}
 # ============================================================
 # SERVICE IPs
 # ============================================================
+# the host's own address on fabric_net: the services on the host network (the DC) answer containers here, so their
+# traffic stays on the bridge (2.1.2.15)
+ip_fabric_gateway: {{ ip_fabric_gateway | default('10.255.0.1') }}
 ip_nginx: {{ ip_nginx | default('10.255.0.10') }}
 ip_bind9: {{ ip_bind9 | default('10.255.0.30') }}
 ip_stepca: {{ ip_stepca | default('10.255.0.40') }}
