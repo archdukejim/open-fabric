@@ -104,6 +104,17 @@ try:
           all(rendered_vars[f"image_fabric_{n}"] == refs[n] for n in IMAGES)
           and "@sha256:" in rendered_vars["image_cosign"] and rendered_vars["image_signature_check"] is True)
 
+    # a rolled-back image of fabric's keeps its older ref (image_rolled_back); one not listed follows the lock
+    old_bind = refs["bind9"].split("@")[0].rsplit(":", 1)[0] + ":0.6.2-rc.47@sha256:" + "f" * 64
+    back = render(os.path.join(tree, "templates"), os.path.join(work, "rolledback"),
+                  {"image_rolled_back": ["image_fabric_bind9"], "image_fabric_bind9": old_bind,
+                   "image_fabric_kea": old_bind})
+    back_vars = yaml.safe_load(open(os.path.join(work, "rolledback", "vars.yaml")))
+    check("a rolled-back image of fabric's keeps its older ref; another follows the lock (0.6.3 image-update test)",
+          old_bind in images_of(back["bind9"]) and back_vars["image_fabric_kea"] == refs["kea"]
+          and back_vars["image_rolled_back"] == ["image_fabric_bind9"], (images_of(back["bind9"]), back_vars.get(
+              "image_fabric_kea")))
+
     # custom ids for the DNS account: bind9 is built locally (its ids are baked in); stepca (no account) is not
     users = {"bind": {"uid": 700, "gid": 700, "name": "fabric-dns"}}
     custom = render(os.path.join(tree, "templates"), os.path.join(work, "custom"), {"service_users": users})
