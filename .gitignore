@@ -19,3 +19,7 @@ dist/
 
 # packages downloaded for inspection never belong in the repository
 /*.deb
+
+# Claude Code: the project's skills are shared (/rc, /tag, /promote: 2.1.1.40); the rest of .claude/ is local
+.claude/*
+!.claude/skills/

@@ -13,3 +13,6 @@ An entry point for agents (global Rule 7.1); it holds no rules of its own.
    branches and commits: [3.1.4](docs/volume_3_installation/3.1.4-working-on-fabric.md).
 5. A decision whose status is **Open** ([2.1](docs/volume_2_engineering_decisions/README.md)) waits for the owner:
    ask before building around one.
+6. Releases run as `/rc`, `/tag` and `/promote` (`.claude/skills/`), following
+   [2.1.1.40](docs/volume_2_engineering_decisions/2.1.1-product.md) and
+   [3.14.1.4](docs/volume_3_installation/3.14.1-building-images.md).
