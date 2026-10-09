@@ -1084,7 +1084,7 @@ static/vendor/README.md	f60fe41b9c2957b27a80619caf661a53160d6668	2026-10-03
 static/vendor/marked.min.js	b4e0d73b2bdc93af14ec56ed661ecff3c9f78a2f	2026-09-30	vendored minified: version checked (15.0.12), code not read; no source URL/checksum recorded
 static/vendor/mermaid.min.js	3dce007acabbec440d303bb632042981d5354e96	2026-09-30	vendored minified: version checked (10.9.1), code not read; no source URL/checksum recorded
 static/webui-app/README.md	20f0cf457140d63b259934c0f3b081f06809e7a4	2026-10-03	
-static/webui-app/app.css	bfaf10d9d9ce08cd876a002581bb0f3d72efc20a	2026-10-02	
+static/webui-app/app.css	d7ef0258ff7c61fc308539a891b710b17abd0500	2026-10-09	
 templates/README.md	a3240335342f4a78f4032b8bd525d6150ca6e744	2026-10-08	
 templates/adguard-auth/README.md	10983e84f0b5ceb44f03b79566cb19aefab09773	2026-10-08	
 templates/adguard-auth/docker-compose.yml.j2	850b5f62a74e6ba6974c870951abc5dadb591071	2026-10-08	
