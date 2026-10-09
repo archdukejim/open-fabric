@@ -51,7 +51,7 @@ docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.22-fabriclib-secrets.md	74f026337aad89eb5aeaaf8decd4bb352ee34e98	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.23-fabriclib-security.md	d920e7834a56aafa8fdc1602f2ef23e455944d53	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	ec93ac765d4fc4d3d0731911b10ce97b03ca105e	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	b0deeec1f4b9277b5324917d3631f9503732e09c	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.25-fabriclib-system.md	b57979b1c79b1c15f4e4edcaff531706311aa242	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.26-fabriclib-undo.md	5591364f414bc6fc2a505d9b421026d7ae218d45	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	81f6cde28df7beccc344c4ce2a4394ff454c089c	2026-10-09	
@@ -233,7 +233,7 @@ scripts/README.md	dd36e9248260e4f936662417c4d10511c3cdb00a	2026-10-08
 scripts/docs/README.md	af834e1650d5a42ed93702d10180e09780634830	2026-10-08	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	7ff94cd622677c2a6040c2c75374a04e50cc48c4	2026-10-08	
-scripts/docs/lib_doc_numbers.tsv	1fbc974a271b78332e0e7cc3436a0f9d4406b23b	2026-10-09	
+scripts/docs/lib_doc_numbers.tsv	ac730c379fd74f0996253a42fd2fd116178d8bf4	2026-10-09	
 scripts/docs/lib_doc_registry.py	a65ab5459802daaca963fac77a8b708397d42d89	2026-10-08	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	b3f307b4dbaba54a69cc93c993287d43c747ba8f	2026-10-08	
@@ -845,7 +845,7 @@ src/fabriclib/setup/start_unit.py	898cc7b68b842376bbff19fa3ce5ea9480651a3b	2026-
 src/fabriclib/setup/steps.py	a2b27bb694df2e35fbc74f26bdce64651b2c9a42	2026-10-09	
 src/fabriclib/setup/uninstall.py	b926f86de70781fed727a03e7b8e24f70e9cffda	2026-10-09	
 src/fabriclib/setup/upgrade_vars.py	a141f70ee81696ce7a5b3ae7d8e0367e45ba8bdd	2026-10-08	
-src/fabriclib/setup/verify_install.py	247771c5550dc37d2bef83349fd5cbf23a7b0daa	2026-10-09	
+src/fabriclib/setup/verify_install.py	b193a7198d676381999da3868e4014dec6e23cfc	2026-10-09	
 src/fabriclib/system/README.md	c10c4233e56c7ec667ed3cb475e45a4c29a8433c	2026-10-06	
 src/fabriclib/system/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
 src/fabriclib/system/apply_changes.py	a6b0c5238b28b1e9e44701002dd734756be00917	2026-10-02	

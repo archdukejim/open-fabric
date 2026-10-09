@@ -1562,6 +1562,7 @@ function	fabriclib-setup|src/fabriclib/setup/upgrade_vars.py|upgrade_vars	1
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_curl	1	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_db_rotation	5	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_ldap_bind	2	0.5.0 / 2026-10-04
+function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_records	6	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|checks	3	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|run	4	
 function	fabriclib-system|src/fabriclib/system/apply_changes.py|apply_changes	1	

@@ -9,7 +9,7 @@ import subprocess
 from fabriclib.common.console import err, ok, warn
 from fabriclib.common.dns_query import dns_query
 from fabriclib.common.doh_query import doh_query
-from fabriclib.common.paths import DB_ROTATION_FILE
+from fabriclib.common.paths import CERT_RENEWAL_FILE, DB_ROTATION_FILE, ISSUED_CERTS_FILE
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.plan_trust import plan_trust
@@ -57,6 +57,17 @@ def _db_rotation(path=DB_ROTATION_FILE, now=None):
     return age <= 40, f"last rotated {age} day(s) ago" + ("" if age <= 40 else ": is the fabric-db-rotate timer on?")
 
 
+def _records(archive):
+    """Purpose: the certificate records of this install, in its own archive: setup runs from the package's copy, where
+             the default paths would point (found by the 0.6.3 sandbox).
+    Inputs:  archive — <install>/archive.
+    Returns: {"record", "ledger"} for cert_warnings.
+    Fails:   never.
+    Feeds:   checks, run."""
+    return {"record": os.path.join(archive, os.path.basename(CERT_RENEWAL_FILE)),
+            "ledger": os.path.join(archive, os.path.basename(ISSUED_CERTS_FILE))}
+
+
 def checks(ctx):
     """Purpose: the end-to-end checks of a running install: DNS (and DNS-over-HTTPS), HTTP/HTTPS chains, CA
              publishing, ACME, host trust (unless the `trust` host change was declined), web UI gates, fabric-agent
@@ -73,6 +84,7 @@ def checks(ctx):
              root_ca.crt; struct.error/IndexError from
              dns_query on a malformed reply. Check failures are results, not exceptions.
     Feeds:   run."""
+    archive = os.path.join(ctx.target_dir, "archive")      # the install's, not the package copy's
     v, s = ctx.vars, ctx.secrets
     root_ca = ctx.path("stepca", "data", "certs", "root_ca.crt")
     port = int(v.get("bind_dns_port", 53))
@@ -194,8 +206,9 @@ def checks(ctx):
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
     if v.get("install_keycloak"):           # Keycloak's database password, rotated monthly by OpenBao (2.1.7.4)
-        add("Keycloak's database password: rotated by OpenBao in the last 40 days", *_db_rotation())
-    failing = [w["what"] for w in cert_warnings(v) if w["level"] == "fail"]
+        add("Keycloak's database password: rotated by OpenBao in the last 40 days",
+            *_db_rotation(os.path.join(archive, "db-rotation.json")))
+    failing = [w["what"] for w in cert_warnings(v, **_records(archive)) if w["level"] == "fail"]
     add("certificates: renewal working, none about to expire (2.1.5.4)", not failing, "; ".join(failing))
     for unit in ("bind9", "stepca", "nginx", "samba", "postgres", "keycloak", "openbao", "kea", "freeradius",
                  "samba", "fluentbit",
@@ -223,7 +236,7 @@ def run(ctx):
     for row in relaxed_settings(ctx.vars, ctx.config_dir):
         if " lowered: " in row["setting"]:
             warn(f"sign-in {row['setting']} — {row['effect']}")
-    for row in cert_warnings(ctx.vars):          # what is coming (a CA, issued certificates): warnings
+    for row in cert_warnings(ctx.vars, **_records(os.path.join(ctx.target_dir, "archive"))):    # what is coming
         if row["level"] == "warn":
             warn(f"certificates: {row['what']}")
     if failed:
