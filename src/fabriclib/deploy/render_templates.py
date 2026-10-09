@@ -74,6 +74,7 @@ def render_templates(paths, jinja_env, context, final_vars, secrets, tsig_keys, 
         render("systemd/fabric-federation.service.j2", "systemd/fabric-federation.service")
     render("openbao/openbao.hcl.j2", "openbao/config/openbao.hcl")
     render("stepca/leaf.tpl.j2", "stepca/templates/certs/leaf.tpl")
+    render("stepca/acme.tpl.j2", "stepca/templates/certs/acme.tpl")
     render("stepca/subca.tpl.j2", "stepca/templates/certs/subca.tpl")
 
     # RFC2136 client settings, one per TSIG key (the zone's own ACME key too)

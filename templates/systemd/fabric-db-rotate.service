@@ -1,0 +1,10 @@
+[Unit]
+Description=fabric: rotate Keycloak's database password (manual 1.7.1, decision 2.1.7.4)
+After=docker.service fabric.target openbao.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+# OpenBao sets a new password in Postgres; fabric keeps it, applies Keycloak's settings and waits until it is healthy.
+# A failure leaves Keycloak's open connections working and is recorded for doctor
+ExecStart=/usr/bin/fabricctl vault rotate-db --scheduled

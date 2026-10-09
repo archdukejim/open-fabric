@@ -216,10 +216,14 @@ aaaa = R(f"dig +short AAAA ad.{DOMAIN} @{HOST_IP}; dig +short AAAA $(hostname -s
 check("the domain on IPv4 only: no AAAA for the AD domain or its DC, though the host has IPv6 (2.1.6.29)",
       aaaa.strip() == "" and R(f"dig +short A ad.{DOMAIN} @{HOST_IP}").strip() == HOST_IP,
       (aaaa, R("ip -6 addr show scope global | grep inet6")))
-landing = R(f"curl -s --resolve {guess_host}.{DOMAIN}:443:{HOST_IP} https://{guess_host}.{DOMAIN}/ "
-            "--cacert /opt/stepca/data/certs/root_ca.crt")
-check("the landing page at the host's own name, trusted (not a bare 404)", "Fabric Landing Portal" in landing,
-      landing[:300])
+landing = R(f"curl -sL --resolve {guess_host}.{DOMAIN}:443:{HOST_IP} --resolve info.{DOMAIN}:443:{HOST_IP} "
+            f"https://{guess_host}.{DOMAIN}/ --cacert /opt/stepca/data/certs/root_ca.crt")
+check("the host's own name leads to the info page, trusted (2.1.4.3; not a bare 404)",
+      "Fabric Landing Portal" in landing, landing[:300])
+plain = R(f"curl -s --resolve info.{DOMAIN}:80:{HOST_IP} -o /dev/null -w '%{{http_code}}' http://info.{DOMAIN}/; "
+          f"curl -s --resolve info.{DOMAIN}:80:{HOST_IP} http://info.{DOMAIN}/certs/root-ca.pem | head -1")
+check("the info page over plain HTTP, no redirect, with the root CA to download (2.1.4.3)",
+      plain.startswith("200") and "BEGIN CERTIFICATE" in plain, plain[:200])
 after = R("ufw status | grep -iE 'ALLOW|DENY' | grep -v '(v6)'")
 check("the host's own ufw rules kept beside fabric's (answered no)", all(line in after for line in own_rules.splitlines()),
       after)

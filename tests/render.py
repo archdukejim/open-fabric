@@ -134,6 +134,10 @@ assert 'server_name admin.example.org;' in ngx and 'server_name certs.lan.j-j.fa
 same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'hostname': 'fabric'}))
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
+doh = ngx[ngx.index('location /dns-query'):]
+doh = doh[:doh.index('\n        }')]          # the location block only
+assert 'grpc_pass $bind9_doh_backend;' in doh and '"grpc://bind9:' in doh and 'proxy_pass $' not in doh,     "DoH goes to BIND over HTTP/2 (grpc_pass): BIND's DoH speaks HTTP/2 only"
+print('DoH: nginx speaks HTTP/2 to BIND (grpc_pass)')
 
 # Federation (manual 1.9): the endpoint's vhost, socket mount, CNAME and unit only when it is
 # on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.
@@ -372,7 +376,7 @@ assert "--username=%{mschap:User-Name}" in mschap and "--allow-mschapv2" in msch
 frj_p = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**{**rv_, "radius_people": people}))
 assert frj_p["people"] == people, frj_p
 frj = json.loads(env.get_template("freeradius/config/fabric-radius.json.j2").render(**rv_))
-assert frj["uri"] == f"ldaps://{rv_['host_ip']}:636" and frj["bind_dn"] == f"fabric-radius-{rv_['site_name']}@{rv_['ad_domain']}" \
+assert frj["uri"] == f"ldaps://{rv_['ip_fabric_gateway']}:636" and frj["bind_dn"] == f"fabric-radius-{rv_['site_name']}@{rv_['ad_domain']}" \
     and frj["base"] == rv_["ad_base_dn"] and frj["site"] == rv_["site_name"], frj   # the site's DC (S3.2)
 fc = yaml.safe_load(env.get_template("freeradius/docker-compose.yml.j2").render(**rv_))["services"]["freeradius"]
 assert fc["cap_drop"] == ["ALL"] and not fc.get("cap_add") and fc["read_only"] and fc["user"] == "610:610", fc
@@ -498,6 +502,21 @@ _db = env.get_template('bind9/data/zone.j2').render(**full, federation_links={},
 assert re.search(r"^host1\s+A\s+192\.168\.4\.21$", _db, re.M) and "8006" not in _db and "Proxmox" not in _db
 print('landing links from DNS records: only marked ones, https with port and path; the zone file unchanged (2.1.4.2)')
 _ngx = env.get_template('nginx/nginx.conf.j2').render(**full)
-assert f"server_name {v2['hostname_landing']} {(v2['hostname'] + '.' + v2['domain']).lower()};" in _ngx, \
-    "the landing page also answers at the host's own name"
-print("landing page at the host's own name too (no bare 404 at https://<host>.<domain>)")
+# the info page (2.1.4.3): info.<domain> by default, on HTTP with no redirect; <domain> and the host's name redirect
+_land = v2['hostname_landing']
+_blocks = re.split(r"\n    server \{", _ngx)
+_info80 = [b for b in _blocks if "listen 80;" in b and f"server_name {_land};" in b]
+assert _land == f"info.{v2['domain']}", _land
+assert _info80 and "return 301 https" not in _info80[0].split("location /manual/")[0] \
+    and "location /certs/" in _info80[0], "info.<domain> answers on plain HTTP, with the CA files, without a redirect"
+_redir = [b for b in _blocks if f"return 301 $scheme://{_land}$request_uri;" in b]
+assert _redir and v2['domain'] + " " in _redir[0] and (v2['hostname'] + '.' + v2['domain']).lower() in _redir[0] \
+    and "listen 80;" in _redir[0] and "listen 443 ssl;" in _redir[0], "<domain> and the host's name redirect, both"
+assert 'id="root-fp"' in _landing and "/certs/ca-certs.json" in _landing and f"https://{_land}/manual/" in _landing, \
+    "the page shows the root's fingerprint and links the manual over HTTPS"
+_db_apex = env.get_template('bind9/data/zone.j2').render(**full, federation_links={}, zone_name=v2['domain'],
+                                                         zone_records=_zone["dynamic_zone_var"])
+assert re.search(r"^@\s+A\s+", _db_apex, re.M) and re.search(r"^info\s+CNAME\s+", _db_apex, re.M), \
+    "the zone answers for <domain> (to redirect) and for info"
+print("the info page at info.<domain>: HTTP without a redirect, the CA and its fingerprint; <domain> and the host's "
+      "name redirect (2.1.4.3)")

@@ -308,5 +308,24 @@ print("\n".join(line for line in site.stdout.splitlines() if line.startswith(("P
       or site.stdout[-2000:] + site.stderr[-2000:])
 check("site CAs: site_ca.py passed", site.returncode == 0, site.stderr[-400:])
 
+print("--- renewal and its warnings (renewal.py)")
+ren = subprocess.run([sys.executable, os.path.join(REPO, "tests", "pki", "renewal.py")], capture_output=True, text=True)
+print("\n".join(line for line in ren.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+      or ren.stdout[-2000:] + ren.stderr[-2000:])
+check("renewal: renewal.py passed", ren.returncode == 0, ren.stderr[-400:])
+
+print("--- revocation and the CRLs (revocation.py)")
+rev = subprocess.run([sys.executable, os.path.join(REPO, "tests", "pki", "revocation.py")], capture_output=True, text=True)
+print("\n".join(line for line in rev.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+      or rev.stdout[-2000:] + rev.stderr[-2000:])
+check("revocation: revocation.py passed", rev.returncode == 0, rev.stderr[-400:])
+
+print("--- ACME for LAN machines (acme.py)")
+acme_run = subprocess.run([sys.executable, os.path.join(REPO, "tests", "pki", "acme.py")], capture_output=True,
+                          text=True)
+print("\n".join(line for line in acme_run.stdout.splitlines() if line.startswith(("PASS", "FAIL")))
+      or acme_run.stdout[-2000:] + acme_run.stderr[-2000:])
+check("ACME: acme.py passed", acme_run.returncode == 0, acme_run.stderr[-400:])
+
 print(f"\n{'FAILED' if FAILED else 'all passed'} ({FAILED} failures)")
 sys.exit(1 if FAILED else 0)

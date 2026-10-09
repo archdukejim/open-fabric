@@ -46,6 +46,7 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `remove_radius_client.py` | Remove a RADIUS client; saved and applied at once. Agent route: POST /v1/radius/clients/<name>/delete (radius:admin), timeout 300 s. |
 | `remove_reservation.py` | Remove a DHCP reservation and apply at once. Agent route: POST /v1/dhcp/reservations/<mac>/delete (dhcp:write), timeout 300 s. |
 | `reset_sign_in.py` | Reset a person's sign-in: new one-time password, TOTP removed, sessions ended. Agent route: POST /v1/people/<uid>/reset (people:reset). |
+| `person_action.py` | Disable, enable or remove a person, or change their groups. Agent routes: POST /v1/people/<uid>/disable\|enable (people:disable), /delete (people:remove), /groups (people:groups). |
 | `reverse_zones.py` | The reverse (PTR) zones apply generates from the A/AAAA records. Agent route: GET /v1/reverse-zones (dns:read). |
 | `rotate_radius_secret.py` | Give a RADIUS client a new shared secret; saved and applied at once. Agent route: POST /v1/radius/clients/<name>/rotate (radius:admin), timeout 300 s. |
 | `rotate_tsig_key.py` | Give a TSIG key a new secret. Agent route: POST /v1/tsig/<name>/rotate (tsig:manage). |
@@ -64,6 +65,8 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `vault_status.py` | OpenBao at a glance for the OpenBao page; never secrets. Agent route: GET /v1/vault (vault:status). |
 | `version_info.py` | The fabric version and build shown in every page's header. Agent route: GET /v1/version (permission: session). |
 | `zone_detail.py` | One zone's records and BIND sync status, for the forward-zone view. Agent route: GET /v1/zones/<key> (dns:read). |
+| `revoke_cert.py` | Revoke a certificate fabric issued; the CRLs are published at once. Agent route: POST /v1/pki/revoke (pki:revoke). |
+| `cert_warnings.py` | What is wrong or coming with fabric's certificates, shown at the top of the overview. Agent route: GET /v1/cert-warnings (status:read). |
 | `relaxed_settings.py` | The security relaxations turned on, shown at the top of the overview. Agent route: GET /v1/relaxed-settings (status:read). |
 | `__init__.py` | Imports every function of this folder, so callers keep `module.function` |
 | `domain_overview.py` | The domain, its controller, the password policy and this site's machines. Agent route: GET /v1/domain (domain:read). |
@@ -74,3 +77,7 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `federation_overview.py` | The federation's sites, replication, conflicts, limits and address plan. Agent route: GET /v1/federation (federation:read). |
 | `security_layers.py` | GET /v1/security: the sign-in layers |
 | `raise_signin_layer.py` | POST /v1/security/raise or /kerberos |
+| `image_rows.py` | Each service's image: running, validated, update available. Agent route: GET /v1/images (status:read). |
+| `start_job.py` | Start a background job: doctor, or one service's image update or rollback. Agent routes: POST /v1/jobs/doctor (status:read), /v1/jobs/images (images:update). |
+| `read_job.py` | A job the signed-in person started. Agent route: GET /v1/jobs/<id>. |
+| `acme_overview.py` | ACME for LAN machines: the directory and how, the machines enrolled for DNS-01. Agent route: GET /v1/pki/acme (pki:read). |

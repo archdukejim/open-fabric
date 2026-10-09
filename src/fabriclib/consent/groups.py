@@ -32,3 +32,9 @@ GROUPS = {
              "declined": "chrony keeps the host's own configuration: fabric does not serve time to the network "
                          "or follow the upstream site"},
 }
+
+# A group later split into several (2.1.2.14): an install whose answers predate the split (it has no answer for
+# the marker group) keeps its answer for each group the old one covered; groups that are new are asked as usual.
+SPLITS = {
+    "firewall": {"release": "0.6.2", "marker": "ports", "covered": ["ports", "firewall"]},   # own_rules: new
+}

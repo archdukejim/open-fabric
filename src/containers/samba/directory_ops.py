@@ -8,12 +8,15 @@ from list_people import list_people
 from read_devices import read_devices
 from read_networks import read_networks
 from remove_device import remove_device
+from remove_group_member import remove_group_member
 from remove_machine import remove_machine
+from remove_person import remove_person
 from remove_role import remove_role
 from reset_password import reset_password
 from save_device import save_device
 from save_role import save_role
 from set_machine import set_machine
+from set_person import set_person
 from site_info import site_info
 
 # the operations fabric-agent may ask for (directory_op): each is f(samdb, lp, site, **args) -> JSON-able result
@@ -28,11 +31,14 @@ OPS = {
     "read_devices": read_devices,
     "read_networks": read_networks,
     "remove_device": remove_device,
+    "remove_group_member": remove_group_member,
     "remove_machine": remove_machine,
+    "remove_person": remove_person,
     "remove_role": remove_role,
     "reset_password": reset_password,
     "save_device": save_device,
     "save_role": save_role,
     "set_machine": set_machine,
+    "set_person": set_person,
     "site_info": site_info,
 }

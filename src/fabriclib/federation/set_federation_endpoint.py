@@ -25,6 +25,6 @@ def set_federation_endpoint(ctx, actor, on, source="cli"):
         save_vars(data)
     write_audit(actor, "FED_ENDPOINT_ON" if on else "FED_ENDPOINT_OFF", f"host={data.get('hostname_federation')}",
                 source)
-    if on:
-        renew_service_certs(ctx)
+    if on and renew_service_certs(ctx) != 0:
+        return False, "the federation endpoint's certificate could not be issued: see `fabricctl status`"
     return apply_changes(actor, source)

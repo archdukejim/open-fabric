@@ -3,19 +3,22 @@ import re
 import secrets
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.pki.common.describe_cert import describe_cert
+from fabriclib.pki.common.record_issued import record_issued
 from fabriclib.pki.export_p12 import export_p12
 from fabriclib.pki.mint_offline_cert import mint_offline_cert
 
 USER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$")
 
 
-def issue_client_cert(v, user, out_dir, owner=(0, 0), days=365):
+def issue_client_cert(v, user, out_dir, owner=(0, 0), days=365, actor="root", source="cli"):
     """Purpose: Issue a web UI client certificate for a user as a password-protected .p12.
     Inputs:  v — fabric vars (CA and artifacts); user — username matching ^[A-Za-z0-9][A-Za-z0-9._@-]{0,63}$,
              becomes the CN; out_dir — existing directory; owner — (uid, gid) of the .p12, default root;
-             days — validity, default 365.
+             days — validity, default 365; actor, source — who issued it, for the ledger.
     Returns: (p12_path "<out_dir>/<user>.p12", password): RSA 3072 key, chain intermediate + root,
-             generated password (token_urlsafe(18)).
+             generated password (token_urlsafe(18)). The certificate (never its key) is recorded in the
+             issued-certificate ledger, kind "client": listed, warned before it expires, revocable.
     Fails:   ValidationError "invalid username for a client certificate: ..."; mint_offline_cert /
              run_step's ValidationError; subprocess.CalledProcessError from export_p12; OSError (out_dir
              missing, chown).
@@ -35,6 +38,8 @@ def issue_client_cert(v, user, out_dir, owner=(0, 0), days=365):
                                                                 and os.path.getsize(parents) else [])
         export_p12(crt, key, chain + [os.path.join(certs, "root_ca.crt")],
                    f"{user} (fabric)", password, p12)
+        with open(crt) as f:
+            record_issued(actor, "client", describe_cert(f.read()), source)
     finally:
         for path in (crt, key):
             if os.path.exists(path):

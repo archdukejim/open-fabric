@@ -7,7 +7,7 @@ from fabriclib.setup.errors import SetupError
 def mint_cert(ctx, cn, sans, name):
     """Purpose: Issue a service TLS certificate from the running step-ca through its JWK provisioner
              `admin` (setup's service certificates).
-    Inputs:  ctx — SetupContext: vars (stepca_port default 9000, cert_service_days default 5475),
+    Inputs:  ctx — SetupContext: vars (stepca_port default 9000, cert_service_days default 47, manual 2.1.5.4),
              uid("step"), path(); cn — str; sans — list of names (cn is added first, duplicates dropped);
              name — base name of the artifact files.
     Returns: (crt_path, key_path) in <base>/stepca/data/artifacts; RSA 4096; the crt holds the leaf and
@@ -23,7 +23,7 @@ def mint_cert(ctx, cn, sans, name):
     artifacts = ctx.path("stepca", "data", "artifacts")
     os.makedirs(artifacts, mode=0o750, exist_ok=True)
     os.chown(artifacts, uid, gid)
-    hours = int(v.get("cert_service_days", 5475)) * 24
+    hours = int(v.get("cert_service_days", 47)) * 24
     cmd = ["docker", "exec", "-u", f"{uid}:{gid}", "step-ca", "step", "ca", "certificate", cn,
            f"/home/step/artifacts/{name}.crt", f"/home/step/artifacts/{name}.key",
            "--ca-url", f"https://127.0.0.1:{v.get('stepca_port', 9000)}",

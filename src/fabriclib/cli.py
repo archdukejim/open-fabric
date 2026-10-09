@@ -5,7 +5,14 @@
   fabricctl doctor               end-to-end checks of the running install
   fabricctl status|start|stop|restart
                                  the whole stack (systemd fabric.target)
-  fabricctl certs [--force]      renew service certificates that need it (--force: all)
+  fabricctl certs [--force|--scheduled]
+                                 renew service certificates that need it (--force: all; --scheduled:
+                                 the daily timer's run, recorded for status and doctor)
+  fabricctl certs issued         certificates issued by hand, client certificates and site CAs
+  fabricctl acme info|enroll|list|remove
+                                 ACME from fabric's CA for machines on the LAN (DNS-01 keys)
+  fabricctl certs revoke <serial|name> [--reason R]
+                                 revoke one: published in the CRL at once
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
@@ -15,6 +22,8 @@
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
   fabricctl domain status|password-policy|add-machine
                                  the domain (Samba AD): its DC, roles, password policy, machines to join
+  fabricctl people list|show|add|reset|disable|enable|remove|groups|group
+                                 the site's people: sign-in, groups, removal (fabricctl people --help)
   fabricctl gpo load|templates|list|show|set|clear|starter
                                  Group Policy from ADMX templates for this site's machines and people
   fabricctl sso add|list|remove  apps (Proxmox VE, TrueNAS, …) signing people in through Keycloak
@@ -61,6 +70,7 @@ from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
+from fabriclib.directory.run_people_command import run_people_command  # noqa: E402
 from fabriclib.samba.run_gpo_command import run_gpo_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.keycloak.run_sso_command import run_sso_command  # noqa: E402
@@ -76,7 +86,6 @@ from fabriclib.system.render_template_file import render_template_file  # noqa: 
 from fabriclib.setup import run_setup  # noqa: E402
 from fabriclib.setup.backup_install import backup_install  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
-from fabriclib.setup.renew_service_certs import renew_service_certs  # noqa: E402
 from fabriclib.setup.restore_install import restore_install  # noqa: E402
 from fabriclib.setup.run_restore_command import run_restore_command  # noqa: E402
 from fabriclib.setup.run_uninstall_command import run_uninstall_command  # noqa: E402
@@ -84,6 +93,9 @@ from fabriclib.setup.stage_source import stage_source  # noqa: E402
 from fabriclib.system.control_stack import control_stack  # noqa: E402
 from fabriclib.vault.run_vault_command import run_vault_command  # noqa: E402
 from fabriclib.setup.uninstall import uninstall  # noqa: E402
+from fabriclib.pki.run_acme_command import run_acme_command  # noqa: E402
+from fabriclib.pki.run_certs_command import run_certs_command  # noqa: E402
+from fabriclib.pki.show_cert_warnings import show_cert_warnings  # noqa: E402
 from fabriclib.system.show_relaxed_settings import show_relaxed_settings  # noqa: E402
 
 
@@ -95,6 +107,16 @@ def _base(args):
     Fails:   IndexError if --deploy-base is the last argument (no value follows).
     Feeds:   main (the SetupContext of every command, restore and uninstall)."""
     return args[args.index("--deploy-base") + 1] if "--deploy-base" in args else "/opt"
+
+
+def _without_base(args):
+    """Purpose: a subcommand's arguments without "--deploy-base DIR" (the commands that check their arguments).
+    Inputs:  args — list of str.
+    Returns: list of str.
+    Fails:   never.
+    Feeds:   main (acme, certs)."""
+    at = args.index("--deploy-base") if "--deploy-base" in args else None
+    return args if at is None else args[:at] + args[at + 2:]
 
 
 def _confirm(prompt, args):
@@ -194,6 +216,8 @@ def main(argv):
         return run_radius_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "domain":
         return run_domain_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "people":
+        return run_people_command(SetupContext(deploy_base=_base(args)).load_state().vars, _without_base(args))
     if cmd == "gpo":
         return run_gpo_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "federation":
@@ -204,9 +228,10 @@ def main(argv):
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "vault":
         return run_vault_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "acme":
+        return run_acme_command(SetupContext(deploy_base=_base(args)), _without_base(args))
     if cmd == "certs":
-        renew_service_certs(SetupContext(deploy_base=_base(args)), force="--force" in args)
-        return 0
+        return run_certs_command(SetupContext(deploy_base=_base(args)), _without_base(args))
     if cmd == "client-cert" and args and not args[0].startswith("-"):
         days = int(args[args.index("--days") + 1]) if "--days" in args else 365
         p12, password = hand_out_client_cert(SetupContext(deploy_base=_base(args)).load_state().vars, args[0], days)
@@ -226,7 +251,9 @@ def main(argv):
         else:
             ctx = SetupContext(deploy_base=_base(args))
             show_consent_status(ctx.config_dir)
-            show_relaxed_settings(ctx.load_state().vars)
+            vars_ = ctx.load_state().vars
+            show_relaxed_settings(vars_)
+            show_cert_warnings(vars_)
         return 0
     if cmd == "tsig":
         return run_tsig_command(args)

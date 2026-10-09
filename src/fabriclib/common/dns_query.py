@@ -1,6 +1,6 @@
-import random
 import socket
-import struct
+
+from fabriclib.common.dns_wire import dns_wire_answers, dns_wire_query
 
 
 def dns_query(name, server, port=53, timeout=3):
@@ -13,24 +13,10 @@ def dns_query(name, server, port=53, timeout=3):
     Fails:   socket.timeout (OSError) if no reply in time; OSError on a network error; struct.error or
              IndexError on a truncated or malformed reply. Labels longer than 63 bytes are not checked.
     Feeds:   setup/verify_install.py.
-    Notes:   no TCP fallback and no check of the reply's id or rcode; the answer section is read right after
-             the question, assuming the server echoed it unchanged."""
-    qid = random.randint(0, 65535)
-    labels = b"".join(bytes([len(p)]) + p.encode() for p in name.rstrip(".").split("."))
-    query = struct.pack(">HHHHHH", qid, 0x0100, 1, 0, 0, 0) + labels + b"\0" + struct.pack(">HH", 1, 1)
+    Notes:   no TCP fallback and no check of the reply's id or rcode (dns_wire)."""
+    query = dns_wire_query(name)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
         s.settimeout(timeout)
         s.sendto(query, (server, port))
         data = s.recv(4096)
-    answers = struct.unpack(">H", data[6:8])[0]
-    i, found = len(query), []
-    for _ in range(answers):
-        while data[i] and data[i] < 0xC0:        # skip the owner name
-            i += data[i] + 1
-        i += 2 if data[i] >= 0xC0 else 1
-        rtype, _, _, rdlen = struct.unpack(">HHIH", data[i:i + 10])
-        i += 10
-        if rtype == 1 and rdlen == 4:
-            found.append(".".join(map(str, data[i:i + 4])))
-        i += rdlen
-    return found
+    return dns_wire_answers(query, data)

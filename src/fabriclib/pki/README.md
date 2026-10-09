@@ -4,6 +4,13 @@ Certificates from fabric's Step-CA.
 
 | File | What |
 |---|---|
+| `cert_warnings.py` | What is wrong or coming with fabric's certificates (a failed renewal, a service certificate under 7 days, the CA within 180 days, issued certificates within 30), for status, doctor and the web console |
+| `check_cert_lifetimes.py` | Refuses certificate lifetimes that cannot work (2.1.5.4, 2.1.5.6) |
+| `publish_crl.py` | Publish the CRLs (the intermediate's; the root's where its key is here) to the certs host, nginx and FreeRADIUS (2.1.5.10) |
+| `revoke_cert.py` | Revoke a certificate fabric issued, by serial or name; the CRLs published at once |
+| `run_acme_command.py` | `fabricctl acme`: the ACME directory for LAN machines, their DNS-01 keys (2.1.5.8) |
+| `run_certs_command.py` | `fabricctl certs`: renewal, the issued list, revocation |
+| `pick_up_cert.py` | How a service takes a renewed certificate: a reload, by itself, or a restart (2.1.5.4) |
 | `needs_renewal.py` | True if a cert is missing, expires within 30 days, lacks a required DNS/IP name, or is not from the current CA |
 | `mint_cert.py` | Issue a service cert from the running step-ca (JWK provisioner `admin`, RSA 4096); chain includes the intermediate |
 | `install_cert.py` | Copy chain/key/root CA into a service's cert dir with its owner (chain/root 0644, key 0600) |
@@ -27,3 +34,6 @@ Certificates from fabric's Step-CA.
 | `run_mint_certs_command.py` | `fabricctl --mint-certs`: mint every `extra_certs` entry (`--apply`), or ask for one, record it and mint it |
 | `run_service_cert_command.py` | `fabricctl --service-cert`: list expiry dates, then re-issue every service certificate |
 | `common/` | Helpers shared by the operations above (see its README) |
+| `show_cert_warnings.py` | `fabricctl status`'s certificates section |
+| `acme_info.py` | What a LAN machine's ACME client needs: the directory, trusting the root, names, http-01 and dns-01 |
+| `acme_machines.py` | The machines enrolled for ACME DNS-01 (TSIG keys `acme-<name>`) |

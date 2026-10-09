@@ -1,0 +1,9 @@
+[Unit]
+Description=fabric: renew the service certificates that are due (manual 2.1.5.4)
+After=docker.service fabric.target
+Wants=docker.service
+
+[Service]
+Type=oneshot
+# renews what is due, reloads or restarts what changed, and records the run for status and doctor
+ExecStart=/usr/bin/fabricctl certs --scheduled

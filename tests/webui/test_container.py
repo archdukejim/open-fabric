@@ -574,6 +574,25 @@ out = agent_call("POST", "/v1/people", "carol", AUDITOR_ROLES, {"uid": "mallory"
 check("auditor token: may not create people (403, people:create)", " 403 " in out and "people:create" in out, out)
 out = agent_call("POST", "/v1/people/alice/reset", "carol", AUDITOR_ROLES)
 check("auditor token: may not reset a sign-in (403, people:reset)", " 403 " in out and "people:reset" in out, out)
+for route, perm in (("disable", "people:disable"), ("enable", "people:disable"), ("delete", "people:remove"),
+                    ("groups", "people:groups")):
+    out = agent_call("POST", f"/v1/people/alice/{route}", "carol", AUDITOR_ROLES, {"confirm": "alice"})
+    check(f"auditor token: may not {route} a person (403, {perm})", " 403 " in out and perm in out, out)
+out = agent_call("POST", "/v1/jobs/images", "carol", AUDITOR_ROLES, {"action": "update", "service": "nginx"})
+check("auditor token: may not update an image (403, images:update)", " 403 " in out and "images:update" in out, out)
+out = agent_call("POST", "/v1/jobs/doctor", "carol", AUDITOR_ROLES)
+job = json.loads(out.split("\n", 1)[1]).get("id", "") if " 200 " in out else ""
+check("auditor token: may run doctor as a job (status:read): an id comes back", bool(job), out)
+out = agent_call("GET", f"/v1/jobs/{job}", "carol", AUDITOR_ROLES)
+check("...and read it back (running, done or failed: it is theirs)", " 200 " in out and '"kind": "doctor"' in out, out)
+out = agent_call("GET", f"/v1/jobs/{job}", "alice", ADMIN_ROLES)
+check("refused: another person's job, even an admin's request (no such job)", " 400 " in out and "no such job" in out,
+      out)
+out = agent_call("GET", "/v1/images", "carol", AUDITOR_ROLES)
+check("auditor token: may read the image status (status:read)", " 200 " in out, out)
+for route, perm in (("delete", "people:remove"), ("groups", "people:groups")):
+    out = agent_call("POST", f"/v1/people/alice/{route}", "carol", bundle_roles("fabric-helpdesk"), {"confirm": "alice"})
+    check(f"helpdesk token: may not {route} a person (403, {perm}: admins only)", " 403 " in out and perm in out, out)
 out = agent_call("POST", "/v1/radius/clients", "carol", AUDITOR_ROLES, {"name": "evil", "address": "192.168.7.66"})
 check("auditor token: may not add a RADIUS client (403, radius:admin)", " 403 " in out and "radius:admin" in out, out)
 out = agent_call("POST", "/v1/radius/clients", "carol", bundle_roles("fabric-network-operator"),

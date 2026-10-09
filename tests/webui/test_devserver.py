@@ -100,7 +100,28 @@ try:
     check("generate shows sample downloads and the one-time key warning",
           st == 200 and 'download="device.home.arpa.key"' in page and "only copy of the private key" in page)
     page = req("GET", "/")[3]
-    check("overview shows one status light per service", page.count('class="light ok"') == 9 and "pill" not in page.split("<section class=\"tiles\">")[1])
+    tiles = page.split("<section class=\"tiles\">")[1].split("</section>")[0]
+    check("overview shows one status light per service", tiles.count('class="light ok"') == 9 and "pill" not in tiles)
+    check("overview (2.1.8.3): a Run doctor button and the Updates section with update and roll-back forms",
+          'action="/overview/doctor"' in page and "<h2>Updates</h2>" in page
+          and 'action="/overview/images/postgres/update"' in page and 'action="/overview/images/nginx/rollback"' in page
+          and 'action="/overview/images/nginx/update"' not in page)
+    st, loc, _, _ = req("POST", "/overview/doctor", {"csrf": "dev"})
+    job = req("GET", loc)[3] if loc else ""
+    check("run doctor -> its job page: each check with its result", st == 303 and loc.startswith("/jobs/")
+          and "3 of 4 checks passed" in job and "a sample failure" in job, (st, loc))
+    st, loc, _, _ = req("POST", "/overview/images/postgres/update", {"csrf": "dev"})
+    job = req("GET", loc)[3] if loc else ""
+    check("update an image -> its job page says what moved", st == 303 and "updated postgres" in job, (st, loc))
+    st, _, _, _ = req("GET", "/jobs/no-such-job")
+    check("refused: a job that is not yours or does not exist", st == 400)
+    page = req("GET", "/stepca?view=acme")[3]
+    check("Step-CA ACME (2.1.5.8): the directory, the enrolled machines, withdraw and enroll forms",
+          "acme/acme/directory" in page and "nas.home.arpa" in page and "/bind9/tsig/acme-nas/delete" in page
+          and 'action="/stepca/acme/enroll"' in page)
+    st, _, _, page = req("POST", "/stepca/acme/enroll", {"csrf": "dev", "host": "printer", "domain": "home.arpa"})
+    check("enroll a machine for DNS-01 -> its key, shown once", st == 200 and "acme-printer" in page)
+    page = req("GET", "/")[3]
     check("overview lists the host changes: a declined one with what it leaves unmanaged",
           "Host changes" in page and "Host trust store" in page and "declined" in page
           and "does not trust fabric&#39;s CA" in page and "not asked" in page, page[-800:])
@@ -137,6 +158,25 @@ try:
     check("people page (admin): people, add form, reset buttons, Keycloak link for fabric groups",
           "jim@home.arpa" in page and "Keycloak admin console" in page and "/directory/people/_new" in page
           and "Reset sign-in" in page)
+    check("people page (admin): disable buttons, the group form and the remove form (2.1.6.30)",
+          "/directory/people/sam/disable" in page and "/directory/people/_form/groups" in page
+          and "/directory/people/_form/delete" in page, page[-800:])
+    st, loc, _, _ = req("POST", "/directory/people/sam/disable", {"csrf": "dev"})
+    page = req("GET", "/directory?view=people")[3]
+    check("disable a person -> listed locked, an enable button instead", st == 303 and "disabled" in (loc or "")
+          and "/directory/people/sam/enable" in page, loc)
+    st, loc, _, _ = req("POST", "/directory/people/sam/enable", {"csrf": "dev"})
+    check("enable them again", st == 303 and "enabled" in (loc or "")
+          and "/directory/people/sam/disable" in req("GET", "/directory?view=people")[3], loc)
+    st, loc, _, _ = req("POST", "/directory/people/_form/groups", {"csrf": "dev", "uid": "sam", "group": "admins",
+                                                                   "action": "add"})
+    check("put a person in a group (the form picks them)", st == 303 and "added+to+admins" in (loc or ""), loc)
+    st, loc, _, _ = req("POST", "/directory/people/_form/delete", {"csrf": "dev", "uid": "sam", "confirm": "sma"})
+    check("refused: a removal without the user name typed back", st == 303 and "type+the+user+name" in (loc or ""),
+          loc)
+    st, loc, _, _ = req("POST", "/directory/people/_form/delete", {"csrf": "dev", "uid": "sam", "confirm": "sam"})
+    check("remove a person with the user name typed back -> gone from the list", st == 303
+          and "removed" in (loc or "") and "sam@home.arpa" not in req("GET", "/directory?view=people")[3], loc)
     page = req("GET", "/directory?view=domain")[3]
     check("domain section: the domain, its controller running, the password policy",
           "ad.home.arpa" in page and "pi-core.ad.home.arpa" in page and "minimum length" in page, page[-600:])
@@ -208,6 +248,14 @@ try:
     check("helpdesk: reset a plain user's sign-in", st == 200 and "sign-in reset" in page)
     st, loc, _, _ = req("POST", "/directory/people/jim/reset", {"csrf": "dev"})
     check("helpdesk: an admin's sign-in cannot be reset", st == 303 and "only%20an%20admin" in (loc or ""), loc)
+    page = req("GET", "/directory?view=people")[3]
+    check("helpdesk: disable buttons, but no group or remove form (people:groups, people:remove are admins')",
+          "/directory/people/sam/disable" in page and "/directory/people/_form/groups" not in page
+          and "/directory/people/_form/delete" not in page)
+    st, loc, _, _ = req("POST", "/directory/people/sam/disable", {"csrf": "dev"})
+    check("helpdesk: disable a plain user", st == 303 and "disabled" in (loc or ""), loc)
+    st, loc, _, _ = req("POST", "/directory/people/jim/disable", {"csrf": "dev"})
+    check("helpdesk: refused: disabling an admin", st == 303 and "only+an+admin" in (loc or ""), loc)
 finally:
     proc.terminate()
     proc.wait(timeout=5)
@@ -226,7 +274,16 @@ try:
     check("--as fabric-auditor: records shown, no add form", "nas" in page and "/add" not in page and "as fabric-auditor" in page)
     page = req("GET", "/directory?view=people")[3]
     check("--as fabric-auditor: people listed, no add form or reset buttons",
-          "jim@home.arpa" in page and "/directory/people/_new" not in page and "Reset sign-in" not in page)
+          "jim@home.arpa" in page and "/directory/people/_new" not in page and "Reset sign-in" not in page
+          and "/disable" not in page and "/directory/people/_form/" not in page)
+    page = req("GET", "/")[3]
+    check("--as fabric-auditor: Run doctor and the Updates table, but no update or roll-back forms",
+          'action="/overview/doctor"' in page and "<h2>Updates</h2>" in page and "/overview/images/" not in page)
+    st, _, _, _ = req("POST", "/overview/images/postgres/update", {"csrf": "dev"})
+    check("--as fabric-auditor: refused: an image update (403, images:update)", st == 403)
+    page = req("GET", "/stepca?view=acme")[3]
+    check("--as fabric-auditor: the ACME view without enroll or withdraw", "nas.home.arpa" in page
+          and "/stepca/acme/enroll" not in page and "/delete" not in page)
 finally:
     proc.terminate()
     proc.wait(timeout=5)

@@ -1,14 +1,14 @@
 from webui import views
 from webui.devpreview.sample_data import (RECORD_TYPES, SAMPLE_CA, SAMPLE_DEVICES, SAMPLE_DHCP, SAMPLE_DOMAIN,
-                                          SAMPLE_FEDERATION, SAMPLE_GPO, SAMPLE_RADIUS,
+                                          SAMPLE_FEDERATION, SAMPLE_GPO, SAMPLE_RADIUS, SAMPLE_ACME, SAMPLE_IMAGES,
                                           SAMPLE_SECURITY, SAMPLE_VAULT)
 from webui.devpreview.sample_radius_guides import sample_radius_guides
 
 
 def dev_get_page(h, path, query):
     """Purpose: Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao,
-             /directory, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks
-             like). No sign-in, no client certificate, no fabric-agent.
+             /directory, /kea, /freeradius, /audit, /jobs/<id>, /static/app.css, and /preview/denied (what a refused
+             sign-in looks like). No sign-in, no client certificate, no fabric-agent.
     Inputs:  h — the dev handler (send, state, ctx); path — the URL path; query — dict (msg, err, view, zone, device,
              slot, name).
     Returns: None; sends 200 with the page, 403 for /preview/denied, 404 for anything else.
@@ -19,7 +19,14 @@ def dev_get_page(h, path, query):
         return h.send(200, views.css(), "text/css; charset=utf-8")
     if path == "/":
         return h.send(200, views.overview(ctx, state.data["services"], state.data["host_changes"],
-                                             state.data.get("relaxed_settings", [])))
+                                             state.data.get("relaxed_settings", []),
+                                             state.data.get("cert_warnings", []), SAMPLE_IMAGES,
+                                             query.get("err", "")))
+    if path.startswith("/jobs/"):
+        job = state.data.setdefault("jobs", {}).get(path[len("/jobs/"):])
+        if job is None:
+            return h.send(400, views.error_page(400, "no such job"))
+        return h.send(200, views.job_page(ctx, job))
     if path == "/bind9":
         section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"
         key = query.get("zone") or next(iter(state.data["zones"]))
@@ -33,7 +40,8 @@ def dev_get_page(h, path, query):
         view = view if view in views.STEPCA_VIEWS else "ca"
         ov = state.overview()
         return h.send(200, views.stepca(ctx, view, SAMPLE_CA, issued=state.data["issued"],
-                                        devices=ov["devices"] if ov else [], device=query.get("device", "")))
+                                        devices=ov["devices"] if ov else [], device=query.get("device", ""),
+                                        acme=SAMPLE_ACME if view == "acme" else None))
     if path == "/openbao":
         view = query.get("view") if query.get("view") in views.OPENBAO_VIEWS else "status"
         return h.send(200, views.openbao(ctx, SAMPLE_VAULT, view, state.data["slots"], SAMPLE_DEVICES,

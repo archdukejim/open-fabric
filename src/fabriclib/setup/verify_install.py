@@ -1,10 +1,15 @@
+import datetime
+import json
 import os
 import shutil
 import stat
+import struct
 import subprocess
 
 from fabriclib.common.console import err, ok, warn
 from fabriclib.common.dns_query import dns_query
+from fabriclib.common.doh_query import doh_query
+from fabriclib.common.paths import CERT_RENEWAL_FILE, DB_ROTATION_FILE, ISSUED_CERTS_FILE
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.plan_trust import plan_trust
@@ -13,6 +18,7 @@ from fabriclib.keycloak.user_has_role import user_has_role
 from fabriclib.ntp.chrony_settings import chrony_settings
 from fabriclib.ntp.query_time import query_time
 from fabriclib.ntp.time_status import time_status
+from fabriclib.pki.cert_warnings import cert_warnings
 from fabriclib.setup.errors import SetupError
 from fabriclib.system.relaxed_settings import relaxed_settings
 from fabriclib.vault.vault_status import vault_status
@@ -32,13 +38,44 @@ def _curl(url, host, ip, port, root_ca, client_cert=False):
     return res.returncode, res.stdout
 
 
+def _db_rotation(path=DB_ROTATION_FILE, now=None):
+    """Purpose: whether Keycloak's database password was rotated lately (2.1.7.4): the last run worked and is at most
+             40 days old (monthly, with a missed night or two to spare).
+    Inputs:  path — the record rotate_db_password keeps; now — aware datetime (tests).
+    Returns: (ok: bool, detail: str).
+    Fails:   never (an unreadable record is a failed check).
+    Feeds:   checks."""
+    try:
+        with open(path) as f:
+            last = json.load(f)
+        when = datetime.datetime.fromisoformat(last["when"])
+    except (OSError, ValueError, KeyError):
+        return False, "never rotated: sudo fabricctl setup, or sudo fabricctl vault rotate-db"
+    age = ((now or datetime.datetime.now().astimezone()) - when).days
+    if not last.get("ok"):
+        return False, f"the last rotation failed ({last.get('detail', '')}): sudo fabricctl vault rotate-db"
+    return age <= 40, f"last rotated {age} day(s) ago" + ("" if age <= 40 else ": is the fabric-db-rotate timer on?")
+
+
+def _records(archive):
+    """Purpose: the certificate records of this install, in its own archive: setup runs from the package's copy, where
+             the default paths would point (found by the 0.6.3 sandbox).
+    Inputs:  archive — <install>/archive.
+    Returns: {"record", "ledger"} for cert_warnings.
+    Fails:   never.
+    Feeds:   checks, run."""
+    return {"record": os.path.join(archive, os.path.basename(CERT_RENEWAL_FILE)),
+            "ledger": os.path.join(archive, os.path.basename(ISSUED_CERTS_FILE))}
+
+
 def checks(ctx):
-    """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
-             trust (unless the `trust` host change was declined), web UI gates, fabric-agent socket, first admin
+    """Purpose: the end-to-end checks of a running install: DNS (and DNS-over-HTTPS), HTTP/HTTPS chains, CA
+             publishing, ACME, host trust (unless the `trust` host change was declined), web UI gates, fabric-agent
+             socket, first admin
              (Keycloak role, the client certificate while one is required), OpenBao state, the federation endpoint and
              the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and
              under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its
-             upstream site), and every installed service.
+             upstream site), the certificates (renewal working, none about to expire), and every installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, bind_dns_port, install_webui/keycloak,
              federation_endpoint, install_adguard, webui_admin_user/role), secrets (Keycloak), Step-CA root, the
              agent socket, ~/fabric-admin of the sudo user.
@@ -47,6 +84,7 @@ def checks(ctx):
              root_ca.crt; struct.error/IndexError from
              dns_query on a malformed reply. Check failures are results, not exceptions.
     Feeds:   run."""
+    archive = os.path.join(ctx.target_dir, "archive")      # the install's, not the package copy's
     v, s = ctx.vars, ctx.secrets
     root_ca = ctx.path("stepca", "data", "certs", "root_ca.crt")
     port = int(v.get("bind_dns_port", 53))
@@ -61,6 +99,13 @@ def checks(ctx):
             add(f"DNS {name}", v["host_ip"] in got, ", ".join(got) or "no answer")
         except OSError as e:
             add(f"DNS {name}", False, str(e))
+
+    try:                                     # DNS-over-HTTPS through nginx to BIND (2.1.12.2)
+        got = doh_query(f"ns.{v['domain']}", v["hostname_bind9"], v["ip_nginx"], root_ca)
+        add(f"DNS-over-HTTPS https://{v['hostname_bind9']}/dns-query answers", v["host_ip"] in got,
+            ", ".join(got) or "no answer")
+    except (subprocess.CalledProcessError, struct.error, IndexError) as e:
+        add(f"DNS-over-HTTPS https://{v['hostname_bind9']}/dns-query answers", False, str(e)[-200:])
 
     if v.get("install_adguard"):           # the DNS filter answers clients on 53, fabric's names through BIND
         try:
@@ -160,6 +205,11 @@ def checks(ctx):
                      root_ca)
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
+    if v.get("install_keycloak"):           # Keycloak's database password, rotated monthly by OpenBao (2.1.7.4)
+        add("Keycloak's database password: rotated by OpenBao in the last 40 days",
+            *_db_rotation(os.path.join(archive, "db-rotation.json")))
+    failing = [w["what"] for w in cert_warnings(v, **_records(archive)) if w["level"] == "fail"]
+    add("certificates: renewal working, none about to expire (2.1.5.4)", not failing, "; ".join(failing))
     for unit in ("bind9", "stepca", "nginx", "samba", "postgres", "keycloak", "openbao", "kea", "freeradius",
                  "samba", "fluentbit",
                  "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
@@ -174,7 +224,7 @@ def run(ctx):
              `fabricctl doctor`).
     Inputs:  ctx — SetupContext with state loaded (see checks).
     Returns: None; each check printed as ok or error, then a warning for each sign-in layer lowered below a level
-             it had.
+             it had and for what is coming with the certificates (cert_warnings).
     Fails:   SetupError("<n> check(s) failed"); exceptions from checks propagate.
     Feeds:   setup step `verify`, run by run_setup via STEPS; run_setup main for `fabricctl doctor`."""
     failed = 0
@@ -186,5 +236,8 @@ def run(ctx):
     for row in relaxed_settings(ctx.vars, ctx.config_dir):
         if " lowered: " in row["setting"]:
             warn(f"sign-in {row['setting']} — {row['effect']}")
+    for row in cert_warnings(ctx.vars, **_records(os.path.join(ctx.target_dir, "archive"))):    # what is coming
+        if row["level"] == "warn":
+            warn(f"certificates: {row['what']}")
     if failed:
         raise SetupError(f"{failed} check(s) failed")

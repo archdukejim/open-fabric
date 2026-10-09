@@ -15,6 +15,13 @@ def generate_missing_secrets(secrets):
     Fails:   never.
     Feeds:   apply_deployment (before the vars are rendered: templates read the secrets)."""
     changed = False
+    # Postgres creates Keycloak's user with this, once, on an empty data folder; Keycloak's password then rotates in
+    # OpenBao (2.1.7.4) without touching Postgres's settings. It starts as Keycloak's (an existing install: the
+    # current one, so nothing changes)
+    if "postgres_init_password" not in secrets:
+        secrets.setdefault("keycloak_db_password", random_secret(32))
+        secrets["postgres_init_password"] = secrets["keycloak_db_password"]
+        changed = True
     for name, nbytes in BASE64.items():
         if name not in secrets:
             secrets[name] = random_secret(nbytes)
@@ -35,6 +42,9 @@ def generate_missing_secrets(secrets):
         if name not in secrets:
             secrets[name] = random_password()
             changed = True
+    if "postgres_admin_password" not in secrets:   # Postgres's own admin, apart from Keycloak's user (2.1.7.4)
+        secrets["postgres_admin_password"] = random_secret(alnum=True)
+        changed = True
     if "tsig_secrets" not in secrets:
         secrets["tsig_secrets"] = {}
         changed = True

@@ -29,7 +29,8 @@ services:
       - /tmp:nosuid,size=64m
     environment:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak?sslmode=verify-full&sslrootcert=/etc/keycloak/certs/root_ca.crt
-      KC_DB_USERNAME: keycloak
+      # its own role from the take-over by OpenBao (2.1.7.4), the role Postgres was created with until then
+      KC_DB_USERNAME: "{{ keycloak_db_user | default('keycloak') }}"
       KC_DB_PASSWORD: "{{ keycloak_db_password }}"
       KC_HOSTNAME: "{{ hostname_keycloak }}"
       KC_PROXY_HEADERS: xforwarded

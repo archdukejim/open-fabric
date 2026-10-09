@@ -36,11 +36,14 @@ from webui.agentclient.radius_guides import radius_guides  # noqa: F401
 from webui.agentclient.radius_overview import radius_overview  # noqa: F401
 from webui.agentclient.read_audit import read_audit  # noqa: F401
 from webui.agentclient.relaxed_settings import relaxed_settings  # noqa: F401
+from webui.agentclient.cert_warnings import cert_warnings  # noqa: F401
+from webui.agentclient.revoke_cert import revoke_cert  # noqa: F401
 from webui.agentclient.remove_client_class import remove_client_class  # noqa: F401
 from webui.agentclient.remove_radius_client import remove_radius_client  # noqa: F401
 from webui.agentclient.remove_reservation import remove_reservation  # noqa: F401
 from webui.agentclient.remove_subnet import remove_subnet  # noqa: F401
 from webui.agentclient.reset_sign_in import reset_sign_in  # noqa: F401
+from webui.agentclient.person_action import person_action  # noqa: F401
 from webui.agentclient.reverse_zones import reverse_zones  # noqa: F401
 from webui.agentclient.rotate_radius_secret import rotate_radius_secret  # noqa: F401
 from webui.agentclient.rotate_tsig_key import rotate_tsig_key  # noqa: F401
@@ -68,3 +71,7 @@ from webui.agentclient.gpo_change import gpo_change  # noqa: F401
 from webui.agentclient.add_machine import add_machine  # noqa: F401
 from webui.agentclient.machine_action import machine_action  # noqa: F401
 from webui.agentclient.federation_overview import federation_overview  # noqa: F401
+from webui.agentclient.image_rows import image_rows  # noqa: F401
+from webui.agentclient.start_job import start_job  # noqa: F401
+from webui.agentclient.read_job import read_job  # noqa: F401
+from webui.agentclient.acme_overview import acme_overview  # noqa: F401

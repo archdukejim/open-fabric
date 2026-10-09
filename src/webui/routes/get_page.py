@@ -10,8 +10,8 @@ from webui.session.page_context import page_context
 def get_page(h, sess, path, query):
     """Purpose: Route a signed-in GET to its page.
     Inputs:  h — the request handler (send, deny); sess — dict from find_session; path — str: /, /bind9, /stepca,
-             /directory, /openbao, /kea, /freeradius, /federation, /audit, /security; query — dict (view, zone,
-             device, name, slot, msg, err as each page uses them).
+             /directory, /openbao, /kea, /freeradius, /federation, /audit, /security, /jobs/<id>; query — dict (view,
+             zone, device, name, slot, msg, err as each page uses them).
     Returns: 200 page (overview with the host changes fabric may make, BIND9, Step-CA, directory, OpenBao, Kea,
              Federation, FreeRADIUS with its setup guides for view switches / windows, audit log).
     Fails:   404 for any other path; agent errors propagate to handle_request (400, redirect to /login, 403, 503).
@@ -19,8 +19,15 @@ def get_page(h, sess, path, query):
     """
     ctx = page_context(sess)
     if path == "/":
+        try:
+            images = actions.image_rows()
+        except (actions.AgentError, actions.ValidationError):
+            images = None
         return h.send(200, views.overview(ctx, actions.service_status(), actions.host_changes(),
-                                             actions.relaxed_settings()))
+                                             actions.relaxed_settings(), actions.cert_warnings(), images,
+                                             query.get("err", "")))
+    if path.startswith("/jobs/") and path.count("/") == 2:
+        return h.send(200, views.job_page(ctx, actions.read_job(path[len("/jobs/"):])))
     if path == "/bind9":
         return bind9_page(h, ctx, query)
     if path == "/stepca":

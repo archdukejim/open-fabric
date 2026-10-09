@@ -313,6 +313,11 @@ check("and fabric's own zone, unchanged", client("dig", "+short", f"@{BIND_IP}",
 upd = dc("samba_dnsupdate", "-s", "/data/etc/smb.conf", "--all-names")
 check("the DC's signed (GSS-TSIG) updates are accepted through BIND",
       upd.returncode == 0 and "Failed update" not in upd.stdout + upd.stderr, (upd.stdout + upd.stderr)[-400:])
+cmd = dc("testparm", "-s", "--parameter-name=dns update command", "/data/etc/smb.conf").stdout.strip()
+pinned = dc("sh", "-c", f"{cmd} -s /data/etc/smb.conf --all-names")
+a_rec = client("dig", "+short", f"@{BIND_IP}", "A", "dc1.ad.lan.test").stdout.split()
+check("the DC's own DNS updates name its LAN address only, never fabric_net's gateway it also listens on (2.1.2.15)",
+      f"--current-ip={IP}" in cmd and pinned.returncode == 0 and a_rec == [IP], (cmd, a_rec, pinned.stderr[-300:]))
 evil = unsigned_update("ad.lan.test")
 check("refused: an unsigned update to the AD zone", "REFUSED" in evil.stdout + evil.stderr, evil.stderr[-200:])
 evil = unsigned_update("lan.test")
@@ -516,6 +521,53 @@ try:
 except ValidationError as e:
     check("refused: a nested site's agent resetting a person of its parent",
           "refused" in str(e) or "not permitted" in str(e), e)
+
+# fabricctl people's operations (2.1.6.30, manual 1.6.3.11): disable / enable, groups, remove — the site's own only
+dave_pw = "Dv-" + random_password(20)
+mk("dave", pw=dave_pw)
+dc("samba-tool", "user", "setpassword", "dave", f"--newpassword={dave_pw}", "-s", "/data/etc/smb.conf")
+signin = as_user("dave", dave_pw, "ldbsearch")
+check("a person signs in (the starting point)", signin.returncode == 0 and BASE in signin.stdout, signin.stderr[-300:])
+off = run_op(v, SECRETS, "set_person", {"uid": "dave", "enabled": False}, container=DC)
+signin = as_user("dave", dave_pw, "ldbsearch")
+check("disable: the account is disabled and its sign-in refused", off["changed"] and signin.returncode != 0
+      and int(attr("(sAMAccountName=dave)", "userAccountControl")[0]) & 0x2, signin.stdout[-200:])
+again = run_op(v, SECRETS, "set_person", {"uid": "dave", "enabled": False}, container=DC)
+check("disable twice: no change the second time", again["changed"] is False, again)
+listed = next(u for u in run_op(v, SECRETS, "list_people", container=DC)["users"] if u["uid"] == "dave")
+check("the People list shows them locked", listed["locked"] is True, listed)
+on = run_op(v, SECRETS, "set_person", {"uid": "dave", "enabled": True}, container=DC)
+signin = as_user("dave", dave_pw, "ldbsearch")
+check("enable: they sign in again", on["changed"] and signin.returncode == 0, signin.stderr[-300:])
+for label, args, site_v, sec in (
+        ("a service account is not a person", {"uid": "fabric-agent-lan", "enabled": False}, v, SECRETS),
+        ("a nested site's agent disabling a person of its parent", {"uid": "dave", "enabled": False},
+         {**v, "site_name": "lab"}, {**SECRETS, "ad_agent_password": lab["accounts"]["fabric-agent-lab"]})):
+    try:
+        run_op(site_v, sec, "set_person", args, container=DC)
+        check(f"refused: {label}", False)
+    except ValidationError as e:
+        check(f"refused: {label}", "no such entry" in str(e) or "refused" in str(e), e)
+added = run_op(v, SECRETS, "add_group_member", {"group": "admins", "uid": "dave"}, container=DC)
+gone = run_op(v, SECRETS, "remove_group_member", {"group": "admins", "uid": "dave"}, container=DC)
+twice = run_op(v, SECRETS, "remove_group_member", {"group": "admins", "uid": "dave"}, container=DC)
+check("groups: in, then out of a group, once", added["added"] and gone["removed"] and twice["removed"] is False
+      and "admins" not in run_op(v, SECRETS, "get_person", {"uid": "dave"}, container=DC)["groups"])
+try:
+    run_op(v, SECRETS, "remove_group_member", {"group": "no-such-group", "uid": "dave"}, container=DC)
+    check("refused: a group that does not exist", False)
+except ValidationError as e:
+    check("refused: a group that does not exist", "no such entry" in str(e), e)
+try:
+    run_op({**v, "site_name": "lab"}, {**SECRETS, "ad_agent_password": lab["accounts"]["fabric-agent-lab"]},
+           "remove_person", {"uid": "dave"}, container=DC)
+    check("refused: a nested site's agent removing a person of its parent", False)
+except ValidationError as e:
+    check("refused: a nested site's agent removing a person of its parent", "no such entry" in str(e), e)
+run_op(v, SECRETS, "remove_person", {"uid": "dave"}, container=DC)
+signin = as_user("dave", dave_pw, "ldbsearch")
+check("remove: the account is gone and its sign-in refused", attr("(sAMAccountName=dave)", "dn") == []
+      and signin.returncode != 0)
 first = alice["uidNumber"]
 dc("samba-tool", "user", "delete", "alice", "-s", "/data/etc/smb.conf")
 carol = mk("carol")

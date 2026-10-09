@@ -294,6 +294,46 @@ check("undo refuses on an install never asked (setup asks first), and an unknown
       and "unknown" in refused(lambda: undo_group(Ctx(cfg, {}), "bogus", True, True)))
 check("undo without --yes never runs unattended",
       "--yes" in refused(lambda: undo_group(Ctx(cfg, {"domain_file": "x"}), "trust", False, False)))
+print("--- an answer given before a group was split carries over (2.1.2.14; found by the upgrade test)")
+split_plan = {"ports": ["ufw: allow 53/udp from 10.0.0.0/24"], "firewall": ["ufw: deny incoming (default)"],
+              "own_rules": ["ufw: remove `ufw allow OpenSSH` (the host's own)"]}
+
+
+def _old_install(answer):
+    d = tempfile.mkdtemp()
+    with open(os.path.join(d, "consent.yaml"), "w") as f:      # 0.6.1's record: one firewall group, no ports
+        yaml.safe_dump({"groups": {"firewall": {"answer": answer, "changes": ["ufw: allow 53/udp from 10.0.0.0/24"],
+                                                "when": "2026-10-07T10:00:00-04:00", "by": "tempuser"}}}, f)
+    return d
+
+
+old_yes = _old_install("yes")
+msg = refused(lambda: ask_consent(old_yes, split_plan, interactive=False))
+check("0.6.1's yes to the firewall answers ports and securing; only the new question (own rules) is asked",
+      "need an answer: own_rules" in msg and "ports" not in msg.split("need an answer:")[1].split(".")[0], msg)
+with contextlib.redirect_stdout(io.StringIO()):
+    ans = ask_consent(old_yes, split_plan, interactive=False, decline=["own_rules"])
+rec = yaml.safe_load(open(os.path.join(old_yes, "consent.yaml")))["groups"]
+check("…and with own_rules answered, setup goes ahead: ports and firewall yes, recorded as carried from 0.6.1's",
+      ans == {"ports": "yes", "firewall": "yes", "own_rules": "no"}
+      and rec["ports"]["carried_from"].startswith("firewall") and rec["ports"]["by"] == "tempuser", (ans, rec))
+old_no = _old_install("no")
+with contextlib.redirect_stdout(io.StringIO()):
+    ans = ask_consent(old_no, split_plan, interactive=False)
+check("negative: 0.6.1's no carries over as a no (nothing opened or secured, own rules not asked)",
+      ans == {"ports": "no", "firewall": "skipped", "own_rules": "skipped"}, ans)
+new_install = tempfile.mkdtemp()
+with open(os.path.join(new_install, "consent.yaml"), "w") as f:   # after the split: firewall's no stands alone
+    yaml.safe_dump({"groups": {"ports": {"answer": "yes", "changes": split_plan["ports"]},
+                               "firewall": {"answer": "no", "changes": ["ufw: something else"]}}}, f)
+msg = refused(lambda: ask_consent(new_install, split_plan, interactive=False))
+check("negative: an install answered after the split is not touched (its changed firewall is asked again)",
+      "need an answer: firewall" in msg, msg)
+empty = tempfile.mkdtemp()
+msg = refused(lambda: ask_consent(empty, split_plan, interactive=False))
+check("negative: a fresh install has nothing to carry: every question needs an answer",
+      "need an answer: ports, firewall, own_rules" in msg, msg)
+
 rows = {t: (how, what) for t, how, what in uninstall_plan()}
 check("uninstall lists every kind of host change: removed, undone or kept (Docker's settings: how to undo first)",
       len(rows) == 10 and rows["Service accounts"][0] == "removed" and rows["Secure this host"][0] == "undone"

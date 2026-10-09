@@ -29,6 +29,7 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `get_person.py` | Operation `get_person`: where a person lives and their groups |
 | `reset_password.py` | Operation `reset_password`: a new one-time password, the account unlocked |
 | `add_group_member.py` | Operation `add_group_member`: a person in a group, once |
+| `remove_group_member.py` | Operation `remove_group_member`: a person out of a group, once |
 | `paths.py` | The DNs of `OU=sites`, a site's OU and its `OU=devices` |
 | `read_devices.py` | Operation `read_devices`: the site's devices and the roles it may use (its own and the organisation's) |
 | `save_device.py` | Operation `save_device`: a device created or replaced in the site's `OU=devices`, its roles by name |
@@ -50,6 +51,9 @@ and mounted read-only. `converge.py` runs as root inside the DC on its own datab
 | `find_machine.py` | A machine of the site by its name (for set_machine and remove_machine) |
 | `set_machine.py` | Operation `set_machine`: disable a machine, or enable it again |
 | `remove_machine.py` | Operation `remove_machine`: a machine removed from the domain |
+| `find_person.py` | A person of the site by user name, in its own OU=people (for set_person and remove_person) |
+| `set_person.py` | Operation `set_person`: disable a person, or enable them again |
+| `remove_person.py` | Operation `remove_person`: a person removed from the domain |
 | `ensure_join_account.py` | At the root: the temporary account a new site's DC joins with (Domain Admins, expires in an hour) |
 | `ensure_site_link.py` | A site's AD site link to its parent (cost 100, 15 minutes, change notification) |
 | `set_gpo_acl.py` | One GPO folder's file ACLs from its AD object (a site's DC lacks the domain's other GPO folders) |

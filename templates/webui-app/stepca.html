@@ -2,6 +2,7 @@
 {% macro device_select() %}{% if devices %}<label>For device (optional — links the certificate to it)<select name="device"><option value="">—</option>{% for d in devices %}<option{{ ' selected' if d.name == device }}>{{ d.name }}</option>{% endfor %}</select></label>{% endif %}{% endmacro %}
 {% block body %}
 <h1>Step-CA · PKI</h1>
+{% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 <nav class="subtabs">
 {% for v, label in menu %}<a href="/stepca?view={{ v }}" class="subtab{{ ' active' if v == view }}">{{ label }}</a>{% endfor %}
@@ -100,15 +101,36 @@
 
 {% elif view == 'issued' %}
 <section class="card"><h2>Issued by hand</h2>
-<p class="muted">Certificates signed from a CSR or generated here (newest first). Service certificates are managed by setup and not listed.</p>
+<p class="muted">Certificates signed from a CSR or generated here, client certificates and site CAs (newest first). Service certificates are managed by setup and not listed. A revoked certificate is refused by FreeRADIUS and the web console at once (the CRL on <code>certs.&lt;domain&gt;/crl/</code>).</p>
 {% if issued %}
-<table><thead><tr><th>Subject</th><th>Names</th><th>How</th><th>Expires</th><th>By</th></tr></thead><tbody>
+<table><thead><tr><th>Subject</th><th>Names</th><th>How</th><th>Expires</th><th>By</th>{% if can('pki:revoke') %}<th>Revoke</th>{% endif %}</tr></thead><tbody>
 {% for c in issued %}
-<tr><td>{{ c.subject }}</td><td>{{ (c.sans or []) | join(', ') }}</td><td>{{ 'CSR' if c.kind == 'csr' else 'key + cert' }}</td>
+<tr><td>{{ c.subject }}</td><td>{{ (c.sans or []) | join(', ') }}</td><td>{{ {'csr': 'CSR', 'keypair': 'key + cert', 'client': 'client certificate', 'site-ca': 'site CA'}.get(c.kind, c.kind) }}</td>
 <td><span class="pill {{ 'ok' if c.status == 'valid' else ('warn' if c.status == 'expires soon' else 'bad') }}">{{ c.status }}</span> <span class="muted">{{ c.not_after }}</span></td>
-<td>{{ c.actor }} <span class="muted">{{ c.when }}</span></td></tr>
+<td>{{ c.actor }} <span class="muted">{{ c.when }}</span></td>{% if can('pki:revoke') %}<td>{% if c.status in ('valid', 'expires soon') %}<form method="post" action="/stepca/revoke"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="target" value="{{ c.serial }}"><select name="reason" aria-label="Reason"><option>unspecified</option><option>keyCompromise</option><option>superseded</option><option>cessationOfOperation</option><option>affiliationChanged</option></select> <button class="danger">Revoke</button></form>{% endif %}</td>{% endif %}</tr>
 {% endfor %}</tbody></table>
 {% else %}<p class="blank">Nothing issued by hand yet.</p>{% endif %}
+</section>
+
+{% elif view == 'acme' %}
+<section class="card"><h2>ACME for machines on the LAN</h2>
+<p class="muted">Machines fabric does not run (a NAS, a printer, a proxy) get their certificates from this CA with any ACME client, renewed by the client itself. Only names under <code>{{ acme.domain }}</code>.</p>
+<ul>{% for line in acme.info %}<li>{{ line }}</li>{% endfor %}</ul>
+</section>
+<section class="card"><h2>Machines enrolled for DNS-01 <span class="muted">{{ acme.machines | length }}</span></h2>
+<p class="muted">A machine without a web server on port 80 proves its name in DNS: its key may change only its own <code>_acme-challenge</code> TXT record.</p>
+{% if acme.machines %}
+<table><thead><tr><th>Machine</th><th>Key</th>{% if can('tsig:manage') %}<th></th>{% endif %}</tr></thead><tbody>
+{% for m in acme.machines %}<tr><td>{{ m.fqdn }}</td><td><code>{{ m.key }}</code></td>{% if can('tsig:manage') %}<td class="num"><form method="post" action="/bind9/tsig/{{ m.key | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger" title="withdraw its key (Apply publishes it)">Withdraw</button></form></td>{% endif %}</tr>{% endfor %}
+</tbody></table>{% else %}<p class="blank">No machine enrolled for DNS-01.</p>{% endif %}
+{% if can('tsig:manage') %}
+<form method="post" action="/stepca/acme/enroll" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="domain" value="{{ acme.domain }}">
+<label>Machine name<input name="host" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="nas"></label>
+<div><button>Enroll for DNS-01</button></div>
+</form>
+<p class="muted small">Its key and <code>rfc2136.ini</code> are shown once; then Apply publishes it to BIND. Copy them to the machine over a channel you trust.</p>
+{% endif %}
 </section>
 {% endif %}
 {% endblock %}

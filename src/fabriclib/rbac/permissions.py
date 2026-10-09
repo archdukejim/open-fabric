@@ -16,6 +16,7 @@ PERMISSIONS = {
     "pki:read": "see the CA and issued certificates; inspect a CSR or certificate",
     "pki:issue": "issue key + certificate pairs, convert to .p12",
     "pki:sign": "sign uploaded CSRs",
+    "pki:revoke": "revoke issued certificates (published in the CRL at once, 2.1.5.10)",
     "pki:link-device": "link a certificate to a device",
     "devices:read": "see devices and device roles",
     "devices:enroll": "add devices",
@@ -26,6 +27,9 @@ PERMISSIONS = {
     "people:read": "see realm users",
     "people:create": "create realm users",
     "people:reset": "reset a user's sign-in (password, TOTP)",
+    "people:disable": "disable a user's sign-in everywhere at once, or enable it again",
+    "people:remove": "remove a user and revoke their certificates",
+    "people:groups": "change which groups a user is in",
     "domain:read": "see the domain: its controller, password policy, machines and Group Policy settings",
     "machines:admin": "pre-create, disable, enable and remove the site's machines",
     "gpo:admin": "set and clear policies in the site's admin settings GPO",
@@ -34,6 +38,7 @@ PERMISSIONS = {
     "vault:unlock": "add, test, remove unlock methods; rotate the vault key",
     "audit:read": "read the audit log",
     "system:admin": "services, updates and settings",
+    "images:update": "update a service's container image, or roll it back (2.1.8.3)",
     "security:raise": "raise sign-in security: second factors, the web console's client certificate (2.1.6.27)",
 }
 
@@ -51,7 +56,8 @@ BUNDLES = {
     "fabric-equipment-operator": ["status:read", "dns:read", "pki:read", "pki:link-device", "devices:read",
                                   "devices:enroll", "devices:admin", "roles:admin", "radius:read", "radius:admin",
                                   "domain:read", "machines:admin"],
-    "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:link-device", "devices:read"],
+    "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:revoke", "pki:link-device",
+                           "devices:read"],
     "fabric-helpdesk": ["status:read", "dns:read", "pki:read", "devices:read", "devices:enroll", "people:read",
-                        "people:create", "people:reset", "domain:read"],
+                        "people:create", "people:reset", "people:disable", "domain:read"],
 }

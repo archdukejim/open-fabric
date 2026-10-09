@@ -3,9 +3,11 @@ import os
 import subprocess
 
 from fabriclib.common.errors import ValidationError
+from fabriclib.common.read_published_lock import read_published_lock
 from fabriclib.common.write_audit import write_audit
 from fabriclib.images.constants import STATE
 from fabriclib.images.installed_services import installed_services
+from fabriclib.images.running_image import running_image
 from fabriclib.setup import deploy_config
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.start_unit import start_unit
@@ -15,12 +17,20 @@ def _apply(ctx, var, ref, services):
     """Purpose: render and deploy with image var `var` set to `ref` (local images rebuild on the new base),
              then restart each service through its systemd unit and wait until it is healthy.
     Inputs:  ctx — SetupContext (ctx.vars is changed in place and persisted by deploy_config); var — str image var;
-             ref — str image ref; services — list of SERVICES entries to restart, in order.
+             ref — str image ref; services — list of SERVICES entries to restart, in order. A published image of
+             fabric's (image_fabric_*) follows the lock unless held: one moved to a ref other than the lock's is listed
+             in image_rolled_back (vars.yaml.j2 keeps it there), one moved back to the lock's leaves the list.
     Returns: None.
     Fails:   SetupError from start_unit when a container does not become healthy; subprocess.CalledProcessError
              from systemctl; anything deploy_config.run / the deploy engine raises (SystemExit on a deploy failure).
     Feeds:   switch_image (update and its rollback)."""
     ctx.vars[var] = ref
+    if var.startswith("image_fabric_"):      # follows the release unless held: a ref other than the lock's is held
+        validated = next((e["ref"] for e in (read_published_lock(ctx.target_dir).get("images") or {}).values()
+                          if e["var"] == var), "")
+        back = set(ctx.vars.get("image_rolled_back") or [])
+        back = back | {var} if ref != validated else back - {var}
+        ctx.vars["image_rolled_back"] = sorted(back)
     deploy_config.run(ctx)
     for s in services:
         start_unit(s["unit"], s["container"], restart=True)
@@ -39,8 +49,11 @@ def switch_image(ctx, var, target, actor="root", source="cli"):
     Feeds:   update_images, rollback_image."""
     if "@sha256:" not in (target or ""):
         raise ValidationError(f"{target!r} is not pinned by digest")
-    previous = ctx.vars.get(var)
     services = [s for s in installed_services(ctx) if s["var"] == var]
+    # what runs now, not the setting: a published image of fabric's renders from the lock, which may already name
+    # the target (found by the 0.6.3 image-update test); a local build's running ref is its base, as the var's
+    running = [r for r in (running_image(s) for s in services) if r]
+    previous = running[0] if running else ctx.vars.get(var)
     if not services or previous == target:
         return []
     pull = subprocess.run(["docker", "pull", "-q", target], capture_output=True, text=True, timeout=1800)

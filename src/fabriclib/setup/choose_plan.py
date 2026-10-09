@@ -1,3 +1,5 @@
+import os
+
 from fabriclib.common.console import BOLD, NC, YELLOW, heading
 
 # (settings key, default, what enabling it does, what relaxing it costs)
@@ -133,6 +135,35 @@ def _ask_dns_filter(ctx):
         ctx.vars["adguard_upstreams"] = [u.strip() for u in ups.split(",") if u.strip()]
 
 
+def _ca_exists(ctx):
+    """Purpose: whether this install already has its CA (its lifetime is then fixed, 2.1.5.6).
+    Inputs:  ctx — SetupContext.
+    Returns: bool: Step-CA's ca.json exists.
+    Fails:   never.
+    Feeds:   choose_plan, _ask_ca_lifetime."""
+    return os.path.exists(ctx.path("stepca", "data", "config", "ca.json"))
+
+
+def _ask_ca_lifetime(ctx):
+    """Purpose: Advanced plan question: the root CA's lifetime in years (manual 2.1.5.6); asked only before the CA
+             exists. The intermediate lives a year less.
+    Inputs:  ctx — SetupContext; reads ctx.vars cert_root_ca_days (default 3650). Interactive.
+    Returns: None; ctx.vars["cert_root_ca_days"] set (whole years, at least 1, as days). A value that is not a whole
+             number of years from 1 to 30 is refused with the reason and asked again.
+    Fails:   EOFError from input().
+    Feeds:   choose_plan (Advanced)."""
+    if _ca_exists(ctx):
+        return
+    years = round(int(ctx.vars.get("cert_root_ca_days") or 3650) / 365)
+    while True:
+        answer = input(f"\n  The internal CA's root is valid for how many years (its intermediate a year less; fixed "
+                       f"once made)? [{years}] ").strip() or str(years)
+        if answer.isdigit() and 1 <= int(answer) <= 30:
+            ctx.vars["cert_root_ca_days"] = int(answer) * 365
+            return
+        print(f"    {YELLOW}{answer!r}: a whole number of years, 1 to 30{NC}")
+
+
 def _get(data, dotted, default):
     """Purpose: read a dotted key ("security.firewall") from nested dicts.
     Inputs:  data — dict; dotted — key path; default — value when any part is missing or not a dict.
@@ -162,8 +193,8 @@ def _set(data, dotted, value):
 
 def choose_plan(ctx):
     """Purpose: show what setup will do (every default is the hardened choice), then Proceed / Advanced / Quit.
-             Advanced walks each PLAN item, states the cost of relaxing it, and asks the DNS filter and the optional
-             services.
+             Advanced walks each PLAN item, states the cost of relaxing it, and asks the CA's lifetime (before the
+             CA exists), the DNS filter and the optional services.
     Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
              webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
     Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
@@ -179,7 +210,12 @@ def choose_plan(ctx):
             mark = "✓" if on else f"{YELLOW}✗{NC}"
             print(f"  {mark} {does}" + ("" if on else f"  {YELLOW}(disabled: {key}){NC}"))
         print("  ✓ Run every service non-root with no capabilities and a read-only filesystem")
-        print("  ✓ Create an internal CA (Step-CA) and TLS certificates for every service; trust it on this host")
+        if _ca_exists(ctx):
+            print("  ✓ Keep this install's CA (Step-CA); TLS certificates for every service, renewed every 30 days")
+        else:
+            years = round(int(ctx.vars.get("cert_root_ca_days") or 3650) / 365)
+            print(f"  ✓ Create an internal CA (Step-CA; root valid {years} years — Advanced to change) and TLS "
+                  "certificates for every service, renewed every 30 days; trust it on this host")
         if _get(ctx.vars, "install_webui", True):
             print(f"  ✓ Create the first web UI admin '{ctx.vars.get('webui_admin_user')}' with a client certificate; "
                   "login kit in ~/fabric-admin")
@@ -230,6 +266,7 @@ def choose_plan(ctx):
                 _set(ctx.vars, key, on)
             if not _get(ctx.vars, "install_keycloak", True):
                 _set(ctx.vars, "install_webui", False)
+            _ask_ca_lifetime(ctx)
             _ask_dns_filter(ctx)
             _ask_dhcp(ctx)
             _ask_radius(ctx)

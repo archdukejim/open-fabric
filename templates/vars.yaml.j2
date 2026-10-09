@@ -38,6 +38,9 @@ host_ip: {{ host_ip }}
 # ============================================================
 # SERVICE IPs
 # ============================================================
+# the host's own address on fabric_net: the services on the host network (the DC) answer containers here, so their
+# traffic stays on the bridge (2.1.2.15)
+ip_fabric_gateway: {{ ip_fabric_gateway | default('10.255.0.1') }}
 ip_nginx: {{ ip_nginx | default('10.255.0.10') }}
 ip_bind9: {{ ip_bind9 | default('10.255.0.30') }}
 ip_stepca: {{ ip_stepca | default('10.255.0.40') }}
@@ -50,7 +53,8 @@ ip_openbao: {{ ip_openbao | default('10.255.0.90') }}
 # SERVICE HOSTNAMES
 # ============================================================
 cname_ca: {{ cname_ca | default('ca') }}
-landing_page_cname: {{ landing_page_cname | default('', true) }}
+# The info page's name (2.1.4.3): info.<domain> by default; <domain> and the host's own name redirect to it.
+landing_page_cname: {{ landing_page_cname | default('info', true) }}
 cname_dns: {{ cname_dns | default('dns') }}
 cname_sso: {{ cname_sso | default('sso') }}
 cname_mgr: {{ cname_mgr | default('fabric') }}
@@ -63,7 +67,7 @@ webui_hostname: {{ webui_hostname | default('', true) }}
 hostname_nginx: {{ hostname_nginx | default('nginx.' ~ domain) }}
 hostname_bind9: {{ hostname_bind9 | default((cname_dns | default('dns')) ~ '.' ~ domain) }}
 hostname_stepca: {{ hostname_stepca | default((cname_ca | default('ca')) ~ '.' ~ domain) }}
-hostname_landing: {{ hostname_landing | default((landing_page_cname ~ '.' ~ domain) if landing_page_cname | default('', true) else domain) }}
+hostname_landing: {{ hostname_landing | default((landing_page_cname | default('info', true)) ~ '.' ~ domain) }}
 hostname_keycloak: {{ hostname_keycloak | default((cname_sso | default('sso')) ~ '.' ~ domain) }}
 {% set _hostname_mgr = (webui_hostname | default('', true) or ((cname_mgr | default('fabric')) ~ '.' ~ domain)) | lower %}
 hostname_mgr: {{ _hostname_mgr }}
@@ -102,21 +106,24 @@ image_samba: {{ image_samba | default('fabric/samba:local') }}
 {# fabric's own images as published (manual 1.14.3): "" until the lock pins a digest. The compose files run one
    when it is set and the host's ids match it (published_ref); otherwise the host builds that image itself.
    They carry fabric's own code, so they follow the release (as a local build did): always the lock's, unless the
-   admin pinned one in image_pins. #}
-image_fabric_adguard: "{{ image_fabric_adguard if 'image_fabric_adguard' in (image_pins | default([], true)) else published_lock.adguard }}"
-image_fabric_bind9: "{{ image_fabric_bind9 if 'image_fabric_bind9' in (image_pins | default([], true)) else published_lock.bind9 }}"
-image_fabric_freeradius: "{{ image_fabric_freeradius if 'image_fabric_freeradius' in (image_pins | default([], true)) else published_lock.freeradius }}"
-image_fabric_kea: "{{ image_fabric_kea if 'image_fabric_kea' in (image_pins | default([], true)) else published_lock.kea }}"
-image_fabric_keycloak: "{{ image_fabric_keycloak if 'image_fabric_keycloak' in (image_pins | default([], true)) else published_lock.keycloak }}"
-image_fabric_samba: "{{ image_fabric_samba if 'image_fabric_samba' in (image_pins | default([], true)) else published_lock.samba }}"
-image_fabric_stepca: "{{ image_fabric_stepca if 'image_fabric_stepca' in (image_pins | default([], true)) else published_lock.stepca }}"
-image_fabric_webui: "{{ image_fabric_webui if 'image_fabric_webui' in (image_pins | default([], true)) else published_lock.webui }}"
+   admin pinned one in image_pins, or `fabricctl images rollback` moved it back (image_rolled_back, which the next
+   update clears; 0.6.3 image-update test). #}
+{% set _held = (image_pins | default([], true)) + (image_rolled_back | default([], true)) %}
+image_fabric_adguard: "{{ image_fabric_adguard if 'image_fabric_adguard' in _held else published_lock.adguard }}"
+image_fabric_bind9: "{{ image_fabric_bind9 if 'image_fabric_bind9' in _held else published_lock.bind9 }}"
+image_fabric_freeradius: "{{ image_fabric_freeradius if 'image_fabric_freeradius' in _held else published_lock.freeradius }}"
+image_fabric_kea: "{{ image_fabric_kea if 'image_fabric_kea' in _held else published_lock.kea }}"
+image_fabric_keycloak: "{{ image_fabric_keycloak if 'image_fabric_keycloak' in _held else published_lock.keycloak }}"
+image_fabric_samba: "{{ image_fabric_samba if 'image_fabric_samba' in _held else published_lock.samba }}"
+image_fabric_stepca: "{{ image_fabric_stepca if 'image_fabric_stepca' in _held else published_lock.stepca }}"
+image_fabric_webui: "{{ image_fabric_webui if 'image_fabric_webui' in _held else published_lock.webui }}"
 {# verifies their signatures before a new digest is used (2.1.14.6, 2.1.14.11) #}
 image_cosign: {{ image_cosign | default(images_lock.cosign) }}
 {# false turns the signature check off (2.1.14.10): a relaxation, listed by `fabricctl status` and the web UI #}
 image_signature_check: {{ image_signature_check | default(true) | bool }}
 {# image_* keys the admin set explicitly: `fabricctl images update` leaves them alone. #}
 image_pins: {{ image_pins | default([], true) | to_json }}
+image_rolled_back: {{ image_rolled_back | default([], true) | to_json }}
 # After `fabricctl images update`: remove old images of fabric's repositories (never the rollback one).
 image_prune: {{ image_prune | default(true) | bool }}
 
@@ -316,7 +323,9 @@ cert_province: {{ cert_province | default('State') }}
 cert_city: {{ cert_city | default('City') }}
 cert_org: {{ cert_org | default(friendly_name) }}
 cert_ou: {{ cert_ou | default('IT') }}
-cert_root_ca_days: {{ cert_root_ca_days | default(1825) }}
+# The root CA's lifetime (2.1.5.6), asked in setup's Advanced; the intermediate's is it less a year. Fixed once the
+# CA exists.
+cert_root_ca_days: {{ cert_root_ca_days | default(3650) }}
 cert_root_digest: {{ cert_root_digest | default('sha512') }}
 cert_root_key_type: {{ cert_root_key_type | default('rsa') }}
 cert_root_key_param: {{ cert_root_key_param | default(4096) }}
@@ -324,7 +333,9 @@ cert_intermediate_days: {{ cert_intermediate_days | default(1095) }}
 cert_intermediate_digest: {{ cert_intermediate_digest | default('sha512') }}
 cert_intermediate_key_type: {{ cert_intermediate_key_type | default('rsa') }}
 cert_intermediate_key_param: {{ cert_intermediate_key_param | default(4096) }}
-cert_service_days: {{ cert_service_days | default(365) }}
+# Service certificates (2.1.5.4): their lifetime, and the age at which the daily timer renews them.
+cert_service_days: {{ cert_service_days | default(47) }}
+cert_renew_after_days: {{ cert_renew_after_days | default(30) }}
 # Longest validity the web UI's Step-CA tab issues (CSR signing, generated key pairs).
 pki_manual_max_days: {{ pki_manual_max_days | default(1825) }}
 
@@ -333,8 +344,8 @@ pki_manual_max_days: {{ pki_manual_max_days | default(1825) }}
 # ============================================================
 stepca_port: {{ stepca_port | default(9000) }}
 stepca_cert_allow_subordinate_ca: {{ stepca_cert_allow_subordinate_ca | default(true) | lower }}
-stepca_cert_max_lifetime_hours: "{{ stepca_cert_max_lifetime_hours | default((cert_service_days | default(365) * 24) ~ 'h') }}"
-cert_acme_lifetime_hours: {{ cert_acme_lifetime_hours | default('720h') }}
+stepca_cert_max_lifetime_hours: "{{ stepca_cert_max_lifetime_hours | default((cert_service_days | default(47) * 24) ~ 'h') }}"
+cert_acme_lifetime_hours: {{ cert_acme_lifetime_hours | default('1128h') }}
 
 # ============================================================
 # DNS — BIND9
@@ -387,8 +398,8 @@ bind_acl_policies:
 {% if (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) and _mgr_label and _mgr_label != hostname %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': _mgr_label }) %}
 {% endif %}
-{% if landing_page_cname | default('', true) %}
-{% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname }) %}
+{% if landing_page_cname | default('info', true) %}
+{% set _ = default_cnames.append({ 'canonical': hostname, 'name': landing_page_cname | default('info', true) }) %}
 {% endif %}
 {% if federation_endpoint | default(false) | bool %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_federation | default('federation') }) %}
@@ -404,7 +415,8 @@ bind_acl_policies:
 {% set default_a = [
   { 'ip': host_ip, 'name': hostname }
 ] %}
-{% if not landing_page_cname | default('', true) %}
+{# <domain> itself answers on this host (it redirects to the info page, 2.1.4.3) unless the admin's own records name it #}
+{% if '@' not in _own %}
 {% set _ = default_a.append({ 'ip': host_ip, 'name': '@' }) %}
 {% endif %}
 {% set _user_dns = dns | default({'dynamic_zone_var': {'zone_authority': true}}) %}

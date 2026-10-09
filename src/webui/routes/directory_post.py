@@ -30,15 +30,36 @@ def _role_fields(form):
             "permissions": [k[5:] for k, val in form.items() if k.startswith("perm_") and val]}
 
 
+def _person_change(uid, op, form):
+    """Purpose: Disable, enable or remove a person, or change their groups, through fabric-agent.
+    Inputs:  uid — the user name; op — "disable", "enable", "delete" (form confirm: the user name typed back) or
+             "groups" (form action add|remove, group); form — dict.
+    Returns: str, the message for the people list.
+    Fails:   the agentclient exceptions (ValidationError for a refusal).
+    Feeds:   directory_post."""
+    if op == "delete":
+        done = actions.person_action(uid, "delete", {"confirm": form.get("confirm", "")})
+        return f"{uid} removed; certificates revoked: {len(done.get('revoked') or [])}."
+    if op == "groups":
+        done = actions.person_action(uid, "groups", {"action": form.get("action", ""), "group": form.get("group", "")})
+        return f"{uid} {'added to' if done['member'] else 'removed from'} {done['group']}" + (
+            "." if done["changed"] else " (no change).")
+    actions.person_action(uid, op)
+    return f"{uid} {op}d: " + ("their sessions ended." if op == "disable" else "they can sign in again.")
+
+
 def directory_post(h, sess, parts, form):
     """Purpose: Devices, device roles, people, machines and Group Policy: each form maps to one fabric-agent call.
     Inputs:  h — the request handler (send, redirect, deny); sess — dict from find_session; parts — path segments after
              /directory/: ['people', '_new'] (form uid, first, last, email), ['people', <uid>, 'reset'],
+             ['people', <uid> or '_form' (form uid), 'disable'|'enable'|'delete'|'groups'] (_person_change's
+             form),
              ['devices'|'roles', '_new'] (form name + fields), ['devices'|'roles', <name>] (save), [..., <name>,
              'delete'], ['devices', <name>, 'certs', …] (unlink the certificate in form sha256), ['machines',
              '_new'] (form name), ['machines', <name>, 'enable'|'disable'|'delete'], ['gpo', 'set'|'clear'] (form
              policy, el_<element> values, disabled); form — dict.
-    Returns: people and a new machine: 200 page with the one-time password; machines and gpo: 303 to their view with
+    Returns: a new person, a reset and a new machine: 200 page with the one-time password; the other people changes,
+             machines and gpo: 303 to their view with
              msg or err; devices and roles: 303 to /directory with msg — the new item's
              page after create, the list after delete, the item's page otherwise.
     Fails:   404 for an unknown kind or operation or a missing name; ValidationError → 303 with err (people list; the
@@ -58,6 +79,10 @@ def directory_post(h, sess, parts, form):
             elif name and op == "reset":
                 uid, what = name, "reset"
                 password = actions.reset_sign_in(uid)
+            elif name and op in ("disable", "enable", "delete", "groups"):
+                uid = form.get("uid", "") if name == "_form" else name     # the forms that pick the person
+                return h.redirect("/directory?" + urllib.parse.urlencode(
+                    {"view": "people", "msg": _person_change(uid, op, form)}))
             else:
                 return h.deny(404, "Not found.")
         except actions.ValidationError as exc:

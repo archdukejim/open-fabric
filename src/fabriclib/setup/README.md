@@ -42,5 +42,7 @@
 | `backup_install.py` | `reinstall`: keep config, secrets (exported from OpenBao), CA, certificates and OpenBao (data + key) in `/root` (owners preserved; not the directory or Keycloak data) |
 | `restore_install.py` | Put a reinstall backup or a full export back under the install root (owners preserved) |
 | `stage_source.py` | Reinstall from the installed copy: stage the code in `/var/tmp` so uninstall cannot delete what setup runs from |
-| `renew_service_certs.py` | `fabricctl certs [--force]`: day-2 renewal; restarts only running services whose certs changed |
+| `renew_service_certs.py` | `fabricctl certs [--force / --scheduled]`: renewal (the daily timer's too); each changed service reloaded or restarted (pick_up_cert); the run recorded for status and doctor |
 | `common/` | Helpers shared with the consent plans |
+| `doctor_report.py` | Doctor's checks as data, for the web console's Run doctor |
+| `ensure_db_rotation.py` | Step `dbrotation`: Postgres's own admin and Keycloak's own role, OpenBao's database engine and static role for Keycloak's password (2.1.7.4) |

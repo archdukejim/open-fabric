@@ -179,3 +179,25 @@ SAMPLE_SECURITY = [
     {"layer": "kerberos", "what": "signing in with the domain logon (Kerberos)", "value": "on", "effective": None,
      "choices": [], "lowered": None},
 ]
+_REG = "ghcr.io/archdukejim/open-fabric"
+SAMPLE_IMAGES = [
+    {"service": "bind9", "var": "image_fabric_bind9", "running": f"{_REG}/bind9:0.6.3-rc.1@sha256:1111",
+     "applied": f"{_REG}/bind9:0.6.3-rc.1@sha256:1111", "validated": f"{_REG}/bind9:0.6.3-rc.1@sha256:1111",
+     "state": "current"},
+    {"service": "postgres", "var": "image_postgres", "running": "postgres:18.4@sha256:a02d",
+     "applied": "postgres:18.4@sha256:a02d", "validated": "postgres:18.6@sha256:5a5a", "state": "update available"},
+    {"service": "nginx", "var": "image_nginx", "running": "nginx:1.30.5@sha256:b972",
+     "applied": "nginx:1.30.5@sha256:b972", "validated": "nginx:1.30.5@sha256:b972", "state": "current"},
+]
+SAMPLE_DOCTOR = {"checks": [{"name": "DNS ns.home.arpa", "ok": True, "detail": ""},
+                            {"name": "DNS-over-HTTPS https://ns.home.arpa/dns-query answers", "ok": True, "detail": ""},
+                            {"name": "certificates: renewal working, none about to expire (2.1.5.4)", "ok": False,
+                             "detail": "DEV PREVIEW: a sample failure"},
+                            {"name": "service nginx", "ok": True, "detail": "active"}], "failed": 1}
+SAMPLE_ACME = {"domain": "home.arpa", "machines": [{"name": "nas", "fqdn": "nas.home.arpa", "key": "acme-nas",
+                                                    "records": ["nas"]}],
+               "info": ["ACME directory: https://ca.home.arpa/acme/acme/directory",
+                        "trust fabric's root CA first: http://certs.home.arpa/ (check its fingerprint there)",
+                        "names: <name>.home.arpa only; certificates live 47 days: let the client renew at 30 days old",
+                        "http-01: the machine answers on port 80 for its name (nothing to enroll)",
+                        "dns-01: enroll it below; its client sends RFC2136 updates with its key"]}

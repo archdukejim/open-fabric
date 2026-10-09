@@ -151,6 +151,12 @@ echo "--- POSIX identities in the domain (manual 1.6.3.9)"
 check "the admin has fabric's POSIX identity in AD: a uid from the site's block, Domain Users' gid 5000" \
     "in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=fabricadmin)' uidNumber gidNumber\" | grep -qE '^uidNumber: (500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-9][0-9]{4,5})$'"
 
+echo "--- traffic stays on the host (2.1.2.15): containers reach the DC on fabric_net's gateway"
+DC_NAME=$(in_box "python3 -c 'import yaml; print(yaml.safe_load(open(\"/opt/fabric/config/vars.yaml\"))[\"hostname_dc\"])'")
+check "the DC listens for LDAPS on fabric_net's gateway (10.255.0.1) as well as the LAN address"     "in_box 'ss -ltn' | grep -q '10.255.0.1:636' && in_box 'ss -ltn' | grep -q '$IP:636'"
+check "Keycloak's LDAP federation and FreeRADIUS's LDAPS go to the gateway, never the LAN address" "in_box \"docker exec postgres psql -tA -U fabric_admin -d keycloak -c \\\"SELECT value FROM component_config WHERE name = 'connectionUrl'\\\"\" | grep -qx 'ldaps://10.255.0.1:636' && { ! in_box 'systemctl is-enabled freeradius' >/dev/null 2>&1 || in_box 'grep -q ldaps://10.255.0.1:636 /opt/freeradius/config/fabric-radius.json'; }"
+check "the DC's name in DNS is the LAN address only (the gateway it listens on never published)"     "[ \"\$(in_box 'dig +short @$IP $DC_NAME A' | sort -u)\" = '$IP' ]"
+
 echo "--- DNS filter (AdGuard Home) in front of BIND"
 BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
 check "AdGuard answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
@@ -370,6 +376,13 @@ check "third user carol in the auditors group, with a client cert" "grep -q crea
 BOB_UID=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=bob)' uidNumber" | grep ^uidNumber)
 CAROL_UID=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=carol)' uidNumber" | grep ^uidNumber)
 check "bob and carol have distinct uid numbers from the site's block" "[ -n '$BOB_UID' ] && [ '$BOB_UID' != '$CAROL_UID' ]"
+echo "--- Keycloak's database password, rotated by OpenBao (2.1.7.4)"
+pg_roles() { in_box "docker exec postgres psql -tA -U fabric_admin -d keycloak -c 'SELECT rolname, rolsuper, rolcanlogin FROM pg_roles'"; }
+check "setup handed Keycloak's password to OpenBao: Keycloak runs as its own role, the bootstrap role locked" \
+    "pg_roles | grep -qx 'keycloak_db|f|t' && pg_roles | grep -qx 'keycloak|t|f' && pg_roles | grep -qx 'fabric_admin|t|t'"
+in_box 'fabricctl vault rotate-db' > "$OUT/rotate-db.log" 2>&1
+check "fabricctl vault rotate-db: rotated, Keycloak restarted with it and healthy; doctor's rotation check passes"     "grep -q 'Keycloak restarted with it and healthy' '$OUT/rotate-db.log' && in_box 'fabricctl doctor' | grep -q 'rotated by OpenBao in the last 40 days'"
+check "the monthly fabric-db-rotate timer is on" "in_box 'systemctl is-enabled fabric-db-rotate.timer' | grep -qx enabled"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
 in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
@@ -428,6 +441,12 @@ in_box "python3 /root/set_lock.py nginx nginx 1.30.5 sha256:b972f831f200b19ef076
 in_box 'fabricctl images prune' > "$OUT/images-prune.log" 2>&1
 check "images prune keeps the rollback image and everything in use" \
     "in_box 'docker image inspect nginx@$NGX_OLD' >/dev/null 2>&1 && in_box 'fabricctl images status' | grep -q 'all images current'"
+
+docker cp "$REPO/tests/sandbox/agent_job.py" "$NAME:/root/agent_job.py"
+in_box 'python3 /root/agent_job.py doctor' > "$OUT/doctor-job.json" 2>&1
+check "doctor as an agent job (the web console's Run doctor): done, every check passed"     "python3 -c 'import json,sys; j=json.load(open(sys.argv[1])); sys.exit(not (j[\"state\"] == \"done\" and j[\"result\"][\"failed\"] == 0 and j[\"result\"][\"checks\"]))' '$OUT/doctor-job.json'"
+in_box 'python3 /root/agent_job.py images update nginx' > "$OUT/images-job.json" 2>&1
+check "an image update as an agent job (the web console's Updates): done, nothing to move while current"     "grep -q '\"state\": \"done\"' '$OUT/images-job.json' && grep -q 'nothing to update' '$OUT/images-job.json'"
 
 echo "--- setup with a changed setting (live DNS zone must update, bind9 keeps serving)"
 cat > "$OUT/change.yaml" <<EOF

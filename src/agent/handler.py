@@ -163,7 +163,7 @@ class Handler(BaseHTTPRequestHandler):
             if refused:
                 return self.reply(refused[0], {"error": refused[1]})
             if method == "GET":
-                return self.reply(200, get_route(route))
+                return self.reply(200, get_route(route, self.user))
             data = self.body()
             return self.reply(200, post_route(route, self.actor(data), data, self.perms))
         except RouteNotFound:

@@ -14,7 +14,7 @@ their own local network (design [1.9.1](../../../docs/volume_1_description_and_a
 | `join_upstream.py` | Joining node: make the site CA request, pin the upstream's root, join over verified TLS, stage the CA, record the upstream |
 | `relay_join.py` | On a relay node: pass a join that names it (`via`) on to its upstream and return the answer unchanged |
 | `drop_relay.py` | On a site that joined through a relay: talk to the upstream directly from now on |
-| `remove_site.py` | On a parent: forget a site that joined here (its CA stays valid until it expires: no revocation yet) |
+| `remove_site.py` | On a parent: forget a site that joined here, revoking its CA (2.1.5.10) |
 | `reparent_site.py` | On a site: move under another parent with its invitation — new CA, Step-CA switched, certificates re-issued |
 | `dns_links.py` | The DNS links to the sites next to this one (delegation, secondary zones, TSIG keys) for the BIND templates |
 | `federation_status.py` | Standalone, upstream or site; the endpoint; joined sites; open invitations |

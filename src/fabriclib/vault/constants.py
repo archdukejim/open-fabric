@@ -22,6 +22,10 @@ path "identity/group"      { capabilities = ["create", "update"] }
 path "identity/group/*"    { capabilities = ["create", "read", "update", "list"] }
 path "identity/group-alias"   { capabilities = ["create", "update"] }
 path "identity/group-alias/*" { capabilities = ["create", "read", "update", "list"] }
+path "database/config/*"   { capabilities = ["create", "read", "update"] }
+path "database/static-roles/*" { capabilities = ["create", "read", "update"] }
+path "database/static-creds/*" { capabilities = ["read"] }
+path "database/rotate-role/*"  { capabilities = ["update"] }
 """,
     "fabric-agent": """
 path "sys/mounts" { capabilities = ["read"] }

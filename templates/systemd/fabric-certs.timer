@@ -1,0 +1,11 @@
+[Unit]
+Description=fabric: daily certificate renewal (manual 2.1.5.4)
+
+[Timer]
+# a quiet hour, spread so sites do not renew at once; a night missed while off runs at the next boot
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target

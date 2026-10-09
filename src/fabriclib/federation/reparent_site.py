@@ -69,7 +69,9 @@ def reparent_site(ctx, actor, invitation):
             data.update({"ad_site_ou": dom["site_ou"], "ad_org_ou": dom["org_ou"]})
         save_vars(data)
     subprocess.run(["systemctl", "restart", "stepca"], check=True)
-    renew_service_certs(ctx, force=True)
+    if renew_service_certs(ctx, force=True) != 0:
+        raise ValidationError("the service certificates could not be re-issued under the new parent: see "
+                              "`fabricctl status`")
     ok, output = apply_changes(actor, "cli")
     write_audit(actor, "FED_REPARENT", f"site={inv['site']} parent={res['upstream']['site_name']} "
                                        f"depth={new['site_ca_depth']}", "cli")

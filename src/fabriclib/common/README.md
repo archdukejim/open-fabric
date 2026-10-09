@@ -16,6 +16,8 @@
 | `console.py` | `heading` / `info` / `ok` / `warn` / `err` output (colour only on a terminal) |
 | `wait_healthy.py` | Wait for a container's Docker healthcheck |
 | `dns_query.py` | A-record lookup against one DNS server (stdlib; no `dig` needed) |
+| `dns_wire.py` | A DNS query in wire format and the A records of its reply (shared by `dns_query` and `doh_query`) |
+| `doh_query.py` | A-record lookup over DNS-over-HTTPS (`POST /dns-query` with curl, verified against fabric's root) |
 | `sudo_owner.py` | Login, home, uid and gid of the account that ran `sudo` (files handed to the admin) |
 | `set_tsig_secrets.py` | Set or remove TSIG secrets in `fabric-secrets.yml` (kept `0600`) |
 | `write_file_if_changed.py` | Write a file atomically with its mode and owner, only if its content changed (Kea, FreeRADIUS configs) |
