@@ -28,7 +28,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check the tag matches config/VERSION
         if: startsWith(github.ref, 'refs/tags/v')
-        run: test "v$(tr -d ' \n' < config/VERSION)" = "${GITHUB_REF_NAME}"
+        # v<version> (a release) or v<version>-rc.<n> (its candidate, tagged on main: 2.1.1.40)
+        run: |
+          version="$(tr -d ' \n' < config/VERSION)"
+          case "${GITHUB_REF_NAME}" in
+            "v${version}") ;;
+            "v${version}-rc."*) [[ "${GITHUB_REF_NAME#v${version}-rc.}" =~ ^[0-9]+$ ]] ||
+                                  { echo "::error::rc tag ${GITHUB_REF_NAME}: v${version}-rc.<n>"; exit 1; } ;;
+            *) echo "::error::tag ${GITHUB_REF_NAME} is not v${version} or v${version}-rc.<n>"; exit 1 ;;
+          esac
       - name: Build
         id: build
         run: echo "deb=$(bash packaging/deb/build-deb.sh)" >> "$GITHUB_OUTPUT"
@@ -57,15 +65,18 @@ jobs:
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${GITHUB_REF_NAME}" ./*.deb --clobber --repo "${GITHUB_REPOSITORY}" ||
-             gh release create "${GITHUB_REF_NAME}" ./*.deb --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}"
+        # an rc tag is a pre-release, which apt stable never takes (2.1.1.40)
+        run: |
+          pre=""; case "${GITHUB_REF_NAME}" in *-rc.*) pre="--prerelease" ;; esac
+          gh release upload "${GITHUB_REF_NAME}" ./*.deb --clobber --repo "${GITHUB_REPOSITORY}" ||
+            gh release create "${GITHUB_REF_NAME}" ./*.deb --repo "${GITHUB_REPOSITORY}" --title "${GITHUB_REF_NAME}" $pre
 
   apt:
     # the signed apt repository on GitHub Pages: on a release tag (after `release`), or by hand from an rc branch
     # (testing; `release` is skipped then, which must not skip this job)
     needs: [deb, release]
     if: >-
-      !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/v')
+      !failure() && !cancelled() && ((startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-rc.'))
       || (github.event_name == 'workflow_dispatch' && inputs.apt_testing && startsWith(github.ref, 'refs/heads/rc/')))
     runs-on: ubuntu-24.04
     permissions:
