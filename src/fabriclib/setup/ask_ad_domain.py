@@ -1,7 +1,6 @@
 import re
 
 from fabriclib.common.console import BOLD, NC, YELLOW
-from fabriclib.common.errors import ValidationError
 from fabriclib.samba.check_password_policy import POLICY_KEYS, check_password_policy
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
@@ -21,21 +20,43 @@ POLICY_QUESTIONS = [
 ]
 
 
-def _number(prompt, low, high, current):
-    """Purpose: ask for a whole number within a range, again until one is given.
+def _number(prompt, low, high, current, rule=None):
+    """Purpose: ask for a whole number within a range, again until one is given that the range and rule accept.
     Inputs:  prompt — the question; low, high — the allowed range; current — the value already set, or None (then
-             there is no default: an empty answer asks again). Interactive.
+             there is no default: an empty answer asks again); rule — None, or a function of the number returning why
+             it is refused (str) or None. Interactive.
     Returns: int.
     Fails:   EOFError from input().
-    Feeds:   ask_windows_domain."""
+    Feeds:   ask_ad_domain."""
     hint = f" [{current}]" if current is not None else ""
     while True:
         answer = input(f"    {prompt}{hint}: ").strip()
-        if not answer and current is not None:
-            return current
-        if answer.isdigit() and low <= int(answer) <= high:
-            return int(answer)
-        print(f"    {YELLOW}a whole number from {low} to {high}{NC}")
+        value = current if not answer and current is not None else int(answer) if answer.isdigit() else None
+        if value is None or not low <= value <= high:
+            print(f"    {YELLOW}a whole number from {low} to {high}{NC}")
+            continue
+        refused = rule(value) if rule else None
+        if not refused:
+            return value
+        print(f"    {YELLOW}{refused}{NC}")
+
+
+def _rule(key, policy):
+    """Purpose: the rule between one policy answer and those before it (as check_password_policy checks them), so a
+             bad pair is refused at the question that makes it, not after the whole policy (the owner was misled by
+             "Again", 2026-10-09).
+    Inputs:  key — the question's POLICY_KEYS key; policy — the answers so far.
+    Returns: None, or a function of the number returning why it is refused (str) or None.
+    Fails:   never.
+    Feeds:   ask_ad_domain."""
+    if key == "maximum_age_days":
+        least = policy["minimum_age_days"]
+        return lambda n: (f"must be above {least} (the days before a change), or 0" if n and n <= least else None)
+    if key == "lockout_minutes":
+        window = policy["lockout_window_minutes"]
+        return lambda n: (f"at least {window} (failed sign-ins are counted that long), or 0" if n and n < window
+                          else None)
+    return None
 
 
 def ask_ad_domain(ctx):
@@ -44,9 +65,10 @@ def ask_ad_domain(ctx):
              (2.1.6.13: asked, never preselected). Fabric's directory is a Samba AD domain on every install.
     Inputs:  ctx — SetupContext; reads and sets ctx.vars ad_domain, ad_password_policy; domain for the suggestion.
              Interactive.
-    Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is). A policy AD
-             would refuse (check_password_policy) is explained and asked again, its answers kept as defaults.
-    Fails:   EOFError from input().
+    Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is). An answer
+             AD would refuse beside an earlier one (_rule: the maximum age above the minimum, the lock at least the
+             window) is explained and that one question asked again.
+    Fails:   EOFError from input(); ValidationError from check_password_policy (only on a rule not asked here).
     Feeds:   setup/collect_vars."""
     print("\n  fabric's directory is a Samba AD domain (people, groups, devices; Windows and Linux machines may join).")
     domain = str(ctx.vars.get("domain") or "").lower()
@@ -71,25 +93,20 @@ def ask_ad_domain(ctx):
               f"nor a parent of it{NC}")
     print("    The password policy is yours: nothing is preselected (2.1.6.13).")
     policy = dict(ctx.vars.get("ad_password_policy") or {})
-    while True:                           # checked as AD takes it, so a bad pair is asked again here, not at deploy
-        for key, question in POLICY_QUESTIONS:
-            if key in ("lockout_window_minutes", "lockout_minutes") and policy.get("lockout_threshold") == 0:
-                policy[key] = 0           # never locked: neither the window nor the lock time applies
-                continue
-            low, high = POLICY_KEYS[key]
-            policy[key] = _number(question, low, high, policy.get(key))
-        while True:
-            hint = {True: " [y]", False: " [n]"}.get(policy.get("complexity"), "")
-            answer = input(f"    Require letters of both cases, digits or symbols (complexity) [y/n]{hint}: ")
-            answer = answer.strip().lower()
-            if not answer and isinstance(policy.get("complexity"), bool):
-                break
-            if answer[:1] in ("y", "n"):
-                policy["complexity"] = answer.startswith("y")
-                break
-        try:
-            check_password_policy(policy)
+    for key, question in POLICY_QUESTIONS:    # each answer checked as AD takes it, against those before it
+        if key in ("lockout_window_minutes", "lockout_minutes") and policy.get("lockout_threshold") == 0:
+            policy[key] = 0                   # never locked: neither the window nor the lock time applies
+            continue
+        low, high = POLICY_KEYS[key]
+        policy[key] = _number(question, low, high, policy.get(key), _rule(key, policy))
+    while True:
+        hint = {True: " [y]", False: " [n]"}.get(policy.get("complexity"), "")
+        answer = input(f"    Require letters of both cases, digits or symbols (complexity) [y/n]{hint}: ")
+        answer = answer.strip().lower()
+        if not answer and isinstance(policy.get("complexity"), bool):
             break
-        except ValidationError as e:
-            print(f"    {YELLOW}{e}{NC}\n    Again (Enter keeps an answer):")
+        if answer[:1] in ("y", "n"):
+            policy["complexity"] = answer.startswith("y")
+            break
+    check_password_policy(policy)             # every rule was asked above: a refusal here is a bug, said loudly
     ctx.vars["ad_password_policy"] = policy

@@ -100,6 +100,8 @@ in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
 grep -q "fabric is ready" "$OUT/setup.log" || in_box 'journalctl --no-pager -u samba | tail -60; docker logs samba 2>&1 | tail -80' > "$OUT/setup-dc.log" 2>&1   # diagnosis when setup fails
 check "setup did not shadow the package command" "! in_box 'test -e /usr/local/bin/fabricctl'"
+check "setup wrote nothing beside the package's copy: its records are the install's (0.6.4)" \
+    "! in_box 'test -e /usr/lib/fabricctl/fabric/archive || test -e /usr/lib/fabricctl/fabric/config'"
 check "Docker comes from the Ubuntu archive, no apt source added" \
     "in_box 'dpkg -s docker.io docker-compose-v2 docker-buildx' | grep -c '^Status: install ok installed' | grep -qx 3 \
      && ! in_box 'ls /etc/apt/sources.list.d/' | grep -qv '^ubuntu.sources$'"
@@ -547,9 +549,15 @@ docker cp "$DEB2" "$NAME:/root/fabricctl-new.deb"
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > "$OUT/apt2.log" 2>&1
 check "newer package installs over the old one" "grep -q 'package updated' '$OUT/apt2.log'"
 check "until setup runs, commands say the package is newer" "in_box 'fabricctl status' 2>&1 | grep -q 'package is newer'"
+# what builds before 0.6.4 left beside the package's copy: one line the install has, one it lacks
+in_box 'mkdir -p /usr/lib/fabricctl/fabric/archive && tail -1 /opt/fabric/archive/audit.log > /usr/lib/fabricctl/fabric/archive/audit.log \
+        && echo "[stray] an earlier build wrote this" >> /usr/lib/fabricctl/fabric/archive/audit.log'
 in_box 'fabricctl setup --non-interactive --yes' > "$OUT/setup-upgrade.log" 2>&1
 check "setup applies the upgrade" "grep -q 'fabric is ready' '$OUT/setup-upgrade.log' && ! in_box 'fabricctl status' 2>&1 | grep -q 'package is newer'"
 check "the install runs the upgraded build" "in_box 'cmp /usr/lib/fabricctl/fabric/BUILD /opt/fabric/BUILD'"
+check "records an earlier build left beside the package's copy adopted once, the stray folder gone" \
+    "[ \"\$(in_box 'grep -cF \"[stray] an earlier build\" /opt/fabric/archive/audit.log')\" = 1 ] \
+     && ! in_box 'test -e /usr/lib/fabricctl/fabric/archive'"
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq fabricctl' > "$OUT/apt-remove.log" 2>&1
 check "apt remove removes the command but not the running install" \
     "! in_box 'test -e /usr/bin/fabricctl' && in_box 'systemctl is-active fabric.target' | grep -qx active && in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP"

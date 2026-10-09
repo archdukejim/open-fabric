@@ -489,6 +489,7 @@ file	fabriclib-security|src/fabriclib/security/signin_layers.py	9
 file	fabriclib-security|src/fabriclib/security/ssh_ports.py	5	
 file	fabriclib-security|src/fabriclib/security/ufw_active.py	11	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
+file	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py	43	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
 file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	
 file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	0.5.0 / 2026-10-04
@@ -516,6 +517,7 @@ file	fabriclib-setup|src/fabriclib/setup/join_federation.py	19
 file	fabriclib-setup|src/fabriclib/setup/mint_extra_certs.py	20	
 file	fabriclib-setup|src/fabriclib/setup/mint_service_certs.py	21	
 file	fabriclib-setup|src/fabriclib/setup/preflight.py	22	
+file	fabriclib-setup|src/fabriclib/setup/print_first_steps.py	44	
 file	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py	23	
 file	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py	24	
 file	fabriclib-setup|src/fabriclib/setup/restore_install.py	25	
@@ -1455,7 +1457,9 @@ function	fabriclib-security|src/fabriclib/security/signin_layers.py|signin_rows	
 function	fabriclib-security|src/fabriclib/security/ssh_ports.py|ssh_ports	1	
 function	fabriclib-security|src/fabriclib/security/ufw_active.py|ufw_active	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
+function	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py|adopt_stray_records	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_rule	3	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	
 function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	
@@ -1541,6 +1545,7 @@ function	fabriclib-setup|src/fabriclib/setup/preflight.py|_foreign_listeners	3
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_mem_gb	2	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_os_release	1	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|run	4	
+function	fabriclib-setup|src/fabriclib/setup/print_first_steps.py|print_first_steps	1	
 function	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py|read_join_invitation	1	
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|_record	2	
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|renew_service_certs	1	

@@ -132,14 +132,14 @@ bad = {
     "friendly_name": ['a"quote', "<b>", "x" * 41, "Fabric Installer Test"],
     "admin": ["administrator", "root", "fabric-agent", "Bad User", ""],
     "ad_domain": [DOMAIN, DOMAIN.split(".")[-1], "ad.local", "ad_x." + DOMAIN, ""],
-    "min_length": ["65", "abc", "12", ""],
+    "min_length": ["65", "abc", "12"],
     "history": ["25", "5", ""],
-    "min_age": ["999", "0", ""],
-    "max_age": ["0", ""],
-    "threshold": ["5", ""],
-    "window": ["15", ""],
+    "min_age": ["999", "3"],
+    "max_age": ["2", "0"],
+    "threshold": ["5"],
+    "window": ["15"],
     "lock": ["5", "30"],
-    "complexity": ["maybe", "y", ""],
+    "complexity": ["maybe", "y"],
     "memory": ["3", "99", "x", ""],
     "plan": ["x", "p"],
 }
@@ -169,13 +169,16 @@ EXPECT = [
     ("fabric's own domain, its parent, .local, an underscore: refused as the AD domain",
      "a domain of two labels or more", 4),
     ("65 and text for the minimum length, 25 remembered, 999 days: refused (each its range)", "a whole number from", 4),
-    ("a lockout shorter than its window: explained and the policy asked again", "AD needs the lock", 1),
+    ("a maximum age not above the minimum: explained and that question asked again", "must be above 3", 1),
+    ("a lockout shorter than its window: explained and that question asked again", "at least 15 (failed sign-ins", 1),
     ("3 GB, more than the host has, text: refused as the memory", "a whole number from 4 to", 3),
 ]
 for name, needle, count in EXPECT:
     check(name, text.count(needle) >= count, (text.count(needle), needle))
 names = [n for n, _ in asked]
-check("the complexity question asked again after 'maybe'", names.count("complexity") >= 3, names.count("complexity"))
+check("the complexity question asked again after 'maybe'", names.count("complexity") == 2, names.count("complexity"))
+check("each policy rule asked again at its own question, never the whole policy (no \"Again\")",
+      "Again" not in text and names.count("min_length") == 3, names.count("min_length"))
 check("the plan asked again after an answer that is no choice", names.count("plan") == 2, names.count("plan"))
 check("a consent question asked again after an answer that is not y or n",
       len(consent_seen) >= 2 and consent_seen[0] == consent_seen[1], consent_seen[:3])
@@ -210,6 +213,12 @@ check("the three firewall questions, in order: the ports, securing, then the hos
       == ["Ports fabric needs", "Secure this host", "The host's own firewall rules"], seen2)
 check("with everything allowed, setup finishes (fabric is ready)", code == 0 and "fabric is ready" in text,
       (code, text[-1500:]))
+first, signin = text.find("FIRST install fabric's root certificate"), text.find("then sign in")
+fingerprint = R("openssl x509 -in /opt/nginx/www/certs/root-ca.crt -noout -fingerprint -sha256 | cut -d= -f2")
+check("setup's last words: FIRST the root certificate from the landing page (plain HTTP, its fingerprint), "
+      "then sign in at the console", 0 <= first < signin and f"http://info.{DOMAIN}/" in text[first:signin]
+      and fingerprint.strip() and fingerprint.strip() in text[first:signin]
+      and f"https://fabric.{DOMAIN}" in text[signin:], text[-1500:])
 doctor = R("fabricctl doctor 2>&1")
 check("doctor passes", "✗" not in doctor and "✓" in doctor, doctor[-1500:])
 aaaa = R(f"dig +short AAAA ad.{DOMAIN} @{HOST_IP}; dig +short AAAA $(hostname -s).ad.{DOMAIN} @{HOST_IP}")

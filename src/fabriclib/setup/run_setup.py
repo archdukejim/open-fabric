@@ -14,7 +14,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from fabriclib.common.console import BOLD, NC, err, heading, ok  # noqa: E402
+from fabriclib.common.console import BOLD, NC, err, heading  # noqa: E402
 from fabriclib.consent.ask_consent import ask_consent  # noqa: E402
 from fabriclib.consent.plan_host_changes import plan_host_changes  # noqa: E402
 from fabriclib.consent.planned_vars import planned_vars  # noqa: E402
@@ -22,6 +22,7 @@ from fabriclib.setup.choose_plan import choose_plan  # noqa: E402
 from fabriclib.setup.collect_vars import collect_vars  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
 from fabriclib.setup.errors import SetupError  # noqa: E402
+from fabriclib.setup.print_first_steps import print_first_steps  # noqa: E402
 from fabriclib.setup.read_join_invitation import read_join_invitation  # noqa: E402
 from fabriclib.setup.steps import STEPS  # noqa: E402
 from fabriclib.setup.verify_install import run as verify  # noqa: E402
@@ -127,9 +128,7 @@ def main(argv=None):
             if name == "deploy":
                 ctx.load_state()
         heading(f"{BOLD}fabric is ready{NC} ({time.monotonic() - start:.0f}s)")
-        if ctx.vars.get("install_webui"):
-            ok(f"web UI: https://{ctx.vars.get('hostname_mgr')}  (login kit: ~/fabric-admin/README.txt)")
-        ok("checks any time: sudo fabricctl doctor")
+        print_first_steps(ctx)
         return 0
     except SetupError as e:
         err(str(e))

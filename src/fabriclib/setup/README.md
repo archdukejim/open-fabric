@@ -19,6 +19,7 @@
 | `condition_host.py` | Host packages and Docker Engine (compose v2, buildx) from the Ubuntu archive; no apt source added |
 | `harden_docker.py` | Hardened `/etc/docker/daemon.json` (merged, not replaced), after the `runtime` consent |
 | `deploy_config.py` | Render + deploy all configuration without starting anything; install `fabricctl` |
+| `adopt_stray_records.py` | Records earlier builds wrote beside the package's copy moved into the install's archive (2.1.1.41) |
 | `create_accounts.py` | `fabric-*` service users and groups (uid band 600–649); moves an older install off its previous accounts |
 | `configure_network.py` | Docker network `fabric_net`; optional host resolver drop-in |
 | `configure_firewall.py` | UFW default-deny (SSH from the LAN) + LAN-only Docker-published ports; lockout guard |
@@ -32,6 +33,7 @@
 | `start_unit.py` | Enable, start or restart one unit and wait until its container is healthy |
 | `setup_openbao.py` | `vault` step: vault key and unlock, start OpenBao, init once (recovery keys to `~/fabric-admin`, root token used once and revoked), converge its configuration, move fabric's secrets file into OpenBao |
 | `create_admin.py` | First web UI admin: a person in the domain, in the admin group, forced password change, client `.p12`, root CA and README in `~/fabric-admin` |
+| `print_first_steps.py` | Setup's last words: the root certificate from the landing page first, then sign in (2.1.1.41) |
 | `verify_install.py` | End-to-end checks (DNS, HTTPS chains, web UI gates, time, services) |
 | `retire_renamed_units.py` | Upgrade: stop and remove units/containers that were renamed (`webui` → `fabric-web`) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
