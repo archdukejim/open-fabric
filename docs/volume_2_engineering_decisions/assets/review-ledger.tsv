@@ -1250,7 +1250,7 @@ tests/host/README.md	0ca6a906d5bddb7d03f4f92f65f0ef52ea61b9d0	2026-10-08
 tests/host/installer.py	f3e55e679a006ae8dfe8813233e8ee46e6e44ea1	2026-10-09	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
 tests/host/run.sh	fc951e34cf42f4ebb2d321211f1a6e6c814a4cab	2026-10-09	
-tests/host/upgrade.sh	c0a4d6c8a01ecb1104e37dd7637cd5aad5e79453	2026-10-09	
+tests/host/upgrade.sh	467304345b51546e7d1b87f6541c3a056bf3c9bd	2026-10-09	
 tests/host/upgrade_state.py	48966589b91287fa325346a473032a93e300a551	2026-10-09	
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
 tests/images/README.md	faef5036b8a6c2ea180834b851533c0e6709bd7b	2026-10-09	
