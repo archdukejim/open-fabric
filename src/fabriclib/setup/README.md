@@ -13,14 +13,13 @@
 | `upgrade_vars.py` | Existing install's vars before re-render: new release's images (unless pinned) and service accounts (unless changed) |
 | `detect_network.py` | Guess hostname, host IP, gateway, LAN CIDR and interface from the default route |
 | `choose_plan.py` | Show the (hardened) default plan; Proceed / Advanced / Quit |
-| `ask_ad_domain.py` | The directory's AD domain (permanent; a sibling suggested) and the whole password policy (no defaults), asked when missing |
+| `ask_ad_domain.py` | The directory's AD domain (permanent; a sibling suggested), asked when missing; its password policy starts from the default (2.1.6.35) |
 | `ask_first_admin.py` | The first admin's password, chosen in setup: typed twice and checked against the policy, or from `--admin-password-file` (2.1.6.33) |
-| `ask_ram.py` | Setup measures the host's memory and asks how much fabric may use (all by default; 4 GB at least) |
-| `ask_kerberos.py` | Whether to sign in with the domain logon (Kerberos): asked once, no by default (2.1.6.32) |
 | `preflight.py` | Refuse a host without amd64/arm64, root, enough RAM or the cgroup memory controller; warn about untested OS and conflicting listeners |
 | `condition_host.py` | Host packages and Docker Engine (compose v2, buildx) from the Ubuntu archive; no apt source added |
 | `harden_docker.py` | Hardened `/etc/docker/daemon.json` (merged, not replaced), after the `runtime` consent |
 | `deploy_config.py` | Render + deploy all configuration without starting anything; install `fabricctl` |
+| `set_ram_capacity.py` | The memory fabric sizes itself for: all of the host's measured memory unless set (4 GB at least; 2.1.2.3, 2.1.2.16) |
 | `adopt_stray_records.py` | Records earlier builds wrote beside the package's copy moved into the install's archive (2.1.1.41) |
 | `create_accounts.py` | `fabric-*` service users and groups (uid band 600–649); moves an older install off its previous accounts |
 | `configure_network.py` | Docker network `fabric_net`; optional host resolver drop-in |

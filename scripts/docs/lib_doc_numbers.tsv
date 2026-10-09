@@ -494,8 +494,8 @@ file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4
 file	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py	43	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
 file	fabriclib-setup|src/fabriclib/setup/ask_first_admin.py	45	
-file	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py	46	
-file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	
+file	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py	46	0.6.4 / 2026-10-09
+file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	0.6.4 / 2026-10-09
 file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	0.5.0 / 2026-10-04
 file	fabriclib-setup|src/fabriclib/setup/backup_install.py	1	
 file	fabriclib-setup|src/fabriclib/setup/check_export_dir.py	2	
@@ -529,6 +529,7 @@ file	fabriclib-setup|src/fabriclib/setup/retire_renamed_units.py	26
 file	fabriclib-setup|src/fabriclib/setup/run_restore_command.py	27	
 file	fabriclib-setup|src/fabriclib/setup/run_setup.py	28	
 file	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py	29	
+file	fabriclib-setup|src/fabriclib/setup/set_ram_capacity.py	47	
 file	fabriclib-setup|src/fabriclib/setup/setup_openbao.py	30	
 file	fabriclib-setup|src/fabriclib/setup/stage_source.py	31	
 file	fabriclib-setup|src/fabriclib/setup/start_bootstrap.py	32	
@@ -1464,22 +1465,22 @@ function	fabriclib-security|src/fabriclib/security/ssh_ports.py|ssh_ports	1
 function	fabriclib-security|src/fabriclib/security/ufw_active.py|ufw_active	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
 function	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py|adopt_stray_records	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_rule	3	
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_rule	3	0.6.4 / 2026-10-09
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	
 function	fabriclib-setup|src/fabriclib/setup/ask_first_admin.py|ask_first_admin	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py|ask_kerberos	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	
+function	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py|ask_kerberos	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	0.6.4 / 2026-10-09
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
 function	fabriclib-setup|src/fabriclib/setup/check_export_dir.py|check_export_dir	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_ca_lifetime	10	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dns_filter	8	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_log_forwarding	1	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_radius	3	
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dns_filter	8	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_log_forwarding	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_radius	3	0.6.4 / 2026-10-09
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ca_exists	9	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_get	4	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_set	5	
@@ -1565,6 +1566,8 @@ function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|_opt	1
 function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|_package_installed	2	
 function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|_show_plan	3	
 function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|run_uninstall_command	4	
+function	fabriclib-setup|src/fabriclib/setup/set_ram_capacity.py|_plan	1	
+function	fabriclib-setup|src/fabriclib/setup/set_ram_capacity.py|set_ram_capacity	2	
 function	fabriclib-setup|src/fabriclib/setup/setup_openbao.py|_save_recovery	1	
 function	fabriclib-setup|src/fabriclib/setup/setup_openbao.py|run	2	
 function	fabriclib-setup|src/fabriclib/setup/stage_source.py|stage_source	1	

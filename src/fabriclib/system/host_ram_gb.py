@@ -3,7 +3,7 @@ def host_ram_gb():
     Inputs:  none (/proc/meminfo).
     Returns: int, or 0 when it cannot be read.
     Fails:   never.
-    Feeds:   setup/ask_ram (setup's question), deploy/render_vars (an install from before the question)."""
+    Feeds:   setup/set_ram_capacity, deploy/render_vars (an install from before setup recorded it)."""
     try:
         with open("/proc/meminfo") as f:
             kb = next(int(line.split()[1]) for line in f if line.startswith("MemTotal:"))

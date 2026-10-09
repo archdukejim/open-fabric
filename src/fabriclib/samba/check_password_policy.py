@@ -1,9 +1,12 @@
 from fabriclib.common.errors import ValidationError
 
-# the password policy's keys (2.1.6.13): every one is the admin's, none has a default
+# the password policy's keys (2.1.6.13); a new domain starts from DEFAULT_POLICY (2.1.6.35)
 POLICY_KEYS = {"minimum_length": (0, 64), "history": (0, 24), "minimum_age_days": (0, 998),
                "maximum_age_days": (0, 999), "lockout_threshold": (0, 999), "lockout_minutes": (0, 99999),
                "lockout_window_minutes": (0, 99999)}
+# a new domain's policy (2.1.6.35: the lighter of three, the owner's choice); changed any time
+DEFAULT_POLICY = {"minimum_length": 12, "complexity": True, "history": 5, "minimum_age_days": 0, "maximum_age_days": 0,
+                  "lockout_threshold": 10, "lockout_window_minutes": 15, "lockout_minutes": 15}
 
 
 def check_password_policy(policy):

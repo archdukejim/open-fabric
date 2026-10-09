@@ -19,6 +19,8 @@ import subprocess
 import sys
 import time
 
+import yaml
+
 TARGET, KEY = os.environ["TARGET"], os.path.expanduser(os.environ["KEY"])
 HOST_IP, DOMAIN = os.environ["HOST_IP"], os.environ.get("DOMAIN", "home.arpa")
 FOREIGN_IP = os.environ.get("FOREIGN_IP", "192.168.7.250")    # in the host's subnet, but not one of its addresses
@@ -61,7 +63,7 @@ PROMPTS = [
     ("kerberos", r"Turn it on now\? \[y/N\]: $"),
     ("admin_pw", r"Password for [^:\n]+: $"),
     ("admin_pw2", r"The same again: $"),
-    ("plan", r"\[P\]roceed, \[A\]dvanced, or \[Q\]uit\? $"),
+    ("plan", r"\[P\]roceed.*\[Q\]uit\? $"),
     ("consent", r"Allow these changes\? \[y/n\] $"),
 ]
 
@@ -135,19 +137,9 @@ bad = {
     "friendly_name": ['a"quote', "<b>", "x" * 41, "Fabric Installer Test"],
     "admin": ["administrator", "root", "fabric-agent", "Bad User", ""],
     "ad_domain": [DOMAIN, DOMAIN.split(".")[-1], "ad.local", "ad_x." + DOMAIN, ""],
-    "min_length": ["65", "abc", "12"],
-    "history": ["25", "5", ""],
-    "min_age": ["999", "3"],
-    "max_age": ["2", "0"],
-    "threshold": ["5"],
-    "window": ["15"],
-    "lock": ["5", "30"],
-    "complexity": ["maybe", "y"],
-    "kerberos": ["maybe", ""],
-    # too short (the policy just set: 12), containing the user name, then two that differ, then a good one twice
+    # too short (the default policy: 12), containing the user name, then two that differ, then a good one twice
     "admin_pw": ["short", "xFabric-Admin-9", "Good-Pass-1234", "Good-Pass-1234"],
     "admin_pw2": ["nope", "Good-Pass-1234"],
-    "memory": ["3", "99", "x", ""],
     "plan": ["x", "p"],
 }
 consent_seen = []
@@ -175,21 +167,16 @@ EXPECT = [
      "not a valid webui_admin_user", 4),
     ("fabric's own domain, its parent, .local, an underscore: refused as the AD domain",
      "a domain of two labels or more", 4),
-    ("65 and text for the minimum length, 25 remembered, 999 days: refused (each its range)", "a whole number from", 4),
-    ("a maximum age not above the minimum: explained and that question asked again", "must be above 3", 1),
-    ("a lockout shorter than its window: explained and that question asked again", "at least 15 (failed sign-ins", 1),
-    ("3 GB, more than the host has, text: refused as the memory", "a whole number from 4 to", 3),
-    ("the Kerberos question: an answer that is not y or n asked again", "y or n", 1),
-    ("the first admin's password: shorter than the policy just set, refused", "at least 12 characters", 1),
+    ("the first admin's password: shorter than the default policy (12), refused", "at least 12 characters", 1),
     ("...containing the user name, refused", "not containing your user name", 1),
     ("...typed differently the second time, asked again", "the two differ", 1),
 ]
 for name, needle, count in EXPECT:
     check(name, text.count(needle) >= count, (text.count(needle), needle))
 names = [n for n, _ in asked]
-check("the complexity question asked again after 'maybe'", names.count("complexity") == 2, names.count("complexity"))
-check("each policy rule asked again at its own question, never the whole policy (no \"Again\")",
-      "Again" not in text and names.count("min_length") == 3, names.count("min_length"))
+check("only what cannot change later is asked (2.1.2.16): no password policy, memory or Kerberos question",
+      not {"min_length", "history", "min_age", "max_age", "threshold", "window", "lock", "complexity", "memory",
+           "kerberos"} & set(names) and "password policy: fabric's default" in text, names)
 check("the plan asked again after an answer that is no choice", names.count("plan") == 2, names.count("plan"))
 check("a consent question asked again after an answer that is not y or n",
       len(consent_seen) >= 2 and consent_seen[0] == consent_seen[1], consent_seen[:3])
@@ -206,9 +193,8 @@ check("…and nothing was started or changed: no containers, ufw's rules as they
 
 # ---- run 2: valid answers, everything allowed; the install finished and looked at
 good = {
-    "domain": [DOMAIN], "friendly_name": ["Fabric Installer Test"], "min_length": ["12"], "history": ["5"],
-    "min_age": ["0"], "max_age": ["0"], "threshold": ["5"], "window": ["15"], "lock": ["30"], "complexity": ["y"],
-    "plan": ["p"], "kerberos": ["y"], "admin_pw": ["Good-Pass-1234"], "admin_pw2": ["Good-Pass-1234"],
+    "domain": [DOMAIN], "friendly_name": ["Fabric Installer Test"], "plan": ["p"], "admin_pw": ["Good-Pass-1234"],
+    "admin_pw2": ["Good-Pass-1234"],
 }
 seen2 = []
 
@@ -230,10 +216,15 @@ check("setup's last words: FIRST the root certificate from the landing page (pla
       "then sign in at the console", 0 <= first < signin and f"http://info.{DOMAIN}/" in text[first:signin]
       and fingerprint.strip() and fingerprint.strip() in text[first:signin]
       and f"https://fabric.{DOMAIN}" in text[signin:], text[-1500:])
-saved = R("grep -E '^(webui_admin_user|webui_admin_role|signin_kerberos):' /opt/fabric/config/vars.yaml")
-check("Enter took fabric-admin as the first admin; the console's role is fabric-console-admin; Kerberos on as "
-      "answered (2.1.6.32, 2.1.6.33)", "webui_admin_user: fabric-admin" in saved
-      and "webui_admin_role: fabric-console-admin" in saved and "signin_kerberos: true" in saved, saved)
+saved = yaml.safe_load(R("cat /opt/fabric/config/vars.yaml")) or {}
+check("Enter took fabric-admin as the first admin; the console's role is fabric-console-admin; Kerberos off; the "
+      "default policy; all the memory (2.1.2.16, 2.1.6.32, 2.1.6.33, 2.1.6.35)",
+      saved.get("webui_admin_user") == "fabric-admin" and saved.get("webui_admin_role") == "fabric-console-admin"
+      and saved.get("signin_kerberos") is False and (saved.get("ad_password_policy") or {}).get("minimum_length") == 12
+      and (saved.get("ad_password_policy") or {}).get("lockout_threshold") == 10
+      and int(saved.get("host_ram_capacity") or 0) >= 4,
+      {k: saved.get(k) for k in ("webui_admin_user", "webui_admin_role", "signin_kerberos", "ad_password_policy",
+                                 "host_ram_capacity")})
 check("the first admin was created with the chosen password; none written to the login kit",
       "created in the directory with the password chosen in setup" in text
       and not R("find /home /root -path '*/fabric-admin/initial-password.txt' -newer /opt/fabric/config/fabric.yaml "
