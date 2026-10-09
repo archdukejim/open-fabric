@@ -2,7 +2,7 @@
 # RFC2136 dynamic updates the way nginx-proxy-manager's certbot rfc2136
 # plugin does them, against the running fabric (inside the sandbox).
 #   rfc2136_test.sh <server-ip> <zone> <key-name> <secret> <allowed-host> [<bind-port>]
-# Updates and the read-back go to BIND's port (bind_dns_port: 5053 behind the DNS filter): AdGuard on 53 caches.
+# Updates and the read-back go to BIND's port (bind_dns_port: 5053 behind the DNS filter): the DNS filter's resolver on 53 caches.
 # The secret is written to a 0600 key file; it is never an nsupdate argument.
 set -uo pipefail
 SERVER=$1 ZONE=$2 KEY=$3 SECRET=$4 HOST=$5 PORT=${6:-53}

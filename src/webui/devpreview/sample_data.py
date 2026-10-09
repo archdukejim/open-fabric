@@ -169,7 +169,7 @@ SAMPLE_GPO = {"site": "lan", "templates": ["fabric-starter", "samba"], "match": 
                             "class": "Machine", "elements": ["text:ExampleText"]}], "more": False}
 SAMPLE_SECURITY = [
     {"layer": "admin-2fa",
-     "what": "a second factor for the admin tools (the web console, OpenBao's UI, AdGuard's page)",
+     "what": "a second factor for the admin tools (the web console, OpenBao's UI)",
      "value": "totp", "effective": "totp", "choices": ["passkey"], "lowered": None},
     {"layer": "everyone-2fa", "what": "a second factor for every sign-in (every app signing in through Keycloak)",
      "value": "none", "effective": "none", "choices": ["any", "totp", "passkey"],

@@ -5,8 +5,7 @@ BASE64 = {"ca_password": 32, "rndc_secret": 32, "keycloak_admin_password": 24, "
           "kea_ddns_secret": 32,                     # HMAC-SHA256 TSIG key for Kea's DDNS
           "resolver_rndc_secret": 32}                # the BIND resolver's own control key (manual 1.12.2.4)
 # alphanumeric: safe inside JSON and configuration files without quoting
-ALNUM = ("webui_oidc_secret", "openbao_oidc_secret",
-         "adguard_admin_password", "adguard_oidc_secret", "adguard_cookie_secret")
+ALNUM = ("webui_oidc_secret", "openbao_oidc_secret")
 
 
 def generate_missing_secrets(secrets):

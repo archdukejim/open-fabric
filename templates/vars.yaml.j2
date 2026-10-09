@@ -75,7 +75,6 @@ hostname_mgr: {{ _hostname_mgr }}
 hostname_certs: {{ ((cname_certs | default('certs')) ~ '.' ~ domain) | lower }}
 hostname_openbao: {{ ((cname_openbao | default('vault')) ~ '.' ~ domain) | lower }}
 hostname_radius: {{ ((cname_radius | default('radius')) ~ '.' ~ domain) | lower }}
-hostname_adguard: {{ ((cname_adguard | default('adguard')) ~ '.' ~ domain) | lower }}
 hostname_ntp: {{ ((cname_ntp | default('ntp')) ~ '.' ~ domain) | lower }}
 {# The federation endpoint (manual 1.9.4.2): sites join this install through it. Off until
    `fabricctl federation enable`; the name is always computed. #}
@@ -94,8 +93,6 @@ image_keycloak: {{ image_keycloak | default(images_lock.keycloak) }}
 image_postgres: {{ image_postgres | default(images_lock.postgres) }}
 image_openbao: {{ image_openbao | default(images_lock.openbao) }}
 image_fluentbit: {{ image_fluentbit | default(images_lock.fluentbit) }}
-image_adguard: {{ image_adguard | default(images_lock.adguard) }}
-image_oauth2proxy: {{ image_oauth2proxy | default(images_lock.oauth2proxy) }}
 {# Base of the locally built images (Debian packages). #}
 image_debian: {{ image_debian | default(images_lock.debian) }}
 {# Names of the locally built images (not pulled). #}
@@ -109,7 +106,6 @@ image_samba: {{ image_samba | default('fabric/samba:local') }}
    admin pinned one in image_pins, or `fabricctl images rollback` moved it back (image_rolled_back, which the next
    update clears; 0.6.3 image-update test). #}
 {% set _held = (image_pins | default([], true)) + (image_rolled_back | default([], true)) %}
-image_fabric_adguard: "{{ image_fabric_adguard if 'image_fabric_adguard' in _held else published_lock.adguard }}"
 image_fabric_bind9: "{{ image_fabric_bind9 if 'image_fabric_bind9' in _held else published_lock.bind9 }}"
 image_fabric_freeradius: "{{ image_fabric_freeradius if 'image_fabric_freeradius' in _held else published_lock.freeradius }}"
 image_fabric_kea: "{{ image_fabric_kea if 'image_fabric_kea' in _held else published_lock.kea }}"
@@ -199,24 +195,10 @@ radius_people: {{ radius_people | default([{'group': 'network-staff', 'vlan': no
                                           {'group': 'network-guests', 'vlan': none, 'priority': 100}]) | to_json }}
 ip_fluentbit: {{ ip_fluentbit | default('10.255.0.95') }}
 fluentbit_mem_limit: {{ fluentbit_mem_limit | default('64m') }}
-# DNS filter (manual 1.12.1; on by default, 2.1.12.1): AdGuard Home in front of BIND on host_ip:53; BIND moves to
-# bind_dns_port (5053). Clients ask AdGuard; AdGuard forwards fabric's domains to BIND and the rest over
-# DNS-over-HTTPS/TLS. Its UI: https://adguard.<domain>, OIDC sign-in through oauth2-proxy. none turns it off.
-dns_filter: {{ dns_filter | default('adguard', true) | lower }}
-install_adguard: {{ (dns_filter | default('adguard', true) | lower) == 'adguard' }}
-ip_adguard: {{ ip_adguard | default('10.255.0.31') }}
-ip_oauth2proxy: {{ ip_oauth2proxy | default('10.255.0.32') }}
-adguard_mem_limit: {{ adguard_mem_limit | default('256m') }}
-# What a first deploy starts with; afterwards AdGuard's UI owns them (kept across deploys). By default (2.1.12.1)
-# Cloudflare over DNS-over-HTTPS, by address so no bootstrap resolver is needed, and AdGuard's own DNS filter.
-# [] = local DNS only (this site's BIND: fabric's names, not the internet); [] for the lists = none.
-adguard_upstreams: {{ (adguard_upstreams if adguard_upstreams is defined and adguard_upstreams is not none else ['https://1.1.1.1/dns-query', 'https://1.0.0.1/dns-query']) | to_json }}
-adguard_filter_lists: {{ (adguard_filter_lists if adguard_filter_lists is defined and adguard_filter_lists is not none else [{'name': 'AdGuard DNS filter', 'url': 'https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt'}]) | to_json }}
-# Rules after the generated ones (fabric's own domains and this host are always allowed first).
-adguard_rules: {{ adguard_rules | default([], true) | to_json }}
-# The BIND resolver (manual 1.12.2, 0.7; dns_filter: bind): a second BIND answers clients on host_ip:53 and filters
-# with response policy zones; fabric's zones go to the authoritative BIND, never filtered.
-install_resolver: {{ (dns_filter | default('adguard', true) | lower) == 'bind' }}
+# DNS filter (manual 1.12.2; on by default, 2.1.12.3): a BIND resolver answers clients on host_ip:53 and filters with
+# response policy zones; BIND moves to bind_dns_port (5053); fabric's zones go to it, never filtered. none turns it off.
+dns_filter: {{ dns_filter | default('bind', true) | lower }}
+install_resolver: {{ (dns_filter | default('bind', true) | lower) == 'bind' }}
 ip_resolver: {{ ip_resolver | default('10.255.0.33') }}
 resolver_mem_limit: {{ resolver_mem_limit | default('384m') }}
 # Lists [{name, url}] (hosts, domains, RPZ or AdGuard DNS syntax, converted); [] = none. Default: AdGuard's DNS filter.
@@ -306,8 +288,6 @@ service_dirs:
   'fluentbit': {'uid': 608, 'gid': 608, 'name': 'fabric-logs'},
   'kea': {'uid': 609, 'gid': 609, 'name': 'fabric-dhcp'},
   'freeradius': {'uid': 610, 'gid': 610, 'name': 'fabric-radius'},
-  'adguard': {'uid': 611, 'gid': 611, 'name': 'fabric-dnsfilter'},
-  'oauth2proxy': {'uid': 612, 'gid': 612, 'name': 'fabric-auth'},
   'resolver': {'uid': 613, 'gid': 613, 'name': 'fabric-resolver'}
 } %}
 {# Merged, not defaulted: a vars.yaml rendered by an older release must still gain new accounts. #}
@@ -363,11 +343,10 @@ cert_acme_lifetime_hours: {{ cert_acme_lifetime_hours | default('1128h') }}
 # ============================================================
 # DNS — BIND9
 # ============================================================
-{# With the DNS filter on, AdGuard or the BIND resolver answers clients on 53, so BIND can never be there: 53
-   becomes 5053 (manual 1.12.1, 1.12.2). With it off the port is kept as set (e.g. 5053 behind an AdGuard of your
-   own). #}
+{# With the DNS filter on, the BIND resolver answers clients on 53, so BIND can never be there: 53 becomes 5053
+   (manual 1.12.2). With it off the port is kept as set (e.g. 5053 behind a resolver of your own). #}
 {% set _bind_port = (bind_dns_port | default(53, true)) | int %}
-bind_dns_port: {{ 5053 if (dns_filter | default('adguard', true) | lower) in ('adguard', 'bind') and _bind_port == 53 else _bind_port }}
+bind_dns_port: {{ 5053 if (dns_filter | default('bind', true) | lower) == 'bind' and _bind_port == 53 else _bind_port }}
 bind9_doh_port: {{ bind9_doh_port | default(8053) }}
 {% set _fabric_subnet = fabric_subnet | default('10.255.0.0/24') %}
 {% set default_acls = {
@@ -417,9 +396,6 @@ bind_acl_policies:
 {% endif %}
 {% if federation_endpoint | default(false) | bool %}
 {% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_federation | default('federation') }) %}
-{% endif %}
-{% if (dns_filter | default('adguard', true) | lower) == 'adguard' %}
-{% set _ = default_cnames.append({ 'canonical': hostname, 'name': cname_adguard | default('adguard') }) %}
 {% endif %}
 {# ntp.<domain> for clients; an install that already has a record of that name keeps its own #}
 {% set _own = ((dns | default({})).get('dynamic_zone_var', {}).get('A', []) + (dns | default({})).get('dynamic_zone_var', {}).get('CNAME', [])) | map(attribute='name') | list %}

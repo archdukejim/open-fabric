@@ -1,7 +1,6 @@
 import os
 
 from fabriclib.common.console import ok
-from fabriclib.common.write_file_if_changed import write_file_if_changed
 from fabriclib.pki.install_cert import install_cert
 from fabriclib.pki.mint_cert import mint_cert
 from fabriclib.pki.needs_renewal import needs_renewal
@@ -12,12 +11,12 @@ from fabriclib.setup.mint_extra_certs import mint_extra_certs
 def _targets(ctx):
     """Purpose: the service certificates this install needs and where each one goes.
     Inputs:  ctx — SetupContext: vars hostname_* (bind9, stepca, landing, certs, openbao, keycloak, mgr,
-             radius, federation, adguard, dc), domain, install_keycloak, install_webui,
-             install_freeradius, federation_endpoint, install_adguard, ad_domain.
+             radius, federation, dc), domain, install_keycloak, install_webui,
+             install_freeradius, federation_endpoint, ad_domain.
     Returns: list of (cn, extra SANs, [(destination dir, service user or "freeradius:eap")],
              services to restart when it changes). bind9, stepca, landing, certs and openbao always; LDAP,
-             Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint, the DNS
-             filter's UI when on, and the domain controller.
+             Keycloak + Postgres, web UI, FreeRADIUS (EAP-TLS server cert), the federation endpoint when on, and
+             the domain controller.
     Fails:   KeyError for a missing hostname_* var.
     Feeds:   run."""
     v, p = ctx.vars, ctx.path
@@ -43,8 +42,6 @@ def _targets(ctx):
         t.append((v["hostname_mgr"], [], [nginx(v["hostname_mgr"])], ["nginx"]))
     if v.get("federation_endpoint"):
         t.append((v["hostname_federation"], [], [nginx(v["hostname_federation"])], ["nginx"]))
-    if v.get("install_adguard"):
-        t.append((v["hostname_adguard"], [], [nginx(v["hostname_adguard"])], ["nginx"]))
     # the DC's LDAPS/TLS certificate (manual 1.6.5.7): Keycloak, FreeRADIUS and members verify it; Keycloak and
     # FreeRADIUS reach it at the host's address, so it names that too
     # fabric_net's gateway too: containers reach the DC there (2.1.2.15)
@@ -65,8 +62,7 @@ def run(ctx):
     Returns: None. Certificates that exist, cover their names, chain to this CA, are younger than
              cert_renew_after_days and live no longer than cert_service_days (manual 2.1.5.4, 2.1.5.7) are left
              alone unless force_certs. The web UI client-CA bundle is rewritten on every run; the CRLs
-             are published every run (publish_crl: FreeRADIUS's ca.pem with them); the DNS filter's oauth2-proxy
-             root_ca.crt only when changed. Services whose
+             are published every run (publish_crl: FreeRADIUS's ca.pem with them). Services whose
              certificates changed are added to
              ctx.restart_services.
     Fails:   SetupError from mint_cert (step-ca refused); OSError/CalledProcessError installing files;
@@ -119,11 +115,5 @@ def run(ctx):
     if crl["radius_changed"]:
         restart.add("freeradius")
         ok("FreeRADIUS CA bundle and CRLs")
-    if ctx.vars.get("install_adguard"):
-        # oauth2-proxy verifies Keycloak against this CA; on a first install the deploy ran before the CA existed
-        if write_file_if_changed(ctx.path("adguard", "oauth2-proxy", "root_ca.crt"), open(root_ca).read(),
-                                 0o644, 0, 0):
-            restart.add("adguard-auth")
-            ok("DNS filter sign-in (oauth2-proxy) trusts the fabric CA")
     ctx.restart_services.update(restart)
     mint_extra_certs(ctx)

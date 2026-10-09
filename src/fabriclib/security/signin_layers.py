@@ -9,7 +9,7 @@ from fabriclib.keycloak.signin_levels import LEVELS, admin_level, signin_level
 # it changes both ways (`fabricctl security kerberos on|off`).
 LAYERS = {
     "admin-2fa": {"setting": "signin_admin_second_factor", "kind": "level",
-                  "what": "a second factor for the admin tools (the web console, OpenBao's UI, AdGuard's page)"},
+                  "what": "a second factor for the admin tools (the web console, OpenBao's UI)"},
     "everyone-2fa": {"setting": "signin_everyone_second_factor", "kind": "level",
                      "what": "a second factor for every sign-in (every app signing in through Keycloak)"},
     "client-cert": {"setting": "webui_client_cert", "kind": "switch",

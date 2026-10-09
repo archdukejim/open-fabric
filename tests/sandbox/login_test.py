@@ -15,7 +15,6 @@ handed out. Proves the admin gets in and that everyone else is refused:
   - OpenBao's own UI: the admin signs in with Keycloak (TOTP) and gets the
     fabric-admin policy (apps/ yes, fabric's own secrets no); others refused
   - people: the admin adds a person and resets a sign-in
-  - the DNS filter's UI (when on): the admin gets AdGuard after OIDC, a user without dns:filter is refused
 
   python3 login_test.py <vars.yaml> <other-user> <other-password> <other-p12-password>
 Prints PASS/FAIL lines.
@@ -46,7 +45,6 @@ ADMIN = V["webui_admin_user"]
 KIT = os.environ.get("FABRIC_KIT") or os.path.join(os.path.expanduser("~"), "fabric-admin")
 ROOT_CA = os.path.join(V["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
 MGR, SSO, NGINX, VAULT = V["hostname_mgr"], V["hostname_keycloak"], V["ip_nginx"], V["hostname_openbao"]
-ADG = V.get("hostname_adguard", "")
 TMP = tempfile.mkdtemp()
 FAILED = 0
 
@@ -217,22 +215,6 @@ def vault_login(user, password):
     return st, (json.loads(page) if page.startswith("{") else page)
 
 
-def adguard_login(user, password):
-    """AdGuard Home's UI behind oauth2-proxy (manual 1.12.1.6): the page sends a stranger to sign-in,
-    Keycloak, the callback, then the page again. Returns (status, page) of that last request."""
-    b = Browser()
-    st, loc, page = b.request("GET", f"https://{ADG}/")
-    if not (st == 302 and loc and "/oauth2/sign_in" in loc):
-        return st, f"no sign-in redirect: {loc}"
-    done, _, st, page = through_keycloak(b, loc, user, password, f"https://{ADG}/oauth2/callback")
-    if not done:
-        return st, page
-    st, loc, page = b.request("GET", done)
-    if st == 302 and loc:
-        st, _, page = b.request("GET", loc)
-    return st, page
-
-
 # -- the default (2.1.6.23, 0.6.1): no client certificate, a password only; then stop (SIGNIN_MODE=plain) --------------
 if os.environ.get("SIGNIN_MODE") == "plain":
     b = Browser()
@@ -356,14 +338,6 @@ if os.environ.get("CAROL_PW"):
         st2, _, _ = vb.request("GET", f"https://{VAULT}/v1/apps/data/sandbox/probe", token=ctok)
         check("OpenBao UI: the auditor lists application secrets but cannot read one",
               st1 == 200 and "sandbox" in page and st2 == 403, (st1, st2, page[:200]))
-
-# -- the DNS filter's UI (AdGuard Home) behind OIDC: fabric:dns:filter only ----------------
-if V.get("install_adguard"):
-    st, page = adguard_login(ADMIN, NEW_PW.get(ADMIN, read("initial-password.txt")))
-    check("AdGuard UI: the admin signs in with Keycloak (TOTP) and gets AdGuard (fabric:dns:filter)",
-          st == 200 and "AdGuard" in page, (st, page[:200]))
-    st, page = adguard_login(OTHER, NEW_PW.get(OTHER, OTHER_PW))
-    check(f"AdGuard UI: '{OTHER}' (no dns:filter) is refused after signing in", st == 403, (st, page[:200]))
 
 # -- people (Directory -> People): add a person, reset a sign-in ---------------------------
 # NEW_PERSON: a reused host (tests/host) already has the previous run's person

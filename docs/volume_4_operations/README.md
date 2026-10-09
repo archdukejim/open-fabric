@@ -62,7 +62,7 @@ Nothing here yet — nothing to operate on its own: see [1.1](../volume_1_descri
 
 - [4.11.1 802.1X with FreeRADIUS](4.11.1-radius.md)
 
-## 4.12 The DNS filter: AdGuard Home
+## 4.12 The DNS filter
 
 - [4.12.1 The DNS filter](4.12.1-dns-filter.md)
 

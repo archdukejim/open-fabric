@@ -18,7 +18,6 @@ IMAGE="${2:?usage: smoke-test.sh <image name> <image ref>}"
 # groups baked in (only the DC)
 groups=""
 case "$NAME" in
-    adguard)    user=611:611; ids="";        run=(/opt/adguardhome/AdGuardHome --version) ;;
     bind9)      user=600:600; ids=600:600;   run=(/usr/sbin/named -v) ;;
     # ns-slapd -v prints its version and exits 1: the version line is the proof
     freeradius) user=610:610; ids=610:610;   run=(/usr/sbin/freeradius -v) ;;

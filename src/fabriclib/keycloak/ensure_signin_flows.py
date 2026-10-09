@@ -109,7 +109,7 @@ def _unbind(kc, realm, flow_id):
 def ensure_signin_flows(kc, realm, v):
     """Purpose: fabric's two sign-in flows (manual 2.3.6.2.6.2) and the realm settings they use: fabric-signin, the
              realm's browser flow (every app), and fabric-admin-signin for the admin tools (the web console, OpenBao's
-             UI, AdGuard's page), which never accepts the session cookie, so a sign-in without the admin tools' second
+             UI), which never accepts the session cookie, so a sign-in without the admin tools' second
              factor never carries into them. Each: Kerberos (on with signin_kerberos) or the password form, then the
              second factor of its level ("any": a passkey for someone who has one, else TOTP, enrolled if needed).
              Passkeys (WebAuthn) must be unlocked on the device (user verification required). 0.6.0's flow
@@ -144,7 +144,7 @@ def ensure_signin_flows(kc, realm, v):
         for client in kc.call("GET", f"/{q(realm)}/clients")[1]:
             if (client.get("authenticationFlowBindingOverrides") or {}).get("browser") == flows[OLD_FLOW]:
                 # the admin tools' clients are bound to the admin flow by their own steps; apps use the realm's flow
-                admin_tool = client["clientId"] in ("fabric-webui", "fabric-openbao", "fabric-adguard")
+                admin_tool = client["clientId"] in ("fabric-webui", "fabric-openbao")
                 client["authenticationFlowBindingOverrides"] = {"browser": flows[ADMIN]} if admin_tool else {}
                 kc.call("PUT", f"/{q(realm)}/clients/{client['id']}", client)
         kc.call("DELETE", f"{base}/{flows[OLD_FLOW]}")

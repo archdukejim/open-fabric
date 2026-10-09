@@ -1,7 +1,8 @@
 """Seed and snapshot what an upgrade must keep (manual 2.1.1.36), on a real install, as root on the fabric host.
 
     python3 upgrade_state.py seed       add state an operator would have: a person, a DNS record shown on the
-                                        landing page, a device certificate, a rule added in AdGuard's UI
+                                        landing page, a device certificate, a rule added in AdGuard's UI (0.6; the
+                                        resolver's dns_filter_block after the move to 0.7)
     python3 upgrade_state.py snapshot   print it as JSON (no secret values: hashes only), to compare before and after
 
 Uses only what both the previous release and the candidate have (fabriclib's functions, samba-tool, the files).
@@ -57,13 +58,13 @@ def seed():
         print(f"record: {e}")
     path = _adguard_yaml()
     if path:                                 # a rule added in AdGuard's own UI (kept below fabric's marker)
-        subprocess.run(["docker", "stop", "adguard"], capture_output=True)
+        subprocess.run(["docker", "stop", "adguardhome"], capture_output=True)
         cfg = yaml.safe_load(open(path))
         if RULE not in (cfg.get("user_rules") or []):
             cfg.setdefault("user_rules", []).append(RULE)
             with open(path, "w") as f:
                 yaml.safe_dump(cfg, f, sort_keys=False)
-        subprocess.run(["docker", "start", "adguard"], capture_output=True)
+        subprocess.run(["docker", "start", "adguardhome"], capture_output=True)
         print("AdGuard rule added")
 
 
@@ -87,8 +88,11 @@ def snapshot():
     out["secrets"] = {k: _sha(json.dumps(secrets[k], sort_keys=True, default=str)) for k in sorted(secrets)
                       if k not in ROTATED}
     out["dns record"] = _sh(f"dig +short -p {v.get('bind_dns_port', 53)} @{v['host_ip']} upgrade-test.{v['domain']}").strip()
+    # the rule as AdGuard held it (0.6), or as the resolver's own block after the move (0.7, manual 2.3.12.1.9)
     path = _adguard_yaml()
-    out["adguard rule"] = bool(path) and RULE in (yaml.safe_load(open(path)).get("user_rules") or [])
+    name = RULE[2:-1]
+    out["dns filter rule"] = (bool(path) and RULE in (yaml.safe_load(open(path)).get("user_rules") or [])) or \
+        name in (v.get("dns_filter_block") or [])
     out["security"] = sorted(ln.split()[0] + " " + ln.split()[1] for ln in _sh("fabricctl security").splitlines()
                              if re.match(r"[a-z0-9-]+ +[a-z]+( |$)", ln))
     print(json.dumps(out, indent=1, sort_keys=True))

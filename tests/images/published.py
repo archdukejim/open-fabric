@@ -31,7 +31,7 @@ from fabriclib.system.relaxed_settings import relaxed_settings  # noqa: E402
 sys.path.insert(0, os.path.join(REPO, "scripts", "images"))
 import source_hash  # noqa: E402
 
-IMAGES = ["adguard", "bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
+IMAGES = ["bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
 PASS = FAIL = 0
 
 

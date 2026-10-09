@@ -301,56 +301,6 @@ http {
         }
     }
 {% endif %}
-{% if install_adguard | default(false) | bool %}
-
-    # DNS filter (manual 1.12.1.6): AdGuard Home's UI, only after OIDC sign-in through
-    # oauth2-proxy (fabric:dns:filter); nginx then adds AdGuard's own local login.
-    server {
-        listen 443 ssl;
-        server_name {{ hostname_adguard }};
-
-        ssl_certificate     /etc/nginx/certs/{{ hostname_adguard }}/fullchain.pem;
-        ssl_certificate_key /etc/nginx/certs/{{ hostname_adguard }}/privkey.pem;
-        ssl_protocols       TLSv1.2 TLSv1.3;
-        client_max_body_size 8m;
-
-        # oauth2-proxy's session cookie (split into 4 kB parts) and its auth headers outgrow nginx's
-        # default 4 kB header buffer: "upstream sent too big header" would be a 502
-        proxy_buffer_size 16k;
-        proxy_buffers 8 16k;
-        proxy_busy_buffers_size 32k;
-        large_client_header_buffers 4 32k;
-
-        location /oauth2/ {
-            proxy_pass http://{{ ip_oauth2proxy }}:4180;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Auth-Request-Redirect $request_uri;
-        }
-        location = /oauth2/auth {
-            internal;
-            proxy_pass http://{{ ip_oauth2proxy }}:4180;
-            proxy_set_header Host $host;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_pass_request_body off;
-            proxy_set_header Content-Length "";
-        }
-        location @signin {
-            return 302 /oauth2/sign_in?rd=$scheme://$host$request_uri;
-        }
-        location / {
-            auth_request /oauth2/auth;
-            error_page 401 = @signin;
-            proxy_pass http://{{ ip_adguard }}:3000;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            include /etc/nginx/conf.d/adguard-auth.inc;
-        }
-    }
-{% endif %}
 {% if federation_endpoint | default(false) | bool %}
 
     # Federation endpoint (manual 1.9.4.2): other sites join here. A join

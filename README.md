@@ -23,7 +23,7 @@ hardware and working offline.
 | Samba AD | The directory: people, groups, machines and devices in one domain; Windows and Linux machines join it |
 | Keycloak | Single sign-on with TOTP, on the directory |
 | Open Fabric | The web control: every action through a fixed, permission-checked host API |
-| AdGuard Home | A DNS filter in front of BIND (on by default) |
+| DNS filter | A second BIND that filters ads, trackers and malware with AdGuard's lists (on by default) |
 | Kea, FreeRADIUS, Fluent Bit *(optional)* | DHCP, 802.1X, log forwarding |
 
 Several installs can join one **federation** of sites, each with its own DNS zone, intermediate CA and copy of the

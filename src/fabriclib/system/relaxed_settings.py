@@ -21,7 +21,7 @@ def relaxed_settings(vars_, config_dir=None):
                         "effect": "fabric's published images are used without checking their signatures (1.14.3.4)"})
     if vars_.get("install_keycloak") and admin_level(vars_) == "none":     # 2.1.6.23: a password only, by default
         relaxed.append({"setting": "signin_admin_second_factor: none",
-                        "effect": "the web console, OpenBao and AdGuard's page ask for a password only; raise a "
+                        "effect": "the web console and OpenBao ask for a password only; raise a "
                                   "second factor in the web console's Security page (2.3.6.2.6)"})
     for layer, entry in read_lowered(config_dir or os.path.dirname(VARS_FILE)).items():
         relaxed.append({"setting": f"{layer} lowered: {entry['from']} -> {entry['to']}",

@@ -125,7 +125,7 @@ def _deploy(paths, start_services):
     state = {"restart": restart, "rebuild": svc["rebuild"],
              "daemon_reload": svc["daemon_reload"] or ngx["daemon_reload"] or web["agent"]
              or fed["unit_changed"] or fed["removed"],
-             "bind9_config": bind["config"], "zones": bind["zones"], "nginx": ngx["nginx"] or optional["nginx"],
+             "bind9_config": bind["config"], "zones": bind["zones"], "nginx": ngx["nginx"],
              "webui": web["webui"], "agent": web["agent"], "federation_unit": fed["unit_changed"]}
     bind_ids = service_user(final_vars, "bind")
     if not start_services:
@@ -136,7 +136,7 @@ def _deploy(paths, start_services):
 def apply_deployment(start_services=True):
     """Purpose: the deploy engine: render every template from the vars file and secrets into /tmp/fabric-render, copy
              what changed into the deploy base and /etc/systemd/system, then reload or restart what is affected.
-             Missing secrets (CA, rndc, the domain's accounts, Keycloak, Kea, OIDC, AdGuard, TSIG, RADIUS) are
+             Missing secrets (CA, rndc, the domain's accounts, Keycloak, Kea, OIDC, the resolver, TSIG, RADIUS) are
              generated once and saved.
     Inputs:  start_services — bool, default True. False (first install, `fabricctl setup` via
              fabriclib/setup/deploy_config.py): files are deployed, changed images built and zones swapped safely, but

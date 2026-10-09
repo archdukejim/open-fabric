@@ -77,7 +77,7 @@ webui_client_cert: true
 signin_admin_second_factor: totp
 install_freeradius: true
 install_kea: true
-dns_filter: adguard
+dns_filter: bind
 ntp_set_clock: false        # the sandbox shares the PC's kernel clock: chrony keeps time, never sets it
 dhcp:
   interfaces: [eth0]
@@ -157,23 +157,20 @@ check "the DC listens for LDAPS on fabric_net's gateway (10.255.0.1) as well as 
 check "Keycloak's LDAP federation and FreeRADIUS's LDAPS go to the gateway, never the LAN address" "in_box \"docker exec postgres psql -tA -U fabric_admin -d keycloak -c \\\"SELECT value FROM component_config WHERE name = 'connectionUrl'\\\"\" | grep -qx 'ldaps://10.255.0.1:636' && { ! in_box 'systemctl is-enabled freeradius' >/dev/null 2>&1 || in_box 'grep -q ldaps://10.255.0.1:636 /opt/freeradius/config/fabric-radius.json'; }"
 check "the DC's name in DNS is the LAN address only (the gateway it listens on never published)"     "[ \"\$(in_box 'dig +short @$IP $DC_NAME A' | sort -u)\" = '$IP' ]"
 
-echo "--- DNS filter (AdGuard Home) in front of BIND"
-BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
-check "AdGuard answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
+echo "--- DNS filter (the BIND resolver) in front of BIND"
+BIND_PORT=5053                      # dns_filter: bind moves BIND off 53
+check "the resolver answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
     "in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP && in_box 'dig +short +time=3 -p 5053 @$IP ns.lan.test' | grep -qx $IP"
-check "AdGuard runs with no capabilities, its UI is not published (only 53)" \
-    "[ \"\$(in_box \"docker inspect -f '{{.HostConfig.CapAdd}} {{.HostConfig.CapDrop}}' adguardhome\")\" = '[] [ALL]' ] && ! in_box 'docker port adguardhome' | grep -q 3000"
-check "https://adguard.lan.test sends a stranger to sign-in (OIDC), never to AdGuard" \
-    "in_box 'curl -s -o /dev/null -w %{http_code}:%{redirect_url} --cacert /opt/stepca/data/certs/root_ca.crt --resolve adguard.lan.test:443:$IP https://adguard.lan.test/' | grep -q '^302:https://adguard.lan.test/oauth2/sign_in'"
-check "fabricctl status lists the DNS filter" "in_box 'fabricctl status' | grep -qE '^adguard +active'"
-ADG_SINCE=$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value adguard')
-in_box 'systemctl restart bind9'
-check "a BIND restart (every DNS apply) leaves AdGuard running" \
-    "[ \"\$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value adguard')\" = '$ADG_SINCE' ] && in_box 'systemctl is-active adguard' | grep -qx active"
-in_box 'systemctl stop keycloak && systemctl restart adguard-auth' > "$OUT/adguard-no-keycloak.log" 2>&1
-check "with Keycloak down the sign-in still starts and DNS answers through AdGuard" \
-    "in_box 'systemctl is-active adguard-auth' | grep -qx active && in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP"
-in_box 'systemctl start keycloak' >> "$OUT/adguard-no-keycloak.log" 2>&1
+check "the resolver runs with no capabilities, as its own account" \
+    "[ \"\$(in_box \"docker inspect -f '{{.HostConfig.CapAdd}} {{.HostConfig.CapDrop}} {{.Config.User}}' bind9-resolver\")\" = '[] [ALL] 613:613' ]"
+check "fabricctl status lists the DNS filter" "in_box 'fabricctl status' | grep -qE '^bind9-resolver +active'"
+check "fabricctl dns-filter status: the resolver answers and every list has a good copy" \
+    "in_box 'fabricctl dns-filter status' > '$OUT/dns-filter-status.log' 2>&1"
+check "the daily list timer is installed and enabled" "in_box 'systemctl is-enabled fabric-dns-lists.timer' | grep -qx enabled"
+RES_SINCE=$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value bind9-resolver')
+in_box 'systemctl restart bind9' > /dev/null 2>&1
+check "a BIND restart (every DNS apply) leaves the resolver running" \
+    "[ \"\$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value bind9-resolver')\" = '$RES_SINCE' ] && in_box 'systemctl is-active bind9-resolver' | grep -qx active"
 
 echo "--- Time: chrony on the host serves the LAN (manual 1.13.1)"
 BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
@@ -385,7 +382,7 @@ check "fabricctl vault rotate-db: rotated, Keycloak restarted with it and health
 check "the monthly fabric-db-rotate timer is on" "in_box 'systemctl is-enabled fabric-db-rotate.timer' | grep -qx enabled"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
-in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
+in_box 'journalctl --no-pager CONTAINER_NAME=nginx | grep -iE "oidc|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
 cat > "$OUT/reset_guard.py" <<'PY'
 import sys, yaml
 sys.path.insert(0, "/opt/fabric/lib")

@@ -113,7 +113,7 @@ try:
           and lab_links["upstream"]["key"] == lan_links["children"][0]["key"] == "fed-lab", (lan_links, lab_links))
     zone = open(f"{W}/lan/data/db.lan.test").read()
     conf = open(f"{W}/lan/config/named.conf").read()
-    check("lan transfers lab's zone from lab's DNS port (5053, like a BIND behind AdGuard)",
+    check("lan transfers lab's zone from lab's DNS port (5053, like a BIND behind the DNS filter)",
           'primaries { 10.254.31.11 port 5053 key "fed-lab"; };' in conf
           and 'also-notify { 10.254.31.11 port 5053 key "fed-lab"; };' in conf, conf[-900:])
     check("lan's zone: NS and glue for lab", "lab                     NS      ns.lab.lan.test." in zone

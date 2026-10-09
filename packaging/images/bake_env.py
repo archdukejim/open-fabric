@@ -18,7 +18,7 @@ def bake_env(config_dir):
     Fails:   KeyError if the lock lacks one of those bases or Kea's package; yaml.YAMLError on an invalid lock.
     Feeds:   this script's output (the images workflow and the manual's build procedure)."""
     images, kea = read_images_lock(config_dir), read_packages_lock(config_dir)["kea"]
-    env = {f"BASE_{name.upper()}": images[name]["ref"] for name in ("debian", "stepca", "keycloak", "adguard")}
+    env = {f"BASE_{name.upper()}": images[name]["ref"] for name in ("debian", "stepca", "keycloak")}
     env.update(KEA_VERSION=kea["version"], KEA_REPO=kea["repo"], KEA_SUITE=kea["suite"],
                KEA_KEY_URL=kea["key_url"], KEA_KEY_FINGERPRINT=kea["key_fingerprint"])
     return env

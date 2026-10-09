@@ -12,6 +12,7 @@ from fabriclib.samba.finish_join import finish_join
 from fabriclib.samba.write_bind_dlz import write_bind_dlz
 from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.errors import SetupError
+from fabriclib.setup.retire_adguard import retire_adguard
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
 from fabriclib.setup.ensure_db_rotation import align_postgres_roles
 from fabriclib.setup.start_unit import start_unit
@@ -21,7 +22,6 @@ ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("samba", "samba
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit"),
          ("kea", "kea-dhcp4", "install_kea"), ("freeradius", "freeradius", "install_freeradius"),
-         ("adguard", "adguardhome", "install_adguard"), ("adguard-auth", "oauth2-proxy-adguard", "install_adguard"),
          ("bind9-resolver", "bind9-resolver", "install_resolver")]
 
 
@@ -29,7 +29,7 @@ def run(ctx):
     """Purpose: start the stack in dependency order (ORDER), converge the domain (and at the root site make fabric's
              default device roles), configure Keycloak, then fabric-agent and the web UI, and activate fabric.target.
     Inputs:  ctx — SetupContext: vars install_keycloak, install_webui, install_fluentbit, install_kea,
-             install_freeradius, install_adguard, install_resolver, federation_endpoint; restart_services (units to
+             install_freeradius, install_resolver, federation_endpoint; restart_services (units to
              restart); target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file, config_dir.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; the domain converged; Keycloak given the DC's Kerberos keytab; Keycloak configured (up
@@ -45,6 +45,8 @@ def run(ctx):
     subprocess.run(["systemctl", "enable", "fabric.target"], check=True, capture_output=True)
     for unit in retire_renamed_units():
         ok(f"{unit}: retired (renamed)")
+    for item in retire_adguard(v, ctx.secrets, ctx.secrets_file, ctx.config_dir):   # 0.7: the resolver takes 53
+        ok(f"AdGuard Home retired: {item}")
     for unit, container, flag in ORDER:
         if flag and not v.get(flag):
             continue

@@ -3,7 +3,6 @@ import os
 import yaml
 
 from fabriclib.keycloak.admin_client import Admin
-from fabriclib.keycloak.ensure_adguard_client import ensure_adguard_client
 from fabriclib.keycloak.ensure_group_mapper import ensure_group_mapper
 from fabriclib.keycloak.ensure_ldap_federation import ensure_ldap_federation
 from fabriclib.keycloak.ensure_openbao_client import ensure_openbao_client
@@ -12,6 +11,7 @@ from fabriclib.keycloak.ensure_realm import ensure_realm
 from fabriclib.keycloak.ensure_signin_flows import ensure_signin_flows
 from fabriclib.keycloak.ensure_webui_client import ensure_webui_client
 from fabriclib.keycloak.grant_role_to_group import grant_role_to_group
+from fabriclib.keycloak.remove_retired_client import remove_retired_client
 from fabriclib.keycloak.step import step
 from fabriclib.federation.common.is_root_site import is_root_site
 from fabriclib.secrets.load_secrets import load_secrets
@@ -20,7 +20,8 @@ from fabriclib.secrets.load_secrets import load_secrets
 def configure_keycloak(vars_path, secrets_path):
     """Purpose: configure Keycloak for fabric, idempotently: realm, LDAP federation and group sync, fabric's permission
              and bundle roles with their group grants, fabric's sign-in flows (Kerberos, the second factors), and the
-             fabric-webui / fabric-openbao clients (and fabric-adguard with the DNS filter on).
+             fabric-webui / fabric-openbao clients; the fabric-adguard client of 0.6 is removed (AdGuard Home
+             retired in 0.7).
     Inputs:  vars_path — vars.yaml; secrets_path — the secrets file (or OpenBao once imported: load_secrets). Talks to
              ip_keycloak:8443 with TLS pinned to <deploy_base_dir>/stepca/data/certs/root_ca.crt.
     Returns: None; prints progress and "Keycloak configuration complete.".
@@ -44,7 +45,7 @@ def configure_keycloak(vars_path, secrets_path):
     kerberos = bool(v.get("signin_kerberos", True)) and os.path.exists(
         os.path.join(v["deploy_base_dir"], "keycloak", "kerberos", "sso.keytab"))
     ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s, writable, kerberos), v)
-    # The admin role and the admin sign-in flow serve the web UI, OpenBao's UI and AdGuard's.
+    # The admin role and the admin sign-in flow serve the web UI and OpenBao's UI.
     admin_role = v.get("webui_admin_role", "fabric-admin")
     reps = ensure_rbac_roles(kc, realm, admin_role)
     step(f"access control: {len(reps)} fabric roles (permissions and bundles)")
@@ -58,6 +59,7 @@ def configure_keycloak(vars_path, secrets_path):
         ensure_webui_client(kc, realm, v, s, roles, flow_id)
     if s.get("openbao_oidc_secret"):
         step(f"{ensure_openbao_client(kc, realm, v, s['openbao_oidc_secret'], roles, flow_id)} client fabric-openbao")
-    if v.get("install_adguard") and s.get("adguard_oidc_secret"):
-        step(f"{ensure_adguard_client(kc, realm, v, s['adguard_oidc_secret'], roles, flow_id)} client fabric-adguard")
+    # 0.7: AdGuard Home's sign-in is gone with it (2.1.12.3); its client goes from an install that had it
+    if remove_retired_client(kc, realm, "fabric-adguard"):
+        step("removed client fabric-adguard (AdGuard Home retired)")
     print("Keycloak configuration complete.")

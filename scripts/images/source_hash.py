@@ -19,7 +19,7 @@ import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 LOCK = os.path.join(REPO, "config", "images.lock.yaml")
-BASES = {"adguard": ["adguard"], "bind9": ["debian"], "freeradius": ["debian"], "kea": ["debian"],
+BASES = {"bind9": ["debian"], "freeradius": ["debian"], "kea": ["debian"],
          "keycloak": ["keycloak"], "samba": ["debian"], "stepca": ["stepca"], "webui": ["debian"]}
 SKIP = ("__pycache__", ".pyc")
 

@@ -100,39 +100,51 @@ def _ask_radius(ctx):
         print("    Add your switches and access points afterwards: sudo fabricctl radius add-client <name> <address>")
 
 
-CLOUDFLARE = ["https://1.1.1.1/dns-query", "https://1.0.0.1/dns-query"]     # vars.yaml.j2's default (2.1.12.1)
+CLOUDFLARE = [{"address": "1.1.1.1", "name": "cloudflare-dns.com"},
+              {"address": "1.0.0.1", "name": "cloudflare-dns.com"}]           # vars.yaml.j2's default (2.1.12.3)
 
 
 def _upstreams_text(ctx):
     """Purpose: how the plan names the DNS filter's internet upstreams.
-    Inputs:  ctx — SetupContext; reads ctx.vars adguard_upstreams (None: the default).
-    Returns: "Cloudflare (DNS-over-HTTPS)", "local DNS only" or the upstreams joined by ", ".
+    Inputs:  ctx — SetupContext; reads ctx.vars dns_filter_upstreams (None: the default).
+    Returns: "Cloudflare (DNS-over-TLS)", "the root servers (no forwarder)" or "<address> (<name>)" joined by ", ".
     Fails:   never.
     Feeds:   choose_plan, _ask_dns_filter."""
-    ups = ctx.vars.get("adguard_upstreams")
+    ups = ctx.vars.get("dns_filter_upstreams")
     if ups is None or list(ups) == CLOUDFLARE:
-        return "Cloudflare (DNS-over-HTTPS)"
-    return ", ".join(ups) or "local DNS only"
+        return "Cloudflare (DNS-over-TLS)"
+    return ", ".join(f"{u.get('address')} ({u.get('name')})" for u in ups) or "the root servers (no forwarder)"
 
 
 def _ask_dns_filter(ctx):
-    """Purpose: Advanced plan question: the DNS filter, AdGuard Home (on by default, 2.1.12.1), and where it sends
-             internet lookups.
-    Inputs:  ctx — SetupContext; reads ctx.vars dns_filter, adguard_upstreams. Interactive.
-    Returns: None; ctx.vars["dns_filter"] set ("adguard" or "none"), and adguard_upstreams when typed (they only
-             seed a first deploy: afterwards AdGuard's own page owns them).
+    """Purpose: Advanced plan question: the DNS filter, the BIND resolver (on by default, 2.1.12.3), and where it
+             sends internet lookups.
+    Inputs:  ctx — SetupContext; reads ctx.vars dns_filter, dns_filter_upstreams. Interactive.
+    Returns: None; ctx.vars["dns_filter"] set ("bind" or "none"), and dns_filter_upstreams when typed: "<address>
+             <certificate name>" pairs separated by commas, or "none" for the root servers. A pair without a name is
+             asked again.
     Fails:   EOFError from input().
     Feeds:   choose_plan (Advanced)."""
-    on = ctx.vars.get("dns_filter", "adguard") == "adguard"
-    answer = input(f"\n  DNS filter: AdGuard Home answers the network's DNS (ads, trackers and malware blocked)? "
-                   f"[{'Y/n' if on else 'y/N'}] ").strip().lower()
+    on = ctx.vars.get("dns_filter", "bind") == "bind"
+    answer = input(f"\n  DNS filter: fabric's resolver answers the network's DNS (ads, trackers and malware blocked "
+                   f"with AdGuard's DNS filter list)? [{'Y/n' if on else 'y/N'}] ").strip().lower()
     on = answer.startswith("y") if answer else on
-    ctx.vars["dns_filter"] = "adguard" if on else "none"
+    ctx.vars["dns_filter"] = "bind" if on else "none"
     if not on:
         return
-    ups = input(f"    internet lookups go to (comma-separated DoH/DoT/IP upstreams) [{_upstreams_text(ctx)}] ").strip()
-    if ups:
-        ctx.vars["adguard_upstreams"] = [u.strip() for u in ups.split(",") if u.strip()]
+    while True:
+        ups = input(f"    internet lookups go over DNS-over-TLS to (\"<address> <certificate name>\", "
+                    f"comma-separated; none = the root servers) [{_upstreams_text(ctx)}] ").strip()
+        if not ups:
+            return
+        if ups.lower() == "none":
+            ctx.vars["dns_filter_upstreams"] = []
+            return
+        pairs = [p.split() for p in ups.split(",") if p.strip()]
+        if all(len(p) == 2 for p in pairs):
+            ctx.vars["dns_filter_upstreams"] = [{"address": a, "name": n} for a, n in pairs]
+            return
+        print("    each upstream needs its address and the name on its certificate, e.g. 9.9.9.9 dns.quad9.net")
 
 
 def _ca_exists(ctx):
@@ -198,7 +210,8 @@ def choose_plan(ctx):
     Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
              webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
     Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
-             rendered), and dns_filter (AdGuard on unless set to none, 2.1.12.1); install_webui is forced off when
+             rendered), and dns_filter (the BIND resolver on unless set to none, 2.1.12.3); install_webui is forced
+             off when
              Keycloak is off. deploy_config saves ctx.vars to
              fabric.yaml, so a --file can set all of these non-interactively.
     Fails:   SystemExit("setup cancelled") on Quit; EOFError from input(); errors of the _ask_* helpers.
@@ -221,11 +234,11 @@ def choose_plan(ctx):
                   "login kit in ~/fabric-admin")
         lf = ctx.vars.get("log_forwarding") or {}
         dests = [d for d in ((lf.get("syslog") or {}).get("host"), (lf.get("elastic") or {}).get("url")) if d]
-        if ctx.vars.get("dns_filter", "adguard") == "adguard":
-            print(f"  ✓ DNS filter: AdGuard Home answers DNS on port 53, internet lookups to {_upstreams_text(ctx)}, "
-                  "AdGuard's DNS filter; its page https://adguard.<domain>")
+        if ctx.vars.get("dns_filter", "bind") == "bind":
+            print("  ✓ DNS filter: fabric's resolver answers DNS on port 53, internet lookups to "
+                  f"{_upstreams_text(ctx)}, AdGuard's DNS filter list (sudo fabricctl dns-filter status)")
         else:
-            print("  · Optional, off: DNS filter (AdGuard Home) — choose it in Advanced")
+            print("  · Optional, off: DNS filter (fabric's resolver) — choose it in Advanced")
         if ctx.vars.get("install_kea"):
             subnets = ", ".join(s.get("subnet", "?") for s in (ctx.vars.get("dhcp") or {}).get("subnets") or [])
             print(f"  ✓ Optional: DHCP with Kea 3.0 on {subnets or '(no subnet yet)'}; hostnames in dhcp.<domain>")
@@ -245,7 +258,7 @@ def choose_plan(ctx):
     # gets rendered (template defaults differ, e.g. install_keycloak).
     for key, default, _, _ in PLAN:
         _set(ctx.vars, key, bool(_get(ctx.vars, key, default)))
-    ctx.vars["dns_filter"] = str(ctx.vars.get("dns_filter") or "adguard").lower()
+    ctx.vars["dns_filter"] = str(ctx.vars.get("dns_filter") or "bind").lower()
     show()
     if ctx.non_interactive or ctx.assume_yes:
         return

@@ -223,15 +223,16 @@ file	fabriclib-directory|src/fabriclib/directory/set_person_enabled.py	30
 file	fabriclib-directory|src/fabriclib/directory/set_person_group.py	31	
 file	fabriclib-directory|src/fabriclib/directory/update_device.py	21	
 file	fabriclib-directory|src/fabriclib/directory/update_role.py	22	
-file	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py	1	
+file	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py	1	0.6.3 / 2026-10-09
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/check_filter_settings.py	3	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/common/filter_zones.py	4	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/common/list_zone.py	5	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/common/resolver_paths.py	6	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/common/resolver_rndc.py	7	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/convert_list.py	8	
-file	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py	2	
+file	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py	2	0.6.3 / 2026-10-09
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_resolver.py	9	
+file	fabriclib-dns_filter|src/fabriclib/dns_filter/import_adguard_settings.py	13	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/run_dns_filter_command.py	10	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/show_filter_status.py	11	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/update_lists.py	12	
@@ -323,7 +324,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/app_client_id.py	22
 file	fabriclib-keycloak|src/fabriclib/keycloak/configure_keycloak.py	2	
 file	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py	3	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/enable_person.py	30	
-file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py	4	
+file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py	4	0.6.3 / 2026-10-09
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_group_mapper.py	5	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_ldap_federation.py	6	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_mfa_flow.py	7	0.6.0 / 2026-10-07
@@ -339,6 +340,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/keycloak_admin.py	14
 file	fabriclib-keycloak|src/fabriclib/keycloak/list_app_clients.py	23	
 file	fabriclib-keycloak|src/fabriclib/keycloak/quote.py	15	
 file	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py	24	
+file	fabriclib-keycloak|src/fabriclib/keycloak/remove_retired_client.py	31	
 file	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py	16	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py	25	
@@ -525,10 +527,12 @@ file	fabriclib-setup|src/fabriclib/setup/init_pki.py	18
 file	fabriclib-setup|src/fabriclib/setup/join_federation.py	19	
 file	fabriclib-setup|src/fabriclib/setup/mint_extra_certs.py	20	
 file	fabriclib-setup|src/fabriclib/setup/mint_service_certs.py	21	
+file	fabriclib-setup|src/fabriclib/setup/move_dns_filter.py	43	
 file	fabriclib-setup|src/fabriclib/setup/preflight.py	22	
 file	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py	23	
 file	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py	24	
 file	fabriclib-setup|src/fabriclib/setup/restore_install.py	25	
+file	fabriclib-setup|src/fabriclib/setup/retire_adguard.py	44	
 file	fabriclib-setup|src/fabriclib/setup/retire_renamed_units.py	26	
 file	fabriclib-setup|src/fabriclib/setup/run_restore_command.py	27	
 file	fabriclib-setup|src/fabriclib/setup/run_setup.py	28	
@@ -1108,7 +1112,7 @@ function	fabriclib-directory|src/fabriclib/directory/set_person_enabled.py|set_p
 function	fabriclib-directory|src/fabriclib/directory/set_person_group.py|set_person_group	1	
 function	fabriclib-directory|src/fabriclib/directory/update_device.py|update_device	1	
 function	fabriclib-directory|src/fabriclib/directory/update_role.py|update_role	1	
-function	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py|build_adguard_config	1	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py|build_adguard_config	1	0.6.3 / 2026-10-09
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/check_filter_settings.py|_names	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/check_filter_settings.py|check_filter_settings	2	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/common/filter_zones.py|filter_zones	1	
@@ -1125,8 +1129,11 @@ function	fabriclib-dns_filter|src/fabriclib/dns_filter/convert_list.py|_records	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/convert_list.py|_rpz_ip	7	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/convert_list.py|convert_list	9	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py|_domains	1	0.6.3 / 2026-10-09
-function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py|deploy_adguard	2	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py|deploy_adguard	2	0.6.3 / 2026-10-09
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_resolver.py|deploy_resolver	1	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/import_adguard_settings.py|_rule	2	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/import_adguard_settings.py|_upstream	1	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/import_adguard_settings.py|import_adguard_settings	3	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/run_dns_filter_command.py|run_dns_filter_command	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/show_filter_status.py|_age	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/show_filter_status.py|show_filter_status	2	
@@ -1252,8 +1259,8 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/configure_keycloak.py|configu
 function	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py|create_person	2	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/enable_person.py|enable_person	1	
-function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|_q	1	
-function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|ensure_adguard_client	2	
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|_q	1	0.6.3 / 2026-10-09
+function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|ensure_adguard_client	2	0.6.3 / 2026-10-09
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_group_mapper.py|ensure_group_mapper	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_ldap_federation.py|ensure_ldap_federation	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_mfa_flow.py|ensure_mfa_flow	1	0.6.0 / 2026-10-07
@@ -1277,6 +1284,7 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/keycloak_admin.py|keycloak_ad
 function	fabriclib-keycloak|src/fabriclib/keycloak/list_app_clients.py|list_app_clients	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/quote.py|q	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py|remove_app_client	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/remove_retired_client.py|remove_retired_client	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py|require_password_change	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|reset_sign_in	2	0.5.0 / 2026-10-04
@@ -1569,6 +1577,7 @@ function	fabriclib-setup|src/fabriclib/setup/mint_extra_certs.py|mint_extra_cert
 function	fabriclib-setup|src/fabriclib/setup/mint_service_certs.py|_install_dirsrv_tls	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/mint_service_certs.py|_targets	1	
 function	fabriclib-setup|src/fabriclib/setup/mint_service_certs.py|run	3	
+function	fabriclib-setup|src/fabriclib/setup/move_dns_filter.py|move_dns_filter	1	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_foreign_listeners	3	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_mem_gb	2	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_os_release	1	
@@ -1577,6 +1586,7 @@ function	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py|read_join_i
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|_record	2	
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|renew_service_certs	1	
 function	fabriclib-setup|src/fabriclib/setup/restore_install.py|restore_install	1	
+function	fabriclib-setup|src/fabriclib/setup/retire_adguard.py|retire_adguard	1	
 function	fabriclib-setup|src/fabriclib/setup/retire_renamed_units.py|retire_renamed_units	1	
 function	fabriclib-setup|src/fabriclib/setup/run_restore_command.py|run_restore_command	1	
 function	fabriclib-setup|src/fabriclib/setup/run_setup.py|main	1	

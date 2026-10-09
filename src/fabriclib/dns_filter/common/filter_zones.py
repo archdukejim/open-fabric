@@ -9,7 +9,7 @@ def filter_zones(v, links):
              dns_links' result.
     Returns: list of zone names without duplicates, this site's domain first.
     Fails:   errors from reverse_zones on malformed records.
-    Feeds:   dns_filter/deploy_adguard, dns_filter/deploy_resolver; tests/samba/run.py."""
+    Feeds:   dns_filter/deploy_resolver; tests/samba/run.py."""
     names = [v["domain"], v.get("org_domain") or v["domain"]]
     names += [link["domain"] for link in (links or {}).get("children") or []]
     if (links or {}).get("upstream"):
