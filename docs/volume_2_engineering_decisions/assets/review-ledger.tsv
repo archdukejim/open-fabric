@@ -16,7 +16,7 @@ THIRD_PARTY_NOTICES	ff836ec5208f7ac6140740a07186107c63702d24	2026-10-08
 archive/db-rotation.json	18182e8c32543d8fa8b328e6aa2dc32e4efa2d43	2026-10-09	
 config/README.md	6300abd255fbbe5a87bd0d83cd9c9dd1c4b8de1f	2026-10-08	
 config/VERSION	d2b13eb644d68d6a2962e3c6288f03ea32854725	2026-10-09	
-config/images.lock.yaml	caf04172667d2a93460d828e81f1435b385ad2d7	2026-10-09	
+config/images.lock.yaml	95bfdd6f18f305c7bb83361217d11b6749c9d112	2026-10-09	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	31865b92b634c167a85fadbc592110690eeddaff	2026-10-08	
 docs/volume_1_description_and_architecture/1.1.1-what-fabric-is.md	2616cd61465cdc6a60eb06146c56ba2dc3625f8d	2026-10-08	
