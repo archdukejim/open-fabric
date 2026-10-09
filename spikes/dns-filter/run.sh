@@ -30,7 +30,8 @@ cleanup
 [ -s "$W/zones/list1.rpz" ] || { echo "run fetch.sh first"; exit 1; }
 
 # ---- the image: the same Debian base fabric's BIND is built on, with dig for the clients
-BASE=$(python3 "$REPO/tests/image_ref.py" debian) || exit 1
+# BASE_IMAGE: the pinned ref, given when the spike runs away from the repository (the test Pi)
+BASE=${BASE_IMAGE:-$(python3 "$REPO/tests/image_ref.py" debian)} || exit 1
 docker build -q -t "$IMG" - >/dev/null <<EOF || exit 1
 FROM $BASE
 RUN apt-get update && apt-get install -y --no-install-recommends bind9 bind9-utils bind9-dnsutils ca-certificates \
