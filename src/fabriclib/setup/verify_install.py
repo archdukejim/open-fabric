@@ -1,3 +1,5 @@
+import datetime
+import json
 import os
 import shutil
 import stat
@@ -7,6 +9,7 @@ import subprocess
 from fabriclib.common.console import err, ok, warn
 from fabriclib.common.dns_query import dns_query
 from fabriclib.common.doh_query import doh_query
+from fabriclib.common.paths import DB_ROTATION_FILE
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.plan_trust import plan_trust
@@ -33,6 +36,25 @@ def _curl(url, host, ip, port, root_ca, client_cert=False):
                           *ca, "--resolve", f"{host}:{port}:{ip}", url],
                          capture_output=True, text=True)
     return res.returncode, res.stdout
+
+
+def _db_rotation(path=DB_ROTATION_FILE, now=None):
+    """Purpose: whether Keycloak's database password was rotated lately (2.1.7.4): the last run worked and is at most
+             40 days old (monthly, with a missed night or two to spare).
+    Inputs:  path — the record rotate_db_password keeps; now — aware datetime (tests).
+    Returns: (ok: bool, detail: str).
+    Fails:   never (an unreadable record is a failed check).
+    Feeds:   checks."""
+    try:
+        with open(path) as f:
+            last = json.load(f)
+        when = datetime.datetime.fromisoformat(last["when"])
+    except (OSError, ValueError, KeyError):
+        return False, "never rotated: sudo fabricctl setup, or sudo fabricctl vault rotate-db"
+    age = ((now or datetime.datetime.now().astimezone()) - when).days
+    if not last.get("ok"):
+        return False, f"the last rotation failed ({last.get('detail', '')}): sudo fabricctl vault rotate-db"
+    return age <= 40, f"last rotated {age} day(s) ago" + ("" if age <= 40 else ": is the fabric-db-rotate timer on?")
 
 
 def checks(ctx):
@@ -171,6 +193,8 @@ def checks(ctx):
                      root_ca)
         add(f"https://{v['hostname_federation']} (federation endpoint, TLS verified)", code == (0, "200"), code)
 
+    if v.get("install_keycloak"):           # Keycloak's database password, rotated monthly by OpenBao (2.1.7.4)
+        add("Keycloak's database password: rotated by OpenBao in the last 40 days", *_db_rotation())
     failing = [w["what"] for w in cert_warnings(v) if w["level"] == "fail"]
     add("certificates: renewal working, none about to expire (2.1.5.4)", not failing, "; ".join(failing))
     for unit in ("bind9", "stepca", "nginx", "samba", "postgres", "keycloak", "openbao", "kea", "freeradius",

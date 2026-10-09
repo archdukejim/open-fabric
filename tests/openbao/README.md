@@ -6,3 +6,4 @@
 
 Needs Docker, root, `losetup`, `softhsm2` + `python3-pykcs11` (security keys)
 and `python3-pykmip` (HSM): `sudo apt install softhsm2 python3-pykcs11 python3-pykmip`.
+| `db_rotation.py` | Keycloak's database password rotated by OpenBao, against the real Postgres and OpenBao images: the take-over (own admin, Keycloak's own role owning its data, the bootstrap role locked), a rotation, converging without change, the refusals (2.1.7.4) |

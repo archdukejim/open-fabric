@@ -12,6 +12,7 @@ AUDIT_FILE = os.path.join(FABRIC_DIR, "archive", "audit.log")
 ISSUED_CERTS_FILE = os.path.join(FABRIC_DIR, "archive", "issued-certs.jsonl")
 REVOKED_CERTS_FILE = os.path.join(FABRIC_DIR, "archive", "revoked-certs.jsonl")   # 2.1.5.10
 CERT_RENEWAL_FILE = os.path.join(FABRIC_DIR, "archive", "cert-renewal.json")   # the last run (2.1.5.4)
+DB_ROTATION_FILE = os.path.join(FABRIC_DIR, "archive", "db-rotation.json")    # the last run (2.1.7.4)
 FEDERATION_FILE = os.path.join(FABRIC_DIR, "config", "federation.yaml")
 FEDERATION_LOCK_FILE = os.path.join(FABRIC_DIR, "config", ".federation.lock")
 BIND_DATA_DIR = os.path.join(DEPLOY_BASE_DIR, "bind9", "data")

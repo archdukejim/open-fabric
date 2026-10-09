@@ -9,3 +9,5 @@ Host systemd units, rendered or copied by `deploy.py` to `/etc/systemd/system/`.
 | `fabric.target` | Groups every fabric unit (`systemctl start/stop/restart fabric.target`), copied as is → `fabric.target` |
 | `fabric-agent.service.j2` | The root `fabric-agent` (`lib/agent/server.py`): the web UI's privileged API on a unix socket only; only with `install_webui` → `fabric-agent.service` |
 | `fabric-federation.service.j2` | The root `fabric-federation` (`lib/federation/server.py`): the federation endpoint on a unix socket mounted into nginx; only with `federation_endpoint` → `fabric-federation.service` |
+| `fabric-db-rotate.service` | Runs `fabricctl vault rotate-db --scheduled` (2.1.7.4) |
+| `fabric-db-rotate.timer` | Monthly, the 1st at night, spread over half an hour; a missed run at the next boot |

@@ -1,7 +1,7 @@
 """Ordered setup steps. Each is idempotent and can run alone:
 `fabricctl setup --step <name>`."""
 from fabriclib.setup import (condition_host, configure_firewall, configure_network, create_accounts, create_admin,
-                             deploy_config,
+                             deploy_config, ensure_db_rotation,
                              harden_docker, init_pki, join_federation, mint_service_certs, preflight, setup_openbao,
                              start_bootstrap, start_services, verify_install)
 
@@ -20,6 +20,8 @@ STEPS = [
     ("start", start_services.run, "start everything; converge the domain; configure Keycloak; web UI"),
     ("vault", setup_openbao.run,
      "OpenBao: vault key + unlock methods, init once (recovery keys to ~/fabric-admin), configure, import secrets"),
+    ("dbrotation", ensure_db_rotation.run,
+     "Keycloak's database password: Postgres's own admin, OpenBao's database engine (rotated monthly)"),
     ("admin", create_admin.run, "first web UI admin: a person in the domain, client certificate, login kit"),
     ("verify", verify_install.run, "end-to-end checks (same as fabricctl doctor)"),
 ]

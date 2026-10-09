@@ -376,6 +376,13 @@ check "third user carol in the auditors group, with a client cert" "grep -q crea
 BOB_UID=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=bob)' uidNumber" | grep ^uidNumber)
 CAROL_UID=$(in_box "docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=carol)' uidNumber" | grep ^uidNumber)
 check "bob and carol have distinct uid numbers from the site's block" "[ -n '$BOB_UID' ] && [ '$BOB_UID' != '$CAROL_UID' ]"
+echo "--- Keycloak's database password, rotated by OpenBao (2.1.7.4)"
+pg_roles() { in_box "docker exec postgres psql -tA -U fabric_admin -d keycloak -c 'SELECT rolname, rolsuper, rolcanlogin FROM pg_roles'"; }
+check "setup handed Keycloak's password to OpenBao: Keycloak runs as its own role, the bootstrap role locked" \
+    "pg_roles | grep -qx 'keycloak_db|f|t' && pg_roles | grep -qx 'keycloak|t|f' && pg_roles | grep -qx 'fabric_admin|t|t'"
+in_box 'fabricctl vault rotate-db' > "$OUT/rotate-db.log" 2>&1
+check "fabricctl vault rotate-db: rotated, Keycloak restarted with it and healthy; doctor's rotation check passes"     "grep -q 'Keycloak restarted with it and healthy' '$OUT/rotate-db.log' && in_box 'fabricctl doctor' | grep -q 'rotated by OpenBao in the last 40 days'"
+check "the monthly fabric-db-rotate timer is on" "in_box 'systemctl is-enabled fabric-db-rotate.timer' | grep -qx enabled"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
 in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails

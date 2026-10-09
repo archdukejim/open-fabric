@@ -1,0 +1,11 @@
+[Unit]
+Description=fabric: monthly rotation of Keycloak's database password (decision 2.1.7.4)
+
+[Timer]
+# the first of the month at night, spread over half an hour; a night missed while off runs at the next boot
+OnCalendar=*-*-01 03:45:00
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target

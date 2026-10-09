@@ -4,7 +4,9 @@ import sys
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.vault.add_kmip_slot import add_kmip_slot
+from fabriclib.vault.common.approle_login import approle_login
 from fabriclib.vault.common.wait_active import wait_active
+from fabriclib.vault.constants import SETUP_CREDS
 from fabriclib.vault.add_security_key_slot import add_security_key_slot
 from fabriclib.vault.add_usb_slot import add_usb_slot
 from fabriclib.vault.generate_root_token import generate_root_token
@@ -12,6 +14,7 @@ from fabriclib.vault.list_pkcs11_tokens import list_pkcs11_tokens
 from fabriclib.vault.list_slots import list_slots
 from fabriclib.vault.remove_slot import remove_slot
 from fabriclib.vault.revoke_token import revoke_token
+from fabriclib.vault.rotate_db_password import rotate_db_password
 from fabriclib.vault.rotate_vault_key import rotate_vault_key
 from fabriclib.vault.test_slot import test_slot
 from fabriclib.vault.unlock_vault import unlock_vault
@@ -24,6 +27,8 @@ USAGE = """usage: fabricctl vault status
        fabricctl vault test <slot>           unwrap the vault key through one method
        fabricctl vault remove <slot> --yes   remove a method (never the last)
        fabricctl vault rotate --yes          new vault key for every present method
+       fabricctl vault rotate-db             Keycloak's database password, rotated now by OpenBao (the monthly
+                                             fabric-db-rotate timer runs it with --scheduled)
        fabricctl vault add-usb <disk> [--label L] --yes   ERASE a USB stick and make it an unlock method
        fabricctl vault add-kmip <host:port> --key-id ID --ca FILE --cert FILE --key FILE
                                 [--server-name NAME] [--label L] --yes
@@ -180,6 +185,14 @@ def run_vault_command(v, argv):
             if not revoke_token(v, token):
                 raise ValidationError("the token still works (or OpenBao refused): not revoked")
             print("revoked")
+            return 0
+        if cmd == "rotate-db" and args in ([], ["--scheduled"]):
+            if not v.get("install_keycloak"):
+                print("no Keycloak on this host: nothing to rotate")
+                return 0
+            rotate_db_password(v, approle_login(v, SETUP_CREDS), actor=getpass.getuser(),
+                               source="timer" if args else "cli")
+            print("Keycloak's database password rotated; Keycloak restarted with it and healthy")
             return 0
         if cmd == "rotate" and args in (["--yes"], ["-y"]):
             res = rotate_vault_key(v, "root", lambda: restart_openbao(v), source="cli")

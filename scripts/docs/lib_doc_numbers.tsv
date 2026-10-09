@@ -508,6 +508,7 @@ file	fabriclib-setup|src/fabriclib/setup/create_admin.py	13
 file	fabriclib-setup|src/fabriclib/setup/deploy_config.py	14	
 file	fabriclib-setup|src/fabriclib/setup/detect_network.py	15	
 file	fabriclib-setup|src/fabriclib/setup/doctor_report.py	41	
+file	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py	42	
 file	fabriclib-setup|src/fabriclib/setup/export_install.py	16	
 file	fabriclib-setup|src/fabriclib/setup/harden_docker.py	17	
 file	fabriclib-setup|src/fabriclib/setup/init_pki.py	18	
@@ -576,6 +577,7 @@ file	fabriclib-vault|src/fabriclib/vault/list_pkcs11_tokens.py	28
 file	fabriclib-vault|src/fabriclib/vault/list_slots.py	29	
 file	fabriclib-vault|src/fabriclib/vault/remove_slot.py	30	
 file	fabriclib-vault|src/fabriclib/vault/revoke_token.py	31	
+file	fabriclib-vault|src/fabriclib/vault/rotate_db_password.py	44	
 file	fabriclib-vault|src/fabriclib/vault/rotate_vault_key.py	32	
 file	fabriclib-vault|src/fabriclib/vault/run_vault_command.py	33	
 file	fabriclib-vault|src/fabriclib/vault/slots/kmip.py	34	
@@ -1508,6 +1510,13 @@ function	fabriclib-setup|src/fabriclib/setup/deploy_config.py|_write_exec	2
 function	fabriclib-setup|src/fabriclib/setup/deploy_config.py|run	3	
 function	fabriclib-setup|src/fabriclib/setup/detect_network.py|detect_network	1	
 function	fabriclib-setup|src/fabriclib/setup/doctor_report.py|doctor_report	1	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_call	4	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_ensure_roles	2	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_lock_bootstrap	3	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_psql	1	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_redeploy	6	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|configure_db_engine	5	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|run	7	
 function	fabriclib-setup|src/fabriclib/setup/export_install.py|_copy	1	
 function	fabriclib-setup|src/fabriclib/setup/export_install.py|export_install	2	
 function	fabriclib-setup|src/fabriclib/setup/harden_docker.py|run	1	
@@ -1549,6 +1558,7 @@ function	fabriclib-setup|src/fabriclib/setup/start_unit.py|start_unit	1
 function	fabriclib-setup|src/fabriclib/setup/uninstall.py|uninstall	1	
 function	fabriclib-setup|src/fabriclib/setup/upgrade_vars.py|upgrade_vars	1	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_curl	1	
+function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_db_rotation	5	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|_ldap_bind	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|checks	3	
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|run	4	
@@ -1610,6 +1620,9 @@ function	fabriclib-vault|src/fabriclib/vault/list_pkcs11_tokens.py|list_pkcs11_t
 function	fabriclib-vault|src/fabriclib/vault/list_slots.py|list_slots	1	
 function	fabriclib-vault|src/fabriclib/vault/remove_slot.py|remove_slot	1	
 function	fabriclib-vault|src/fabriclib/vault/revoke_token.py|revoke_token	1	
+function	fabriclib-vault|src/fabriclib/vault/rotate_db_password.py|_apply_and_wait	2	
+function	fabriclib-vault|src/fabriclib/vault/rotate_db_password.py|_record	1	
+function	fabriclib-vault|src/fabriclib/vault/rotate_db_password.py|rotate_db_password	3	
 function	fabriclib-vault|src/fabriclib/vault/rotate_vault_key.py|_next_id	1	
 function	fabriclib-vault|src/fabriclib/vault/rotate_vault_key.py|rotate_vault_key	2	
 function	fabriclib-vault|src/fabriclib/vault/run_vault_command.py|_status	2	

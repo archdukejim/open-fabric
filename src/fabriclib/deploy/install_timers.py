@@ -3,7 +3,7 @@ import subprocess
 
 from fabriclib.common.copy_if_changed import copy_if_changed
 
-TIMERS = ["fabric-certs"]          # fabric's scheduled jobs (the `services` consent group): renewal, 2.1.5.4
+TIMERS = ["fabric-certs", "fabric-db-rotate"]   # fabric's scheduled jobs (`services` consent): 2.1.5.4, 2.1.7.4
 
 
 def install_timers(paths):

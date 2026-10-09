@@ -15,7 +15,7 @@ from fabriclib.undo.undo_trust import undo_trust
 # left them
 UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "samba", "adguard", "adguard-auth", "fabric-agent",
          "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca",
-         "bind9", "fabric-firewall", "fabric-certs"]
+         "bind9", "fabric-firewall", "fabric-certs", "fabric-db-rotate"]
 TARGET = "/etc/systemd/system/fabric.target"
 CONTAINERS = ["fabric-web", "webui", "fluentbit", "kea-dhcp4", "kea-ddns", "freeradius", "samba", "adguardhome",
               "oauth2-proxy-adguard", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
@@ -44,7 +44,7 @@ def uninstall(ctx):
     v = ctx.vars
 
     info("stopping and removing services")
-    for timer in ("fabric-directory-sync", "fabric-certs"):
+    for timer in ("fabric-directory-sync", "fabric-certs", "fabric-db-rotate"):
         subprocess.run(["systemctl", "disable", "--now", f"{timer}.timer"], capture_output=True)
     for unit in UNITS:
         subprocess.run(["systemctl", "disable", "--now", unit], capture_output=True)
