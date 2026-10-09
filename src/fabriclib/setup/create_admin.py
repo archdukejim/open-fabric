@@ -9,6 +9,7 @@ from fabriclib.federation.common.is_root_site import is_root_site
 from fabriclib.keycloak.signin_levels import admin_level
 from fabriclib.pki.issue_client_cert import issue_client_cert
 from fabriclib.pki.needs_renewal import needs_renewal
+from fabriclib.setup.ask_first_admin import ask_first_admin
 
 README = """fabric web UI — first login
 ===========================
@@ -16,8 +17,7 @@ README = """fabric web UI — first login
 Everything your computer needs to reach https://{mgr}:
 
   root-ca.crt / root-ca.cer     fabric root CA (Linux, macOS, iOS, Android / Windows)
-{cert_line}  initial-password.txt          your first password (changed at first login)
-
+{cert_line}
 1. Copy this folder to your computer, e.g.
      scp -r {login}@{host}:{folder} .
 2. Trust the root CA: Windows: double-click root-ca.cer and put it in
@@ -25,12 +25,9 @@ Everything your computer needs to reach https://{mgr}:
    system, format and installer: https://{certs}
 {cert_step}{n}. Your computer must resolve {mgr} (use fabric as its DNS server,
    {ip}, or add a hosts entry).
-{n2}. Open https://{mgr}{choose} and sign in as '{user}'. Keycloak asks you
-   for a new password{factor} before the dashboard opens. On a computer
-   joined to the domain, signing in to Windows or Linux signs you in here.
-
-Delete initial-password.txt{p12_file} once you are in.
-More admins: add them to the '{group}' group.{more}
+{n2}. Open https://{mgr}{choose} and sign in as '{user}' with the password
+   you chose in setup{factor}.{kerberos}
+{p12_delete}More admins: add them to the '{group}' group.{more}
 Raise sign-in security (a second factor, the client certificate) in the web
 console's Security page.
 """
@@ -38,9 +35,11 @@ CERT_LINE = "  {user}.p12                    your client certificate (password: 
 CERT_STEP = """3. Import {user}.p12 into your browser (Firefox: Settings > Certificates >
    Your Certificates > Import; Chrome/Edge/Windows: double-click it).
 """
-FACTOR = {"none": "", "totp": " and to set up an authenticator app (TOTP)",
-          "passkey": " and to register a passkey (Windows Hello, a phone or a security key)",
-          "any": " and to set up an authenticator app (TOTP) unless you add a passkey"}
+FACTOR = {"none": "", "totp": "; Keycloak then asks you to set up an authenticator app (TOTP)",
+          "passkey": "; Keycloak then asks you to register a passkey (Windows Hello, a phone or a security key)",
+          "any": "; Keycloak then asks you to set up an authenticator app (TOTP) unless you add a passkey"}
+KERBEROS = """ On a computer
+   joined to the domain, signing in to Windows or Linux signs you in here."""
 
 
 def _write(path, text, owner):
@@ -48,7 +47,7 @@ def _write(path, text, owner):
     Inputs:  path — destination; text — content; owner — (uid, gid).
     Returns: None; file 0600 (created under umask 077) owned by owner.
     Fails:   OSError on write, chmod or chown.
-    Feeds:   run, _client_cert (initial-password.txt, <user>.crt, p12-password.txt, README.txt)."""
+    Feeds:   run, _client_cert (<user>.crt, p12-password.txt, README.txt)."""
     old = os.umask(0o077)
     try:
         with open(path, "w") as f:
@@ -73,15 +72,16 @@ def _readme(v, user, login, folder):
                          cert_line=CERT_LINE.format(user=user) if cert else "",
                          cert_step=CERT_STEP.format(user=user) if cert else "", n=4 if cert else 3,
                          n2=5 if cert else 4, choose=f', choose the "{user} (fabric)" certificate' if cert else "",
-                         factor=FACTOR[admin_level(v)], p12_file=" and p12-password.txt" if cert else "",
+                         factor=FACTOR[admin_level(v)], kerberos=KERBEROS if v.get("signin_kerberos") else "",
+                         p12_delete="Delete p12-password.txt once you are in.\n" if cert else "",
                          more=" Their client certificate: sudo fabricctl client-cert <user>." if cert else "")
 
 
 def run(ctx):
     """Purpose: the first web UI admin, end to end: a person in the directory, in the admin group (Keycloak grants it
-             fabric-admin), the fabric root CA and, while the web console requires one (webui_client_cert), a client
-             certificate (.p12, CN = username), collected with instructions in ~/fabric-admin of the account that ran
-             setup.
+             fabric-console-admin), the fabric root CA and, while the web console requires one (webui_client_cert), a
+             client certificate (.p12, CN = username), collected with instructions in ~/fabric-admin of the account
+             that ran setup.
     Inputs:  ctx — SetupContext: vars install_webui, install_keycloak,
              webui_admin_user, webui_admin_email, webui_admin_group (default admins), webui_client_cert,
              webui_client_cert_days (default 365), the sign-in settings, domain, hostname_mgr, hostname_certs,
@@ -90,9 +90,9 @@ def run(ctx):
     Returns: None. Without web UI or Keycloak: nothing. At a federated site the person is not created here
              (people come from the root, M5): only the client certificate and the kit. Otherwise the kit folder (0700)
              holds root-ca.crt/.cer, README.txt and, with the certificate on and when due, <user>.p12, <user>.crt and
-             p12-password.txt; initial-password.txt only when the user was created (a one-time password: Keycloak asks
-             for a new one). Idempotent: an existing user keeps their password; the certificate is renewed when due
-             or from another CA.
+             p12-password.txt. A new admin gets the password chosen in setup (ask_first_admin: asked here when setup
+             had not, 2.1.6.33); no password is written to the kit. Idempotent: an existing user keeps their
+             password; the certificate is renewed when due or from another CA.
     Fails:   ValidationError from ensure_admin (the directory) or issue_client_cert (propagates,
              not SetupError); CalledProcessError from openssl; OSError on files. Warns when run as root without sudo.
     Feeds:   setup step `admin`, run by run_setup via STEPS."""
@@ -107,11 +107,11 @@ def run(ctx):
     os.chown(folder, uid, gid)
 
     if is_root_site(os.path.join(ctx.config_dir, "federation.yaml")):
-        state, password = ensure_admin(v, ctx.secrets, user, v.get("webui_admin_email") or f"{user}@{v['domain']}")
+        state, _ = ensure_admin(v, ctx.secrets, user, v.get("webui_admin_email") or f"{user}@{v['domain']}",
+                                lambda: (ask_first_admin(ctx, needed=True), ctx.admin_password)[1])
         if state == "created":
-            _write(os.path.join(folder, "initial-password.txt"), password + "\n", (uid, gid))
-            ok(f"admin '{user}' created in the directory, member of '{v.get('webui_admin_group', 'admins')}' "
-               "(a new password is asked at the first sign-in)")
+            ok(f"admin '{user}' created in the directory with the password chosen in setup, member of "
+               f"'{v.get('webui_admin_group', 'admins')}'")
         else:
             ok(f"admin '{user}' exists" + (" (added to the admin group)" if "+member" in state else ""))
     else:                                     # a federated site: people (the admin too) come from the root (M5)

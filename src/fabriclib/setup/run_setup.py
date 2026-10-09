@@ -18,6 +18,7 @@ from fabriclib.common.console import BOLD, NC, err, heading  # noqa: E402
 from fabriclib.consent.ask_consent import ask_consent  # noqa: E402
 from fabriclib.consent.plan_host_changes import plan_host_changes  # noqa: E402
 from fabriclib.consent.planned_vars import planned_vars  # noqa: E402
+from fabriclib.setup.ask_first_admin import ask_first_admin  # noqa: E402
 from fabriclib.setup.choose_plan import choose_plan  # noqa: E402
 from fabriclib.setup.collect_vars import collect_vars  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
@@ -62,6 +63,8 @@ def main(argv=None):
     ap.add_argument("--decline", action="append", metavar="GROUPS",
                     help="refuse these host changes (recommended ones are then left unmanaged and shown in status)")
     ap.add_argument("--step", action="append", help="run only this step (repeatable)")
+    ap.add_argument("--admin-password-file", metavar="FILE",
+                    help="the first admin's password, read from FILE (unattended; never on the command line)")
     ap.add_argument("--undo", metavar="GROUP",
                     help="undo one kind of host change fabric made (runtime, firewall, trust, time, resolver) and "
                          "record it as declined; nothing else runs")
@@ -83,7 +86,8 @@ def main(argv=None):
         err(str(e))
         return 1
     ctx = SetupContext(deploy_base=args.deploy_base, user_vars_file=args.file, offline=args.offline,
-                       non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=invitation)
+                       non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=invitation,
+                       admin_password_file=args.admin_password_file)
     try:
         if args.undo:
             ctx.load_state()
@@ -104,6 +108,7 @@ def main(argv=None):
             collect_vars(ctx)
             if args.step is None:
                 choose_plan(ctx)
+            ask_first_admin(ctx)
         else:
             ctx.load_state()
         planned = planned_vars(ctx) if any(s in NEEDS_INPUT for s in selected) else ctx.vars

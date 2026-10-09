@@ -14,7 +14,7 @@ def print_first_steps(ctx):
              webui_client_cert; the published ca-certs.json under <deploy_base>/nginx/www/certs; the login kit in the
              home of the account that ran sudo (sudo_owner).
     Returns: None; prints. Without the web UI: only the doctor line.
-    Fails:   never for a missing ca-certs.json or kit file (the line leaves the fingerprint or password file out).
+    Fails:   never for a missing ca-certs.json (the fingerprint is left out).
     Feeds:   setup/run_setup (after every step)."""
     v = ctx.vars
     if v.get("install_webui"):
@@ -32,9 +32,8 @@ def print_first_steps(ctx):
                  + f" install it as a trusted root (the same file: {kit}/root-ca.crt, .cer for Windows)"]
         if v.get("webui_client_cert"):
             steps.append(f"import your client certificate {kit}/{user}.p12 (its password: {kit}/p12-password.txt)")
-        password = (f"the password in {kit}/initial-password.txt (you choose a new one)"
-                    if os.path.exists(os.path.join(kit, "initial-password.txt")) else "your password")
-        steps.append(f"{BOLD}then sign in{NC} at {BOLD}https://{v.get('hostname_mgr')}{NC} as {user}, with {password}")
+        steps.append(f"{BOLD}then sign in{NC} at {BOLD}https://{v.get('hostname_mgr')}{NC} as {user}, with the "
+                     "password you chose in setup")
         print("  Next:")
         for n, text in enumerate(steps, 1):
             print(f"    {n}. {text}")

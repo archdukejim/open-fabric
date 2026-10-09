@@ -331,6 +331,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/quote.py	15
 file	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py	24	
 file	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py	16	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17	0.5.0 / 2026-10-04
+file	fabriclib-keycloak|src/fabriclib/keycloak/retire_old_admin_role.py	31	
 file	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py	25	
 file	fabriclib-keycloak|src/fabriclib/keycloak/sign_out_person.py	29	
 file	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py	28	
@@ -457,6 +458,7 @@ file	fabriclib-samba|src/fabriclib/samba/gpo_overview.py	13
 file	fabriclib-samba|src/fabriclib/samba/gpo_request.py	9	
 file	fabriclib-samba|src/fabriclib/samba/id_range.py	8	
 file	fabriclib-samba|src/fabriclib/samba/list_conflicts.py	18	
+file	fabriclib-samba|src/fabriclib/samba/password_meets_policy.py	24	
 file	fabriclib-samba|src/fabriclib/samba/prepare_site.py	16	
 file	fabriclib-samba|src/fabriclib/samba/replication_status.py	19	
 file	fabriclib-samba|src/fabriclib/samba/run_converge.py	17	
@@ -491,6 +493,8 @@ file	fabriclib-security|src/fabriclib/security/ufw_active.py	11
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
 file	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py	43	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
+file	fabriclib-setup|src/fabriclib/setup/ask_first_admin.py	45	
+file	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py	46	
 file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	
 file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	0.5.0 / 2026-10-04
 file	fabriclib-setup|src/fabriclib/setup/backup_install.py	1	
@@ -1250,6 +1254,7 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py|remove_a
 function	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py|require_password_change	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|reset_sign_in	2	0.5.0 / 2026-10-04
+function	fabriclib-keycloak|src/fabriclib/keycloak/retire_old_admin_role.py|retire_old_admin_role	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py|run_sso_command	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/sign_out_person.py|sign_out_person	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py|admin_level	2	
@@ -1409,6 +1414,7 @@ function	fabriclib-samba|src/fabriclib/samba/gpo_overview.py|gpo_overview	1
 function	fabriclib-samba|src/fabriclib/samba/gpo_request.py|gpo_request	1	
 function	fabriclib-samba|src/fabriclib/samba/id_range.py|id_range	1	
 function	fabriclib-samba|src/fabriclib/samba/list_conflicts.py|list_conflicts	1	
+function	fabriclib-samba|src/fabriclib/samba/password_meets_policy.py|password_meets_policy	1	
 function	fabriclib-samba|src/fabriclib/samba/prepare_site.py|prepare_site	1	
 function	fabriclib-samba|src/fabriclib/samba/replication_status.py|replication_status	1	
 function	fabriclib-samba|src/fabriclib/samba/run_converge.py|run_converge	1	
@@ -1461,6 +1467,8 @@ function	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py|adopt_stray_
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_rule	3	
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	
+function	fabriclib-setup|src/fabriclib/setup/ask_first_admin.py|ask_first_admin	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py|ask_kerberos	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	
 function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	0.5.0 / 2026-10-04

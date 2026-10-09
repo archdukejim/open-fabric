@@ -58,6 +58,9 @@ PROMPTS = [
     ("lock", r"then keep it locked for how many minutes.*: $"),
     ("complexity", r"\(complexity\) \[y/n\].*: $"),
     ("memory", r"GB of memory fabric may use \[\d+\]: $"),
+    ("kerberos", r"Turn it on now\? \[y/N\]: $"),
+    ("admin_pw", r"Password for [^:\n]+: $"),
+    ("admin_pw2", r"The same again: $"),
     ("plan", r"\[P\]roceed, \[A\]dvanced, or \[Q\]uit\? $"),
     ("consent", r"Allow these changes\? \[y/n\] $"),
 ]
@@ -140,6 +143,10 @@ bad = {
     "window": ["15"],
     "lock": ["5", "30"],
     "complexity": ["maybe", "y"],
+    "kerberos": ["maybe", ""],
+    # too short (the policy just set: 12), containing the user name, then two that differ, then a good one twice
+    "admin_pw": ["short", "xFabric-Admin-9", "Good-Pass-1234", "Good-Pass-1234"],
+    "admin_pw2": ["nope", "Good-Pass-1234"],
     "memory": ["3", "99", "x", ""],
     "plan": ["x", "p"],
 }
@@ -172,6 +179,10 @@ EXPECT = [
     ("a maximum age not above the minimum: explained and that question asked again", "must be above 3", 1),
     ("a lockout shorter than its window: explained and that question asked again", "at least 15 (failed sign-ins", 1),
     ("3 GB, more than the host has, text: refused as the memory", "a whole number from 4 to", 3),
+    ("the Kerberos question: an answer that is not y or n asked again", "y or n", 1),
+    ("the first admin's password: shorter than the policy just set, refused", "at least 12 characters", 1),
+    ("...containing the user name, refused", "not containing your user name", 1),
+    ("...typed differently the second time, asked again", "the two differ", 1),
 ]
 for name, needle, count in EXPECT:
     check(name, text.count(needle) >= count, (text.count(needle), needle))
@@ -197,7 +208,7 @@ check("…and nothing was started or changed: no containers, ufw's rules as they
 good = {
     "domain": [DOMAIN], "friendly_name": ["Fabric Installer Test"], "min_length": ["12"], "history": ["5"],
     "min_age": ["0"], "max_age": ["0"], "threshold": ["5"], "window": ["15"], "lock": ["30"], "complexity": ["y"],
-    "plan": ["p"],
+    "plan": ["p"], "kerberos": ["y"], "admin_pw": ["Good-Pass-1234"], "admin_pw2": ["Good-Pass-1234"],
 }
 seen2 = []
 
@@ -219,6 +230,14 @@ check("setup's last words: FIRST the root certificate from the landing page (pla
       "then sign in at the console", 0 <= first < signin and f"http://info.{DOMAIN}/" in text[first:signin]
       and fingerprint.strip() and fingerprint.strip() in text[first:signin]
       and f"https://fabric.{DOMAIN}" in text[signin:], text[-1500:])
+saved = R("grep -E '^(webui_admin_user|webui_admin_role|signin_kerberos):' /opt/fabric/config/vars.yaml")
+check("Enter took fabric-admin as the first admin; the console's role is fabric-console-admin; Kerberos on as "
+      "answered (2.1.6.32, 2.1.6.33)", "webui_admin_user: fabric-admin" in saved
+      and "webui_admin_role: fabric-console-admin" in saved and "signin_kerberos: true" in saved, saved)
+check("the first admin was created with the chosen password; none written to the login kit",
+      "created in the directory with the password chosen in setup" in text
+      and not R("find /home /root -path '*/fabric-admin/initial-password.txt' -newer /opt/fabric/config/fabric.yaml "
+                "2>/dev/null"), text[-1500:])
 doctor = R("fabricctl doctor 2>&1")
 check("doctor passes", "✗" not in doctor and "✓" in doctor, doctor[-1500:])
 aaaa = R(f"dig +short AAAA ad.{DOMAIN} @{HOST_IP}; dig +short AAAA $(hostname -s).ad.{DOMAIN} @{HOST_IP}")

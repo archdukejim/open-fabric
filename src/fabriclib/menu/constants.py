@@ -1,8 +1,8 @@
 """What the vars editor (`fabricctl --interactive`) treats specially."""
 
-# fixed once installed: never edited or deleted from the menu
+# fixed once installed: never edited or deleted from the menu (ad_domain: 2.1.6.11)
 IMMUTABLE_KEYS = {
-    "ca_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou",
+    "ad_domain", "ca_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou",
     "cert_root_digest", "cert_root_key_type", "cert_root_key_param", "cert_root_ca_days",
     "cert_intermediate_days", "cert_intermediate_digest", "cert_intermediate_key_type",
     "cert_intermediate_key_param", "cert_service_days", "cert_acme_lifetime_hours",

@@ -28,7 +28,7 @@ def set_signin_layer(actor, layer, text, source="cli", lower=False, vars_file=VA
     with vars_lock():
         data = load_vars(vars_file)
         if layer == "kerberos":
-            new, old = on_off(text), bool(data.get(KERBEROS, True))
+            new, old = on_off(text), bool(data.get(KERBEROS, False))
             setting, direction = KERBEROS, "SET"
         else:
             new, setting = layer_value(layer, text), LAYERS[layer]["setting"]

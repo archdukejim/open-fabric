@@ -80,6 +80,9 @@ start=$(date +%s)
 R "fabricctl setup --non-interactive --yes ${APPROVE:+--approve $APPROVE} ${DECLINE:+--decline $DECLINE}" > "$OUT/setup-to.log" 2>&1
 echo "    setup ($TO) took $(( ($(date +%s) - start) / 60 )) min"
 check "$TO: setup completes over the old install" "grep -q 'fabric is ready' '$OUT/setup-to.log'"
+check "$TO: the console's admin role renamed fabric-console-admin, the old name gone from Keycloak and OpenBao (2.1.6.33)" \
+    "R 'grep -qx \"webui_admin_role: fabric-console-admin\" /opt/fabric/config/vars.yaml' \
+     && grep -q 'fabric-admin removed' '$OUT/setup-to.log'"
 
 R 'python3 /tmp/upgrade_state.py snapshot' > "$OUT/after.json" 2>"$OUT/after.err"
 check "kept: secrets (each one there before, unchanged; new ones may be added, Keycloak's database password rotates)"     "python3 -c \"import json,sys; a=json.load(open('$OUT/before.json'))['secrets']; b=json.load(open('$OUT/after.json'))['secrets']; sys.exit(any(b.get(k) != v for k, v in a.items()))\""

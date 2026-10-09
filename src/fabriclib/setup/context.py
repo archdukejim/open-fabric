@@ -22,6 +22,8 @@ class SetupContext:
     _secrets: dict = None                         # loaded on first use (see secrets)
     restart_services: set = field(default_factory=set)   # certs/config changed this run
     force_certs: bool = False                     # re-issue service certs even if current
+    admin_password_file: str = None               # setup --admin-password-file (unattended, 2.1.6.33)
+    admin_password: str = None                    # the first admin's chosen password: memory only, never saved
 
     @property
     def target_dir(self):

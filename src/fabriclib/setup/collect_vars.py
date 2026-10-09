@@ -15,6 +15,7 @@ from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.security.check_signin_lowering import check_signin_lowering
 from fabriclib.setup.ask_ad_domain import ask_ad_domain
+from fabriclib.setup.ask_kerberos import ask_kerberos
 from fabriclib.setup.ask_ram import ask_ram
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.upgrade_vars import upgrade_vars
@@ -32,6 +33,7 @@ LABELS = {
 ADMIN_RE = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}$")
 # names the first admin cannot take: the system's own, and AD's built-in accounts
 RESERVED = {"admin", "root", "administrator", "guest", "krbtgt", "nobody", "daemon"}
+FIRST_ADMIN = "fabric-admin"     # the recommended first admin: the one fabric- name a person may have (2.1.6.33)
 HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
                      r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
 
@@ -42,10 +44,11 @@ def _valid(key, value):
     Inputs:  key — setting name (host_ip, lan_gateway, lan_cidr, webui_admin_user, domain, hostname, friendly_name, or
              other); value — str.
     Returns: True if valid: an IPv4 address; an IPv4 network; an admin username matching ADMIN_RE that no system or
-             AD account uses (RESERVED, and not fabric-…); a domain of two labels or more that is not `.local` (mDNS)
-             or `localhost`; a host name of one label, at most 15 characters (the DC's NetBIOS name), not
-             `localhost`; an organisation name of 1-40 printable characters without quotes, backslashes or <> (the
-             CA's certificate names, at most 64 characters, are built from it); any other key just needs a value.
+             AD account uses (RESERVED, and not fabric-… other than FIRST_ADMIN, 2.1.6.33); a domain of two labels or
+             more that is not `.local` (mDNS) or `localhost`; a host name of one label, at most 15 characters (the
+             DC's NetBIOS name), not `localhost`; an organisation name of 1-40 printable characters without quotes,
+             backslashes or <> (the CA's certificate names, at most 64 characters, are built from it); any other key
+             just needs a value.
     Fails:   never — ValueError from ipaddress is turned into False.
     Feeds:   collect_vars (which required values to ask), _ask."""
     try:
@@ -54,7 +57,8 @@ def _valid(key, value):
         elif key == "lan_cidr":
             ipaddress.IPv4Network(value, strict=False)
         elif key == "webui_admin_user":
-            return bool(ADMIN_RE.match(value)) and value not in RESERVED and not value.startswith("fabric-")
+            return (bool(ADMIN_RE.match(value)) and value not in RESERVED
+                    and (value == FIRST_ADMIN or not value.startswith("fabric-")))
         elif key == "domain":
             low = value.lower()
             return (bool(HOST_RE.match(value)) and "." in value and not low.endswith(".local")
@@ -162,7 +166,7 @@ def collect_vars(ctx):
              (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required
              values are asked for (defaults from detect_network); webui_admin_user is chosen once; the AD domain
              and the password policy are asked when missing (ask_ad_domain), and once the memory fabric may use
-             (ask_ram).
+             (ask_ram); Kerberos sign-in when not set (ask_kerberos, 2.1.6.32; off unattended).
              Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
     Fails:   SetupError for a --file that would lower a sign-in layer (check_signin_lowering), for missing/invalid
              required values (the AD domain and policy included) with
@@ -224,11 +228,9 @@ def collect_vars(ctx):
             raise SetupError("friendly_name: 1-40 printable characters without quotes, backslashes or <>")
         data["friendly_name"] = "Home Network" if ctx.non_interactive else _ask("friendly_name", "Home Network")
 
-    # First web UI admin (created by the admin step). Chosen once, then kept.
+    # First web UI admin (created by the admin step). Chosen once, then kept; fabric-admin recommended (2.1.6.33).
     if not _valid("webui_admin_user", str(data.get("webui_admin_user") or "")):
-        sudo_user = os.environ.get("SUDO_USER", "")
-        default = sudo_user if sudo_user != "root" and _valid("webui_admin_user", sudo_user) else "fabricadmin"
-        data["webui_admin_user"] = default if ctx.non_interactive else _ask("webui_admin_user", default)
+        data["webui_admin_user"] = FIRST_ADMIN if ctx.non_interactive else _ask("webui_admin_user", FIRST_ADMIN)
 
     # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (2.1.6.11, 2.1.6.13)
     policy = data.get("ad_password_policy") or {}
@@ -240,6 +242,9 @@ def collect_vars(ctx):
         ask_ad_domain(ctx)
     # how much of this host fabric may use (2.1.2.3, manual 1.2.4.2): measured, asked once
     ask_ram(ctx, data)
+    # Kerberos sign-in: off unless asked for (2.1.6.32); an install that has it keeps its setting
+    if "signin_kerberos" not in data:
+        data["signin_kerberos"] = False if ctx.non_interactive else ask_kerberos()
 
     data["deploy_base_dir"] = ctx.deploy_base
     os.makedirs(ctx.config_dir, mode=0o750, exist_ok=True)
