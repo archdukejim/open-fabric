@@ -16,8 +16,8 @@
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
-  fabricctl dns-filter lists|status
-                                 the DNS filter's BIND resolver: fetch the lists now, their state
+  fabricctl dns-filter lists|status|log|stats|ingest
+                                 the DNS filter's BIND resolver: its lists, their state, the query log
   fabricctl dhcp status|leases|reserve|unreserve|add-subnet|set-subnet|remove-subnet|option|class
                                  DHCP (optional Kea): subnets, leases, reservations, options, client classes
   fabricctl radius status|log|add-client|rotate-secret|remove-client

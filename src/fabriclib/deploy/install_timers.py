@@ -4,13 +4,14 @@ import subprocess
 from fabriclib.common.copy_if_changed import copy_if_changed
 
 TIMERS = ["fabric-certs", "fabric-db-rotate"]   # fabric's scheduled jobs (`services` consent): 2.1.5.4, 2.1.7.4
-# timers of an optional part: installed while its flag is on, removed when it is off
-OPTIONAL = {"fabric-dns-lists": "install_resolver"}     # the DNS filter's lists, daily (manual 1.12.2.10)
+# timers of an optional part: installed while all its flags are on, removed when one is off
+OPTIONAL = {"fabric-dns-lists": ("install_resolver",),                    # the lists, daily (manual 1.12.2.10)
+            "fabric-dns-log": ("install_resolver", "install_keycloak")}  # the query log, 5 min (1.12.2.13)
 
 
 def install_timers(paths, v=None):
     """Purpose: install fabric's timers and their services and keep them enabled; an optional part's timer only
-             while that part is on (removed when it is turned off).
+             while every part it needs is on (removed when one is turned off).
     Inputs:  paths — deploy_paths() (jinja: the templates folder); v — rendered vars (the install_* flags of
              OPTIONAL); None: the optional timers are left as they are.
     Returns: True if a unit file changed (systemd reloaded here).
@@ -20,8 +21,8 @@ def install_timers(paths, v=None):
     on = list(TIMERS)
     off = []
     if v is not None:
-        for name, flag in OPTIONAL.items():
-            (on if v.get(flag) else off).append(name)
+        for name, flags in OPTIONAL.items():
+            (on if all(v.get(f) for f in flags) else off).append(name)
     changed = False
     for name in on:
         for kind in ("service", "timer"):

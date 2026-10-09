@@ -1,0 +1,10 @@
+[Unit]
+Description=fabric: the DNS filter's query log, every 5 minutes (manual 1.12.2.13, 2.1.12.5)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

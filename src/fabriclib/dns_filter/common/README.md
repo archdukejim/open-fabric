@@ -7,4 +7,5 @@ Helpers shared by the DNS filter's files (manual [1.12.2](../../../../docs/volum
 | `filter_zones.py` | fabric's own zones: forwarded to this site's BIND and never filtered |
 | `list_zone.py` | A list's zone name, from its URL (stable when lists are reordered or renamed) |
 | `resolver_paths.py` | The resolver's folders and files under the deploy base |
+| `dnslog_psql.py` | SQL for the query log through psql in the Postgres container (local socket, SQL on stdin) |
 | `resolver_rndc.py` | Run rndc in the resolver's container, with its own control key |

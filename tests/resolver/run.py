@@ -290,6 +290,12 @@ try:
           f"ads.example/A/IN via ads.example.{zone1}" in log, log[-600:])
     check("the query log names the client and the view", f"{GATEWAY}#" in open(f"{W}/resolver/log/query.log").read()
           and "view everyone: query: ads.example" in open(f"{W}/resolver/log/query.log").read())
+    from fabriclib.dns_filter.ingest_dns_log import QUERY, RPZ, _rows  # noqa: E402
+    q_rows, q_skip = _rows(open(f"{W}/resolver/log/query.log").read().splitlines(), QUERY, False)
+    r_rows, r_skip = _rows(open(f"{W}/resolver/log/rpz.log").read().splitlines(), RPZ, True)
+    check("the query-log job parses every line BIND wrote (query and RPZ logs), the list's zone taken from 'via'",
+          q_rows and r_rows and q_skip == 0 and r_skip == 0 and any(f"\t{zone1}" in row for row in r_rows),
+          (q_skip, r_skip, r_rows[:2]))
     if internet:
         check("an internet name resolves over DoT, DNSSEC validated", " ad;" in dig("+dnssec", "example.com")
               and status("example.com") == "NOERROR", dig("+dnssec", "example.com"))

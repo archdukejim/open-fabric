@@ -7,6 +7,7 @@ GET = {
     ("zones",): "dns:read", ("zones", "*"): "dns:read", ("reverse-zones",): "dns:read", ("tsig",): "dns:read",
     ("audit",): "audit:read",
     ("dhcp",): "dhcp:read",
+    ("dns-filter",): "dns:filter",
     ("radius",): "radius:read", ("radius", "guides"): "radius:read",
     ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read", ("pki", "acme"): "pki:read",
     ("devices",): "devices:read",
@@ -20,6 +21,7 @@ POST = {
     ("security", "raise"): "security:raise", ("security", "kerberos"): "security:raise",
     ("zones", "*", "records"): "dns:write", ("zones", "*", "records", "delete"): "dns:write",
     ("apply",): "dns:write",
+    ("dns-filter", "querylog"): "dns:querylog",        # who looked up what: the admin bundle only (2.1.12.4)
     ("pki", "describe-csr"): "pki:read", ("pki", "inspect"): "pki:read",
     ("pki", "sign"): "pki:sign", ("pki", "revoke"): "pki:revoke",
     ("pki", "issue"): "pki:issue", ("pki", "convert"): "pki:issue",
