@@ -27,6 +27,9 @@ PERMISSIONS = {
     "people:read": "see realm users",
     "people:create": "create realm users",
     "people:reset": "reset a user's sign-in (password, TOTP)",
+    "people:disable": "disable a user's sign-in everywhere at once, or enable it again",
+    "people:remove": "remove a user and revoke their certificates",
+    "people:groups": "change which groups a user is in",
     "domain:read": "see the domain: its controller, password policy, machines and Group Policy settings",
     "machines:admin": "pre-create, disable, enable and remove the site's machines",
     "gpo:admin": "set and clear policies in the site's admin settings GPO",
@@ -55,5 +58,5 @@ BUNDLES = {
     "fabric-pki-operator": ["status:read", "pki:read", "pki:issue", "pki:sign", "pki:revoke", "pki:link-device",
                            "devices:read"],
     "fabric-helpdesk": ["status:read", "dns:read", "pki:read", "devices:read", "devices:enroll", "people:read",
-                        "people:create", "people:reset", "domain:read"],
+                        "people:create", "people:reset", "people:disable", "domain:read"],
 }

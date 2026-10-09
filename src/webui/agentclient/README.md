@@ -46,6 +46,7 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `remove_radius_client.py` | Remove a RADIUS client; saved and applied at once. Agent route: POST /v1/radius/clients/<name>/delete (radius:admin), timeout 300 s. |
 | `remove_reservation.py` | Remove a DHCP reservation and apply at once. Agent route: POST /v1/dhcp/reservations/<mac>/delete (dhcp:write), timeout 300 s. |
 | `reset_sign_in.py` | Reset a person's sign-in: new one-time password, TOTP removed, sessions ended. Agent route: POST /v1/people/<uid>/reset (people:reset). |
+| `person_action.py` | Disable, enable or remove a person, or change their groups. Agent routes: POST /v1/people/<uid>/disable\|enable (people:disable), /delete (people:remove), /groups (people:groups). |
 | `reverse_zones.py` | The reverse (PTR) zones apply generates from the A/AAAA records. Agent route: GET /v1/reverse-zones (dns:read). |
 | `rotate_radius_secret.py` | Give a RADIUS client a new shared secret; saved and applied at once. Agent route: POST /v1/radius/clients/<name>/rotate (radius:admin), timeout 300 s. |
 | `rotate_tsig_key.py` | Give a TSIG key a new secret. Agent route: POST /v1/tsig/<name>/rotate (tsig:manage). |

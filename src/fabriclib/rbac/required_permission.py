@@ -31,6 +31,8 @@ POST = {
     ("devices", "*", "certs"): "pki:link-device",
     ("roles",): "roles:admin", ("roles", "*"): "roles:admin", ("roles", "*", "delete"): "roles:admin",
     ("people",): "people:create", ("people", "*", "reset"): "people:reset",
+    ("people", "*", "disable"): "people:disable", ("people", "*", "enable"): "people:disable",
+    ("people", "*", "delete"): "people:remove", ("people", "*", "groups"): "people:groups",
     ("machines",): "machines:admin", ("machines", "*", "enable"): "machines:admin",
     ("machines", "*", "disable"): "machines:admin", ("machines", "*", "delete"): "machines:admin",
     ("gpo", "search"): "domain:read", ("gpo", "set"): "gpo:admin", ("gpo", "clear"): "gpo:admin",

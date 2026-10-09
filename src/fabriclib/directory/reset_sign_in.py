@@ -1,11 +1,8 @@
-import urllib.parse
-
-from fabriclib.common.errors import ValidationError
 from fabriclib.common.write_audit import write_audit
+from fabriclib.directory.common.person_guard import person_guard
 from fabriclib.directory.people_password import people_password
 from fabriclib.directory.run_op import run_op
-from fabriclib.keycloak.fabric_groups import fabric_groups
-from fabriclib.keycloak.keycloak_admin import keycloak_admin
+from fabriclib.keycloak.sign_out_person import sign_out_person
 from fabriclib.secrets.load_secrets import load_secrets
 
 
@@ -24,21 +21,9 @@ def reset_sign_in(v, actor, uid, privileged=False, source="web", secrets=None):
     Notes:   members of fabric groups need `privileged`: otherwise the helpdesk could take over an admin's single
              sign-on. Audited as PERSON_RESET."""
     secrets = secrets if secrets is not None else load_secrets()
-    person = run_op(v, secrets, "get_person", {"uid": uid})
-    held = sorted(set(person["groups"]) & fabric_groups(v))
-    if held and not privileged:
-        raise ValidationError(f"{uid} is in a fabric group ({', '.join(held)}): only an admin can reset their sign-in")
+    person_guard(v, secrets, uid, privileged, "reset their sign-in")
     password = people_password(v)
     run_op(v, secrets, "reset_password", {"uid": uid, "password": password})
-    try:
-        kc, realm = keycloak_admin(v, secrets)
-        r, u = urllib.parse.quote(realm, safe=""), urllib.parse.quote(uid, safe="")
-        for user in kc.call("GET", f"/{r}/users?username={u}&exact=true")[1]:
-            for cred in kc.call("GET", f"/{r}/users/{user['id']}/credentials")[1]:
-                if cred.get("type") == "otp":
-                    kc.call("DELETE", f"/{r}/users/{user['id']}/credentials/{cred['id']}")
-            kc.call("POST", f"/{r}/users/{user['id']}/logout")
-    except SystemExit as exc:                 # the admin client's way of saying Keycloak refused
-        raise ValidationError(f"Keycloak refused: {exc}")
+    sign_out_person(v, secrets, uid, drop_otp=True)
     write_audit(actor, "PERSON_RESET", f"user={uid} (password, TOTP, sessions)", source)
     return password

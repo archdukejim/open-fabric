@@ -11,6 +11,10 @@ account, so AD's per-site limits apply to it.
 | `list_people.py` | The People page: every person and group (never a password) and the Keycloak console link |
 | `create_person.py` | A new person in this site (POSIX identity from its block, `<site>-users`, a one-time password) |
 | `reset_sign_in.py` | A new one-time password in AD; TOTP removed and sessions ended in Keycloak (fabric groups: admins only) |
+| `set_person_enabled.py` | Disable a person of this site (sign-in refused, sessions ended), or enable them again (audited) |
+| `remove_person.py` | Remove a person of this site (the user name typed back): account, Keycloak user, their certificates revoked (audited) |
+| `set_person_group.py` | Put a person in a group or take them out (fabric groups: admins only; audited) |
+| `run_people_command.py` | `fabricctl people`: routes to the people functions |
 | `ensure_admin.py` | Setup's first admin: made once, kept in the web UI's admin group |
 | `people_password.py` | A one-time password the domain's policy accepts |
 | `constants.py` | Device types, the permission vocabulary (what it grants, what enforces it), name rules, the default device roles |

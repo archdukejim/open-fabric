@@ -574,6 +574,13 @@ out = agent_call("POST", "/v1/people", "carol", AUDITOR_ROLES, {"uid": "mallory"
 check("auditor token: may not create people (403, people:create)", " 403 " in out and "people:create" in out, out)
 out = agent_call("POST", "/v1/people/alice/reset", "carol", AUDITOR_ROLES)
 check("auditor token: may not reset a sign-in (403, people:reset)", " 403 " in out and "people:reset" in out, out)
+for route, perm in (("disable", "people:disable"), ("enable", "people:disable"), ("delete", "people:remove"),
+                    ("groups", "people:groups")):
+    out = agent_call("POST", f"/v1/people/alice/{route}", "carol", AUDITOR_ROLES, {"confirm": "alice"})
+    check(f"auditor token: may not {route} a person (403, {perm})", " 403 " in out and perm in out, out)
+for route, perm in (("delete", "people:remove"), ("groups", "people:groups")):
+    out = agent_call("POST", f"/v1/people/alice/{route}", "carol", bundle_roles("fabric-helpdesk"), {"confirm": "alice"})
+    check(f"helpdesk token: may not {route} a person (403, {perm}: admins only)", " 403 " in out and perm in out, out)
 out = agent_call("POST", "/v1/radius/clients", "carol", AUDITOR_ROLES, {"name": "evil", "address": "192.168.7.66"})
 check("auditor token: may not add a RADIUS client (403, radius:admin)", " 403 " in out and "radius:admin" in out, out)
 out = agent_call("POST", "/v1/radius/clients", "carol", bundle_roles("fabric-network-operator"),

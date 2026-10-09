@@ -43,6 +43,7 @@ from webui.agentclient.remove_radius_client import remove_radius_client  # noqa:
 from webui.agentclient.remove_reservation import remove_reservation  # noqa: F401
 from webui.agentclient.remove_subnet import remove_subnet  # noqa: F401
 from webui.agentclient.reset_sign_in import reset_sign_in  # noqa: F401
+from webui.agentclient.person_action import person_action  # noqa: F401
 from webui.agentclient.reverse_zones import reverse_zones  # noqa: F401
 from webui.agentclient.rotate_radius_secret import rotate_radius_secret  # noqa: F401
 from webui.agentclient.rotate_tsig_key import rotate_tsig_key  # noqa: F401

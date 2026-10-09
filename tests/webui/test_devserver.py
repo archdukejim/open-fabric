@@ -137,6 +137,25 @@ try:
     check("people page (admin): people, add form, reset buttons, Keycloak link for fabric groups",
           "jim@home.arpa" in page and "Keycloak admin console" in page and "/directory/people/_new" in page
           and "Reset sign-in" in page)
+    check("people page (admin): disable buttons, the group form and the remove form (2.1.6.30)",
+          "/directory/people/sam/disable" in page and "/directory/people/_form/groups" in page
+          and "/directory/people/_form/delete" in page, page[-800:])
+    st, loc, _, _ = req("POST", "/directory/people/sam/disable", {"csrf": "dev"})
+    page = req("GET", "/directory?view=people")[3]
+    check("disable a person -> listed locked, an enable button instead", st == 303 and "disabled" in (loc or "")
+          and "/directory/people/sam/enable" in page, loc)
+    st, loc, _, _ = req("POST", "/directory/people/sam/enable", {"csrf": "dev"})
+    check("enable them again", st == 303 and "enabled" in (loc or "")
+          and "/directory/people/sam/disable" in req("GET", "/directory?view=people")[3], loc)
+    st, loc, _, _ = req("POST", "/directory/people/_form/groups", {"csrf": "dev", "uid": "sam", "group": "admins",
+                                                                   "action": "add"})
+    check("put a person in a group (the form picks them)", st == 303 and "added+to+admins" in (loc or ""), loc)
+    st, loc, _, _ = req("POST", "/directory/people/_form/delete", {"csrf": "dev", "uid": "sam", "confirm": "sma"})
+    check("refused: a removal without the user name typed back", st == 303 and "type+the+user+name" in (loc or ""),
+          loc)
+    st, loc, _, _ = req("POST", "/directory/people/_form/delete", {"csrf": "dev", "uid": "sam", "confirm": "sam"})
+    check("remove a person with the user name typed back -> gone from the list", st == 303
+          and "removed" in (loc or "") and "sam@home.arpa" not in req("GET", "/directory?view=people")[3], loc)
     page = req("GET", "/directory?view=domain")[3]
     check("domain section: the domain, its controller running, the password policy",
           "ad.home.arpa" in page and "pi-core.ad.home.arpa" in page and "minimum length" in page, page[-600:])
@@ -208,6 +227,14 @@ try:
     check("helpdesk: reset a plain user's sign-in", st == 200 and "sign-in reset" in page)
     st, loc, _, _ = req("POST", "/directory/people/jim/reset", {"csrf": "dev"})
     check("helpdesk: an admin's sign-in cannot be reset", st == 303 and "only%20an%20admin" in (loc or ""), loc)
+    page = req("GET", "/directory?view=people")[3]
+    check("helpdesk: disable buttons, but no group or remove form (people:groups, people:remove are admins')",
+          "/directory/people/sam/disable" in page and "/directory/people/_form/groups" not in page
+          and "/directory/people/_form/delete" not in page)
+    st, loc, _, _ = req("POST", "/directory/people/sam/disable", {"csrf": "dev"})
+    check("helpdesk: disable a plain user", st == 303 and "disabled" in (loc or ""), loc)
+    st, loc, _, _ = req("POST", "/directory/people/jim/disable", {"csrf": "dev"})
+    check("helpdesk: refused: disabling an admin", st == 303 and "only+an+admin" in (loc or ""), loc)
 finally:
     proc.terminate()
     proc.wait(timeout=5)
@@ -226,7 +253,8 @@ try:
     check("--as fabric-auditor: records shown, no add form", "nas" in page and "/add" not in page and "as fabric-auditor" in page)
     page = req("GET", "/directory?view=people")[3]
     check("--as fabric-auditor: people listed, no add form or reset buttons",
-          "jim@home.arpa" in page and "/directory/people/_new" not in page and "Reset sign-in" not in page)
+          "jim@home.arpa" in page and "/directory/people/_new" not in page and "Reset sign-in" not in page
+          and "/disable" not in page and "/directory/people/_form/" not in page)
 finally:
     proc.terminate()
     proc.wait(timeout=5)

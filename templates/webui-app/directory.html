@@ -97,9 +97,28 @@
 <table><thead><tr><th></th><th>User</th><th>Name</th><th>E-mail</th><th>Groups</th><th></th></tr></thead><tbody>
 {% for u in people.users %}<tr><td><span class="light {{ 'bad' if u.locked else 'ok' }}" title="{{ 'locked' if u.locked else 'active' }}"></span></td>
 <td>{{ u.uid }}</td><td>{{ u.name }}</td><td>{{ u.mail or '—' }}</td><td>{{ u.groups | join(', ') or '—' }}</td>
-<td class="num">{% if can('people:reset') %}<form method="post" action="/directory/people/{{ u.uid | urlencode }}/reset"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost" title="new one-time password, TOTP enrolled again, sessions ended">Reset sign-in</button></form>{% endif %}</td></tr>{% endfor %}
+<td class="num">{% if can('people:reset') %}<form method="post" action="/directory/people/{{ u.uid | urlencode }}/reset"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost" title="new one-time password, TOTP enrolled again, sessions ended">Reset sign-in</button></form>{% endif %}
+{% if can('people:disable') %}{% set act = 'enable' if u.locked else 'disable' %}<form method="post" action="/directory/people/{{ u.uid | urlencode }}/{{ act }}"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="ghost" title="{{ 'allow sign-in again' if u.locked else 'block every sign-in at once; their sessions end' }}">{{ act | capitalize }}</button></form>{% endif %}</td></tr>{% endfor %}
 </tbody></table>{% else %}<p class="blank">No users.</p>{% endif %}
 </section>
+{% if people.users and can('people:groups') %}<section class="card"><h2>Group membership</h2>
+<form method="post" action="/directory/people/_form/groups" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Person<select name="uid" required>{% for u in people.users %}<option>{{ u.uid }}</option>{% endfor %}</select></label>
+<label>Group<select name="group" required>{% for g in people.groups %}<option>{{ g.name }}</option>{% endfor %}</select></label>
+<div><button name="action" value="add">Add to group</button> <button name="action" value="remove" class="ghost">Remove from group</button></div>
+</form>
+<p class="muted small">This site's groups, and the organisation's at the root site. Fabric's groups (admins, auditors, operators, helpdesk) carry permissions: only an admin changes them, and the last admin who can sign in is never taken out. Keycloak reads the change at the person's next sign-in.</p>
+</section>{% endif %}
+{% if people.users and can('people:remove') %}<section class="card"><h2>Remove a person</h2>
+<form method="post" action="/directory/people/_form/delete" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}">
+<label>Person<select name="uid" required>{% for u in people.users %}<option>{{ u.uid }}</option>{% endfor %}</select></label>
+<label>Type their user name to confirm<input name="confirm" required autocomplete="off"></label>
+<div><button class="danger">Remove</button></div>
+</form>
+<p class="muted small">Their sessions end, their account and group memberships go, and the certificates fabric issued to them are revoked at once. Only this site's people; never yourself or the last admin.</p>
+</section>{% endif %}
 {% if can('people:create') %}<section class="card"><h2>Add a person</h2>
 <form method="post" action="/directory/people/_new" class="grid">
 <input type="hidden" name="csrf" value="{{ ctx.csrf }}">

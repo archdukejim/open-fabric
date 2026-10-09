@@ -546,6 +546,48 @@ check("sso remove: the client is gone; removing it again is refused",
       kc.call("GET", f"{R}/clients?clientId=app-proxmox")[1] == []
       and refused(remove_app_client, kc, REALM, "proxmox"))
 
+# ---- disabling and removing a person (fabricctl people, 2.1.6.30): their sessions end at once, sign-in refused
+import fabriclib.directory.remove_person as remove_mod  # noqa: E402
+import fabriclib.directory.set_person_enabled as enabled_mod  # noqa: E402
+
+PEOPLE_AUDIT = []
+for mod in (enabled_mod, remove_mod):
+    mod.write_audit = lambda actor, event, detail, source: PEOPLE_AUDIT.append(event)
+pv = {**v, "deploy_base_dir": os.path.join(W, "opt")}
+ps = {**secrets, "keycloak_admin_user": "admin", "keycloak_admin_password": "KcAdmin1"}
+fred_pw = "Fr-" + random_password(20)
+person("fred")
+sh(["docker", "exec", DC, "samba-tool", "user", "setpassword", "fred", f"--newpassword={fred_pw}", "-s",
+    "/data/etc/smb.conf"])
+st, location, page = sign_in(Browser(root_ca), APP_AUTH, "fred", fred_pw)
+fred_kc = kc.call("GET", f"{R}/users?username=fred&exact=true")[1]
+sessions = kc.call("GET", f"{R}/users/{fred_kc[0]['id']}/sessions")[1] if fred_kc else []
+check("a person signs in through Keycloak (a session held)", "code=" in location and sessions,
+      (st, location[:120], page[:200]))
+done = enabled_mod.set_person_enabled(pv, "root", "fred", False, privileged=True, source="cli", secrets=ps,
+                                      container=DC)
+check("disable: their Keycloak sessions end at once", done["changed"]
+      and kc.call("GET", f"{R}/users/{fred_kc[0]['id']}/sessions")[1] == [], done)
+st, location, page = sign_in(Browser(root_ca), APP_AUTH, "fred", fred_pw)
+check("disable: a new sign-in is refused, and so is NTLM", "code=" not in location and not ntlm_signs_in("fred", fred_pw),
+      page[:300])
+enabled_mod.set_person_enabled(pv, "root", "fred", True, privileged=True, source="cli", secrets=ps, container=DC)
+st, location, page = sign_in(Browser(root_ca), APP_AUTH, "fred", fred_pw)
+check("enable: they sign in again", "code=" in location,
+      (st, location[:120], re.findall(r'(?s)<span[^>]*(?:kc-feedback-text|input-error)[^>]*>(.*?)</span>', page)))
+check("refused: disabling the last admin who can sign in, or a remove without the user name typed back",
+      refused(enabled_mod.set_person_enabled, pv, "root", "jim", False, True, "cli", ps, DC)
+      and refused(remove_mod.remove_person, pv, "root", "fred", "fre", True, "cli", ps, DC))
+check("refused: the helpdesk disabling an admin (a fabric group's member)",
+      refused(enabled_mod.set_person_enabled, pv, "helper", "jim", False, False, "web", ps, DC))
+ledger, revoked = os.path.join(W, "issued.jsonl"), os.path.join(W, "revoked.jsonl")
+gone = remove_mod.remove_person(pv, "root", "fred", "fred", privileged=True, source="cli", secrets=ps, container=DC,
+                                ledger=ledger, revoked=revoked)
+check("remove: the directory account and Keycloak's copy are gone, sign-in refused",
+      gone == {"uid": "fred", "revoked": []} and kc.call("GET", f"{R}/users?username=fred&exact=true")[1] == []
+      and not ntlm_signs_in("fred", fred_pw), gone)
+check("each change audited", PEOPLE_AUDIT == ["PERSON_DISABLE", "PERSON_ENABLE", "PERSON_REMOVE"], PEOPLE_AUDIT)
+
 if not os.environ.get("KEYCLOAK_TEST_KEEP"):
     cleanup()
 print(f"\n{PASS} passed, {FAIL} failed")

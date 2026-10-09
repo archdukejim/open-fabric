@@ -4,6 +4,34 @@ from webui import views
 from webui.devpreview.fabric_rules import ValidationError, list_devices
 
 
+def _person_change(state, ctx, users, target, op, form):
+    """Purpose: disable, enable, remove a person or change their groups, in memory, with the agent's refusals (a
+             fabric-group member without system:admin; yourself; the user name not typed back).
+    Inputs:  state — the dev state; ctx — the page context (user, perms); users — the people list (changed in
+             place); target — the person's entry; op — "disable", "enable", "delete" or "groups"; form — dict.
+    Returns: str, the query string's msg= or err= part.
+    Fails:   never.
+    Feeds:   dev_post_directory."""
+    uid = target["uid"]
+    if set(target["groups"]) - {"users"} and "system:admin" not in ctx["perms"]:
+        return urllib.parse.urlencode({"err": f"{uid} is in a fabric group: only an admin can change them"})
+    if op in ("disable", "delete") and uid == ctx.get("user"):
+        return urllib.parse.urlencode({"err": f"you cannot {'remove' if op == 'delete' else op} yourself"})
+    if op == "delete":
+        if form.get("confirm", "").strip() != uid:
+            return urllib.parse.urlencode({"err": "type the user name to confirm"})
+        users.remove(target)
+        state.log("PERSON_REMOVE", f"user={uid} (dev preview)")
+        return urllib.parse.urlencode({"msg": f"{uid} removed; certificates revoked: 0 (in memory)."})
+    if op == "groups":
+        group, add = form.get("group", ""), form.get("action") == "add"
+        target["groups"] = sorted(set(target["groups"]) | {group} if add else set(target["groups"]) - {group})
+        return urllib.parse.urlencode({"msg": f"{uid} {'added to' if add else 'removed from'} {group} (in memory)."})
+    target["locked"] = op == "disable"
+    state.log("PERSON_DISABLE" if op == "disable" else "PERSON_ENABLE", f"user={uid} (dev preview)")
+    return urllib.parse.urlencode({"msg": f"{uid} {op}d (in memory)."})
+
+
 def dev_post_directory(h, path, form):
     """Purpose: People, devices and roles acted out in memory, with the real fabriclib rules when available.
     Inputs:  h — the dev handler (send, state, ctx); path — /directory/people/<_new|uid>[/reset] or
@@ -27,7 +55,12 @@ def dev_post_directory(h, path, form):
             state.log("PERSON_CREATE", f"user={uid} (dev preview)")
             h.send(200, views.person_result(ctx, uid, "created", "dev-preview-not-real"))
             return True
+        if name == "_form":                  # the forms that pick the person
+            name = form.get("uid", "")
         target = next((u for u in users if u["uid"] == name), None)
+        if op in ("disable", "enable", "delete", "groups") and target:
+            h.send(303, b"", location="/directory?view=people&" + _person_change(state, ctx, users, target, op, form))
+            return True
         if op != "reset" or not target:
             h.send(404, views.error_page(404, "Not found."))
             return True

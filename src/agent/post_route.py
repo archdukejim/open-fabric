@@ -12,7 +12,10 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.write_audit import write_audit
 from fabriclib.directory.create_person import create_person
+from fabriclib.directory.remove_person import remove_person
 from fabriclib.directory.reset_sign_in import reset_sign_in
+from fabriclib.directory.set_person_enabled import set_person_enabled
+from fabriclib.directory.set_person_group import set_person_group
 from fabriclib.system.apply_changes import apply_changes
 
 EVENT_ACTIONS = {"LOGIN", "LOGOUT", "LOGIN_DENIED"}
@@ -24,6 +27,9 @@ def post_route(route, actor, data, perms):
              JSON body; perms — the token's permissions (None for a root peer).
     Returns: the operation's JSON-serialisable result. apply: {"ok", "output"}; people: {"password"} (one-time,
              shown once); people/<uid>/reset: {"password"} — fabric-group members only with system:admin (or root);
+             people/<uid>/disable|enable: {"uid", "enabled", "changed"}; people/<uid>/delete (body: confirm, the
+             user name typed back): {"uid", "revoked"}; people/<uid>/groups (body: action add|remove, group):
+             {"uid", "group", "member", "changed"} — each a fabric-group member's only with system:admin (or root);
              events: {} after the login audit line.
     Fails:   ValidationError (-> 400) for an unsupported event or what fabriclib refuses; RouteNotFound (-> 404).
     Feeds:   agent/handler.py (dispatch).
@@ -54,6 +60,18 @@ def post_route(route, actor, data, perms):
     if len(route) == 3 and route[0] == "people" and route[2] == "reset":
         privileged = perms is None or "system:admin" in perms     # root, or the admin bundle
         return {"password": reset_sign_in(load_vars(), actor, route[1], privileged)}
+    if len(route) == 3 and route[0] == "people" and route[2] in ("disable", "enable"):
+        privileged = perms is None or "system:admin" in perms
+        return set_person_enabled(load_vars(), actor, route[1], route[2] == "enable", privileged)
+    if len(route) == 3 and route[0] == "people" and route[2] == "delete":
+        privileged = perms is None or "system:admin" in perms
+        return remove_person(load_vars(), actor, route[1], read_text(data, "confirm"), privileged)
+    if len(route) == 3 and route[0] == "people" and route[2] == "groups":
+        privileged = perms is None or "system:admin" in perms
+        action = data.get("action")
+        if action not in ("add", "remove"):
+            raise ValidationError("action: add or remove")
+        return set_person_group(load_vars(), actor, read_text(data, "group"), route[1], action == "add", privileged)
     if route == ["events"]:
         action = data.get("action")
         if action not in EVENT_ACTIONS:

@@ -51,6 +51,7 @@ file	fabricctl-jinja|src/containers/samba/ensure_site_link.py	58
 file	fabricctl-jinja|src/containers/samba/ensure_sso_account.py	66	
 file	fabricctl-jinja|src/containers/samba/ensure_sudo_rule.py	47	
 file	fabricctl-jinja|src/containers/samba/find_machine.py	53	
+file	fabricctl-jinja|src/containers/samba/find_person.py	68	
 file	fabricctl-jinja|src/containers/samba/get_person.py	31	
 file	fabricctl-jinja|src/containers/samba/gpo_tool.py	51	
 file	fabricctl-jinja|src/containers/samba/link_device_cert.py	34	
@@ -67,8 +68,10 @@ file	fabricctl-jinja|src/containers/samba/read_networks.py	45
 file	fabricctl-jinja|src/containers/samba/read_replication.py	60	
 file	fabricctl-jinja|src/containers/samba/read_sites.py	65	
 file	fabricctl-jinja|src/containers/samba/remove_device.py	37	
+file	fabricctl-jinja|src/containers/samba/remove_group_member.py	69	
 file	fabricctl-jinja|src/containers/samba/remove_ipv6_records.py	67	
 file	fabricctl-jinja|src/containers/samba/remove_machine.py	55	
+file	fabricctl-jinja|src/containers/samba/remove_person.py	70	
 file	fabricctl-jinja|src/containers/samba/remove_role.py	38	
 file	fabricctl-jinja|src/containers/samba/reset_password.py	33	
 file	fabricctl-jinja|src/containers/samba/root_ca_policy.py	22	
@@ -77,6 +80,7 @@ file	fabricctl-jinja|src/containers/samba/save_role.py	40
 file	fabricctl-jinja|src/containers/samba/set_gpo_acl.py	59	
 file	fabricctl-jinja|src/containers/samba/set_machine.py	56	
 file	fabricctl-jinja|src/containers/samba/set_password_policy.py	23	
+file	fabricctl-jinja|src/containers/samba/set_person.py	71	
 file	fabricctl-jinja|src/containers/samba/share_winbind.py	43	
 file	fabricctl-jinja|src/containers/samba/site_info.py	28	
 file	fabricctl-jinja|src/containers/samba/site_roles.py	64	
@@ -193,6 +197,7 @@ file	fabriclib-directory|src/fabriclib/directory/add_role.py	8
 file	fabriclib-directory|src/fabriclib/directory/common/check_device_fields.py	9	
 file	fabriclib-directory|src/fabriclib/directory/common/check_role_fields.py	10	
 file	fabriclib-directory|src/fabriclib/directory/common/normalize_mac.py	11	
+file	fabriclib-directory|src/fabriclib/directory/common/person_guard.py	27	
 file	fabriclib-directory|src/fabriclib/directory/common/read_directory.py	12	
 file	fabriclib-directory|src/fabriclib/directory/create_person.py	2	
 file	fabriclib-directory|src/fabriclib/directory/device_overview.py	13	
@@ -206,11 +211,15 @@ file	fabriclib-directory|src/fabriclib/directory/list_roles.py	17
 file	fabriclib-directory|src/fabriclib/directory/people_password.py	5	
 file	fabriclib-directory|src/fabriclib/directory/remove_device.py	18	
 file	fabriclib-directory|src/fabriclib/directory/remove_machine.py	25	
+file	fabriclib-directory|src/fabriclib/directory/remove_person.py	28	
 file	fabriclib-directory|src/fabriclib/directory/remove_role.py	19	
 file	fabriclib-directory|src/fabriclib/directory/require_device.py	20	
 file	fabriclib-directory|src/fabriclib/directory/reset_sign_in.py	6	
 file	fabriclib-directory|src/fabriclib/directory/run_op.py	1	
+file	fabriclib-directory|src/fabriclib/directory/run_people_command.py	29	
 file	fabriclib-directory|src/fabriclib/directory/set_machine_enabled.py	26	
+file	fabriclib-directory|src/fabriclib/directory/set_person_enabled.py	30	
+file	fabriclib-directory|src/fabriclib/directory/set_person_group.py	31	
 file	fabriclib-directory|src/fabriclib/directory/update_device.py	21	
 file	fabriclib-directory|src/fabriclib/directory/update_role.py	22	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py	1	
@@ -301,6 +310,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/admin_client.py	1
 file	fabriclib-keycloak|src/fabriclib/keycloak/app_client_id.py	22	
 file	fabriclib-keycloak|src/fabriclib/keycloak/configure_keycloak.py	2	
 file	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py	3	0.5.0 / 2026-10-04
+file	fabriclib-keycloak|src/fabriclib/keycloak/enable_person.py	30	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py	4	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_group_mapper.py	5	
 file	fabriclib-keycloak|src/fabriclib/keycloak/ensure_ldap_federation.py	6	
@@ -320,6 +330,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py	24
 file	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py	16	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py	25	
+file	fabriclib-keycloak|src/fabriclib/keycloak/sign_out_person.py	29	
 file	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py	28	
 file	fabriclib-keycloak|src/fabriclib/keycloak/step.py	18	
 file	fabriclib-keycloak|src/fabriclib/keycloak/user_has_role.py	19	
@@ -610,6 +621,7 @@ file	webui|src/webui/agentclient/list_tsig_keys.py	26
 file	webui|src/webui/agentclient/list_zones.py	27	
 file	webui|src/webui/agentclient/machine_action.py	128	
 file	webui|src/webui/agentclient/map_radius_group.py	28	
+file	webui|src/webui/agentclient/person_action.py	138	
 file	webui|src/webui/agentclient/quote_segment.py	29	
 file	webui|src/webui/agentclient/radius_guides.py	30	
 file	webui|src/webui/agentclient/radius_overview.py	31	
@@ -824,6 +836,7 @@ function	fabricctl-jinja|src/containers/samba/ensure_sso_account.py|ensure_sso_a
 function	fabricctl-jinja|src/containers/samba/ensure_sudo_rule.py|_exists	2	
 function	fabricctl-jinja|src/containers/samba/ensure_sudo_rule.py|ensure_sudo_rule	1	
 function	fabricctl-jinja|src/containers/samba/find_machine.py|find_machine	1	
+function	fabricctl-jinja|src/containers/samba/find_person.py|find_person	1	
 function	fabricctl-jinja|src/containers/samba/get_person.py|get_person	1	
 function	fabricctl-jinja|src/containers/samba/gpo_tool.py|_policy	1	
 function	fabricctl-jinja|src/containers/samba/gpo_tool.py|_without	2	
@@ -860,8 +873,10 @@ function	fabricctl-jinja|src/containers/samba/read_replication.py|_when	1
 function	fabricctl-jinja|src/containers/samba/read_replication.py|read_replication	2	
 function	fabricctl-jinja|src/containers/samba/read_sites.py|read_sites	1	
 function	fabricctl-jinja|src/containers/samba/remove_device.py|remove_device	1	
+function	fabricctl-jinja|src/containers/samba/remove_group_member.py|remove_group_member	1	
 function	fabricctl-jinja|src/containers/samba/remove_ipv6_records.py|remove_ipv6_records	1	
 function	fabricctl-jinja|src/containers/samba/remove_machine.py|remove_machine	1	
+function	fabricctl-jinja|src/containers/samba/remove_person.py|remove_person	1	
 function	fabricctl-jinja|src/containers/samba/remove_role.py|remove_role	1	
 function	fabricctl-jinja|src/containers/samba/reset_password.py|reset_password	1	
 function	fabricctl-jinja|src/containers/samba/root_ca_policy.py|root_ca_policy	1	
@@ -872,6 +887,7 @@ function	fabricctl-jinja|src/containers/samba/set_gpo_acl.py|set_gpo_acl	1
 function	fabricctl-jinja|src/containers/samba/set_machine.py|set_machine	1	
 function	fabricctl-jinja|src/containers/samba/set_password_policy.py|_ticks	1	
 function	fabricctl-jinja|src/containers/samba/set_password_policy.py|set_password_policy	2	
+function	fabricctl-jinja|src/containers/samba/set_person.py|set_person	1	
 function	fabricctl-jinja|src/containers/samba/share_winbind.py|share_winbind	1	
 function	fabricctl-jinja|src/containers/samba/site_info.py|site_info	1	
 function	fabricctl-jinja|src/containers/samba/site_roles.py|role_group	1	
@@ -1036,6 +1052,8 @@ function	fabriclib-directory|src/fabriclib/directory/add_role.py|add_role	1
 function	fabriclib-directory|src/fabriclib/directory/common/check_device_fields.py|check_device_fields	1	
 function	fabriclib-directory|src/fabriclib/directory/common/check_role_fields.py|check_role_fields	1	
 function	fabriclib-directory|src/fabriclib/directory/common/normalize_mac.py|normalize_mac	1	
+function	fabriclib-directory|src/fabriclib/directory/common/person_guard.py|_other_admins	1	
+function	fabriclib-directory|src/fabriclib/directory/common/person_guard.py|person_guard	2	
 function	fabriclib-directory|src/fabriclib/directory/common/read_directory.py|read_directory	1	
 function	fabriclib-directory|src/fabriclib/directory/create_person.py|create_person	1	
 function	fabriclib-directory|src/fabriclib/directory/device_overview.py|device_overview	1	
@@ -1049,11 +1067,19 @@ function	fabriclib-directory|src/fabriclib/directory/list_roles.py|list_roles	1
 function	fabriclib-directory|src/fabriclib/directory/people_password.py|people_password	1	
 function	fabriclib-directory|src/fabriclib/directory/remove_device.py|remove_device	1	
 function	fabriclib-directory|src/fabriclib/directory/remove_machine.py|remove_machine	1	
+function	fabriclib-directory|src/fabriclib/directory/remove_person.py|_their_certs	1	
+function	fabriclib-directory|src/fabriclib/directory/remove_person.py|remove_person	2	
 function	fabriclib-directory|src/fabriclib/directory/remove_role.py|remove_role	1	
 function	fabriclib-directory|src/fabriclib/directory/require_device.py|require_device	1	
 function	fabriclib-directory|src/fabriclib/directory/reset_sign_in.py|reset_sign_in	1	
 function	fabriclib-directory|src/fabriclib/directory/run_op.py|run_op	1	
+function	fabriclib-directory|src/fabriclib/directory/run_people_command.py|_options	1	
+function	fabriclib-directory|src/fabriclib/directory/run_people_command.py|_person	2	
+function	fabriclib-directory|src/fabriclib/directory/run_people_command.py|_run	3	
+function	fabriclib-directory|src/fabriclib/directory/run_people_command.py|run_people_command	4	
 function	fabriclib-directory|src/fabriclib/directory/set_machine_enabled.py|set_machine_enabled	1	
+function	fabriclib-directory|src/fabriclib/directory/set_person_enabled.py|set_person_enabled	1	
+function	fabriclib-directory|src/fabriclib/directory/set_person_group.py|set_person_group	1	
 function	fabriclib-directory|src/fabriclib/directory/update_device.py|update_device	1	
 function	fabriclib-directory|src/fabriclib/directory/update_role.py|update_role	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/build_adguard_config.py|build_adguard_config	1	
@@ -1176,6 +1202,7 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/app_client_id.py|app_client_i
 function	fabriclib-keycloak|src/fabriclib/keycloak/configure_keycloak.py|configure_keycloak	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/create_person.py|create_person	2	0.5.0 / 2026-10-04
+function	fabriclib-keycloak|src/fabriclib/keycloak/enable_person.py|enable_person	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|_q	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_adguard_client.py|ensure_adguard_client	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/ensure_group_mapper.py|ensure_group_mapper	1	
@@ -1205,6 +1232,7 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py|re
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|reset_sign_in	2	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py|run_sso_command	1	
+function	fabriclib-keycloak|src/fabriclib/keycloak/sign_out_person.py|sign_out_person	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py|admin_level	2	
 function	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py|signin_level	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/step.py|step	1	
@@ -1647,6 +1675,7 @@ function	webui|src/webui/agentclient/list_tsig_keys.py|list_tsig_keys	1
 function	webui|src/webui/agentclient/list_zones.py|list_zones	1	
 function	webui|src/webui/agentclient/machine_action.py|machine_action	1	
 function	webui|src/webui/agentclient/map_radius_group.py|map_radius_group	1	
+function	webui|src/webui/agentclient/person_action.py|person_action	1	
 function	webui|src/webui/agentclient/quote_segment.py|quote_segment	1	
 function	webui|src/webui/agentclient/radius_guides.py|radius_guides	1	
 function	webui|src/webui/agentclient/radius_overview.py|radius_overview	1	
@@ -1691,6 +1720,7 @@ function	webui|src/webui/devpreview/dev_handler.py|DevHandler.send	2
 function	webui|src/webui/devpreview/dev_post_action.py|dev_post_action	1	
 function	webui|src/webui/devpreview/dev_post_dhcp.py|_where	1	
 function	webui|src/webui/devpreview/dev_post_dhcp.py|dev_post_dhcp	2	
+function	webui|src/webui/devpreview/dev_post_directory.py|_person_change	2	
 function	webui|src/webui/devpreview/dev_post_directory.py|dev_post_directory	1	
 function	webui|src/webui/devpreview/dev_post_dns.py|dev_post_dns	1	
 function	webui|src/webui/devpreview/dev_post_network.py|dev_post_network	1	
@@ -1731,6 +1761,7 @@ function	webui|src/webui/oidc.py|rs256_verify	3
 function	webui|src/webui/routes/bind9_page.py|bind9_page	1	
 function	webui|src/webui/routes/directory_page.py|directory_page	1	
 function	webui|src/webui/routes/directory_post.py|_device_fields	1	
+function	webui|src/webui/routes/directory_post.py|_person_change	4	
 function	webui|src/webui/routes/directory_post.py|_role_fields	2	
 function	webui|src/webui/routes/directory_post.py|directory_post	3	
 function	webui|src/webui/routes/dirsrv_page.py|dirsrv_page	1	0.5.0 / 2026-10-05

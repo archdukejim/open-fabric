@@ -22,6 +22,8 @@
                                  802.1X (optional FreeRADIUS): RADIUS clients, decisions
   fabricctl domain status|password-policy|add-machine
                                  the domain (Samba AD): its DC, roles, password policy, machines to join
+  fabricctl people list|show|add|reset|disable|enable|remove|groups|group
+                                 the site's people: sign-in, groups, removal (fabricctl people --help)
   fabricctl gpo load|templates|list|show|set|clear|starter
                                  Group Policy from ADMX templates for this site's machines and people
   fabricctl sso add|list|remove  apps (Proxmox VE, TrueNAS, …) signing people in through Keycloak
@@ -68,6 +70,7 @@ from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
+from fabriclib.directory.run_people_command import run_people_command  # noqa: E402
 from fabriclib.samba.run_gpo_command import run_gpo_command  # noqa: E402
 from fabriclib.dns.run_tsig_command import run_tsig_command  # noqa: E402
 from fabriclib.keycloak.run_sso_command import run_sso_command  # noqa: E402
@@ -213,6 +216,8 @@ def main(argv):
         return run_radius_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "domain":
         return run_domain_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "people":
+        return run_people_command(SetupContext(deploy_base=_base(args)).load_state().vars, _without_base(args))
     if cmd == "gpo":
         return run_gpo_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
     if cmd == "federation":
