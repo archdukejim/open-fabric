@@ -4,14 +4,13 @@
 .github/workflows/images.yml	692970614a4833c38c70aac787c58b294a90cc52	2026-10-08	
 .github/workflows/lint.yml	6fb8189ef0d87af6ece1858b97c5bac089c01cce	2026-10-08	
 .github/workflows/package.yml	7dc3ad8145e53008ccdba55d2c2d2820ef38a3e8	2026-10-08	
-.gitignore	31a9b799ecedc72edcb1d7b1f42df022f6492f3d	2026-10-08	
+.gitignore	a7e1c21cc9ebcf56d0257c2f03a06cdcc1ab4316	2026-10-09	
 AGENTS.md	79c4feecc6bcc1e7a0ea7ffff214c2c48a9d56b2	2026-10-08	
 CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30	
 LICENSE	05e475fa9aff67dbd7d98e3bc88d87f93e36c79f	2026-09-30	
 README.md	786c7cd0f2b70b9e48de89c23942a95341316c50	2026-10-08	
 THIRD_PARTY_NOTICES	ff836ec5208f7ac6140740a07186107c63702d24	2026-10-08	
 archive/db-rotation.json	18182e8c32543d8fa8b328e6aa2dc32e4efa2d43	2026-10-09	
-chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	6300abd255fbbe5a87bd0d83cd9c9dd1c4b8de1f	2026-10-08	
 config/VERSION	844f6a91acb92e5f4c58fe0d440fba8deea2a8c8	2026-10-09	
 config/images.lock.yaml	caf04172667d2a93460d828e81f1435b385ad2d7	2026-10-09	
