@@ -1,11 +1,14 @@
 # path	blob (git hash-object of the reviewed content)	reviewed (UTC date)	note
 .claude/launch.json	d825e04e405e671cdac0ca91a0218281215e42b3	2026-10-08	
+.claude/skills/promote/SKILL.md	25c99aff421e0c790c39d8b6a95f2d725f981c41	2026-10-09	
+.claude/skills/rc/SKILL.md	98b084eb8e3c2056c9bc6dfebb192676def220ee	2026-10-09	
+.claude/skills/tag/SKILL.md	8901474bc0fd35e6cac0a861c0d52ab02173db95	2026-10-09	
 .gitattributes	f273656c60a04a693192b0bdc27eb5465842e911	2026-09-30	
-.github/workflows/images.yml	692970614a4833c38c70aac787c58b294a90cc52	2026-10-08	
+.github/workflows/images.yml	8902038a27f69dbfa7ac13961eb8d7a670925540	2026-10-09	
 .github/workflows/lint.yml	6fb8189ef0d87af6ece1858b97c5bac089c01cce	2026-10-08	
-.github/workflows/package.yml	7dc3ad8145e53008ccdba55d2c2d2820ef38a3e8	2026-10-08	
-.gitignore	a7e1c21cc9ebcf56d0257c2f03a06cdcc1ab4316	2026-10-09	
-AGENTS.md	79c4feecc6bcc1e7a0ea7ffff214c2c48a9d56b2	2026-10-08	
+.github/workflows/package.yml	7fbc29997f4d3708bab3011e302b521330dd2d0e	2026-10-09	
+.gitignore	e64a8baa6ed6ded642108a90c470c3c3bcd35c9e	2026-10-09	
+AGENTS.md	1c136916d77a5eb65db37dc93dc9c206a1131761	2026-10-09	
 CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30	
 LICENSE	05e475fa9aff67dbd7d98e3bc88d87f93e36c79f	2026-09-30	
 README.md	786c7cd0f2b70b9e48de89c23942a95341316c50	2026-10-08	
@@ -109,7 +112,7 @@ docs/volume_1_description_and_architecture/1.9.6-changes.md	de23fcd3ade76bb7206a
 docs/volume_1_description_and_architecture/1.9.7-milestones.md	a41e86e4f9febe721f6ea0699ab56a29e3185a48	2026-10-08	
 docs/volume_1_description_and_architecture/1.9.8-federation-on-ad.md	772dcc42dd63416bb110df6d3945db8fc4589b0d	2026-10-08	
 docs/volume_1_description_and_architecture/README.md	f8d194e6612c58aac346cc7dad12c0fa0ca2020c	2026-10-08	
-docs/volume_2_engineering_decisions/2.1.1-product.md	5f7f9c67e1f60c2a813febaf95ba5609a75b9fa4	2026-10-09	
+docs/volume_2_engineering_decisions/2.1.1-product.md	b4322fee2c9c8eaa1b82a8c713e6d8a1c37bc791	2026-10-09	
 docs/volume_2_engineering_decisions/2.1.10-dhcp.md	4af6d09683e978bbb93718ee3863547974ce264e	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.11-radius.md	558e56bfab8acc7043df3b83499e6e3551e688ff	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.12-dns-filter.md	9c32cb6fe6114e036e11c790721e97041b433a28	2026-10-09	
@@ -144,7 +147,7 @@ docs/volume_3_installation/3.1.1-manual-test-plan.md	cbf7626ccb033ad7c00c6f0508f
 docs/volume_3_installation/3.1.2-automated-tests.md	fb8e8cb2883c768509cb6ac7b50576f439745d26	2026-10-08	
 docs/volume_3_installation/3.1.3-dev-preview.md	f913e6ed5b5f0e0428479a417dc655071b3b2f42	2026-10-08	
 docs/volume_3_installation/3.1.4-working-on-fabric.md	f0aa02dae628fc02838839f4887bb5d6baa1e857	2026-10-08	
-docs/volume_3_installation/3.14.1-building-images.md	2202d12890d157923f31797352e4e39ba4b09676	2026-10-09	
+docs/volume_3_installation/3.14.1-building-images.md	2711701b81e4acbc1f844c3cf6b3682524fe1ed6	2026-10-09	
 docs/volume_3_installation/3.16.1-disk-encryption.md	01a470a365017a5f19e088eb54482f8c49919b65	2026-10-08	
 docs/volume_3_installation/3.2.1-requirements.md	422e0c008fdc1ddf75d7209427c1c95c31a6f06f	2026-10-08	
 docs/volume_3_installation/3.2.2-docker-from-ubuntu.md	2d7250a68efefe0413b077ee659fa444d40a325a	2026-10-08	
