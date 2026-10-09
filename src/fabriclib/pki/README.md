@@ -35,3 +35,5 @@ Certificates from fabric's Step-CA.
 | `run_service_cert_command.py` | `fabricctl --service-cert`: list expiry dates, then re-issue every service certificate |
 | `common/` | Helpers shared by the operations above (see its README) |
 | `show_cert_warnings.py` | `fabricctl status`'s certificates section |
+| `acme_info.py` | What a LAN machine's ACME client needs: the directory, trusting the root, names, http-01 and dns-01 |
+| `acme_machines.py` | The machines enrolled for ACME DNS-01 (TSIG keys `acme-<name>`) |

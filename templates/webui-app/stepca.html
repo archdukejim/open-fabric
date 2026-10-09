@@ -111,5 +111,26 @@
 {% endfor %}</tbody></table>
 {% else %}<p class="blank">Nothing issued by hand yet.</p>{% endif %}
 </section>
+
+{% elif view == 'acme' %}
+<section class="card"><h2>ACME for machines on the LAN</h2>
+<p class="muted">Machines fabric does not run (a NAS, a printer, a proxy) get their certificates from this CA with any ACME client, renewed by the client itself. Only names under <code>{{ acme.domain }}</code>.</p>
+<ul>{% for line in acme.info %}<li>{{ line }}</li>{% endfor %}</ul>
+</section>
+<section class="card"><h2>Machines enrolled for DNS-01 <span class="muted">{{ acme.machines | length }}</span></h2>
+<p class="muted">A machine without a web server on port 80 proves its name in DNS: its key may change only its own <code>_acme-challenge</code> TXT record.</p>
+{% if acme.machines %}
+<table><thead><tr><th>Machine</th><th>Key</th>{% if can('tsig:manage') %}<th></th>{% endif %}</tr></thead><tbody>
+{% for m in acme.machines %}<tr><td>{{ m.fqdn }}</td><td><code>{{ m.key }}</code></td>{% if can('tsig:manage') %}<td class="num"><form method="post" action="/bind9/tsig/{{ m.key | urlencode }}/delete"><input type="hidden" name="csrf" value="{{ ctx.csrf }}"><button class="danger" title="withdraw its key (Apply publishes it)">Withdraw</button></form></td>{% endif %}</tr>{% endfor %}
+</tbody></table>{% else %}<p class="blank">No machine enrolled for DNS-01.</p>{% endif %}
+{% if can('tsig:manage') %}
+<form method="post" action="/stepca/acme/enroll" class="grid">
+<input type="hidden" name="csrf" value="{{ ctx.csrf }}"><input type="hidden" name="domain" value="{{ acme.domain }}">
+<label>Machine name<input name="host" required pattern="[a-z0-9]([a-z0-9-]*[a-z0-9])?" placeholder="nas"></label>
+<div><button>Enroll for DNS-01</button></div>
+</form>
+<p class="muted small">Its key and <code>rfc2136.ini</code> are shown once; then Apply publishes it to BIND. Copy them to the machine over a channel you trust.</p>
+{% endif %}
+</section>
 {% endif %}
 {% endblock %}

@@ -21,3 +21,4 @@ the images a host runs, and only `fabricctl images update` moves them.
 | `published_image.py` | The one rule: does this host run fabric's published image or build its own (ids must match, 2.1.14.5) |
 | `effective_service.py` | A managed service as this host runs it (published image: its own var, no local build) |
 | `verify_signature.py` | `cosign verify` (pinned image) of a published image against fabric's signer; verified digests remembered |
+| `apply_image_action.py` | One service updated or rolled back, from the web console (the job behind its Updates section) |

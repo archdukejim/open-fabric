@@ -32,7 +32,8 @@ DIRECTORY_SECTIONS = [("devices", "Devices"), ("roles", "Roles"), ("people", "Pe
                       ("machines", "Machines"), ("gpo", "Group Policy")]
 # Step-CA tab sub-menu: (view, label)
 STEPCA_MENU = [("ca", "Certificate authority"), ("sign", "Sign a CSR"), ("issue", "New key + certificate"),
-               ("inspect", "Inspect"), ("convert", "Convert"), ("issued", "Issued")]
+               ("inspect", "Inspect"), ("convert", "Convert"), ("issued", "Issued"),
+               ("acme", "ACME")]
 STEPCA_VIEWS = {v for v, _ in STEPCA_MENU}
 KEY_TYPES = ["RSA-2048", "RSA-3072", "RSA-4096", "EC-P256", "EC-P384"]
 TSIG_SCOPES = [("acme-hosts", "Certbot DNS-01 for listed hosts only (TXT)"),

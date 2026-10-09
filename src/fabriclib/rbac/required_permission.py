@@ -3,12 +3,12 @@
 GET = {
     ("version",): "session",
     ("services",): "status:read", ("host-changes",): "status:read", ("relaxed-settings",): "status:read",
-    ("cert-warnings",): "status:read",
+    ("cert-warnings",): "status:read", ("images",): "status:read", ("jobs", "*"): "session",
     ("zones",): "dns:read", ("zones", "*"): "dns:read", ("reverse-zones",): "dns:read", ("tsig",): "dns:read",
     ("audit",): "audit:read",
     ("dhcp",): "dhcp:read",
     ("radius",): "radius:read", ("radius", "guides"): "radius:read",
-    ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read",
+    ("pki", "ca"): "pki:read", ("pki", "issued"): "pki:read", ("pki", "acme"): "pki:read",
     ("devices",): "devices:read",
     ("people",): "people:read",
     ("domain",): "domain:read", ("gpo",): "domain:read", ("federation",): "federation:read",
@@ -16,7 +16,7 @@ GET = {
     ("security",): "security:raise",
 }
 POST = {
-    ("events",): "session",
+    ("events",): "session", ("jobs", "doctor"): "status:read", ("jobs", "images"): "images:update",
     ("security", "raise"): "security:raise", ("security", "kerberos"): "security:raise",
     ("zones", "*", "records"): "dns:write", ("zones", "*", "records", "delete"): "dns:write",
     ("apply",): "dns:write",

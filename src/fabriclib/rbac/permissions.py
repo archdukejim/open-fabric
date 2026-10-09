@@ -38,6 +38,7 @@ PERMISSIONS = {
     "vault:unlock": "add, test, remove unlock methods; rotate the vault key",
     "audit:read": "read the audit log",
     "system:admin": "services, updates and settings",
+    "images:update": "update a service's container image, or roll it back (2.1.8.3)",
     "security:raise": "raise sign-in security: second factors, the web console's client certificate (2.1.6.27)",
 }
 

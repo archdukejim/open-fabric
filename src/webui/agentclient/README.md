@@ -77,3 +77,7 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `federation_overview.py` | The federation's sites, replication, conflicts, limits and address plan. Agent route: GET /v1/federation (federation:read). |
 | `security_layers.py` | GET /v1/security: the sign-in layers |
 | `raise_signin_layer.py` | POST /v1/security/raise or /kerberos |
+| `image_rows.py` | Each service's image: running, validated, update available. Agent route: GET /v1/images (status:read). |
+| `start_job.py` | Start a background job: doctor, or one service's image update or rollback. Agent routes: POST /v1/jobs/doctor (status:read), /v1/jobs/images (images:update). |
+| `read_job.py` | A job the signed-in person started. Agent route: GET /v1/jobs/<id>. |
+| `acme_overview.py` | ACME for LAN machines: the directory and how, the machines enrolled for DNS-01. Agent route: GET /v1/pki/acme (pki:read). |

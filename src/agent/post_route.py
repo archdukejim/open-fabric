@@ -1,3 +1,4 @@
+from agent.job_store import JOBS
 from agent.post_directory import post_directory
 from agent.post_dhcp import post_dhcp
 from agent.post_domain import post_domain
@@ -16,6 +17,8 @@ from fabriclib.directory.remove_person import remove_person
 from fabriclib.directory.reset_sign_in import reset_sign_in
 from fabriclib.directory.set_person_enabled import set_person_enabled
 from fabriclib.directory.set_person_group import set_person_group
+from fabriclib.images.apply_image_action import apply_image_action
+from fabriclib.setup.doctor_report import doctor_report
 from fabriclib.system.apply_changes import apply_changes
 
 EVENT_ACTIONS = {"LOGIN", "LOGOUT", "LOGIN_DENIED"}
@@ -30,6 +33,8 @@ def post_route(route, actor, data, perms):
              people/<uid>/disable|enable: {"uid", "enabled", "changed"}; people/<uid>/delete (body: confirm, the
              user name typed back): {"uid", "revoked"}; people/<uid>/groups (body: action add|remove, group):
              {"uid", "group", "member", "changed"} — each a fabric-group member's only with system:admin (or root);
+             jobs/doctor and jobs/images (body: action update|rollback, service): {"id"} of a job read with GET
+             /v1/jobs/<id> by the person who started it;
              events: {} after the login audit line.
     Fails:   ValidationError (-> 400) for an unsupported event or what fabriclib refuses; RouteNotFound (-> 404).
     Feeds:   agent/handler.py (dispatch).
@@ -72,6 +77,15 @@ def post_route(route, actor, data, perms):
         if action not in ("add", "remove"):
             raise ValidationError("action: add or remove")
         return set_person_group(load_vars(), actor, read_text(data, "group"), route[1], action == "add", privileged)
+    owner = actor if perms is not None else None    # a job is read by whoever started it (root: any)
+    if route == ["jobs", "doctor"]:              # doctor's checks take seconds to a minute: a job the page follows
+        base = load_vars()["deploy_base_dir"]
+        return JOBS.start("doctor", owner, lambda: doctor_report(base))
+    if route == ["jobs", "images"]:
+        action, service, base = read_text(data, "action"), read_text(data, "service"), load_vars()["deploy_base_dir"]
+        if action not in ("update", "rollback") or not service:
+            raise ValidationError("action: update or rollback, and a service")
+        return JOBS.start("images", owner, lambda: apply_image_action(action, service, actor, base))
     if route == ["events"]:
         action = data.get("action")
         if action not in EVENT_ACTIONS:

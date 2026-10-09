@@ -2,7 +2,7 @@ from webui.views.constants import SERVICES
 from webui.views.render_page import render_page
 
 
-def overview(ctx, services, host_changes=(), relaxed=(), certs=()):
+def overview(ctx, services, host_changes=(), relaxed=(), certs=(), images=None, err=""):
     """Purpose: The Overview tab: one tile per service with a traffic light and a link to its tab; then
              the host changes fabric may make (approved, declined with what that leaves unmanaged).
     Inputs:  ctx — page context (src/webui/session/page_context); services — list of (name, systemd state, container
@@ -11,7 +11,8 @@ def overview(ctx, services, host_changes=(), relaxed=(), certs=()):
              host_changes — agentclient.host_changes(): what fabric may change on the host, by group ([] for an
              install set up before fabric asked); relaxed — agentclient.relaxed_settings(): the security
              relaxations turned on (global Rule 10), shown at the top while any is; certs —
-             agentclient.cert_warnings(): what is wrong or coming with the certificates (2.1.5.4), shown at the top.
+             agentclient.cert_warnings(): what is wrong or coming with the certificates (2.1.5.4), shown at the top;
+             images — agentclient.image_rows() for the Updates section (None: unreadable); err — a refused job.
     Returns: HTML str.
     Fails:   Jinja2 errors propagate (e.g. UndefinedError when the template reads an attribute of a value the caller
              left out).
@@ -19,4 +20,4 @@ def overview(ctx, services, host_changes=(), relaxed=(), certs=()):
     """
     return render_page("overview", ctx=ctx, tab="overview", services=services, service_info=SERVICES,
                        host_changes=list(host_changes), relaxed=list(relaxed),
-                       certs=list(certs))
+                       certs=list(certs), images=images, err=err)

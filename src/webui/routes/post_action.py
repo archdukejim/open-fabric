@@ -6,6 +6,7 @@ from webui.constants import SESSION_COOKIE
 from webui.httpio.cookie_header import cookie_header
 from webui.routes.directory_post import directory_post
 from webui.routes.kea_post import kea_post
+from webui.routes.overview_post import overview_post
 from webui.routes.radius_post import radius_post
 from webui.routes.saved_and_applied import saved_and_applied
 from webui.routes.stepca_post import stepca_post
@@ -44,7 +45,8 @@ def post_action(h, sess, path, form):
     """Purpose: Route a signed-in, CSRF-checked POST to its action.
     Inputs:  h — the request handler (app, send, redirect, deny); sess — dict from find_session; path — str; form —
              dict from read_form. Routes: /logout; /bind9/zone/…; /apply; /stepca/…; /openbao/…; /directory/…;
-             /kea/… (reservations, subnets, options, classes); /freeradius/clients…; /freeradius/people…; /bind9/tsig/….
+             /kea/… (reservations, subnets, options, classes); /overview/… (jobs); /freeradius/clients…;
+             /freeradius/people…; /bind9/tsig/….
     Returns: /logout: session dropped, LOGOUT audited, 303 to Keycloak's logout URL clearing the session cookie;
              /apply: 200 apply result; the rest as their route modules.
     Fails:   404 for an unknown path; agent errors propagate to handle_request (400, redirect to /login, 403, 503).
@@ -62,6 +64,8 @@ def post_action(h, sess, path, form):
     if path == "/apply":
         ok, output = actions.apply_changes(user)
         return h.send(200, views.apply_result(page_context(sess), ok, output))
+    if path.startswith("/overview/"):
+        return overview_post(h, _segments(path, 2))
     if path.startswith("/stepca/"):
         return stepca_post(h, sess, path[len("/stepca/"):], form)
     if path.startswith("/openbao/"):
