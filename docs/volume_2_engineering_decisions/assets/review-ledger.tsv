@@ -51,7 +51,7 @@ docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.22-fabriclib-secrets.md	74f026337aad89eb5aeaaf8decd4bb352ee34e98	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.23-fabriclib-security.md	d920e7834a56aafa8fdc1602f2ef23e455944d53	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	13b1979cb0061591ab09740994cd14f1c8724067	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	2625e634fc3d5eecb485dea0000281b582b5dab6	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.25-fabriclib-system.md	b57979b1c79b1c15f4e4edcaff531706311aa242	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.26-fabriclib-undo.md	5591364f414bc6fc2a505d9b421026d7ae218d45	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	1f8326f67d39a16349199937fbebabb266df936d	2026-10-09	
@@ -61,7 +61,7 @@ docs/volume_1_description_and_architecture/1.17.3-fabricctl-jinja.md	31bdfa58606
 docs/volume_1_description_and_architecture/1.17.30-fabriclib-samba.md	bb52b03216d8785064493b7a0528b04b204985f2	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.31-fabriclib-directory.md	d229054bef0c0f6c74700bab0baccb9f6d949486	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.4-fabricctl-lib.md	76bc845876c679778c0588d379f7246a12fae2d0	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.5-fabriclib-common.md	eb809c0f8d1caa43a5b6544f77e52b224ee200e7	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.5-fabriclib-common.md	1845252b1056e426da4609a0a782b63380485c06	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.6-fabriclib-consent.md	fac0dccbc79c6b304807039ef3e7dde8cec12ad9	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.7-fabriclib-core.md	287e5a946064faecbdb0262ece385ff0e043036c	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.8-fabriclib-deploy.md	be55a9f117ba3f6f218167884cfefc96ebd19172	2026-10-09	
@@ -81,7 +81,7 @@ docs/volume_1_description_and_architecture/1.2.9-host-consent.md	eb1592d0949a6cb
 docs/volume_1_description_and_architecture/1.3.1-host-package.md	4ee407c77ffcf8f1555c26c533edbaebd31493c2	2026-10-08	
 docs/volume_1_description_and_architecture/1.3.2-setup-design.md	c0e3955e70d4834403d534fed8d256fa2ad78e4a	2026-10-08	
 docs/volume_1_description_and_architecture/1.3.3-agent-api.md	5f7c1afeeb96dd5313d48e110c5289297016d656	2026-10-09	
-docs/volume_1_description_and_architecture/1.4.1-dns-architecture.md	4ad86948358d808dc1ba3098fca753fab9d3397a	2026-10-08	
+docs/volume_1_description_and_architecture/1.4.1-dns-architecture.md	543c6ba34895351452d10a9e05989695a8c248f2	2026-10-09	
 docs/volume_1_description_and_architecture/1.4.2-landing-links.md	8a1ec469d476fdcd75f02f9bb1c27db2db3827d9	2026-10-08	
 docs/volume_1_description_and_architecture/1.5.1-pki-chain.md	4ecb611249153130e8ccad8b6b3b43d54a117c60	2026-10-09	
 docs/volume_1_description_and_architecture/1.5.2-pki.md	f9871fd3d52c1ab0cef250409db06f0d1c74d2c9	2026-10-08	
@@ -134,7 +134,7 @@ docs/volume_2_engineering_decisions/2.3.12-dns-filter-notes.md	3af011ce8dd335d9a
 docs/volume_2_engineering_decisions/2.3.14-image-notes.md	2a6950b89b58dcc37ada049ac8dfe7f10bf86562	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.2-architecture-notes.md	b3ce46829288e2c63f9ecb711fb685ae33f80785	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.4-dns-notes.md	67514706bb849105053e1fa34a6b02f1d81fff26	2026-10-08	
-docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	9a7e2fe5cc9db81431954cab7719b293968a88bc	2026-10-08	
+docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	ae04c66b20fabe295bd810e904eec1d8527c8e60	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.6-identity-notes.md	96ece4d5d2f202171b0eccf0bafc44cb1b0a2065	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.7-openbao-notes.md	4a70f31917b5a9dca1c786b5e4cf64677b56cb71	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.9-federation-notes.md	589194fbf33eda431862f1414dabc04a3181edc9	2026-10-08	
@@ -825,7 +825,7 @@ src/fabriclib/setup/ensure_db_rotation.py	6f547b1e47e076ea9512436dac1a97f36039b7
 src/fabriclib/setup/errors.py	4c7b84633f68a8cd971aa38ba1aa9d8f5a4b2b04	2026-09-30	
 src/fabriclib/setup/export_install.py	608e604feae491de0ac8e96b2735fd0603641e9a	2026-10-05	
 src/fabriclib/setup/harden_docker.py	1ad4aca818b8227f6566193c67503b8f12adae09	2026-10-03	
-src/fabriclib/setup/init_pki.py	e69ea46f2634b8f6500188d54d14cb16b15b1e57	2026-10-08	
+src/fabriclib/setup/init_pki.py	e959c4750d4a3f3388d5607491befbbf337b99fa	2026-10-09	
 src/fabriclib/setup/join_federation.py	52dc92d225b9bffcc91c629181755499be20dc3c	2026-10-08	
 src/fabriclib/setup/mint_extra_certs.py	0e23e41edec381ab688dab5b8a06f9e39eb6a39e	2026-09-30	
 src/fabriclib/setup/mint_service_certs.py	60765cd305bd4b4f1630e199e5819cda061b5d3e	2026-10-09	
@@ -1147,7 +1147,7 @@ templates/keycloak/README.md	0f57c1ade47d7e7b01e80580c90585d37215b40a	2026-10-03
 templates/keycloak/docker-compose.yml.j2	9d88a8fc3c5b1b13146f57fe55db6ad6dcfb14fa	2026-10-09	
 templates/nginx/README.md	80829fdaf576808a7cd12322416620ccf66edfbd	2026-10-05	
 templates/nginx/docker-compose.yml.j2	0782ff161cfd7bc096af7468cbb4093be0b52a96	2026-10-06	
-templates/nginx/nginx.conf.j2	3a12f052def22a24b8ce594c8b0e196e73a349e1	2026-10-08	
+templates/nginx/nginx.conf.j2	25eb2e642bbd5e746e2aef3b7fc52ebe0deb9403	2026-10-09	
 templates/nginx/www/README.md	f25fde1156693652cede612c785ab748faa24ae4	2026-10-05	
 templates/nginx/www/certs/README.md	970670cf8cc07afb6d30f2b595289748d5f6b6c4	2026-10-08	
 templates/nginx/www/certs/index.html.j2	bacff63a75c7727f2fe59f0f4f381761b14173f7	2026-10-06	
@@ -1240,8 +1240,8 @@ tests/host/README.md	0ca6a906d5bddb7d03f4f92f65f0ef52ea61b9d0	2026-10-08
 tests/host/installer.py	be3e3cc5ef91041c871230510ecce4116854f1ed	2026-10-08	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
 tests/host/run.sh	f222ee28946ef4cf028b8ddf05910a75b2d9ce57	2026-10-08	
-tests/host/upgrade.sh	240f6c644c85b045e5300971ac2e5e23fa69a86a	2026-10-08	
-tests/host/upgrade_state.py	3836d0b5eb8fa0cd8660c3e3dd91b8dfbe84891a	2026-10-08	
+tests/host/upgrade.sh	0c33999a4d0bf99abcbaf591635ad22aa54a0347	2026-10-09	
+tests/host/upgrade_state.py	48966589b91287fa325346a473032a93e300a551	2026-10-09	
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
 tests/images/README.md	faef5036b8a6c2ea180834b851533c0e6709bd7b	2026-10-09	
 tests/images/host_images.py	88e855ce667d351a3edc1fe87421a5ad687d19e0	2026-10-09	
@@ -1265,11 +1265,11 @@ tests/openbao/db_rotation.py	e572e092ac975a6dca52cc26067820137e71796f	2026-10-09
 tests/openbao/run.py	7470293409535699527ba108cad767b372fa06bc	2026-10-05	
 tests/pki/README.md	c00ae570e87e3a05c979e041a56057b2b388ec7e	2026-10-08	
 tests/pki/acme.py	64fd96f2019823f7e4ecada6b00a97c97b39d069	2026-10-08	
-tests/pki/renewal.py	6d7dfdde5ebc11c6a6d584ab0ed79e25944bd080	2026-10-08	
+tests/pki/renewal.py	30889317dd2709f3de4aae6a0e1a2c2b2547d03e	2026-10-09	
 tests/pki/revocation.py	f36e8ad4b2ca0683d820802ee8a6b9fb7f97dc97	2026-10-08	
 tests/pki/run.py	8a8b78b3bcc320c5019eb4929129ae5d2b711a7c	2026-10-08	
 tests/pki/site_ca.py	6e71ca7798e1aa94ce0f43160716ac57302bec65	2026-10-08	
-tests/render.py	f3c48434dd34607c90157dfc248d4b1554b477a9	2026-10-09	
+tests/render.py	1a33a5b93ff3c180a5f152b27de6360b435decd6	2026-10-09	
 tests/run-all.sh	0dbed90a445faa87d45e151d90f621ddaef790a8	2026-10-09	
 tests/samba/README.md	2988a9d373cd532a415df9f842180d12152d6271	2026-10-08	
 tests/samba/dc.py	6d3a9aa01bfb0bae58e262c6ca4ce6e4fcf147fa	2026-10-09	

@@ -82,7 +82,8 @@ echo "    setup ($TO) took $(( ($(date +%s) - start) / 60 )) min"
 check "$TO: setup completes over the old install" "grep -q 'fabric is ready' '$OUT/setup-to.log'"
 
 R 'python3 /tmp/upgrade_state.py snapshot' > "$OUT/after.json" 2>"$OUT/after.err"
-for key in "root_ca" "person carol" "issued" "secrets" "dns record" "adguard rule" "security"; do
+check "kept: secrets (each one there before, unchanged; new ones may be added, Keycloak's database password rotates)"     "python3 -c \"import json,sys; a=json.load(open('$OUT/before.json'))['secrets']; b=json.load(open('$OUT/after.json'))['secrets']; sys.exit(any(b.get(k) != v for k, v in a.items()))\""
+for key in "root_ca" "person carol" "issued" "dns record" "adguard rule" "security"; do
     check "kept: $key" "python3 -c \"import json,sys; a=json.load(open('$OUT/before.json')); \
 b=json.load(open('$OUT/after.json')); sys.exit(a.get('$key') != b.get('$key'))\""
 done

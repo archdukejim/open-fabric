@@ -21,6 +21,9 @@ VARS = "/opt/fabric/config/vars.yaml"
 RULE = "||upgrade-test.invalid^"
 PERSON = "carol"
 
+# secrets a release changes by design: compared by presence only
+ROTATED = {"keycloak_db_password"}
+
 
 def _sh(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True).stdout
@@ -80,7 +83,9 @@ def snapshot():
                      + " | " + _sh(f"openssl verify -CAfile /tmp/upgrade-root.pem {cert} 2>&1").strip()
                      if os.path.exists(cert) else "missing")
     secrets = load_secrets(v=v)
-    out["secrets"] = _sha(json.dumps({k: secrets[k] for k in sorted(secrets)}, sort_keys=True, default=str))
+    # one hash per secret: a release may add secrets; Keycloak's database password rotates by design (2.1.7.4)
+    out["secrets"] = {k: _sha(json.dumps(secrets[k], sort_keys=True, default=str)) for k in sorted(secrets)
+                      if k not in ROTATED}
     out["dns record"] = _sh(f"dig +short -p {v.get('bind_dns_port', 53)} @{v['host_ip']} upgrade-test.{v['domain']}").strip()
     path = _adguard_yaml()
     out["adguard rule"] = bool(path) and RULE in (yaml.safe_load(open(path)).get("user_rules") or [])

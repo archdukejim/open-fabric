@@ -134,6 +134,10 @@ assert 'server_name admin.example.org;' in ngx and 'server_name certs.lan.j-j.fa
 same = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'hostname': 'fabric'}))
 assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAME']], 'CNAME must not shadow the host A record'
 print('web UI host name (default, custom, same as host) and certs host rendered')
+doh = ngx[ngx.index('location /dns-query'):]
+doh = doh[:doh.index('\n        }')]          # the location block only
+assert 'grpc_pass $bind9_doh_backend;' in doh and '"grpc://bind9:' in doh and 'proxy_pass $' not in doh,     "DoH goes to BIND over HTTP/2 (grpc_pass): BIND's DoH speaks HTTP/2 only"
+print('DoH: nginx speaks HTTP/2 to BIND (grpc_pass)')
 
 # Federation (manual 1.9): the endpoint's vhost, socket mount, CNAME and unit only when it is
 # on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.

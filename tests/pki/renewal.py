@@ -17,6 +17,8 @@ import subprocess
 import sys
 import tempfile
 
+import yaml
+
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, "src"))
 from fabriclib.common.errors import ValidationError  # noqa: E402
@@ -208,19 +210,37 @@ for argv, want in ((["certs", "--bogus"], 2), (["certs", "--force", "--scheduled
 print("--- the CA's lifetime (2.1.5.6)")
 
 
-def lifetime_refused(days, byoc=False):
+def lifetime_refused(days, byoc=False, config=None):
     certs = os.path.join(base, "stepca", "data", "certs")
+    config = config or os.path.join(W, "cfg-chosen")
+    os.makedirs(config, exist_ok=True)
     try:
-        _check_root_lifetime({"cert_root_ca_days": days, "byoc": byoc}, certs)
+        _check_root_lifetime({"cert_root_ca_days": days, "byoc": byoc}, certs, config)
     except SetupError as e:
         return str(e)
     return ""
 
 
+chosen = os.path.join(W, "cfg-chosen")
+os.makedirs(chosen, exist_ok=True)
+with open(os.path.join(chosen, "ca-lifetime"), "w") as f:      # a CA made by 0.6.3 or later: its lifetime chosen
+    f.write("3650\n")
 check("the existing root's own lifetime passes", lifetime_refused(3650) == "")
 check("negative: a changed lifetime on an existing CA is refused, saying the root's and what to do",
       "made for 3650 days" in lifetime_refused(1825) and "cannot change" in lifetime_refused(1825))
 check("a brought-in root's lifetime is its own: not checked", lifetime_refused(1825, byoc=True) == "")
+# a CA from before 0.6.3: 0.6.2 saved a default of 1825 that never shaped its root (found by the upgrade test)
+old_cfg = os.path.join(W, "cfg-0.6.2")
+os.makedirs(old_cfg, exist_ok=True)
+with open(os.path.join(old_cfg, "fabric.yaml"), "w") as f:
+    yaml.safe_dump({"domain": "lan.test", "cert_root_ca_days": 1825}, f)
+v_old = {"cert_root_ca_days": 1825}
+_check_root_lifetime(v_old, os.path.join(base, "stepca", "data", "certs"), old_cfg)
+check("upgrade from 0.6.2: the CA's own lifetime is adopted (setting and fabric.yaml), not refused",
+      v_old["cert_root_ca_days"] == 3650
+      and yaml.safe_load(open(os.path.join(old_cfg, "fabric.yaml")))["cert_root_ca_days"] == 3650
+      and open(os.path.join(old_cfg, "ca-lifetime")).read().strip() == "3650", v_old)
+check("...once: a change after that is refused", "cannot change" in lifetime_refused(1825, config=old_cfg))
 
 
 class PlanCtx:
