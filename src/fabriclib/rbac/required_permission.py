@@ -22,6 +22,9 @@ POST = {
     ("zones", "*", "records"): "dns:write", ("zones", "*", "records", "delete"): "dns:write",
     ("apply",): "dns:write",
     ("dns-filter", "querylog"): "dns:querylog",        # who looked up what: the admin bundle only (2.1.12.4)
+    ("dns-filter", "lists"): "dns:filter", ("dns-filter", "lists", "delete"): "dns:filter",
+    ("dns-filter", "rules"): "dns:filter", ("dns-filter", "rules", "delete"): "dns:filter",
+    ("dns-filter", "upstreams"): "dns:filter", ("dns-filter", "fetch"): "dns:filter",
     ("pki", "describe-csr"): "pki:read", ("pki", "inspect"): "pki:read",
     ("pki", "sign"): "pki:sign", ("pki", "revoke"): "pki:revoke",
     ("pki", "issue"): "pki:issue", ("pki", "convert"): "pki:issue",

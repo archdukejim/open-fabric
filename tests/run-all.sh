@@ -41,7 +41,7 @@ for s in "${SUITES[@]}"; do
         webui)    run webui    bash -c "python3 \"$HERE/webui/test_container.py\" && python3 \"$HERE/webui/test_devserver.py\"" ;;
         pki)      run pki      python3 "$HERE/pki/run.py" ;;
         federation) run federation python3 "$HERE/federation/run.py" ;;
-        resolver) run resolver bash -c "python3 \"$HERE/resolver/run.py\" && python3 \"$HERE/resolver/querylog.py\"" ;;
+        resolver) run resolver bash -c "python3 \"$HERE/resolver/run.py\" && python3 \"$HERE/resolver/querylog.py\" && python3 \"$HERE/resolver/console.py\"" ;;
         ntp)      run ntp      python3 "$HERE/ntp/run.py" ;;
         openbao)  run openbao  bash -c "python3 \"$HERE/openbao/run.py\" && python3 \"$HERE/openbao/db_rotation.py\"" ;;
         fluentbit) run fluentbit python3 "$HERE/fluentbit/run.py" ;;

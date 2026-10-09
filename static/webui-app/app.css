@@ -79,3 +79,6 @@ label.perm{flex-basis:100%}
 button:disabled,.btn.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
 .danger-link{color:var(--bad);border-color:var(--bad)}
 .devbanner{margin:0;padding:8px 16px;text-align:center;font-weight:600;background:#b45309;color:#fff}
+.big{font-size:24px;font-weight:600}
+meter.bar{width:100%;min-width:120px;height:10px}
+table.hours td{padding:3px 8px}

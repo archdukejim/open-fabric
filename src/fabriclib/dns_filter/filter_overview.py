@@ -1,4 +1,5 @@
 import json
+import os
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.dns_filter.common.list_zone import list_zone
@@ -13,13 +14,14 @@ def filter_overview(v):
              dns_filter_upstreams, resolver_mem_limit, deploy_base_dir).
     Returns: {"on": bool, "lists": [{name, url, zone, last_fetch, last_success, rules, skipped, memory_mb, error}],
              "allow", "block", "upstreams", "memory_limit", "stats": dns_filter_stats' result, or {"off": reason}
-             (the query log off, or Postgres refusing: its message)}.
+             (the query log off, or Postgres refusing: its message), "catalogue": {"fetched", "lists": AdGuard's
+             catalogue as the lists job kept it, without the lists already in use}}.
     Fails:   never for the statistics (a refusal is reported in stats.off); OSError reading the state file other
              than its absence.
     Feeds:   agent/get_route (GET /v1/dns-filter)."""
     if not v.get("install_resolver"):
         return {"on": False, "lists": [], "allow": [], "block": [], "upstreams": [], "memory_limit": None,
-                "stats": {"off": "the BIND resolver is off"}}
+                "stats": {"off": "the BIND resolver is off"}, "catalogue": {"fetched": None, "lists": []}}
     try:
         with open(resolver_paths(v)["state"]) as f:
             state = json.load(f)
@@ -36,6 +38,13 @@ def filter_overview(v):
         stats = dns_filter_stats(v)
     except ValidationError as e:
         stats = {"off": str(e)}
+    try:
+        with open(os.path.join(resolver_paths(v)["lists"], "catalogue.json")) as f:
+            catalogue = json.load(f)
+    except (FileNotFoundError, ValueError):
+        catalogue = {"fetched": None, "lists": []}
+    used = {i["url"] for i in lists}
+    catalogue["lists"] = [c for c in catalogue["lists"] if c["url"] not in used]
     return {"on": True, "lists": lists, "allow": v.get("dns_filter_allow") or [],
             "block": v.get("dns_filter_block") or [], "upstreams": v.get("dns_filter_upstreams") or [],
-            "memory_limit": v.get("resolver_mem_limit"), "stats": stats}
+            "memory_limit": v.get("resolver_mem_limit"), "stats": stats, "catalogue": catalogue}

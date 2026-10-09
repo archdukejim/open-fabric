@@ -3,6 +3,7 @@ from agent.post_directory import post_directory
 from agent.post_dhcp import post_dhcp
 from agent.post_domain import post_domain
 from agent.post_dns import post_dns
+from agent.post_dns_filter import post_dns_filter
 from agent.post_network import post_network
 from agent.post_pki import post_pki
 from agent.post_security import post_security
@@ -17,7 +18,6 @@ from fabriclib.directory.remove_person import remove_person
 from fabriclib.directory.reset_sign_in import reset_sign_in
 from fabriclib.directory.set_person_enabled import set_person_enabled
 from fabriclib.directory.set_person_group import set_person_group
-from fabriclib.dns_filter.read_query_log import read_query_log
 from fabriclib.images.apply_image_action import apply_image_action
 from fabriclib.setup.doctor_report import doctor_report
 from fabriclib.system.apply_changes import apply_changes
@@ -36,8 +36,7 @@ def post_route(route, actor, data, perms):
              {"uid", "group", "member", "changed"} — each a fabric-group member's only with system:admin (or root);
              jobs/doctor and jobs/images (body: action update|rollback, service): {"id"} of a job read with GET
              /v1/jobs/<id> by the person who started it;
-             events: {} after the login audit line; dns-filter/querylog (body: client, name, blocked, limit):
-             read_query_log's result (a search, so a POST).
+             events: {} after the login audit line; dns-filter/...: post_dns_filter's result.
     Fails:   ValidationError (-> 400) for an unsupported event or what fabriclib refuses; RouteNotFound (-> 404).
     Feeds:   agent/handler.py (dispatch).
     Notes:   POST apply only needs dns:write (rbac/required_permission), though it runs the whole deployment."""
@@ -58,6 +57,8 @@ def post_route(route, actor, data, perms):
         return post_domain(route, actor, data)
     if area == ["security"]:
         return post_security(route, actor, data)
+    if area == ["dns-filter"]:
+        return post_dns_filter(route, actor, data)
     if route == ["apply"]:
         ok, output = apply_changes(actor, source="web")
         return {"ok": ok, "output": output}
@@ -79,9 +80,6 @@ def post_route(route, actor, data, perms):
         if action not in ("add", "remove"):
             raise ValidationError("action: add or remove")
         return set_person_group(load_vars(), actor, read_text(data, "group"), route[1], action == "add", privileged)
-    if route == ["dns-filter", "querylog"]:       # a search: its terms in the body (a GET's query string is ignored)
-        return read_query_log(load_vars(), client=read_text(data, "client"), name=read_text(data, "name"),
-                              blocked_only=bool(data.get("blocked")), limit=data.get("limit", 200))
     owner = actor if perms is not None else None    # a job is read by whoever started it (root: any)
     if route == ["jobs", "doctor"]:              # doctor's checks take seconds to a minute: a job the page follows
         base = load_vars()["deploy_base_dir"]

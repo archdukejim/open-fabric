@@ -2,10 +2,11 @@ from fabriclib.common.errors import ValidationError
 from fabriclib.dns_filter.dns_filter_stats import dns_filter_stats
 from fabriclib.dns_filter.ingest_dns_log import ingest_dns_log
 from fabriclib.dns_filter.read_query_log import read_query_log
+from fabriclib.dns_filter.refresh_lists import refresh_lists
 from fabriclib.dns_filter.show_filter_status import show_filter_status
-from fabriclib.dns_filter.update_lists import update_lists
 
-USAGE = """usage: fabricctl dns-filter lists [--scheduled]  fetch every list now, reload the ones that changed
+USAGE = """usage: fabricctl dns-filter lists [--scheduled]  fetch every list and AdGuard's catalogue now, reload the
+                                                lists that changed, apply one not in use yet
        fabricctl dns-filter status              the resolver, and each list's state
        fabricctl dns-filter log [--client ADDRESS] [--name NAME] [--blocked] [--limit N]
                                                 the query log, newest first (a name: it and every name below it)
@@ -73,13 +74,18 @@ def run_dns_filter_command(v, argv):
             if not v.get("install_resolver"):
                 print(f"the BIND resolver is off (dns_filter: {v.get('dns_filter')}): nothing to fetch")
                 return 2
-            result = update_lists(v)
+            result = refresh_lists(v, source="timer" if args else "cli")
             for zone, st in result["lists"].items():
                 mark = "FAILED" if st.get("error") and st["name"] in result["failed"] else (
                     "changed" if zone in result["changed"] else "unchanged")
                 print(f"  {st['name']}: {mark}" + (f" — {st['error']}" if mark == "FAILED" else
                                                    f", {st.get('rules', 0)} rules, {st.get('skipped', 0)} skipped"))
-            return 1 if result["failed"] else 0
+            print(f"AdGuard's catalogue: {result['catalogue']} lists" if result["catalogue"] is not None
+                  else "AdGuard's catalogue: could not be fetched (the last copy kept)")
+            if result["applied"] is not None:
+                print("new lists applied" if result["applied"] else f"applying the new lists failed: "
+                      f"{result.get('output', '')}")
+            return 1 if result["failed"] or result["applied"] is False else 0
         if cmd == "ingest" and args in ([], ["--scheduled"]):
             r = ingest_dns_log(v)
             if "off" in r:

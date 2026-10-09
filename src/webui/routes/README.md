@@ -10,6 +10,8 @@ Every page (GET) and action (POST) behind the gates; each takes the request hand
 | `get_page.py` | Route a signed-in GET to its page. |
 | `openbao_page.py` | Render the OpenBao tab: status, unlock methods and their add/rotate/remove forms, secrets, disk encryption. |
 | `post_action.py` | Route a signed-in, CSRF-checked POST to its action. |
+| `dns_filter_page.py` | The DNS filter tab: overview, lists, rules, the query log (dns:querylog), settings |
+| `dns_filter_post.py` | The DNS filter tab's changes: lists, rules (also Allow / Block from the query log), upstreams, fetch now |
 | `kea_post.py` | The Kea tab's changes: reservations, subnets (name, VLAN, notes, pools), options, client classes |
 | `radius_post.py` | RADIUS clients: add, new shared secret, remove — saved and applied at once; a secret is shown once on its own page, never in a URL. |
 | `saved_and_applied.py` | Run a change that fabric-agent saves and applies at once, and go back to its tab with the outcome. |

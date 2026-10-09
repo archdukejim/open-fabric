@@ -74,6 +74,14 @@ try:
     st, loc, _, _ = req("POST", "/kea/reservations", {"csrf": "dev", "mac": "02:00:00:00:00:99", "ip": "192.168.1.30",
                                                       "hostname": "nas"})
     check("Kea tab: reserve -> listed", st == 303 and "192.168.1.30" in req("GET", "/kea")[3], loc)
+    page = req("GET", "/dns-filter")[3]
+    check("DNS filter tab: statistics, the most blocked names, its sections",
+          "Last 24 hours" in page and "browser.events.data.msn.com" in page and "?view=querylog" in page)
+    st, loc, _, _ = req("POST", "/dns-filter/rules", {"csrf": "dev", "kind": "block", "name": "www.wikipedia.org",
+                                                      "back": "querylog"})
+    check("DNS filter tab: Block from the query log -> back there, listed in the rules",
+          st == 303 and "view=querylog" in (loc or "")
+          and "www.wikipedia.org" in req("GET", "/dns-filter?view=rules")[3], loc)
     check("every service tab renders", tabs_ok)
     check("strict Content-Security-Policy, like production", csp and "default-src 'none'" in csp, csp)
     st, _, _, page = req("GET", "/bind9?zone=dynamic_zone_var")

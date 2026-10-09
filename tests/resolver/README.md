@@ -6,4 +6,5 @@ with real containers.
 | File | What |
 |---|---|
 | `run.py` | The converter's cases, the settings that must be refused, then fabric's BIND image as the authoritative server and the resolver run as its rendered compose file says: a client outside the allowed networks refused, fabric's zone never filtered, lists and the owner's rules applied, the logs, a reload, the list job (a changed list reloaded alone, a failed list kept apart), DoT upstream when Cloudflare is reachable; the query-log job parses every line BIND wrote |
+| `console.py` | The web console's tab without a host: the settings it changes (lists, rules, upstreams, refused input), fabric-agent's routes and their permissions, the lists job's apply when a list is new, the web UI's post route, the page for each kind of user |
 | `querylog.py` | The query log and statistics with a real Postgres: ingesting, rewrites marking their queries, reading on (a rotated file, Postgres down), purging at 7 days while statistics stay, searches, refused input, the database's isolation, the admin-only permission |

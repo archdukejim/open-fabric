@@ -14,6 +14,7 @@ arbitrary commands.
 | `get_route.py` | GET routes: one fabriclib read each |
 | `post_route.py` | POST routes by area; apply, people, login events |
 | `post_dns.py` | Zone records, TSIG keys |
+| `post_dns_filter.py` | The DNS filter's lists, rules and upstreams (saved and applied), the lists job, the query-log search |
 | `post_dhcp.py` | DHCP: reservations, subnets (name, VLAN, notes, pools), options, client classes, each applied at once |
 | `post_network.py` | 802.1X settings, each applied at once |
 | `post_pki.py` | Manual PKI: describe or sign a CSR, issue, inspect, convert |

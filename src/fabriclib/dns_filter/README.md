@@ -16,6 +16,14 @@ Home in 0.7, decision 2.1.12.3).
 | `read_query_log.py` | Search the query log (client, name, blocked only), read up to the moment first |
 | `dns_filter_stats.py` | The statistics: the last 24 hours, the last 7 days, per list and rules zone, the most blocked names |
 | `filter_overview.py` | The DNS filter for the web console: its settings, each list's state, the statistics |
+| `add_filter_list.py` | Add a block list (vars.yaml); fetched by the lists job |
+| `remove_filter_list.py` | Take a block list out (vars.yaml) |
+| `add_filter_rule.py` | Allow or block a name and every name below it; a name in the other rule moves |
+| `remove_filter_rule.py` | Take a name out of the allows or blocks |
+| `set_filter_upstreams.py` | The DoT upstreams (address and certificate name pairs), or none: the root servers |
+| `fetch_catalogue.py` | AdGuard's list catalogue, read from its registry and kept for the web console |
+| `refresh_lists.py` | The lists job: fetch the lists and the catalogue, apply a list not in use yet |
+| `start_list_fetch.py` | Start the lists job now (fabric-agent has no internet) |
 | `show_filter_status.py` | Each list's state and the resolver's, for `fabricctl dns-filter status` |
 | `run_dns_filter_command.py` | `fabricctl dns-filter lists \| status \| log \| stats \| ingest` |
 | `common/` | Helpers shared by these files |

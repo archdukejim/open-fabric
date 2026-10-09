@@ -29,6 +29,8 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `delete_tsig_key.py` | Remove a TSIG key (published by the next apply). Agent route: POST /v1/tsig/<name>/delete (tsig:manage). |
 | `describe_csr.py` | Decode an uploaded CSR and judge it before signing (the review step). Agent route: POST /v1/pki/describe-csr (pki:read). |
 | `device_overview.py` | Devices, roles and the RBAC vocabulary from one directory read. Agent route: GET /v1/devices (devices:read). |
+| `dns_filter_change.py` | Change the DNS filter: lists, rules, upstreams (saved and applied), or start the lists job. Agent routes: POST /v1/dns-filter/... (dns:filter). |
+| `dns_filter_overview.py` | What the DNS filter tab shows. Agent route: GET /v1/dns-filter (dns:filter). |
 | `dhcp_overview.py` | What the Kea (DHCP) page shows, read-only. Agent route: GET /v1/dhcp (dhcp:read). |
 | `errors.py` | The agent rejected the input (HTTP 400); message is safe to show. |
 | `inspect_pem.py` | Decode certificates or a CSR for reading, with a trust verdict. Agent route: POST /v1/pki/inspect (pki:read). |
@@ -42,6 +44,7 @@ The fabric-agent API client: one file per agent route (JSON over the agent's uni
 | `quote_segment.py` | URL-quote one path segment with nothing kept safe ("/" becomes %2F), so a name cannot change the route. |
 | `radius_guides.py` | The FreeRADIUS setup guides and Windows scripts, filled in for this host (public data only). Agent route: GET /v1/radius/guides (radius:read). |
 | `radius_overview.py` | What the FreeRADIUS page shows: on/off, clients, password groups, recent decisions. Agent route: GET /v1/radius (radius:read). |
+| `query_log.py` | Search the DNS query log. Agent route: POST /v1/dns-filter/querylog (dns:querylog). |
 | `read_audit.py` | Recent audit-log lines for the Audit page. Agent route: GET /v1/audit (audit:read). |
 | `remove_radius_client.py` | Remove a RADIUS client; saved and applied at once. Agent route: POST /v1/radius/clients/<name>/delete (radius:admin), timeout 300 s. |
 | `remove_reservation.py` | Remove a DHCP reservation and apply at once. Agent route: POST /v1/dhcp/reservations/<mac>/delete (dhcp:write), timeout 300 s. |

@@ -5,6 +5,7 @@ TABS = [
     ("overview", "/", "Overview", False),
     ("bind9", "/bind9", "BIND9 · DNS", False),
     ("kea", "/kea", "Kea · DHCP", True),
+    ("dnsfilter", "/dns-filter", "DNS filter", True),
     ("stepca", "/stepca", "Step-CA · PKI", False),
     ("directory", "/directory", "Directory", False),
     ("freeradius", "/freeradius", "FreeRADIUS · 802.1X", True),
@@ -12,6 +13,9 @@ TABS = [
     ("federation", "/federation", "Federation", False),
     ("security", "/security", "Security", False),
 ]
+# DNS filter tab sections: (view, label); the query log needs dns:querylog (MENU_PERMS)
+DNS_FILTER_SECTIONS = [("overview", "Overview"), ("lists", "Lists"), ("rules", "Rules"), ("querylog", "Query log"),
+                       ("settings", "Settings")]
 # BIND9 tab sections: (view, label)
 FREERADIUS_SECTIONS = [("overview", "Overview"), ("switches", "Connect a switch"), ("windows", "Connect Windows")]
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
@@ -54,12 +58,14 @@ PREVIEW_PERMS = ["status:read", "dns:read", "dns:write", "tsig:manage", "dhcp:re
                  "pki:link-device", "devices:read", "devices:enroll", "devices:admin", "roles:admin", "radius:read",
                  "radius:admin",
                  "people:read", "domain:read", "machines:admin", "gpo:admin", "federation:read", "vault:status",
-                 "vault:unlock", "audit:read"]
+                 "vault:unlock", "audit:read", "dns:filter", "dns:querylog"]
 # tab -> the permission(s) that show it (any of them)
 TAB_PERMS = {"overview": ("status:read",), "bind9": ("dns:read",), "kea": ("dhcp:read",), "stepca": ("pki:read",),
+             "dnsfilter": ("dns:filter", "dns:querylog"),
              "directory": ("devices:read", "people:read", "domain:read"), "freeradius": ("radius:read",),
              "openbao": ("vault:status",), "federation": ("federation:read",),
              "security": ("security:raise",)}
 MENU_PERMS = {"sign": "pki:sign", "issue": "pki:issue", "convert": "pki:issue", "people": "people:read",
               "devices": "devices:read", "roles": "devices:read", "unlock": "vault:status", "disk": "vault:status",
-              "domain": "domain:read", "machines": "domain:read", "gpo": "domain:read"}
+              "domain": "domain:read", "machines": "domain:read", "gpo": "domain:read", "querylog": "dns:querylog",
+              "lists": "dns:filter", "rules": "dns:filter", "settings": "dns:filter"}
