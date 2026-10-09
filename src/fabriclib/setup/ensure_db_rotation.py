@@ -1,3 +1,4 @@
+import os
 import subprocess
 
 from fabriclib.common.console import ok
@@ -85,13 +86,15 @@ def _call(v, token, method, path, body=None):
     return data
 
 
-def configure_db_engine(v, token, admin_password, apply, container="postgres", secrets_file=SECRETS_FILE):
+def configure_db_engine(v, token, admin_password, apply, container="postgres", secrets_file=SECRETS_FILE,
+                        archive=None):
     """Purpose: converge Postgres and OpenBao for Keycloak's rotated password (decision 2.1.7.4): Postgres's own admin,
              Keycloak's user no superuser, OpenBao's database engine (database/) connected as that admin to Postgres's
              alias on fabric_net (its certificate verified), and Keycloak's password as its static role.
     Inputs:  v — settings (OpenBao's); token — an OpenBao token allowed fabric-setup's paths; admin_password —
              postgres_admin_password; apply — rotate_db_password's apply (re-render and restart Keycloak);
-             container — Postgres's container; secrets_file — where fabric's secrets live.
+             container — Postgres's container; secrets_file — where fabric's secrets live; archive — the
+             install's archive folder for the rotation's record and audit line (None: the defaults).
     Returns: "converged" (nothing new) or "taken over" (the static role was made: it rotated the password, and
              Keycloak was applied with it).
     Fails:   SetupError from Postgres or OpenBao; ValidationError from rotate_db_password.
@@ -112,7 +115,11 @@ def configure_db_engine(v, token, admin_password, apply, container="postgres", s
     # fabric rotates it on its monthly timer; OpenBao's own period is only a backstop far beyond that
     _call(v, token, "POST", f"database/static-roles/{ROLE}", {"db_name": "postgres", "username": KC_ROLE,
                                                              "rotation_period": "87600h"})
-    rotate_db_password(v, token, actor="setup", source="cli", rotate=False, apply=apply, secrets_file=secrets_file)
+    where = {}
+    if archive:
+        where = {"record": os.path.join(archive, "db-rotation.json"), "audit": os.path.join(archive, "audit.log")}
+    rotate_db_password(v, token, actor="setup", source="cli", rotate=False, apply=apply, secrets_file=secrets_file,
+                       **where)
     _lock_bootstrap(container)
     return "taken over"
 
@@ -144,7 +151,8 @@ def run(ctx):
         return
     try:
         state = configure_db_engine(v, approle_login(v, SETUP_CREDS), ctx.secrets["postgres_admin_password"],
-                                    _redeploy(ctx), secrets_file=ctx.secrets_file)
+                                    _redeploy(ctx), secrets_file=ctx.secrets_file,
+                                    archive=os.path.join(ctx.target_dir, "archive"))   # not the package's copy
     except ValidationError as exc:
         raise SetupError(f"Keycloak's database password: {exc}")
     ok("Keycloak's database password: " + ("now OpenBao's, rotated monthly (Postgres has its own admin)"

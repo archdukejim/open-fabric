@@ -51,10 +51,10 @@ docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.22-fabriclib-secrets.md	74f026337aad89eb5aeaaf8decd4bb352ee34e98	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.23-fabriclib-security.md	d920e7834a56aafa8fdc1602f2ef23e455944d53	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	2625e634fc3d5eecb485dea0000281b582b5dab6	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	02d5f9323ae202b194c9879bfa50449c7b661fa1	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.25-fabriclib-system.md	b57979b1c79b1c15f4e4edcaff531706311aa242	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.26-fabriclib-undo.md	5591364f414bc6fc2a505d9b421026d7ae218d45	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	1f8326f67d39a16349199937fbebabb266df936d	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	81f6cde28df7beccc344c4ce2a4394ff454c089c	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.28-installers.md	986b323d7a4ca2e8cbf71d23fdd677f464f51139	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.29-webui.md	344b18bde12f40f0a6dad56d91800c53f742c716	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.3-fabricctl-jinja.md	31bdfa5860678f0ab3e86db2782abc4273d39817	2026-10-09	
@@ -134,7 +134,7 @@ docs/volume_2_engineering_decisions/2.3.12-dns-filter-notes.md	3af011ce8dd335d9a
 docs/volume_2_engineering_decisions/2.3.14-image-notes.md	2a6950b89b58dcc37ada049ac8dfe7f10bf86562	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.2-architecture-notes.md	b3ce46829288e2c63f9ecb711fb685ae33f80785	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.4-dns-notes.md	67514706bb849105053e1fa34a6b02f1d81fff26	2026-10-08	
-docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	ae04c66b20fabe295bd810e904eec1d8527c8e60	2026-10-09	
+docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	a7aadbdf800c043fc2c840ac5a3e0468809f33d4	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.6-identity-notes.md	96ece4d5d2f202171b0eccf0bafc44cb1b0a2065	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.7-openbao-notes.md	4a70f31917b5a9dca1c786b5e4cf64677b56cb71	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.9-federation-notes.md	589194fbf33eda431862f1414dabc04a3181edc9	2026-10-08	
@@ -821,7 +821,7 @@ src/fabriclib/setup/create_admin.py	3e9dd6625c54d1e0cba74dec8f3b09bbe4141767	202
 src/fabriclib/setup/deploy_config.py	933a9fd5211dc258a504e427c3cc989f63b52460	2026-10-02	
 src/fabriclib/setup/detect_network.py	5abb3088d0bb559e9124ad4129d96c1ab05d941d	2026-10-03	
 src/fabriclib/setup/doctor_report.py	00d8bf7d50fa37a9357024e231a6c418a79b73fd	2026-10-09	
-src/fabriclib/setup/ensure_db_rotation.py	6f547b1e47e076ea9512436dac1a97f36039b73f	2026-10-09	
+src/fabriclib/setup/ensure_db_rotation.py	6a317d7cdfc48e4825349d1e05e6289eab543ead	2026-10-09	
 src/fabriclib/setup/errors.py	4c7b84633f68a8cd971aa38ba1aa9d8f5a4b2b04	2026-09-30	
 src/fabriclib/setup/export_install.py	608e604feae491de0ac8e96b2735fd0603641e9a	2026-10-05	
 src/fabriclib/setup/harden_docker.py	1ad4aca818b8227f6566193c67503b8f12adae09	2026-10-03	
@@ -901,7 +901,7 @@ src/fabriclib/vault/list_pkcs11_tokens.py	4e251eef3a66e83f5ed415f7293f1ae6b1a1fe
 src/fabriclib/vault/list_slots.py	734c454c3ad95ed8b85819b39e4687e5afeab008	2026-09-30	
 src/fabriclib/vault/remove_slot.py	3062d14cb3a637b64a3ec528ad160ccfbc8262e0	2026-09-30	
 src/fabriclib/vault/revoke_token.py	66a085d9e8ffd813f19b0b33a4d5282e6fac4834	2026-09-30	
-src/fabriclib/vault/rotate_db_password.py	8ea900081165607d19ae23357f72f8756e6acb91	2026-10-09	
+src/fabriclib/vault/rotate_db_password.py	6bcf62a7747a7387f44e108aa6181a2270c4c851	2026-10-09	
 src/fabriclib/vault/rotate_vault_key.py	16d386833ef8f2f29f6439721138dfedfab66381	2026-09-30	
 src/fabriclib/vault/run_vault_command.py	1f0d62e774204ce89e21d4cdd1ba35dbaeb53148	2026-10-09	
 src/fabriclib/vault/slots/README.md	5a7c602678bcb9d3140ce3156d216c8bab38d865	2026-09-30	
@@ -1261,7 +1261,7 @@ tests/nginx_check.sh	d3ea4647c628988da6a600ceff066204611f24f9	2026-10-08
 tests/ntp/README.md	37e7cca81172f8a93564bcd84d2a894591b76848	2026-10-02	
 tests/ntp/run.py	7a43d438d3a31f9e55a9321d077ed19772a3eac5	2026-10-08	
 tests/openbao/README.md	2bbcd90747078f4eabfc18387617fb8ca1d9bd53	2026-10-09	
-tests/openbao/db_rotation.py	e572e092ac975a6dca52cc26067820137e71796f	2026-10-09	
+tests/openbao/db_rotation.py	d59f3a6a1cbcc76a6762a2d815da933e859145ca	2026-10-09	
 tests/openbao/run.py	7470293409535699527ba108cad767b372fa06bc	2026-10-05	
 tests/pki/README.md	c00ae570e87e3a05c979e041a56057b2b388ec7e	2026-10-08	
 tests/pki/acme.py	64fd96f2019823f7e4ecada6b00a97c97b39d069	2026-10-08	

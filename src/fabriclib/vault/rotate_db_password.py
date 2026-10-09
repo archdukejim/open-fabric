@@ -3,7 +3,7 @@ import json
 import os
 
 from fabriclib.common.errors import ValidationError
-from fabriclib.common.paths import DB_ROTATION_FILE, SECRETS_FILE
+from fabriclib.common.paths import AUDIT_FILE, DB_ROTATION_FILE, SECRETS_FILE
 from fabriclib.common.wait_healthy import wait_healthy
 from fabriclib.common.write_audit import write_audit
 from fabriclib.secrets.save_secrets import save_secrets
@@ -40,14 +40,16 @@ def _apply_and_wait(actor, source):
 
 
 def rotate_db_password(v, token, actor="root", source="cli", rotate=True, apply=_apply_and_wait,
-                       record=DB_ROTATION_FILE, secrets_file=SECRETS_FILE):
+                       record=DB_ROTATION_FILE, secrets_file=SECRETS_FILE, audit=AUDIT_FILE):
     """Purpose: Keycloak's database password, rotated by OpenBao's database engine (decision 2.1.7.4, manual 1.7.1):
              OpenBao sets a new one in Postgres, fabric keeps it in its secrets, renders Keycloak's settings and
              restarts it (about a minute; connections it holds keep working meanwhile).
     Inputs:  v — settings; token — an OpenBao token of fabric-setup; actor, source — the audit's; rotate — False only
              right after the static role was made (making it rotated the password); apply — the re-render and
              restart, callable(actor, source) -> (ok, why), Keycloak healthy when ok (default `fabricctl --apply`;
-             setup and tests pass their own); record — where the last run is kept; secrets_file — fabric's secrets.
+             setup and tests pass their own); record — where the last run is kept; secrets_file — fabric's secrets;
+             audit — the audit log (setup, running from the package's copy, passes the install's own for both: the
+             defaults follow where the code runs from).
     Returns: {"ok": True}.
     Fails:   ValidationError: OpenBao refused the rotation (the old password keeps working); the new password could
              not be read or saved, or Keycloak did not come back with it (Keycloak's open connections keep working;
@@ -70,8 +72,8 @@ def rotate_db_password(v, token, actor="root", source="cli", rotate=True, apply=
             raise ValidationError("Keycloak did not come back with its new password: " + str(why).strip()[-300:])
     except ValidationError as exc:
         _record(record, False, actor, str(exc))
-        write_audit(actor, "DB_ROTATE", f"role={ROLE} failed: {exc}", source)
+        write_audit(actor, "DB_ROTATE", f"role={ROLE} failed: {exc}", source, path=audit)
         raise
     _record(record, True, actor, "rotated" if rotate else "taken over by OpenBao")
-    write_audit(actor, "DB_ROTATE", f"role={ROLE} " + ("rotated" if rotate else "taken over"), source)
+    write_audit(actor, "DB_ROTATE", f"role={ROLE} " + ("rotated" if rotate else "taken over"), source, path=audit)
     return {"ok": True}

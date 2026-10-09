@@ -36,7 +36,7 @@ NET, SUBNET, PG_IP, BAO_IP = "dbrot_net", "10.254.23.0/24", "10.254.23.70", "10.
 PG, BAO, HOST = "dbrot-postgres", "dbrot-bao", "vault.lan.test"
 FAILED = 0
 AUDIT = []
-rotate_mod.write_audit = lambda actor, event, detail, source: AUDIT.append((event, detail))
+rotate_mod.write_audit = lambda actor, event, detail, source, path=None: AUDIT.append((event, detail, path))
 
 
 def check(name, cond, detail=""):
@@ -164,7 +164,15 @@ def rotate(*a, **kw):                            # every rotation here records t
 import fabriclib.setup.ensure_db_rotation as ensure_mod  # noqa: E402
 ensure_mod.rotate_db_password = rotate
 try:
-    state = configure_db_engine(v, TOKEN, ADMIN_PW, apply, container=PG, secrets_file=SECRETS)
+    ARCHIVE = os.path.join(W, "install-archive")             # setup passes the install's own (0.6.3 upgrade test)
+    os.makedirs(ARCHIVE)
+    ensure_mod.rotate_db_password = orig_rotate             # the take-over writes where it is told
+    state = configure_db_engine(v, TOKEN, ADMIN_PW, apply, container=PG, secrets_file=SECRETS, archive=ARCHIVE)
+    ensure_mod.rotate_db_password = rotate
+    check("take-over: its record and audit line go to the install's archive it is given, not where the code runs",
+          json.load(open(os.path.join(ARCHIVE, "db-rotation.json")))["ok"]
+          and AUDIT[-1][2] == os.path.join(ARCHIVE, "audit.log"), AUDIT[-1:])
+    shutil.copy(os.path.join(ARCHIVE, "db-rotation.json"), RECORD)
     P1 = saved()
     check("take-over: OpenBao's static role made, the password rotated at once and saved, Keycloak applied with it",
           state == "taken over" and P1 != P0 and APPLIED == [P1], (state, APPLIED))
