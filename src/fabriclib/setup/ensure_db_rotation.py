@@ -1,9 +1,12 @@
+import datetime
+import json
 import os
+import re
 import subprocess
 
 from fabriclib.common.console import ok
 from fabriclib.common.errors import ValidationError
-from fabriclib.common.paths import SECRETS_FILE
+from fabriclib.common.paths import DB_ROTATION_FILE, SECRETS_FILE
 from fabriclib.common.wait_healthy import wait_healthy
 from fabriclib.deploy.apply_deployment import apply_deployment
 from fabriclib.setup.errors import SetupError
@@ -132,6 +135,7 @@ def configure_db_engine(v, token, admin_password, apply, container="postgres", s
     status, _ = bao_request(v, "GET", f"database/static-roles/{ROLE}", token=token)
     if status == 200:
         _lock_bootstrap(container)            # Keycloak runs as its own role since the take-over
+        _restore_record(v, token, os.path.join(archive, "db-rotation.json") if archive else None)
         return "converged"
     # fabric rotates it on its monthly timer; OpenBao's own period is only a backstop far beyond that
     _call(v, token, "POST", f"database/static-roles/{ROLE}", {"db_name": "postgres", "username": KC_ROLE,
@@ -143,6 +147,28 @@ def configure_db_engine(v, token, admin_password, apply, container="postgres", s
                        **where)
     _lock_bootstrap(container)
     return "taken over"
+
+
+def _restore_record(v, token, path):
+    """Purpose: the last rotation's record when it is missing (a reinstall keeps OpenBao but not the install's archive;
+             found by the 0.6.3 sandbox): rebuilt from OpenBao's own time of the last rotation.
+    Inputs:  v — settings (OpenBao's); token — fabric-setup's; path — the record (None: the default).
+    Returns: True when it was written, else False (there already, or OpenBao gave no time).
+    Fails:   OSError writing the file.
+    Feeds:   configure_db_engine (an existing static role)."""
+    path = path or DB_ROTATION_FILE
+    if os.path.exists(path):
+        return False
+    status, data = bao_request(v, "GET", f"database/static-creds/{ROLE}", token=token)
+    when = (data.get("data") or {}).get("last_vault_rotation") if status == 200 else None
+    if not when:
+        return False
+    stamp = datetime.datetime.fromisoformat(re.sub(r"\.\d+", "", when).replace("Z", "+00:00"))   # RFC 3339, ns
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({"when": stamp.astimezone().isoformat(timespec="seconds"), "ok": True, "actor": "setup",
+                   "detail": "the last rotation's time, from OpenBao"}, f)
+    return True
 
 
 def _redeploy(ctx):

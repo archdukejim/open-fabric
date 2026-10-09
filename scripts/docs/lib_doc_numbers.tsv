@@ -1516,6 +1516,7 @@ function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_ensure_roles
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_lock_bootstrap	3	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_psql	1	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_redeploy	6	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_restore_record	9	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|align_postgres_roles	8	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|configure_db_engine	5	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|run	7	

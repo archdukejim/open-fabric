@@ -14,6 +14,7 @@ the real one).
 
     sudo python3 tests/openbao/db_rotation.py          (needs Docker, openssl, root)
 """
+import datetime
 import json
 import os
 import shutil
@@ -195,6 +196,12 @@ try:
     again = configure_db_engine(v, TOKEN, ADMIN_PW, apply, container=PG, secrets_file=SECRETS)
     check("converging again changes nothing (no rotation, Keycloak left alone)",
           again == "converged" and saved() == P1 and len(APPLIED) == 1 and signs_in("keycloak_db", P1))
+    os.remove(os.path.join(ARCHIVE, "db-rotation.json"))        # a reinstall: OpenBao kept, the archive not
+    configure_db_engine(v, TOKEN, ADMIN_PW, apply, container=PG, secrets_file=SECRETS, archive=ARCHIVE)
+    back = json.load(open(os.path.join(ARCHIVE, "db-rotation.json")))
+    age = time.time() - datetime.datetime.fromisoformat(back["when"]).timestamp()
+    check("a missing record is rebuilt from OpenBao's own time of the last rotation (no rotation for it)",
+          back["ok"] and 0 <= age < 600 and saved() == P1 and len(APPLIED) == 1, (back, age))
     rotate(v, TOKEN, apply=apply, secrets_file=SECRETS)
     P2 = saved()
     check("a rotation: a new password, saved and applied; the previous one refused",

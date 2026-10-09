@@ -10,6 +10,7 @@ CLAUDE.md	43c994c2d3617f947bcb5adf1933e21dabe46bb5	2026-09-30
 LICENSE	05e475fa9aff67dbd7d98e3bc88d87f93e36c79f	2026-09-30	
 README.md	786c7cd0f2b70b9e48de89c23942a95341316c50	2026-10-08	
 THIRD_PARTY_NOTICES	ff836ec5208f7ac6140740a07186107c63702d24	2026-10-08	
+archive/db-rotation.json	18182e8c32543d8fa8b328e6aa2dc32e4efa2d43	2026-10-09	
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	6300abd255fbbe5a87bd0d83cd9c9dd1c4b8de1f	2026-10-08	
 config/VERSION	844f6a91acb92e5f4c58fe0d440fba8deea2a8c8	2026-10-09	
@@ -51,10 +52,10 @@ docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.22-fabriclib-secrets.md	74f026337aad89eb5aeaaf8decd4bb352ee34e98	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.23-fabriclib-security.md	d920e7834a56aafa8fdc1602f2ef23e455944d53	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	b0deeec1f4b9277b5324917d3631f9503732e09c	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	c614b8d99d8c8b625e642d05fe060faa34551848	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.25-fabriclib-system.md	b57979b1c79b1c15f4e4edcaff531706311aa242	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.26-fabriclib-undo.md	5591364f414bc6fc2a505d9b421026d7ae218d45	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	81f6cde28df7beccc344c4ce2a4394ff454c089c	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	37603fa3917f096fcf6052d4532960bf5253816b	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.28-installers.md	986b323d7a4ca2e8cbf71d23fdd677f464f51139	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.29-webui.md	344b18bde12f40f0a6dad56d91800c53f742c716	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.3-fabricctl-jinja.md	31bdfa5860678f0ab3e86db2782abc4273d39817	2026-10-09	
@@ -134,7 +135,7 @@ docs/volume_2_engineering_decisions/2.3.12-dns-filter-notes.md	3af011ce8dd335d9a
 docs/volume_2_engineering_decisions/2.3.14-image-notes.md	2a6950b89b58dcc37ada049ac8dfe7f10bf86562	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.2-architecture-notes.md	b3ce46829288e2c63f9ecb711fb685ae33f80785	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.4-dns-notes.md	67514706bb849105053e1fa34a6b02f1d81fff26	2026-10-08	
-docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	b48d095b94d788bbbbcf97b39a9695d118d244aa	2026-10-09	
+docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	c8b9c2cff5c0ab87373b629bc838c3d18db317c1	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.6-identity-notes.md	96ece4d5d2f202171b0eccf0bafc44cb1b0a2065	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.7-openbao-notes.md	4a70f31917b5a9dca1c786b5e4cf64677b56cb71	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.9-federation-notes.md	589194fbf33eda431862f1414dabc04a3181edc9	2026-10-08	
@@ -233,7 +234,7 @@ scripts/README.md	dd36e9248260e4f936662417c4d10511c3cdb00a	2026-10-08
 scripts/docs/README.md	af834e1650d5a42ed93702d10180e09780634830	2026-10-08	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	7ff94cd622677c2a6040c2c75374a04e50cc48c4	2026-10-08	
-scripts/docs/lib_doc_numbers.tsv	ac730c379fd74f0996253a42fd2fd116178d8bf4	2026-10-09	
+scripts/docs/lib_doc_numbers.tsv	0f56d271ab4dc0cfe934c5ab5a1d03f6e2949ecd	2026-10-09	
 scripts/docs/lib_doc_registry.py	a65ab5459802daaca963fac77a8b708397d42d89	2026-10-08	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	b3f307b4dbaba54a69cc93c993287d43c747ba8f	2026-10-08	
@@ -821,7 +822,7 @@ src/fabriclib/setup/create_admin.py	3e9dd6625c54d1e0cba74dec8f3b09bbe4141767	202
 src/fabriclib/setup/deploy_config.py	933a9fd5211dc258a504e427c3cc989f63b52460	2026-10-02	
 src/fabriclib/setup/detect_network.py	5abb3088d0bb559e9124ad4129d96c1ab05d941d	2026-10-03	
 src/fabriclib/setup/doctor_report.py	2f6ff230fc03c73fdd3a8fcefd7c3f9fb5758b98	2026-10-09	
-src/fabriclib/setup/ensure_db_rotation.py	8653a92c53d74208df6a630250e630619f7925ae	2026-10-09	
+src/fabriclib/setup/ensure_db_rotation.py	8e1aded25a7c29f90d24b2a0bdbdfef65187686c	2026-10-09	
 src/fabriclib/setup/errors.py	4c7b84633f68a8cd971aa38ba1aa9d8f5a4b2b04	2026-09-30	
 src/fabriclib/setup/export_install.py	608e604feae491de0ac8e96b2735fd0603641e9a	2026-10-05	
 src/fabriclib/setup/harden_docker.py	1ad4aca818b8227f6566193c67503b8f12adae09	2026-10-03	
@@ -1261,7 +1262,7 @@ tests/nginx_check.sh	d3ea4647c628988da6a600ceff066204611f24f9	2026-10-08
 tests/ntp/README.md	37e7cca81172f8a93564bcd84d2a894591b76848	2026-10-02	
 tests/ntp/run.py	7a43d438d3a31f9e55a9321d077ed19772a3eac5	2026-10-08	
 tests/openbao/README.md	2bbcd90747078f4eabfc18387617fb8ca1d9bd53	2026-10-09	
-tests/openbao/db_rotation.py	c5d51a6dedb1ad4d6ef8664cabcf4be3bf7ad8a1	2026-10-09	
+tests/openbao/db_rotation.py	e450624cd9b80b426d66ef57ba6a107deaeb9177	2026-10-09	
 tests/openbao/run.py	7470293409535699527ba108cad767b372fa06bc	2026-10-05	
 tests/pki/README.md	c00ae570e87e3a05c979e041a56057b2b388ec7e	2026-10-08	
 tests/pki/acme.py	64fd96f2019823f7e4ecada6b00a97c97b39d069	2026-10-08	
