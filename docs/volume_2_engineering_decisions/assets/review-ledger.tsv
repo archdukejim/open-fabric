@@ -13,7 +13,7 @@ THIRD_PARTY_NOTICES	ff836ec5208f7ac6140740a07186107c63702d24	2026-10-08
 chrony_4.5-1ubuntu4.2_amd64.deb	4cd4c44ac4f701f63e8623cc954938412fb67285	2026-10-05	
 config/README.md	6300abd255fbbe5a87bd0d83cd9c9dd1c4b8de1f	2026-10-08	
 config/VERSION	8f0916f768f0487bcf8d33827ce2c8dcecb645c1	2026-10-04	
-config/images.lock.yaml	b9dac2ff2e2e171969193236c161dd4645ae1b18	2026-10-08	
+config/images.lock.yaml	23f630f65e02b966542ed4732f3319fb4ada8a95	2026-10-09	
 config/link-vars-template.yaml	09caaa55680a13015332a468218c99437f67db26	2026-09-30	
 docs/README.md	31865b92b634c167a85fadbc592110690eeddaff	2026-10-08	
 docs/volume_1_description_and_architecture/1.1.1-what-fabric-is.md	2616cd61465cdc6a60eb06146c56ba2dc3625f8d	2026-10-08	
@@ -32,7 +32,7 @@ docs/volume_1_description_and_architecture/1.12.1-adguard.md	28dbdfbc83381b8470e
 docs/volume_1_description_and_architecture/1.13.1-chrony.md	ad072bf9a0b0d7d74c145a8df36599bb4f1aca6e	2026-10-08	
 docs/volume_1_description_and_architecture/1.14.1-image-channels.md	94a12a60defe93ae9bc13a991ae57f8961edd5ca	2026-10-08	
 docs/volume_1_description_and_architecture/1.14.2-image-updates.md	6f92fc0f6c1036000486a296d33c23116e0e7614	2026-10-08	
-docs/volume_1_description_and_architecture/1.14.3-published-images-on-hosts.md	6bfd93c349bdb6d20c1182e1af322bfd2de21679	2026-10-08	
+docs/volume_1_description_and_architecture/1.14.3-published-images-on-hosts.md	0d62eb112e0c0bcd53c9c02f50aac71dd173f530	2026-10-09	
 docs/volume_1_description_and_architecture/1.15.1-fluent-bit.md	f808ad89a79c10260c048ca1ec58b12037dcb8e9	2026-10-08	
 docs/volume_1_description_and_architecture/1.16.1-luks.md	f4b4c1a4dd1ecd389fd2fde6ec3bc00e7f92a738	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.1-about-the-reference.md	4a2b06beefecb2046109e7be6217d3443827239a	2026-10-08	
@@ -51,7 +51,7 @@ docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.22-fabriclib-secrets.md	caed17b34b3b9a455f8f26e98bb4ab7e76d84115	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.23-fabriclib-security.md	d920e7834a56aafa8fdc1602f2ef23e455944d53	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	86a91601910f61ff07e1d9ac2c995a4f7214e9f5	2026-10-08	
+docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	52aba13afebb7309fabb603769803c70bc107103	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.25-fabriclib-system.md	9bb5d6659447b2cf97bc9a705a02b600c5894bf0	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.26-fabriclib-undo.md	5591364f414bc6fc2a505d9b421026d7ae218d45	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	f4279c45c2d60135061940a968538bfd1f1af849	2026-10-08	
@@ -61,7 +61,7 @@ docs/volume_1_description_and_architecture/1.17.3-fabricctl-jinja.md	43014b62587
 docs/volume_1_description_and_architecture/1.17.30-fabriclib-samba.md	bb52b03216d8785064493b7a0528b04b204985f2	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.31-fabriclib-directory.md	233c5ccb89071a7ce1436b1a277a7754ae398034	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.4-fabricctl-lib.md	76bc845876c679778c0588d379f7246a12fae2d0	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.5-fabriclib-common.md	73317bb038c520db50db9fef2e276a6ed66589c3	2026-10-08	
+docs/volume_1_description_and_architecture/1.17.5-fabriclib-common.md	6783b77e3d1522462300e3f447af49be19227eac	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.6-fabriclib-consent.md	fac0dccbc79c6b304807039ef3e7dde8cec12ad9	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.7-fabriclib-core.md	287e5a946064faecbdb0262ece385ff0e043036c	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.8-fabriclib-deploy.md	b927bdd462060e6d6b055b9a8cf2b7f43e121556	2026-10-08	
@@ -112,9 +112,9 @@ docs/volume_1_description_and_architecture/README.md	f8d194e6612c58aac346cc7dad1
 docs/volume_2_engineering_decisions/2.1.1-product.md	c25e579fd14aa5f21f1945bc53f341128bb27452	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.10-dhcp.md	4af6d09683e978bbb93718ee3863547974ce264e	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.11-radius.md	558e56bfab8acc7043df3b83499e6e3551e688ff	2026-10-08	
-docs/volume_2_engineering_decisions/2.1.12-dns-filter.md	bd31b344bd84fd1e6d71542a4c8d8ab9e45cd259	2026-10-08	
+docs/volume_2_engineering_decisions/2.1.12-dns-filter.md	9c32cb6fe6114e036e11c790721e97041b433a28	2026-10-09	
 docs/volume_2_engineering_decisions/2.1.13-time.md	382002cc710290228742eb0bbece98c5e28bc1c8	2026-10-08	
-docs/volume_2_engineering_decisions/2.1.14-images.md	2cf59c292709f7b14e016256bf627866c1e94835	2026-10-08	
+docs/volume_2_engineering_decisions/2.1.14-images.md	77666315ee7d148f4e5e57c708574c4e6530152d	2026-10-09	
 docs/volume_2_engineering_decisions/2.1.15-logs.md	b3fb9286ea0a6760a0ab597950d771e6cc305633	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.16-disk-encryption.md	2c5f6832b676ea44d7f5e8a76a4717b35f4d3cd6	2026-10-08	
 docs/volume_2_engineering_decisions/2.1.2-architecture.md	5d920ae8e230cfaaafeb6aa77fdd22753fb77227	2026-10-08	
@@ -131,7 +131,7 @@ docs/volume_2_engineering_decisions/2.3.1-product-notes.md	ce9f1d8c78892821a6f1d
 docs/volume_2_engineering_decisions/2.3.10-dhcp-notes.md	f9418b7e2344ba4dfbe3b28ae1cf757611042f69	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.11-radius-notes.md	3424b43960e50007224d299adac7dd0533c7f0f6	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.12-dns-filter-notes.md	3af011ce8dd335d9a0fbe2a3ed614bd40a54d43e	2026-10-08	
-docs/volume_2_engineering_decisions/2.3.14-image-notes.md	a45e0fe329a502ba426cda665844457bd2b5c3c2	2026-10-08	
+docs/volume_2_engineering_decisions/2.3.14-image-notes.md	2a6950b89b58dcc37ada049ac8dfe7f10bf86562	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.2-architecture-notes.md	b3ce46829288e2c63f9ecb711fb685ae33f80785	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.4-dns-notes.md	67514706bb849105053e1fa34a6b02f1d81fff26	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	9a7e2fe5cc9db81431954cab7719b293968a88bc	2026-10-08	
@@ -144,7 +144,7 @@ docs/volume_3_installation/3.1.1-manual-test-plan.md	cbf7626ccb033ad7c00c6f0508f
 docs/volume_3_installation/3.1.2-automated-tests.md	fb8e8cb2883c768509cb6ac7b50576f439745d26	2026-10-08	
 docs/volume_3_installation/3.1.3-dev-preview.md	f913e6ed5b5f0e0428479a417dc655071b3b2f42	2026-10-08	
 docs/volume_3_installation/3.1.4-working-on-fabric.md	f0aa02dae628fc02838839f4887bb5d6baa1e857	2026-10-08	
-docs/volume_3_installation/3.14.1-building-images.md	41e5d7c0cd766ddb2d8ab35d697a0e50f4be3125	2026-10-08	
+docs/volume_3_installation/3.14.1-building-images.md	2202d12890d157923f31797352e4e39ba4b09676	2026-10-09	
 docs/volume_3_installation/3.16.1-disk-encryption.md	01a470a365017a5f19e088eb54482f8c49919b65	2026-10-08	
 docs/volume_3_installation/3.2.1-requirements.md	422e0c008fdc1ddf75d7209427c1c95c31a6f06f	2026-10-08	
 docs/volume_3_installation/3.2.2-docker-from-ubuntu.md	2d7250a68efefe0413b077ee659fa444d40a325a	2026-10-08	
@@ -233,12 +233,13 @@ scripts/README.md	dd36e9248260e4f936662417c4d10511c3cdb00a	2026-10-08
 scripts/docs/README.md	af834e1650d5a42ed93702d10180e09780634830	2026-10-08	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	7ff94cd622677c2a6040c2c75374a04e50cc48c4	2026-10-08	
-scripts/docs/lib_doc_numbers.tsv	d90a1846cbe18d55add09faeaee16a66d9bb9df8	2026-10-08	
+scripts/docs/lib_doc_numbers.tsv	0fd743423471d75a794b8e0ba41248cce76ab5f5	2026-10-09	
 scripts/docs/lib_doc_registry.py	a65ab5459802daaca963fac77a8b708397d42d89	2026-10-08	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	b3f307b4dbaba54a69cc93c993287d43c747ba8f	2026-10-08	
-scripts/images/README.md	99a85154fc9558a4fcdebfb96f6dddf8f6f644b9	2026-10-08	
-scripts/images/pin_published.py	feef947581666d247784aee3fcc9f7a6a77e10d2	2026-10-08	
+scripts/images/README.md	c8d640695a88a5dfc6aba1844fb8c033eda3bd2f	2026-10-09	
+scripts/images/pin_published.py	d9e23ccf4496e2199001bd7a9d7a7314b5eda0e0	2026-10-09	
+scripts/images/source_hash.py	674a107c8c994db2a56b80a9e2ca6abd4059364a	2026-10-09	
 scripts/install-from-checkout.sh	b03b6b30bb230d09753b070af8f196285dfe788a	2026-10-03	
 scripts/release/README.md	d5379b29f1b78dc46eefe9b1b518555b2236f651	2026-10-08	
 scripts/release/make-apt-key.sh	afc377602ea7f299327f42646cace23cb9c25963	2026-10-08	
@@ -370,12 +371,14 @@ src/containers/samba/windows_baseline_policy.py	349c3e6df012d9eab0baaee551503e81
 src/fabriclib/README.md	d8ec92d66ed4e9ebb11641386a70a82696aa3846	2026-10-08	
 src/fabriclib/__init__.py	117907918b0432dc26398d6d6e4aefc09ca0ab31	2026-09-30	
 src/fabriclib/cli.py	9bef43e16a499b61396f5217e2f7eada85dfde37	2026-10-08	
-src/fabriclib/common/README.md	6eecbc9f74ebc0abc71928a2d8c0211bbfce1f34	2026-10-05	
+src/fabriclib/common/README.md	e181f8c17ebc862e39a716ce921bee153610efd7	2026-10-09	
 src/fabriclib/common/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
 src/fabriclib/common/console.py	e62442f4c7a579d268b33bb8ffaadd8e137e5f65	2026-09-30	
 src/fabriclib/common/copy_if_changed.py	31eb7d3a596ca3d0a85472a5621629a5e6ca0e70	2026-10-02	
 src/fabriclib/common/copy_tree_with_perms.py	c6a65b77df4b888043049499aeffe7917168caf8	2026-10-02	
-src/fabriclib/common/dns_query.py	fd832a5b4d0b4cc506f2c5eb88c964c23cd865be	2026-09-30	
+src/fabriclib/common/dns_query.py	9493d6e711242723c27a5ea9b9df5765718efd76	2026-10-09	
+src/fabriclib/common/dns_wire.py	3d0e2891f655b593472a57a2d2123844a66d2dc3	2026-10-09	
+src/fabriclib/common/doh_query.py	820cf245c084a1ead14f327d50c88c37d903d782	2026-10-09	
 src/fabriclib/common/ensure_dir.py	f9a865f3a3df279bd7c7276c2a4cb6a510171b03	2026-10-05	
 src/fabriclib/common/errors.py	71be207d776ff8004eea177377a0a3938601c1a7	2026-09-30	
 src/fabriclib/common/jinja_env.py	4c2274dd6a11180616773d025167b416edecc814	2026-10-08	
@@ -825,7 +828,7 @@ src/fabriclib/setup/start_unit.py	898cc7b68b842376bbff19fa3ce5ea9480651a3b	2026-
 src/fabriclib/setup/steps.py	84d79c926f624700d018fc5d1f95a9ee1167a101	2026-10-05	
 src/fabriclib/setup/uninstall.py	8808f132683b8002ab79c54d27c880ff198c5034	2026-10-08	
 src/fabriclib/setup/upgrade_vars.py	a141f70ee81696ce7a5b3ae7d8e0367e45ba8bdd	2026-10-08	
-src/fabriclib/setup/verify_install.py	0c9252b29d79a74decdc0767c1976ead73998020	2026-10-08	
+src/fabriclib/setup/verify_install.py	b714c812dda55182231661ae5ffa1ad004810077	2026-10-09	
 src/fabriclib/system/README.md	c10c4233e56c7ec667ed3cb475e45a4c29a8433c	2026-10-06	
 src/fabriclib/system/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-09-30	
 src/fabriclib/system/apply_changes.py	a6b0c5238b28b1e9e44701002dd734756be00917	2026-10-02	
@@ -1213,7 +1216,7 @@ tests/host/upgrade.sh	240f6c644c85b045e5300971ac2e5e23fa69a86a	2026-10-08
 tests/host/upgrade_state.py	3836d0b5eb8fa0cd8660c3e3dd91b8dfbe84891a	2026-10-08	
 tests/image_ref.py	4ff35451eb0f155eee1efe6209e935e841d0dc32	2026-10-03	
 tests/images/README.md	2b663fe92361a60103a9e9b43d6cb14a7f002540	2026-10-08	
-tests/images/published.py	fc6693142635b454cfb81bcb22c1f802e9b8e1c4	2026-10-08	
+tests/images/published.py	84a16aec226698ee6b91b5898bd53e8328a97553	2026-10-09	
 tests/images/run.sh	6a9de42d4f2f7db3ec25f11712ff1ea5e755d05f	2026-10-08	
 tests/images/verify.py	afbb49d90fab8183dccaaa8d1a6faa94d7b25f46	2026-10-08	
 tests/kea/README.md	b8373859c948c010128d868414658cd9534e9627	2026-10-02	

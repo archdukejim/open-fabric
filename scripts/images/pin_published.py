@@ -16,10 +16,12 @@ import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, "src"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.read_images_lock import read_images_lock  # noqa: E402
 from fabriclib.common.read_published_lock import read_published_lock  # noqa: E402
 from fabriclib.images.verify_signature import verify_signature  # noqa: E402
+from source_hash import source_hashes  # noqa: E402
 
 LOCK = os.path.join(REPO, "config", "images.lock.yaml")
 PLATFORMS = {"linux/amd64", "linux/arm64"}
@@ -44,7 +46,8 @@ def _index(ref):
 def pin_published(tag):
     """Purpose: write the tag and verified digest of every published fabric image into the lock's published section.
     Inputs:  tag — str, the tag a publish produced (the images workflow's summary names it).
-    Returns: dict {name: digest} as written; a pinned image loses its `pending` mark.
+    Returns: dict {name: digest} as written, each with the source hash of this checkout (what the tag was built
+             from: pin from the commit the publish ran on, 2.1.14.13); a pinned image loses its `pending` mark.
     Fails:   ValidationError if an image lacks a platform, its tag cannot be inspected or its signature does not
              verify (nothing is written then); OSError writing the lock.
     Feeds:   this script (the release procedure, 3.14.1.4)."""
@@ -59,11 +62,12 @@ def pin_published(tag):
             verify_signature(f"{entry['repo']}:{tag}@{digest}", cosign, lock["signer"], lock["issuer"],
                              cache=os.path.join(tmp, "verified.json"))
             pinned[name] = digest
+    sources = source_hashes(REPO)
     with open(LOCK) as f:
         text = f.read()
     for name, digest in pinned.items():
-        line = re.compile(rf'^(    {name}: +\{{var: \S+, )tag: "[^"]*", digest: "[^"]*"', re.M)
-        text, n = line.subn(rf'\g<1>tag: "{tag}", digest: "{digest}"', text)
+        line = re.compile(rf'^(    {name}: +\{{var: \S+, )tag: "[^"]*", digest: "[^"]*"(, source: "[^"]*")?', re.M)
+        text, n = line.subn(rf'\g<1>tag: "{tag}", digest: "{digest}", source: "{sources[name]}"', text)
         if n != 1:
             raise ValidationError(f"{name}: its line in the lock's published section was not found")
         # a pending image (not published before) is pending no longer

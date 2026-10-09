@@ -87,6 +87,8 @@ file	fabriclib-common|src/fabriclib/common/console.py	1
 file	fabriclib-common|src/fabriclib/common/copy_if_changed.py	2	
 file	fabriclib-common|src/fabriclib/common/copy_tree_with_perms.py	3	
 file	fabriclib-common|src/fabriclib/common/dns_query.py	4	
+file	fabriclib-common|src/fabriclib/common/dns_wire.py	25	
+file	fabriclib-common|src/fabriclib/common/doh_query.py	26	
 file	fabriclib-common|src/fabriclib/common/ensure_dir.py	5	
 file	fabriclib-common|src/fabriclib/common/jinja_env.py	6	
 file	fabriclib-common|src/fabriclib/common/keep_original.py	7	
@@ -892,6 +894,9 @@ function	fabriclib-common|src/fabriclib/common/console.py|warn	4
 function	fabriclib-common|src/fabriclib/common/copy_if_changed.py|copy_if_changed	1	
 function	fabriclib-common|src/fabriclib/common/copy_tree_with_perms.py|copy_tree_with_perms	1	
 function	fabriclib-common|src/fabriclib/common/dns_query.py|dns_query	1	
+function	fabriclib-common|src/fabriclib/common/dns_wire.py|dns_wire_answers	2	
+function	fabriclib-common|src/fabriclib/common/dns_wire.py|dns_wire_query	1	
+function	fabriclib-common|src/fabriclib/common/doh_query.py|doh_query	1	
 function	fabriclib-common|src/fabriclib/common/ensure_dir.py|ensure_dir	1	
 function	fabriclib-common|src/fabriclib/common/jinja_env.py|_RelativeEnvironment.join_path	1	
 function	fabriclib-common|src/fabriclib/common/jinja_env.py|_bool	4	

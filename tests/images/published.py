@@ -6,6 +6,8 @@ Run by tests/images/run.sh; no Docker needed.
 - custom ids for an account: that image is built locally again (2.1.14.5); images without an account are not affected
 - the lock's ids equal the Dockerfiles' defaults and vars.yaml.j2's default service accounts
 - the rule itself (published_image) and the relaxed-settings list
+- stale published images (2.1.14.13): the lock as it is passes; a changed source without `pending`, or a published
+  image without a source hash, is refused
 """
 import json
 import os
@@ -26,6 +28,8 @@ from fabriclib.images.effective_service import effective_service  # noqa: E402
 from fabriclib.images.constants import SERVICES  # noqa: E402
 from fabriclib.images.published_image import GROUP_ACCOUNTS, published_image  # noqa: E402
 from fabriclib.system.relaxed_settings import relaxed_settings  # noqa: E402
+sys.path.insert(0, os.path.join(REPO, "scripts", "images"))
+import source_hash  # noqa: E402
 
 IMAGES = ["adguard", "bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
 PASS = FAIL = 0
@@ -158,6 +162,45 @@ try:
     check("relaxed settings: none by default, the signature opt-out listed when set",
           relaxed_settings({}) == [] and relaxed_settings({"image_signature_check": False})[0]["setting"]
           == "image_signature_check: false")
+
+    # stale published images (2.1.14.13): the real hashes once, then locks that differ only in the published section
+    now = source_hash.source_hashes(REPO)
+    check("source hashes: one per fabric image",
+          sorted(now) == IMAGES and all(v.startswith("sha256:") for v in now.values()), now)
+    problems = source_hash.check(REPO)
+    check("the lock as it is: every published image matches its sources or is marked pending", not problems, problems)
+    real = source_hash.source_hashes
+    source_hash.source_hashes = lambda repo=REPO: now
+    try:
+        lock_text = open(os.path.join(REPO, "config", "images.lock.yaml")).read()
+
+        def check_lock(edit):
+            fake = os.path.join(work, "stale")
+            os.makedirs(os.path.join(fake, "config"), exist_ok=True)
+            with open(os.path.join(fake, "config", "images.lock.yaml"), "w") as f:
+                f.write(edit(lock_text))
+            return source_hash.check(fake)
+
+        def published_line(name, text, fields):     # every image published (a fake digest), with these fields
+            return re.sub(rf'^(    {name}: +\{{var: \S+, )tag: "[^"]*", digest: "[^"]*"[^}}]*',
+                          rf'\g<1>tag: "9.9.9-rc.1", digest: "sha256:{"1" * 64}"{fields}', text, flags=re.M)
+
+        def fresh(text):
+            for n in IMAGES:
+                text = published_line(n, text, f', source: "{now[n]}"')
+            return text
+
+        check("a lock whose every source hash matches passes", check_lock(fresh) == [])
+        stale = check_lock(lambda t: published_line("bind9", fresh(t), ', source: "sha256:old"'))
+        check("refused: bind9's sources changed and it is not marked pending",
+              len(stale) == 1 and stale[0].startswith("bind9: its sources changed"), stale)
+        check("a changed image marked pending passes", check_lock(lambda t: published_line(
+            "bind9", fresh(t), ', source: "sha256:old", pending: "rebuilt with the next candidate"')) == [])
+        missing = check_lock(lambda t: published_line("kea", fresh(t), ""))
+        check("refused: a published image without a source hash",
+              len(missing) == 1 and missing[0].startswith("kea: the lock records no source hash"), missing)
+    finally:
+        source_hash.source_hashes = real
 finally:
     shutil.rmtree(work, ignore_errors=True)
 

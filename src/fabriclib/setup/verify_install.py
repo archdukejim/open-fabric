@@ -1,10 +1,12 @@
 import os
 import shutil
 import stat
+import struct
 import subprocess
 
 from fabriclib.common.console import err, ok, warn
 from fabriclib.common.dns_query import dns_query
+from fabriclib.common.doh_query import doh_query
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.plan_trust import plan_trust
@@ -34,8 +36,9 @@ def _curl(url, host, ip, port, root_ca, client_cert=False):
 
 
 def checks(ctx):
-    """Purpose: the end-to-end checks of a running install: DNS, HTTP/HTTPS chains, CA publishing, ACME, host
-             trust (unless the `trust` host change was declined), web UI gates, fabric-agent socket, first admin
+    """Purpose: the end-to-end checks of a running install: DNS (and DNS-over-HTTPS), HTTP/HTTPS chains, CA
+             publishing, ACME, host trust (unless the `trust` host change was declined), web UI gates, fabric-agent
+             socket, first admin
              (Keycloak role, the client certificate while one is required), OpenBao state, the federation endpoint and
              the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and
              under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its
@@ -62,6 +65,13 @@ def checks(ctx):
             add(f"DNS {name}", v["host_ip"] in got, ", ".join(got) or "no answer")
         except OSError as e:
             add(f"DNS {name}", False, str(e))
+
+    try:                                     # DNS-over-HTTPS through nginx to BIND (2.1.12.2)
+        got = doh_query(f"ns.{v['domain']}", v["hostname_bind9"], v["ip_nginx"], root_ca)
+        add(f"DNS-over-HTTPS https://{v['hostname_bind9']}/dns-query answers", v["host_ip"] in got,
+            ", ".join(got) or "no answer")
+    except (subprocess.CalledProcessError, struct.error, IndexError) as e:
+        add(f"DNS-over-HTTPS https://{v['hostname_bind9']}/dns-query answers", False, str(e)[-200:])
 
     if v.get("install_adguard"):           # the DNS filter answers clients on 53, fabric's names through BIND
         try:
