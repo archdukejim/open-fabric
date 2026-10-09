@@ -73,11 +73,13 @@ def checks(ctx):
              publishing, ACME, host trust (unless the `trust` host change was declined), web UI gates, fabric-agent
              socket, first admin
              (Keycloak role, the client certificate while one is required), OpenBao state, the federation endpoint and
-             the DNS filter (AdGuard answers on 53, its UI asks for sign-in) when on, time (chrony synchronised and
+             the DNS filter (AdGuard answers on 53, its UI asks for sign-in; or the BIND resolver answers on 53)
+             when on, time (chrony synchronised and
              under 1 s off — or this host's own clock when no source is set —, and at a site within 1 s of its
              upstream site), the certificates (renewal working, none about to expire), and every installed service.
     Inputs:  ctx — SetupContext: vars (hostnames, host_ip, ip_nginx, bind_dns_port, install_webui/keycloak,
-             federation_endpoint, install_adguard, webui_admin_user/role), secrets (Keycloak), Step-CA root, the
+             federation_endpoint, install_adguard, install_resolver, webui_admin_user/role), secrets (Keycloak),
+             Step-CA root, the
              agent socket, ~/fabric-admin of the sudo user.
     Returns: list of (name, passed: bool, detail: str).
     Fails:   ValidationError from ctx.secrets when OpenBao is locked; KeyError for missing vars; OSError reading
@@ -117,6 +119,14 @@ def checks(ctx):
         rc, code = _curl(f"https://{v['hostname_adguard']}/", v["hostname_adguard"], v["ip_nginx"], 443, root_ca)
         add(f"https://{v['hostname_adguard']} asks for sign-in first (OIDC)", (rc, code) == (0, "302"),
             f"HTTP {code}" if rc == 0 else f"curl exit {rc}")
+
+    if v.get("install_resolver"):          # the BIND resolver (1.12.2) answers clients on 53, fabric's names via BIND
+        try:
+            got = dns_query(v["hostname_landing"], v["host_ip"], 53)
+            add(f"DNS filter (BIND resolver, port 53) resolves {v['hostname_landing']}", v["host_ip"] in got,
+                ", ".join(got) or "no answer")
+        except OSError as e:
+            add(f"DNS filter (BIND resolver, port 53) resolves {v['hostname_landing']}", False, str(e))
 
     if shutil.which("chronyc"):             # time (manual 1.13.1): certificates, TOTP and TSIG depend on it
         t = time_status()
@@ -212,7 +222,8 @@ def checks(ctx):
     add("certificates: renewal working, none about to expire (2.1.5.4)", not failing, "; ".join(failing))
     for unit in ("bind9", "stepca", "nginx", "samba", "postgres", "keycloak", "openbao", "kea", "freeradius",
                  "samba", "fluentbit",
-                 "adguard", "adguard-auth", "fabric-agent", "fabric-federation", "fabric-web", "fabric-firewall"):
+                 "adguard", "adguard-auth", "bind9-resolver", "fabric-agent", "fabric-federation", "fabric-web",
+                 "fabric-firewall"):
         if os.path.exists(f"/etc/systemd/system/{unit}.service"):
             active = subprocess.run(["systemctl", "is-active", unit], capture_output=True, text=True).stdout.strip()
             add(f"service {unit}", active == "active", active)

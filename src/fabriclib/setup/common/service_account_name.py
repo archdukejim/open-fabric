@@ -1,7 +1,7 @@
 NAMES = {"bind": "fabric-dns", "nginx": "fabric-proxy", "step": "fabric-ca",
          "keycloak": "fabric-sso", "postgres": "fabric-db", "webui": "fabric-webui", "openbao": "fabric-vault",
          "fluentbit": "fabric-logs", "kea": "fabric-dhcp", "freeradius": "fabric-radius",
-         "adguard": "fabric-dnsfilter", "oauth2proxy": "fabric-auth"}
+         "adguard": "fabric-dnsfilter", "oauth2proxy": "fabric-auth", "resolver": "fabric-resolver"}
 
 
 def service_account_name(key, ids):

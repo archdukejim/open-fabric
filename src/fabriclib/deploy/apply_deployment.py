@@ -120,7 +120,7 @@ def _deploy(paths, start_services):
     if install_stepca_templates(paths, final_vars):
         restart.add("stepca")
     install_runtime_dirs(paths, final_vars, p["tsig_keys"])
-    install_timers(paths)
+    install_timers(paths, final_vars)
 
     state = {"restart": restart, "rebuild": svc["rebuild"],
              "daemon_reload": svc["daemon_reload"] or ngx["daemon_reload"] or web["agent"]

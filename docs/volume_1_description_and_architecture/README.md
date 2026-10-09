@@ -96,6 +96,7 @@ The home chapter for security is 1.2.8 (Rule 5.8).
 ## 1.12 The DNS filter: AdGuard Home
 
 - [1.12.1 AdGuard Home in front of BIND](1.12.1-adguard.md)
+- [1.12.2 The BIND resolver: filtering with response policy zones](1.12.2-bind-resolver.md)
 
 ## 1.13 Time: chrony
 

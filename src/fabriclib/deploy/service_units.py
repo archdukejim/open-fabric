@@ -32,11 +32,14 @@ def service_units(base, v):
         {'service': 'adguard', 'compose': 'adguardhome', 'folder': 'adguard', 'requires': []},
         # its sign-in, a unit of its own: when it or Keycloak is down only AdGuard's UI is, never DNS
         {'service': 'adguard-auth', 'compose': 'oauth2-proxy-adguard', 'folder': 'adguard-auth', 'requires': []},
+        # the DNS filter as a BIND resolver (manual 1.12.2, 0.7): on host_ip:53; no requires, like AdGuard: an apply
+        # that restarts the authoritative BIND must not take the clients' DNS down
+        {'service': 'bind9-resolver', 'compose': 'bind9-resolver', 'folder': 'resolver', 'requires': []},
     ]
     flag = {"keycloak": "install_keycloak", "postgres": "install_keycloak",
             "webui": "install_webui", "fluentbit": "install_fluentbit", "kea": "install_kea",
             "freeradius": "install_freeradius", "adguard": "install_adguard",
-            "adguard-auth": "install_adguard"}
+            "adguard-auth": "install_adguard", "resolver": "install_resolver"}
     for u in units:
         u["enabled"] = bool(v.get(flag[u["folder"]])) if u["folder"] in flag else True
     return units

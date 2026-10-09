@@ -1,0 +1,63 @@
+// fabric's DNS filter: the BIND resolver (manual 1.12.2). Rendered at every apply: do not edit here.
+include "/etc/bind/rndc.key";
+controls { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { "rndc-key"; }; };
+
+{% for name in upstream_names %}
+tls "upstream-{{ loop.index }}" { remote-hostname "{{ name }}"; ca-file "/etc/ssl/certs/ca-certificates.crt"; };
+{% endfor %}
+// the networks that may use it: the LAN, fabric's own, and what the firewall lets in
+acl "clients" { {% for c in clients %}{{ c }}; {% endfor %}127.0.0.1; };
+
+options {
+    directory "/var/cache/bind";
+    session-keyfile "/var/cache/bind/session.key";
+    listen-on port 53 { any; };
+    listen-on-v6 { none; };
+    recursion yes;
+    allow-query { clients; };
+    allow-recursion { clients; };
+    allow-query-cache { clients; };
+    allow-transfer { none; };
+{% if dns_filter_upstreams %}
+    // DNS-over-TLS, the certificate's name verified (1.12.2.8)
+    forward only;
+    forwarders { {% for u in dns_filter_upstreams %}{{ u.address }} port 853 tls "upstream-{{ upstream_names.index(u.name) + 1 }}"; {% endfor %}};
+{% endif %}
+    dnssec-validation auto;
+    // fabric's zones are private: no DNSSEC chain from the root leads to them
+    validate-except { {% for z in zones %}"{{ z }}"; {% endfor %}};
+    querylog yes;
+    version none;
+    hostname none;
+    server-id none;
+};
+
+logging {
+    channel default_out { stderr; severity info; print-time yes; print-category yes; print-severity yes; };
+    channel queries { file "/var/log/named/query.log" versions 2 size 20m; print-time yes; };
+    channel rpz { file "/var/log/named/rpz.log" versions 2 size 20m; print-time yes; };
+    category default { default_out; };
+    category queries { queries; };
+    category rpz { rpz; };
+    category lame-servers { null; };
+};
+
+view "everyone" {
+    match-clients { any; };
+{% for z in zones %}
+    zone "{{ z }}" { type forward; forward only; forwarders { {{ ip_bind9 }} port 53; }; };
+{% endfor %}
+    zone "fabric.rpz" { type primary; file "/etc/bind/fabric.rpz"; };
+    zone "owner.rpz" { type primary; file "/etc/bind/owner.rpz"; };
+{% for l in lists %}
+    zone "{{ l.zone }}" { type primary; file "/etc/bind-lists/{{ l.zone }}"; };  // {{ l.name | replace('*/', '') | replace('\n', ' ') }}
+{% endfor %}
+    // first match wins: fabric's zones are never filtered, then the owner's rules, then the lists in order
+    response-policy {
+        zone "fabric.rpz";
+        zone "owner.rpz";
+{% for l in lists %}
+        zone "{{ l.zone }}";
+{% endfor %}
+    } break-dnssec yes qname-wait-recurse no;
+};

@@ -11,6 +11,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path[0:0] = [os.path.join(REPO, 'src'), REPO]
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402  (the same env deploy.py uses)
 from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
+from fabriclib.deploy.service_units import service_units  # noqa: E402
 
 # FABRIC_TEST_TEMPLATES: another templates folder (its lock beside it), e.g. one with published digests pinned
 env = jinja_env(os.environ.get('FABRIC_TEST_TEMPLATES') or os.path.join(REPO, 'templates'))
@@ -98,6 +99,9 @@ for tpl in sorted(env.list_templates()):
         extra = dict(reverse_zone_name='7.168.192.in-addr.arpa', ptr_records=rv['zones']['7.168.192.in-addr.arpa'])
     if tpl.startswith('systemd/'):
         extra = dict(item={'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []})
+    if tpl.startswith('resolver/config/'):     # what dns_filter/deploy_resolver passes beside the vars
+        extra = dict(zones=['lan.j-j.family', '7.168.192.in-addr.arpa'], lists=[{'zone': 'abc.list.rpz', 'name': 'L'}],
+                     upstream_names=['cloudflare-dns.com'], clients=['192.168.7.0/24'], resolver_rndc_secret='c2VjcmV0')
     if tpl.endswith('.json.j2'):
         json.loads(env.get_template(tpl).render(**full))
     text = env.get_template(tpl).render(**full, **extra)
@@ -208,7 +212,23 @@ assert 'skip_oidc_discovery = true' in env.get_template('adguard/oauth2-proxy.cf
 _o2p = env.get_template('adguard/oauth2-proxy.cfg.j2').render(**adg)
 assert not [ln for ln in _o2p.splitlines() if ln.strip().startswith(('client_secret', 'cookie_secret'))], \
     'oauth2-proxy secrets only via secrets.env'
-print('DNS filter: off by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
+print('DNS filter: on by default; on -> AdGuard on 53, BIND on 5053, CNAME, OIDC vhost, no capabilities, UI unpublished')
+# the BIND resolver (manual 1.12.2, 0.7): dns_filter bind -> the resolver on 53, BIND on 5053, AdGuard off, its own account
+res = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'BIND',
+                                                                 'bind_dns_port': 53}))
+assert res['install_resolver'] is True and res['install_adguard'] is False and res['bind_dns_port'] == 5053, \
+    (res['install_resolver'], res['install_adguard'], res['bind_dns_port'])
+assert res['service_users']['resolver'] == {'uid': 613, 'gid': 613, 'name': 'fabric-resolver'}, res['service_users']
+assert res['resolver_mem_limit'] == '384m' and res['ip_resolver'] == '10.255.0.33'
+assert [f['name'] for f in res['dns_filter_lists']] == ['AdGuard DNS filter'] and res['dns_filter_upstreams'][0] == \
+    {'address': '1.1.1.1', 'name': 'cloudflare-dns.com'}, (res['dns_filter_lists'], res['dns_filter_upstreams'])
+assert dflt['install_resolver'] is False, 'AdGuard stays the default until step 3 of 0.7 (manual 1.12.2.1)'
+rc = yaml.safe_load(env.get_template('resolver/docker-compose.yml.j2').render(**{**secrets, **res}))['services']
+assert list(rc) == ['bind9-resolver'] and rc['bind9-resolver']['cap_drop'] == ['ALL'] and 'cap_add' not in rc['bind9-resolver']
+assert rc['bind9-resolver']['ports'] == [f"{res['host_ip']}:53:53/tcp", f"{res['host_ip']}:53:53/udp"], rc['bind9-resolver']['ports']
+units_res = {u['service']: u for u in service_units('/opt', res)}
+assert units_res['bind9-resolver']['enabled'] and not units_res['adguard']['enabled'] and units_res['bind9-resolver']['requires'] == []
+print('DNS filter as a BIND resolver: on 53, BIND on 5053, AdGuard off, its own account, no capabilities, no requires')
 # time (manual 1.13.1): served by default with NTS sources and ntp.<domain>; a record of the user's own named ntp is kept
 assert v2['ntp_serve'] is True and v2['ntp_set_clock'] is True and all(x.endswith(' nts') for x in v2['ntp_servers'])
 assert 'ntp' in [r['name'] for r in v2['dns']['dynamic_zone_var']['CNAME']]

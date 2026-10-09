@@ -1,0 +1,9 @@
+[Unit]
+Description=fabric: fetch the DNS filter's lists and reload the ones that changed (manual 1.12.2.10)
+After=docker.service fabric.target network-online.target
+Wants=docker.service network-online.target
+
+[Service]
+Type=oneshot
+# a list that cannot be fetched keeps its last good copy; its state says why (fabricctl dns-filter status)
+ExecStart=/usr/bin/fabricctl dns-filter lists --scheduled

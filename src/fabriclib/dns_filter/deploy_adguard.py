@@ -5,27 +5,8 @@ import bcrypt
 import yaml
 
 from fabriclib.common.write_file_if_changed import write_file_if_changed
-from fabriclib.dns.reverse_zones import reverse_zones
 from fabriclib.dns_filter.build_adguard_config import build_adguard_config
-
-
-def _domains(v, links):
-    """Purpose: the zones AdGuard forwards to this site's BIND and always allows: this site's domain, the
-             organisation's, the linked sites' (they are secondary zones on this BIND, M4), the reverse zones and the
-             AD zone (which may sit beside fabric's domain, e.g. ad.<parent>).
-    Inputs:  v — fabric vars (domain, org_domain, ad_domain and what reverse_zones reads); links —
-             dns_links' result.
-    Returns: list of zone names without duplicates, this site's domain first.
-    Fails:   errors from reverse_zones on malformed records.
-    Feeds:   deploy_adguard."""
-    names = [v["domain"], v.get("org_domain") or v["domain"]]
-    names += [link["domain"] for link in (links or {}).get("children") or []]
-    if (links or {}).get("upstream"):
-        names.append(links["upstream"]["domain"])
-    names += list(reverse_zones(v)["zones"])
-    # the Windows domain's zone (BIND serves it through DLZ): needed when it is not under fabric's domain (2.1.6.11)
-    names.append(v.get("ad_domain"))
-    return list(dict.fromkeys(n for n in names if n))
+from fabriclib.dns_filter.common.filter_zones import filter_zones
 
 
 def deploy_adguard(v, secrets, links, jinja_env):
@@ -69,7 +50,7 @@ def deploy_adguard(v, secrets, links, jinja_env):
     pw_hash = old if keep else bcrypt.hashpw(password, bcrypt.gensalt()).decode()
     with open(os.path.join(jinja_env.loader.searchpath[0], "adguard", "AdGuardHome.base.yaml")) as f:
         base_cfg = yaml.safe_load(f)
-    new = build_adguard_config(current, base_cfg, v, _domains(v, links), pw_hash)
+    new = build_adguard_config(current, base_cfg, v, filter_zones(v, links), pw_hash)
     if new != current:                         # compared parsed: AdGuard's own formatting is no change
         changed["adguard"] = write_file_if_changed(conf_path, yaml.safe_dump(new, sort_keys=False), 0o600,
                                                    a_uid, a_gid)

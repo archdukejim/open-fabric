@@ -21,15 +21,16 @@ ORDER = [("bind9", "bind9", None), ("stepca", "step-ca", None), ("samba", "samba
          ("postgres", "postgres", "install_keycloak"), ("keycloak", "keycloak", "install_keycloak"),
          ("nginx", "nginx", None), ("fluentbit", "fluentbit", "install_fluentbit"),
          ("kea", "kea-dhcp4", "install_kea"), ("freeradius", "freeradius", "install_freeradius"),
-         ("adguard", "adguardhome", "install_adguard"), ("adguard-auth", "oauth2-proxy-adguard", "install_adguard")]
+         ("adguard", "adguardhome", "install_adguard"), ("adguard-auth", "oauth2-proxy-adguard", "install_adguard"),
+         ("bind9-resolver", "bind9-resolver", "install_resolver")]
 
 
 def run(ctx):
     """Purpose: start the stack in dependency order (ORDER), converge the domain (and at the root site make fabric's
              default device roles), configure Keycloak, then fabric-agent and the web UI, and activate fabric.target.
     Inputs:  ctx — SetupContext: vars install_keycloak, install_webui, install_fluentbit, install_kea,
-             install_freeradius, install_adguard, federation_endpoint; restart_services (units to restart);
-             target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file, config_dir.
+             install_freeradius, install_adguard, install_resolver, federation_endpoint; restart_services (units to
+             restart); target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file, config_dir.
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; the domain converged; Keycloak given the DC's Kerberos keytab; Keycloak configured (up
              to 6 tries, 15 s apart); fabric-agent and fabric-web running when the web UI is on; fabric-federation

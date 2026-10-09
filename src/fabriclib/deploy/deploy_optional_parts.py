@@ -5,6 +5,7 @@ from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.plan_time import plan_time
 from fabriclib.dhcp.deploy_kea import deploy_kea
 from fabriclib.dns_filter.deploy_adguard import deploy_adguard
+from fabriclib.dns_filter.deploy_resolver import deploy_resolver
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit
 from fabriclib.ntp.deploy_chrony import deploy_chrony
 from fabriclib.radius.deploy_freeradius import deploy_freeradius
@@ -12,7 +13,8 @@ from fabriclib.samba.deploy_samba import deploy_samba
 
 
 def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
-    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea,
+    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter (AdGuard, or the BIND
+             resolver), time (chrony), Kea,
              FreeRADIUS and the Windows domain — each only when it is on (chrony whenever it is installed and the
              `time` host change is approved — manual 1.2.9; an install set up before consent existed keeps
              converging).
@@ -33,6 +35,10 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
         if adg["oauth2proxy"]:
             restart.add("adguard-auth")
         nginx = adg["nginx"]
+    # DNS filter as a BIND resolver (manual 1.12.2): its config and rules zones, a list never fetched fetched now;
+    # a running resolver reloads what changed, one that is not running takes it when it starts
+    if final_vars.get("install_resolver"):
+        deploy_resolver(final_vars, secrets, links, jinja_env)
     # Time (manual 1.13.1): chrony on the host, the upstream site first; installed by setup's host step
     if shutil.which("chronyd"):
         if not allowed_to_change(paths["config"], "time", plan_time(), unasked_install=True):

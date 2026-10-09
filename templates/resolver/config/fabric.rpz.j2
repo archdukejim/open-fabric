@@ -1,0 +1,8 @@
+; fabric's own zones are never filtered (manual 1.12.2.5): first in the resolver's response policy
+$TTL 300
+@ SOA localhost. hostmaster.fabric.rpz. 1 3600 600 86400 300
+@ NS localhost.
+{% for z in zones %}
+{{ z }} CNAME rpz-passthru.
+*.{{ z }} CNAME rpz-passthru.
+{% endfor %}

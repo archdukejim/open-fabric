@@ -18,7 +18,7 @@ from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.common.jinja_env import jinja_env  # noqa: E402
 from fabriclib.deploy.check_samba_settings import check_samba_settings  # noqa: E402
 from fabriclib.deploy.service_units import service_units  # noqa: E402
-from fabriclib.dns_filter.deploy_adguard import _domains as adguard_zones  # noqa: E402
+from fabriclib.dns_filter.common.filter_zones import filter_zones as adguard_zones  # noqa: E402
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain  # noqa: E402
 from fabriclib.secrets.random_password import random_password  # noqa: E402
 
