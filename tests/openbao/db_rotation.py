@@ -193,7 +193,7 @@ try:
           yaml.safe_load(open(SECRETS)).get("keycloak_db_user") == "keycloak_db")
     rec = json.load(open(RECORD))
     check("...recorded and audited", rec["ok"] and AUDIT[-1][0] == "DB_ROTATE", (rec, AUDIT))
-    again = configure_db_engine(v, TOKEN, ADMIN_PW, apply, container=PG, secrets_file=SECRETS)
+    again = configure_db_engine(v, TOKEN, ADMIN_PW, apply, container=PG, secrets_file=SECRETS, archive=ARCHIVE)
     check("converging again changes nothing (no rotation, Keycloak left alone)",
           again == "converged" and saved() == P1 and len(APPLIED) == 1 and signs_in("keycloak_db", P1))
     os.remove(os.path.join(ARCHIVE, "db-rotation.json"))        # a reinstall: OpenBao kept, the archive not
