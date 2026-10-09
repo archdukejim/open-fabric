@@ -51,7 +51,7 @@ docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.22-fabriclib-secrets.md	74f026337aad89eb5aeaaf8decd4bb352ee34e98	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.23-fabriclib-security.md	d920e7834a56aafa8fdc1602f2ef23e455944d53	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	02d5f9323ae202b194c9879bfa50449c7b661fa1	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.24-fabriclib-setup.md	ec93ac765d4fc4d3d0731911b10ce97b03ca105e	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.25-fabriclib-system.md	b57979b1c79b1c15f4e4edcaff531706311aa242	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.26-fabriclib-undo.md	5591364f414bc6fc2a505d9b421026d7ae218d45	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.27-fabriclib-vault.md	81f6cde28df7beccc344c4ce2a4394ff454c089c	2026-10-09	
@@ -99,7 +99,7 @@ docs/volume_1_description_and_architecture/1.7.1-openbao.md	5019424521bb1a844db5
 docs/volume_1_description_and_architecture/1.8.1-webui-architecture.md	83b49efdcc27617ddd136ce821ff25072d107a03	2026-10-08	
 docs/volume_1_description_and_architecture/1.8.2-webui-security.md	37f882358be4afc4ad8628ba560a92f585b3f969	2026-10-09	
 docs/volume_1_description_and_architecture/1.8.3-single-pane.md	b0e87d98d15b7daae2c08ee600deb2d99fd917b3	2026-10-08	
-docs/volume_1_description_and_architecture/1.8.4-webui.md	1c6b21154aa0fa686255756448781b9e57bfdcb2	2026-10-09	
+docs/volume_1_description_and_architecture/1.8.4-webui.md	be110e569a25a11b3b84abb134d6d7d94f23a4a7	2026-10-09	
 docs/volume_1_description_and_architecture/1.9.1-sites.md	15558c5fadc9d7cd03363eda0b640b4b21cf1dfe	2026-10-08	
 docs/volume_1_description_and_architecture/1.9.2-ha-partners.md	41c88a958092270d4edb9f009d13bdb0e04d543c	2026-10-08	
 docs/volume_1_description_and_architecture/1.9.3-between-sites.md	9b2693352d2d8a3cad600964f14c8df2b13af4f9	2026-10-08	
@@ -134,7 +134,7 @@ docs/volume_2_engineering_decisions/2.3.12-dns-filter-notes.md	3af011ce8dd335d9a
 docs/volume_2_engineering_decisions/2.3.14-image-notes.md	2a6950b89b58dcc37ada049ac8dfe7f10bf86562	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.2-architecture-notes.md	b3ce46829288e2c63f9ecb711fb685ae33f80785	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.4-dns-notes.md	67514706bb849105053e1fa34a6b02f1d81fff26	2026-10-08	
-docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	a7aadbdf800c043fc2c840ac5a3e0468809f33d4	2026-10-09	
+docs/volume_2_engineering_decisions/2.3.5-certificate-notes.md	b48d095b94d788bbbbcf97b39a9695d118d244aa	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.6-identity-notes.md	96ece4d5d2f202171b0eccf0bafc44cb1b0a2065	2026-10-09	
 docs/volume_2_engineering_decisions/2.3.7-openbao-notes.md	4a70f31917b5a9dca1c786b5e4cf64677b56cb71	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.9-federation-notes.md	589194fbf33eda431862f1414dabc04a3181edc9	2026-10-08	
@@ -233,7 +233,7 @@ scripts/README.md	dd36e9248260e4f936662417c4d10511c3cdb00a	2026-10-08
 scripts/docs/README.md	af834e1650d5a42ed93702d10180e09780634830	2026-10-08	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	7ff94cd622677c2a6040c2c75374a04e50cc48c4	2026-10-08	
-scripts/docs/lib_doc_numbers.tsv	2732e2ca7143c62f3f9351d6fe985f7f94c06ce2	2026-10-09	
+scripts/docs/lib_doc_numbers.tsv	1fbc974a271b78332e0e7cc3436a0f9d4406b23b	2026-10-09	
 scripts/docs/lib_doc_registry.py	a65ab5459802daaca963fac77a8b708397d42d89	2026-10-08	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	b3f307b4dbaba54a69cc93c993287d43c747ba8f	2026-10-08	
@@ -820,8 +820,8 @@ src/fabriclib/setup/create_accounts.py	b85910947e65cc42a0a858a526ba6fbbf29ad7e4	
 src/fabriclib/setup/create_admin.py	3e9dd6625c54d1e0cba74dec8f3b09bbe4141767	2026-10-08	
 src/fabriclib/setup/deploy_config.py	933a9fd5211dc258a504e427c3cc989f63b52460	2026-10-02	
 src/fabriclib/setup/detect_network.py	5abb3088d0bb559e9124ad4129d96c1ab05d941d	2026-10-03	
-src/fabriclib/setup/doctor_report.py	00d8bf7d50fa37a9357024e231a6c418a79b73fd	2026-10-09	
-src/fabriclib/setup/ensure_db_rotation.py	6a317d7cdfc48e4825349d1e05e6289eab543ead	2026-10-09	
+src/fabriclib/setup/doctor_report.py	2f6ff230fc03c73fdd3a8fcefd7c3f9fb5758b98	2026-10-09	
+src/fabriclib/setup/ensure_db_rotation.py	8653a92c53d74208df6a630250e630619f7925ae	2026-10-09	
 src/fabriclib/setup/errors.py	4c7b84633f68a8cd971aa38ba1aa9d8f5a4b2b04	2026-09-30	
 src/fabriclib/setup/export_install.py	608e604feae491de0ac8e96b2735fd0603641e9a	2026-10-05	
 src/fabriclib/setup/harden_docker.py	1ad4aca818b8227f6566193c67503b8f12adae09	2026-10-03	
@@ -840,7 +840,7 @@ src/fabriclib/setup/run_uninstall_command.py	22684e2d49ba51ff7d373c1e5edb5ece774
 src/fabriclib/setup/setup_openbao.py	226047644c4e027209806f6cbec82deeecbdd866	2026-10-03	
 src/fabriclib/setup/stage_source.py	fc569e4dbbec1547cbf74bb155ad3d2498c21c6b	2026-09-30	
 src/fabriclib/setup/start_bootstrap.py	cd55ee690beb024d64109b2ac4927bae129d17e7	2026-09-30	
-src/fabriclib/setup/start_services.py	43aacfacdac3604161225b3525a36ee4225bcd26	2026-10-08	
+src/fabriclib/setup/start_services.py	d460114ac1ab3b521e456bb6cc3a1830e43469ad	2026-10-09	
 src/fabriclib/setup/start_unit.py	898cc7b68b842376bbff19fa3ce5ea9480651a3b	2026-10-08	
 src/fabriclib/setup/steps.py	a2b27bb694df2e35fbc74f26bdce64651b2c9a42	2026-10-09	
 src/fabriclib/setup/uninstall.py	b926f86de70781fed727a03e7b8e24f70e9cffda	2026-10-09	
@@ -1261,7 +1261,7 @@ tests/nginx_check.sh	d3ea4647c628988da6a600ceff066204611f24f9	2026-10-08
 tests/ntp/README.md	37e7cca81172f8a93564bcd84d2a894591b76848	2026-10-02	
 tests/ntp/run.py	7a43d438d3a31f9e55a9321d077ed19772a3eac5	2026-10-08	
 tests/openbao/README.md	2bbcd90747078f4eabfc18387617fb8ca1d9bd53	2026-10-09	
-tests/openbao/db_rotation.py	d59f3a6a1cbcc76a6762a2d815da933e859145ca	2026-10-09	
+tests/openbao/db_rotation.py	c5d51a6dedb1ad4d6ef8664cabcf4be3bf7ad8a1	2026-10-09	
 tests/openbao/run.py	7470293409535699527ba108cad767b372fa06bc	2026-10-05	
 tests/pki/README.md	c00ae570e87e3a05c979e041a56057b2b388ec7e	2026-10-08	
 tests/pki/acme.py	64fd96f2019823f7e4ecada6b00a97c97b39d069	2026-10-08	
@@ -1291,7 +1291,7 @@ tests/sandbox/make_person.py	f778029f1dfc122927b454149f21fda1c884cdf7	2026-10-05
 tests/sandbox/radius_device.py	12b3e1127a0cc5966846fe0554dc84da7a2e5449	2026-10-05	
 tests/sandbox/radius_mab.py	c9575e9fd8e3c3d52dbd77b879b9ef9a6bd148d5	2026-09-30	
 tests/sandbox/rfc2136_test.sh	21e1a72cdc0eb36df39f8f49725d5476048d3a28	2026-10-02	
-tests/sandbox/run.sh	1f2e918769e74054b58d6067528757c3c69e7ae8	2026-10-09	
+tests/sandbox/run.sh	ddcba2a0f0fb35316824956f390596e90a9e94aa	2026-10-09	
 tests/sandbox/set_lock.py	3f76da2458bc18d18fbf3efb8b176900a0984ae7	2026-09-30	
 tests/security/README.md	5181e9d08a03731704c2b1580b9901a2206849ad	2026-10-07	
 tests/security/run.py	87d5ce6fb52696c959fb5dcae46dc7dcb6462fd8	2026-10-08	

@@ -221,6 +221,29 @@ try:
         "username": "fabric_admin", "password": ADMIN_PW})
     check("refused: OpenBao reaching Postgres by a name its certificate does not carry (verify-full holds)",
           status >= 400, (status, data))
+
+    # a reinstall: the secrets are kept, Postgres starts on an empty data folder (found by the 0.6.3 sandbox)
+    from fabriclib.setup.ensure_db_rotation import align_postgres_roles  # noqa: E402
+    check("before the take-over nothing is aligned (keycloak_db_user not in the secrets)",
+          align_postgres_roles({"keycloak_db_password": "x", "postgres_admin_password": "y"}, PG) is False)
+    sh(["docker", "rm", "-f", PG])
+    sh(["docker", "run", "-d", "--name", PG, "--network", NET, "--ip", PG_IP, "--network-alias", "postgres",
+        "-e", "POSTGRES_DB=keycloak", "-e", "POSTGRES_USER=keycloak", "-e", f"POSTGRES_PASSWORD={P0}",
+        "-v", f"{W}/pgcerts:/etc/postgres/certs:ro", lock["postgres"]["ref"], "postgres", "-c", "ssl=on",
+        "-c", "ssl_cert_file=/etc/postgres/certs/postgres.crt", "-c", "ssl_key_file=/etc/postgres/certs/postgres.key"])
+    for _ in range(60):
+        if sh(["docker", "exec", PG, "pg_isready", "-U", "keycloak"], ok=False).returncode == 0                 and signs_in("keycloak", P0):
+            break
+        time.sleep(2)
+    kept = yaml.safe_load(open(SECRETS))
+    kept["postgres_admin_password"] = ADMIN_PW
+    aligned = align_postgres_roles(kept, PG)
+    check("reinstall: a fresh Postgres gets Keycloak's role with the kept password, its own admin, the bootstrap locked",
+          aligned and signs_in("keycloak_db", kept["keycloak_db_password"]) and role("keycloak_db") == "falsetrue"
+          and role("fabric_admin") == "truetrue" and role("keycloak") == "truefalse"
+          and sql("SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = 'keycloak'") == "keycloak_db")
+    check("...and aligning again changes nothing", align_postgres_roles(kept, PG)
+          and signs_in("keycloak_db", kept["keycloak_db_password"]))
 finally:
     if not os.environ.get("KEEP"):
         cleanup()

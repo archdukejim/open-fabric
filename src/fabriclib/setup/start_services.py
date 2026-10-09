@@ -13,6 +13,7 @@ from fabriclib.samba.write_bind_dlz import write_bind_dlz
 from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.retire_renamed_units import retire_renamed_units
+from fabriclib.setup.ensure_db_rotation import align_postgres_roles
 from fabriclib.setup.start_unit import start_unit
 
 # (systemd unit, container, enabled-if flag); order = start order
@@ -32,7 +33,8 @@ def run(ctx):
     Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
              container healthy; the domain converged; Keycloak given the DC's Kerberos keytab; Keycloak configured (up
              to 6 tries, 15 s apart); fabric-agent and fabric-web running when the web UI is on; fabric-federation
-             running when federation_endpoint is on.
+             running when federation_endpoint is on. Once Keycloak's password is OpenBao's, Postgres's roles are
+             made to match fabric's secrets before Keycloak starts (a reinstall's fresh data folder, 2.1.7.4).
     Fails:   SetupError when a container is not healthy (start_unit), the domain cannot be converged, the default
              device roles cannot be made, or Keycloak configuration still fails after 6 tries; CalledProcessError
              from systemctl.
@@ -47,6 +49,8 @@ def run(ctx):
             continue
         info(f"{unit}…")
         ok(f"{unit}: {start_unit(unit, container, unit in ctx.restart_services)}")
+        if unit == "postgres" and align_postgres_roles(ctx.secrets):
+            ok("postgres: Keycloak's role and password as fabric's secrets hold them (2.1.7.4)")
 
     try:
         done = converge_domain(v, os.path.join(ctx.config_dir, "federation.yaml"), ctx.secrets)

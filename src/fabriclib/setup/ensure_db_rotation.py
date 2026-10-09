@@ -74,6 +74,27 @@ def _lock_bootstrap(container):
         raise SetupError(f"Postgres's bootstrap role: {res.stderr.strip()[-300:]}")
 
 
+def align_postgres_roles(secrets, container="postgres"):
+    """Purpose: once Keycloak's password is OpenBao's, make Postgres hold what fabric's secrets say (decision 2.1.7.4):
+             its own admin, Keycloak's role with the current password and owning its database, the bootstrap role
+             locked. A reinstall keeps the secrets but starts Postgres on an empty data folder, which has only the
+             bootstrap role (found by the 0.6.3 sandbox); on any other run this changes nothing.
+    Inputs:  secrets — fabric's secrets (keycloak_db_user, keycloak_db_password, postgres_admin_password);
+             container — Postgres's container, running.
+    Returns: False before the take-over (keycloak_db_user not set: nothing to do), else True.
+    Fails:   SetupError with psql's message.
+    Feeds:   setup/start_services (after Postgres is healthy, before Keycloak starts)."""
+    if secrets.get("keycloak_db_user") != KC_ROLE:
+        return False
+    _ensure_roles(secrets["postgres_admin_password"], container)
+    quoted = secrets["keycloak_db_password"].replace("'", "''")
+    res = _psql(f"ALTER ROLE {KC_ROLE} WITH PASSWORD '{quoted}';", PG_ADMIN, container)
+    if res.returncode != 0:
+        raise SetupError(f"Keycloak's role: {res.stderr.strip()[-300:]}")
+    _lock_bootstrap(container)
+    return True
+
+
 def _call(v, token, method, path, body=None):
     """Purpose: one OpenBao call that must succeed.
     Inputs:  v — settings; token — fabric-setup's; method, path, body — as bao_request.

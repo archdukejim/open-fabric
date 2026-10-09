@@ -1509,12 +1509,14 @@ function	fabriclib-setup|src/fabriclib/setup/deploy_config.py|_packaged	1
 function	fabriclib-setup|src/fabriclib/setup/deploy_config.py|_write_exec	2	
 function	fabriclib-setup|src/fabriclib/setup/deploy_config.py|run	3	
 function	fabriclib-setup|src/fabriclib/setup/detect_network.py|detect_network	1	
+function	fabriclib-setup|src/fabriclib/setup/doctor_report.py|_checks	2	
 function	fabriclib-setup|src/fabriclib/setup/doctor_report.py|doctor_report	1	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_call	4	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_ensure_roles	2	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_lock_bootstrap	3	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_psql	1	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|_redeploy	6	
+function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|align_postgres_roles	8	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|configure_db_engine	5	
 function	fabriclib-setup|src/fabriclib/setup/ensure_db_rotation.py|run	7	
 function	fabriclib-setup|src/fabriclib/setup/export_install.py|_copy	1	
