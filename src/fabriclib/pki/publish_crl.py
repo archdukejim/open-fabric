@@ -102,8 +102,8 @@ def _site_crls(timeout=10):
 
 
 def publish_crl(v, revoked_file=REVOKED_CERTS_FILE, fetch_sites=True):
-    """Purpose: publish fabric's certificate revocation lists (manual 2.1.5.10): the intermediate's (every leaf
-             fabric issues), and the root's when its key is on this host (the site CAs it signed); served on the certs
+    """Purpose: publish fabric's certificate revocation lists (manual 2.1.5.10), each where its key is on this host: the
+             intermediate's (every leaf fabric issues) and the root's (the site CAs it signed); served on the certs
              host (DER for the certificates' distribution point, PEM too) and given to nginx and FreeRADIUS.
     Inputs:  v — settings: deploy_base_dir, service_users (nginx); revoked_file — the revocations; fetch_sites — also
              fetch the other sites' CRLs for FreeRADIUS (False in tests).
@@ -121,8 +121,10 @@ def publish_crl(v, revoked_file=REVOKED_CERTS_FILE, fetch_sites=True):
     secrets = os.path.join(base, "stepca", "data", "secrets")
     password = os.path.join(secrets, "password")
     entries = _revoked(revoked_file)
-    inter = _gencrl(os.path.join(certs, "intermediate_ca.crt"), os.path.join(secrets, "intermediate_ca_key"),
-                    password, [e for e in entries if e.get("issuer", "intermediate") == "intermediate"])
+    inter = None                    # each CA's CRL where its key is on this host (the federation suite's root-only CA)
+    if os.path.exists(os.path.join(secrets, "intermediate_ca_key")):
+        inter = _gencrl(os.path.join(certs, "intermediate_ca.crt"), os.path.join(secrets, "intermediate_ca_key"),
+                        password, [e for e in entries if e.get("issuer", "intermediate") == "intermediate"])
     root = None
     if os.path.exists(os.path.join(secrets, "root_ca_key")):
         root = _gencrl(os.path.join(certs, "root_ca.crt"), os.path.join(secrets, "root_ca_key"), password,
@@ -144,10 +146,11 @@ def publish_crl(v, revoked_file=REVOKED_CERTS_FILE, fetch_sites=True):
     changed = False
     client_ca = os.path.join(base, "nginx", "certs", "client-ca")
     if os.path.isdir(client_ca):
-        changed |= write_file_if_changed(os.path.join(client_ca, "crl.pem"), inter + (root or ""), 0o644, uid, gid)
+        changed |= write_file_if_changed(os.path.join(client_ca, "crl.pem"), (inter or "") + (root or ""), 0o644, uid,
+                                         gid)
         conf_d = os.path.join(base, "nginx", "config", "conf.d")
         os.makedirs(conf_d, exist_ok=True)
-        inc = "ssl_crl /etc/nginx/certs/client-ca/crl.pem;\n" if root else \
+        inc = "ssl_crl /etc/nginx/certs/client-ca/crl.pem;\n" if root and inter else \
             "# no root CRL on this host (its root key is elsewhere): the web console checks no CRL\n"
         changed |= write_file_if_changed(os.path.join(conf_d, "client-crl.inc"), inc, 0o644, uid, gid)
     radius = os.path.join(base, "freeradius", "certs")
@@ -159,7 +162,7 @@ def publish_crl(v, revoked_file=REVOKED_CERTS_FILE, fetch_sites=True):
         cas = [os.path.join(certs, "root_ca.crt"), os.path.join(certs, "intermediate_ca.crt")]
         if os.path.exists(parents) and os.path.getsize(parents):
             cas.append(parents)
-        bundle = "".join(open(c).read() for c in cas) + inter + "".join(_site_crls() if fetch_sites else [])
+        bundle = "".join(open(c).read() for c in cas) + (inter or "") + "".join(_site_crls() if fetch_sites else [])
         radius_changed = write_file_if_changed(os.path.join(radius, "ca.pem"), bundle, 0o644, *_owner(radius))
     return {"changed": bool(changed), "radius_changed": bool(radius_changed), "root": root is not None}
 

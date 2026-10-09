@@ -45,7 +45,7 @@ docs/volume_1_description_and_architecture/1.17.15-fabriclib-ldap.md	b418f2836a0
 docs/volume_1_description_and_architecture/1.17.16-fabriclib-logs.md	2fe0f432ca72a73f231bfa4f30061526a2bd82a1	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.17-fabriclib-menu.md	b5267ce64a1db1f421b609e77d59bf254016bb71	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.18-fabriclib-ntp.md	9334d2fa4e44da9a3ed379aecea3c1896b87fc7a	2026-10-08	
-docs/volume_1_description_and_architecture/1.17.19-fabriclib-pki.md	f5592b69139e41a89bdfb5614f0a1818603d3755	2026-10-09	
+docs/volume_1_description_and_architecture/1.17.19-fabriclib-pki.md	58e9fe5fb58c1b965285483e77c85289425b6991	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.2-fabricctl-agent.md	f17de9c8df7ee8ba9fde31c56f71e6585796ac44	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.20-fabriclib-radius.md	1e48d87df66f3c2d7c2015be418ed1d2142a41a4	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.21-fabriclib-rbac.md	3b78491b62eb3573132f18fcff7dd889074a4da5	2026-10-08	
@@ -713,7 +713,7 @@ src/fabriclib/pki/mint_offline_cert.py	53acd52a61d93c0b0e13865faf34989c2d40f34e	
 src/fabriclib/pki/needs_renewal.py	c7551952fa866601e2694ad40035e30f430f3e86	2026-10-08	
 src/fabriclib/pki/pick_up_cert.py	e18433da18ee63474e9d55e189e0126a6df19f76	2026-10-08	
 src/fabriclib/pki/publish_ca_certs.py	a8fb0dc4c216f0a5bcddd00fa39857e9fcdd0a41	2026-10-08	
-src/fabriclib/pki/publish_crl.py	cc05be3baa4ea0b08fb9b5a3394fd924d27961ed	2026-10-08	
+src/fabriclib/pki/publish_crl.py	2c42f40a53dc2cab5e379d8efad493faf6d2129c	2026-10-09	
 src/fabriclib/pki/replace_site_ca.py	f3d7e0fcdd40976c489eed563819d3b9773c9e20	2026-10-08	
 src/fabriclib/pki/revoke_cert.py	49d3ce9badfdc738aaa3e23690069c59e89b56df	2026-10-08	
 src/fabriclib/pki/run_acme_command.py	0904f68ae3e0725dbb9b27d2622db8e03a59eaa2	2026-10-09	
