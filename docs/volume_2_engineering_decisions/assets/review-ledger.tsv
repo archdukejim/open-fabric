@@ -1247,7 +1247,7 @@ tests/freeradius/run.py	67d873222d08c223be8cc151d62d90f1801760e5	2026-10-08
 tests/hardening/README.md	514afa897a841c34383af1ef74949610d5dd333d	2026-10-05	
 tests/hardening/run.sh	b4e3e81266e9980d1dc636d34260a2619c00220c	2026-10-05	
 tests/host/README.md	0ca6a906d5bddb7d03f4f92f65f0ef52ea61b9d0	2026-10-08	
-tests/host/installer.py	f3e55e679a006ae8dfe8813233e8ee46e6e44ea1	2026-10-09	
+tests/host/installer.py	23dc3e21b7be0e53bfc9bb489b0563f0f3ed40ef	2026-10-09	
 tests/host/reset_user.py	36415b5b1fef5a58eb441687393d6062644b34e7	2026-10-05	
 tests/host/run.sh	fc951e34cf42f4ebb2d321211f1a6e6c814a4cab	2026-10-09	
 tests/host/upgrade.sh	467304345b51546e7d1b87f6541c3a056bf3c9bd	2026-10-09	

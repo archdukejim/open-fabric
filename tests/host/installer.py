@@ -24,6 +24,9 @@ import yaml
 TARGET, KEY = os.environ["TARGET"], os.path.expanduser(os.environ["KEY"])
 HOST_IP, DOMAIN = os.environ["HOST_IP"], os.environ.get("DOMAIN", "home.arpa")
 FOREIGN_IP = os.environ.get("FOREIGN_IP", "192.168.7.250")    # in the host's subnet, but not one of its addresses
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "src"))
+from fabriclib.samba.suggested_ad_domain import suggested_ad_domain  # noqa: E402
+AD = suggested_ad_domain(DOMAIN)        # what Enter takes (2.1.6.11: a sibling of a domain of three labels or more)
 OUT = os.environ.get("OUT", "/tmp/fabric-tests/installer")
 SSH = ["ssh", "-o", "BatchMode=yes", "-i", KEY, TARGET]
 PASS = FAIL = 0
@@ -180,8 +183,8 @@ check("only what cannot change later is asked (2.1.2.16): no password policy, me
 check("the plan asked again after an answer that is no choice", names.count("plan") == 2, names.count("plan"))
 check("a consent question asked again after an answer that is not y or n",
       len(consent_seen) >= 2 and consent_seen[0] == consent_seen[1], consent_seen[:3])
-check("the Enter defaults: the suggested AD domain ad.<domain> and the host name it found",
-      f"ad.{DOMAIN}" in text and guess_host in text, guess_host)
+check(f"the Enter defaults: the suggested AD domain ({AD}) and the host name it found",
+      f"[{AD}]" in text and guess_host in text, (AD, guess_host))
 check("declining the ports fabric needs with ufw on stops setup before any step, saying why (2.1.2.12, 2.1.2.13)",
       code != 0 and "ufw is on, and without fabric's firewall rules it blocks" in text and "[preflight]" not in text,
       (code, text[-800:]))
@@ -231,9 +234,9 @@ check("the first admin was created with the chosen password; none written to the
                 "2>/dev/null"), text[-1500:])
 doctor = R("fabricctl doctor 2>&1")
 check("doctor passes", "✗" not in doctor and "✓" in doctor, doctor[-1500:])
-aaaa = R(f"dig +short AAAA ad.{DOMAIN} @{HOST_IP}; dig +short AAAA $(hostname -s).ad.{DOMAIN} @{HOST_IP}")
+aaaa = R(f"dig +short AAAA {AD} @{HOST_IP}; dig +short AAAA $(hostname -s).{AD} @{HOST_IP}")
 check("the domain on IPv4 only: no AAAA for the AD domain or its DC, though the host has IPv6 (2.1.6.29)",
-      aaaa.strip() == "" and R(f"dig +short A ad.{DOMAIN} @{HOST_IP}").strip() == HOST_IP,
+      aaaa.strip() == "" and R(f"dig +short A {AD} @{HOST_IP}").strip() == HOST_IP,
       (aaaa, R("ip -6 addr show scope global | grep inet6")))
 landing = R(f"curl -sL --resolve {guess_host}.{DOMAIN}:443:{HOST_IP} --resolve info.{DOMAIN}:443:{HOST_IP} "
             f"https://{guess_host}.{DOMAIN}/ --cacert /opt/stepca/data/certs/root_ca.crt")
