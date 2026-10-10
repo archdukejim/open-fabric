@@ -7,7 +7,7 @@ import yaml
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
-from fabriclib.samba.check_password_policy import POLICY_KEYS
+from fabriclib.samba.check_password_policy import DEFAULT_POLICY, POLICY_KEYS
 from fabriclib.dns.normalize_tsig_keys import normalize_tsig_keys
 from fabriclib.federation.common.load_registry import load_registry
 from fabriclib.federation.decode_invitation import decode_invitation
@@ -15,9 +15,9 @@ from fabriclib.setup.detect_network import detect_network
 from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.security.check_signin_lowering import check_signin_lowering
 from fabriclib.setup.ask_ad_domain import ask_ad_domain
-from fabriclib.setup.ask_ram import ask_ram
 from fabriclib.setup.errors import SetupError
 from fabriclib.setup.move_dns_filter import move_dns_filter
+from fabriclib.setup.set_ram_capacity import set_ram_capacity
 from fabriclib.setup.upgrade_vars import upgrade_vars
 
 REQUIRED = ["domain", "hostname", "host_ip", "lan_cidr", "lan_gateway"]
@@ -33,6 +33,7 @@ LABELS = {
 ADMIN_RE = re.compile(r"^[a-z_][a-z0-9_.-]{0,31}$")
 # names the first admin cannot take: the system's own, and AD's built-in accounts
 RESERVED = {"admin", "root", "administrator", "guest", "krbtgt", "nobody", "daemon"}
+FIRST_ADMIN = "fabric-admin"     # the recommended first admin: the one fabric- name a person may have (2.1.6.33)
 HOST_RE = re.compile(r"^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
                      r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
 
@@ -43,10 +44,11 @@ def _valid(key, value):
     Inputs:  key — setting name (host_ip, lan_gateway, lan_cidr, webui_admin_user, domain, hostname, friendly_name, or
              other); value — str.
     Returns: True if valid: an IPv4 address; an IPv4 network; an admin username matching ADMIN_RE that no system or
-             AD account uses (RESERVED, and not fabric-…); a domain of two labels or more that is not `.local` (mDNS)
-             or `localhost`; a host name of one label, at most 15 characters (the DC's NetBIOS name), not
-             `localhost`; an organisation name of 1-40 printable characters without quotes, backslashes or <> (the
-             CA's certificate names, at most 64 characters, are built from it); any other key just needs a value.
+             AD account uses (RESERVED, and not fabric-… other than FIRST_ADMIN, 2.1.6.33); a domain of two labels or
+             more that is not `.local` (mDNS) or `localhost`; a host name of one label, at most 15 characters (the
+             DC's NetBIOS name), not `localhost`; an organisation name of 1-40 printable characters without quotes,
+             backslashes or <> (the CA's certificate names, at most 64 characters, are built from it); any other key
+             just needs a value.
     Fails:   never — ValueError from ipaddress is turned into False.
     Feeds:   collect_vars (which required values to ask), _ask."""
     try:
@@ -55,7 +57,8 @@ def _valid(key, value):
         elif key == "lan_cidr":
             ipaddress.IPv4Network(value, strict=False)
         elif key == "webui_admin_user":
-            return bool(ADMIN_RE.match(value)) and value not in RESERVED and not value.startswith("fabric-")
+            return (bool(ADMIN_RE.match(value)) and value not in RESERVED
+                    and (value == FIRST_ADMIN or not value.startswith("fabric-")))
         elif key == "domain":
             low = value.lower()
             return (bool(HOST_RE.match(value)) and "." in value and not low.endswith(".local")
@@ -156,18 +159,18 @@ def collect_vars(ctx):
     Inputs:  ctx — SetupContext: user_vars_file (--file), join_invitation (--join: _join_defaults), non_interactive,
              vars_file (existing install),
              source_dir (a checkout's ../custom-vars.yaml), config_dir, secrets_file, deploy_base;
-             env SUDO_USER (default admin name).
+             (the default admin is FIRST_ADMIN, 2.1.6.33).
     Returns: path of fabric.yaml (str). Leaves ctx.vars = the data written. Precedence: an existing
              vars.yaml is the base and --file overrides the keys it sets; on a fresh install without --file a
              checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images
              (upgrade_vars); image_* keys set explicitly are recorded in image_pins. AdGuard Home's settings move to
              the BIND resolver's (move_dns_filter, 0.7). Missing/invalid required
              values are asked for (defaults from detect_network); webui_admin_user is chosen once; the AD domain
-             and the password policy are asked when missing (ask_ad_domain), and once the memory fabric may use
-             (ask_ram).
+             is asked when missing (ask_ad_domain); the rest takes defaults changed later (2.1.2.16): the password
+             policy (DEFAULT_POLICY, a vars file's keys kept, 2.1.6.35) and the memory (set_ram_capacity).
              Embedded TSIG secrets go to the secrets file, never into fabric.yaml.
     Fails:   SetupError for a --file that would lower a sign-in layer (check_signin_lowering), for missing/invalid
-             required values (the AD domain and policy included) with
+             required values (the AD domain included) with
              --non-interactive, invalid tsig_keys, or a
              secrets file that cannot be written (ValidationError converted); OSError/yaml errors on files.
     Feeds:   run_setup main (before choose_plan and the steps); ctx.vars feeds choose_plan and the steps
@@ -229,22 +232,25 @@ def collect_vars(ctx):
             raise SetupError("friendly_name: 1-40 printable characters without quotes, backslashes or <>")
         data["friendly_name"] = "Home Network" if ctx.non_interactive else _ask("friendly_name", "Home Network")
 
-    # First web UI admin (created by the admin step). Chosen once, then kept.
+    # First web UI admin (created by the admin step). Chosen once, then kept; fabric-admin recommended (2.1.6.33).
     if not _valid("webui_admin_user", str(data.get("webui_admin_user") or "")):
-        sudo_user = os.environ.get("SUDO_USER", "")
-        default = sudo_user if sudo_user != "root" and _valid("webui_admin_user", sudo_user) else "fabricadmin"
-        data["webui_admin_user"] = default if ctx.non_interactive else _ask("webui_admin_user", default)
+        data["webui_admin_user"] = FIRST_ADMIN if ctx.non_interactive else _ask("webui_admin_user", FIRST_ADMIN)
 
-    # The directory (manual 1.6.3): the AD domain and the whole password policy, no defaults (2.1.6.11, 2.1.6.13)
-    policy = data.get("ad_password_policy") or {}
-    if not data.get("ad_domain") or not (set(POLICY_KEYS) | {"complexity"}) <= set(policy):
+    # The directory (manual 1.6.3): the AD domain is asked (permanent, 2.1.6.11); its password policy starts from the
+    # default, a vars file's keys kept, and is changed later (2.1.6.35, 2.1.2.16)
+    if not data.get("ad_domain"):
         if ctx.non_interactive:
-            raise SetupError("missing in the vars file: ad_domain and every key of ad_password_policy (manual "
-                             "1.1.9.7: the directory's domain and password policy have no defaults)")
+            raise SetupError("missing in the vars file: ad_domain (manual 1.1.9.7: the directory's domain is permanent "
+                             "and has no default)")
         ctx.vars = data
         ask_ad_domain(ctx)
-    # how much of this host fabric may use (2.1.2.3, manual 1.2.4.2): measured, asked once
-    ask_ram(ctx, data)
+    policy = data.get("ad_password_policy") or {}
+    if not (set(POLICY_KEYS) | {"complexity"}) <= set(policy):
+        data["ad_password_policy"] = {**DEFAULT_POLICY, **policy}
+        info("password policy: fabric's default (2.1.6.35), change it any time: sudo fabricctl domain password-policy")
+    # how much of this host fabric may use (2.1.2.3, manual 1.2.4.2): all of it, measured, unless set (2.1.2.16)
+    set_ram_capacity(data)
+    # Kerberos sign-in stays off unless set (2.1.6.32, 2.1.2.16): the template's default; turned on later
 
     data["deploy_base_dir"] = ctx.deploy_base
     os.makedirs(ctx.config_dir, mode=0o750, exist_ok=True)

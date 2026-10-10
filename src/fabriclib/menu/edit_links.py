@@ -2,7 +2,7 @@ import os
 
 from fabriclib.common.console import BOLD, NC, YELLOW
 from fabriclib.common.load_vars import load_vars
-from fabriclib.common.paths import DEPLOY_BASE_DIR, FABRIC_DIR
+from fabriclib.common.paths import DEPLOY_BASE_DIR, INSTALL_DIR
 from fabriclib.menu.save_menu_change import save_menu_change
 
 
@@ -12,7 +12,7 @@ def links_file():
     Returns: LINK_VARS_PATH, else <fabric>/config/link-vars.yaml — or <base>/link-vars.yaml when only that exists.
     Fails:   never.
     Feeds:   edit_links."""
-    path = os.environ.get("LINK_VARS_PATH", os.path.join(FABRIC_DIR, "config", "link-vars.yaml"))
+    path = os.environ.get("LINK_VARS_PATH", os.path.join(INSTALL_DIR, "config", "link-vars.yaml"))
     legacy = os.path.join(DEPLOY_BASE_DIR, "link-vars.yaml")
     return legacy if not os.path.exists(path) and os.path.exists(legacy) else path
 

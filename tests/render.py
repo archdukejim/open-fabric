@@ -486,7 +486,8 @@ ngx_off = env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_web
 ngx_on = env.get_template('nginx/nginx.conf.j2').render(**{**full, 'install_webui': True, 'webui_client_cert': True})
 assert 'ssl_verify_client optional;' in ngx_off and 'ssl_verify_client on;' not in ngx_off, 'no certificate required by default'
 assert 'ssl_verify_client on;' in ngx_on and 'ssl_client_certificate /etc/nginx/certs/client-ca/ca-bundle.pem;' in ngx_on
-assert v2['webui_client_cert'] is False and v2['signin_kerberos'] is True and v2['signin_admin_second_factor'] == 'none'
+assert v2['webui_client_cert'] is False and v2['signin_kerberos'] is False and v2['signin_admin_second_factor'] == 'none'
+assert v2['webui_admin_role'] == 'fabric-console-admin', "the admin role is not the first admin's name (2.1.6.33)"
 wj = json.loads(env.get_template('webui/webui.json.j2').render(**{**full, 'webui_oidc_secret': 'x'}))
 assert wj['client_cert'] is False, wj
 kit = {**v2, 'host_ip': '192.168.7.53'}

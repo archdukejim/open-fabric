@@ -1,3 +1,4 @@
+from fabriclib.rbac.permissions import ADMIN_ROLE, OLD_ADMIN_ROLE
 from fabriclib.setup.common.previous_accounts import PREVIOUS_ACCOUNTS
 
 
@@ -11,7 +12,9 @@ def upgrade_vars(data, pinned):
              deleted, so the release's validated, digest-pinned default applies. service_users entries that are
              exactly a previous release's default (PREVIOUS_ACCOUNTS: same uid and gid, no name) are deleted, so
              the fabric-* account in the 600-649 band applies (the accounts step moves the files); entries the
-             admin changed are kept.
+             admin changed are kept. The console's admin role named fabric-admin (before 0.6.4) becomes
+             fabric-console-admin: that name is now the first admin's (2.1.6.33); Keycloak and OpenBao follow at
+             their steps, members kept.
     Fails:   never — dict operations only.
     Feeds:   collect_vars (logs each change).
     Notes:   `fabricctl images update` is what changes images (design 2.1.14.3)."""
@@ -31,4 +34,7 @@ def upgrade_vars(data, pinned):
                 changes.append(f"service account {key} ({prev[1]}:{prev[2]}): moves to this release's fabric-* account")
         if not users:
             del data["service_users"]
+    if data.get("webui_admin_role") == OLD_ADMIN_ROLE:
+        data["webui_admin_role"] = ADMIN_ROLE
+        changes.append(f"the web console's admin role: {OLD_ADMIN_ROLE} is now {ADMIN_ROLE} (2.1.6.33)")
     return changes

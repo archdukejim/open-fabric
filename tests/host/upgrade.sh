@@ -7,13 +7,14 @@
 #
 #   TARGET=tempuser@192.168.4.57 HOST_IP=192.168.4.57 LAN_CIDR=192.168.4.0/22 GATEWAY=192.168.4.1 \
 #   FROM=0.6.1 TO_SUITE=stable [DOMAIN=pitest.home.arpa] [KEY=~/.ssh/id] tests/host/upgrade.sh
+#   (TO_DEB=<a .deb built here> instead of TO_SUITE: a branch not published to apt, e.g. a dev/ branch)
 #
 # It WIPES fabric on that host: use a disposable machine. Then run tests/host/run.sh with APT_SUITE=TO_SUITE
 # for the whole host suite on the upgraded install.
 # -----------------------------------------------------------------------
 set -uo pipefail
 : "${TARGET:?user@host}" "${HOST_IP:?}" "${LAN_CIDR:?}" "${GATEWAY:?}" "${FROM:?previous release, e.g. 0.6.1}" \
-  "${TO_SUITE:?stable or testing}"
+  "${TO_SUITE:=${TO_DEB:+local}}" "${TO_SUITE:?stable or testing (or TO_DEB=<.deb>)}"
 DOMAIN="${DOMAIN:-pitest.home.arpa}"
 KEY="${KEY:-$HOME/.ssh/fabric-test_ed25519}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -68,11 +69,16 @@ check "seeded: the person, the record, the certificate, the DNS filter rule, the
      grep -q 'admin-2fa totp' '$OUT/before.json' && grep -q 'objectGUID' '$OUT/before.json' && \
      grep -q 'upgrade-test-carol.pem: OK' '$OUT/before.json' && grep -q 'objectGUID' '$OUT/before.json'"
 
-echo "--- upgrade to the candidate from apt $TO_SUITE"
+echo "--- upgrade to the candidate from ${TO_DEB:-apt $TO_SUITE}"
+if [ -n "${TO_DEB:-}" ]; then
+    put "$TO_DEB"
+    R "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /tmp/$(basename "$TO_DEB")" > "$OUT/upgrade.log" 2>&1
+else
 R "wget -qO- $APT_URL/public.key | gpg --dearmor --yes -o /usr/share/keyrings/fabric-archive-keyring.gpg && \
    echo 'deb [signed-by=/usr/share/keyrings/fabric-archive-keyring.gpg] $APT_URL $TO_SUITE main' \
    > /etc/apt/sources.list.d/fabric.list && apt-get update -qq && \
    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fabricctl" > "$OUT/upgrade.log" 2>&1
+fi
 TO=$(R "dpkg-query -W -f='\${Version}' fabricctl")
 check "the package moved from $FROM to $TO" "[ -n '$TO' ] && [ '$TO' != '$FROM' ]"
 start=$(date +%s)
@@ -80,6 +86,9 @@ start=$(date +%s)
 R "fabricctl setup --non-interactive --yes ${APPROVE:+--approve $APPROVE} ${DECLINE:+--decline $DECLINE}" > "$OUT/setup-to.log" 2>&1
 echo "    setup ($TO) took $(( ($(date +%s) - start) / 60 )) min"
 check "$TO: setup completes over the old install" "grep -q 'fabric is ready' '$OUT/setup-to.log'"
+check "$TO: the console's admin role renamed fabric-console-admin, the old name gone from Keycloak and OpenBao (2.1.6.33)" \
+    "R 'grep -qx \"webui_admin_role: fabric-console-admin\" /opt/fabric/config/vars.yaml' \
+     && grep -q 'fabric-admin removed' '$OUT/setup-to.log'"
 
 R 'python3 /tmp/upgrade_state.py snapshot' > "$OUT/after.json" 2>"$OUT/after.err"
 # AdGuard Home's three secrets are retired with it (0.7, manual 2.3.12.1.9)

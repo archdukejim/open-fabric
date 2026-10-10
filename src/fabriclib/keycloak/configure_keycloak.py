@@ -12,8 +12,10 @@ from fabriclib.keycloak.ensure_signin_flows import ensure_signin_flows
 from fabriclib.keycloak.ensure_webui_client import ensure_webui_client
 from fabriclib.keycloak.grant_role_to_group import grant_role_to_group
 from fabriclib.keycloak.remove_retired_client import remove_retired_client
+from fabriclib.keycloak.retire_old_admin_role import retire_old_admin_role
 from fabriclib.keycloak.step import step
 from fabriclib.federation.common.is_root_site import is_root_site
+from fabriclib.rbac.permissions import ADMIN_ROLE, OLD_ADMIN_ROLE
 from fabriclib.secrets.load_secrets import load_secrets
 
 
@@ -42,14 +44,16 @@ def configure_keycloak(vars_path, secrets_path):
     # fabric's directory, Samba AD (manual 1.6.3.11): people and groups
     writable = is_root_site(os.path.join(v["deploy_base_dir"], "fabric", "config", "federation.yaml"))
     # Kerberos sign-in (manual 2.3.6.2.6.2) once the site's DC has exported its keytab (a read-only DC cannot make one)
-    kerberos = bool(v.get("signin_kerberos", True)) and os.path.exists(
+    kerberos = bool(v.get("signin_kerberos", False)) and os.path.exists(
         os.path.join(v["deploy_base_dir"], "keycloak", "kerberos", "sso.keytab"))
     ensure_group_mapper(kc, realm, ensure_ldap_federation(kc, realm, realm_id, v, s, writable, kerberos), v)
     # The admin role and the admin sign-in flow serve the web UI and OpenBao's UI.
-    admin_role = v.get("webui_admin_role", "fabric-admin")
+    admin_role = v.get("webui_admin_role", ADMIN_ROLE)
     reps = ensure_rbac_roles(kc, realm, admin_role)
     step(f"access control: {len(reps)} fabric roles (permissions and bundles)")
     grant_role_to_group(kc, realm, reps[admin_role], v.get("webui_admin_group", "admins"))
+    if retire_old_admin_role(kc, realm, admin_role):
+        step(f"the admin role is now {admin_role}: {OLD_ADMIN_ROLE} removed (2.1.6.33)")
     for group in v.get("ldap_groups") or []:
         if group.get("bundle") in reps:
             grant_role_to_group(kc, realm, reps[group["bundle"]], group["name"])

@@ -91,5 +91,5 @@ def dev_get_page(h, path, query):
     if path == "/security":
         return h.send(200, views.security(ctx, SAMPLE_SECURITY, query.get("msg", ""), query.get("err", "")))
     if path == "/preview/denied":       # what a refused sign-in looks like
-        return h.send(403, views.error_page(403, "Your account is missing the 'fabric-admin' role."))
+        return h.send(403, views.error_page(403, "Your account is missing the 'fabric-console-admin' role."))
     return h.send(404, views.error_page(404, "Not found."))

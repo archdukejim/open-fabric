@@ -14,12 +14,12 @@ path "sys/mounts"          { capabilities = ["read"] }
 path "sys/mounts/*"        { capabilities = ["create", "read", "update"] }
 path "sys/auth"            { capabilities = ["read"] }
 path "sys/auth/*"          { capabilities = ["create", "read", "update", "sudo"] }
-path "sys/policies/acl/*"  { capabilities = ["create", "read", "update", "list"] }
+path "sys/policies/acl/*"  { capabilities = ["create", "read", "update", "delete", "list"] }
 path "auth/approle/role/*" { capabilities = ["create", "read", "update", "list"] }
 path "fabric/*"            { capabilities = ["create", "read", "update", "delete", "list"] }
-path "auth/oidc/*"         { capabilities = ["create", "read", "update", "list"] }
+path "auth/oidc/*"         { capabilities = ["create", "read", "update", "delete", "list"] }
 path "identity/group"      { capabilities = ["create", "update"] }
-path "identity/group/*"    { capabilities = ["create", "read", "update", "list"] }
+path "identity/group/*"    { capabilities = ["create", "read", "update", "delete", "list"] }
 path "identity/group-alias"   { capabilities = ["create", "update"] }
 path "identity/group-alias/*" { capabilities = ["create", "read", "update", "list"] }
 path "database/config/*"   { capabilities = ["create", "read", "update"] }
@@ -37,7 +37,7 @@ path "fabric/metadata/secrets" { capabilities = ["read"] }
     # applications' secrets, and a read-only look at the configuration.
     # fabric's own secrets are listed, never read: that stays with
     # `sudo fabricctl secrets show` (audited on the host).
-    "fabric-admin": """
+    "fabric-console-admin": """
 path "apps/*"                 { capabilities = ["create", "read", "update", "patch", "delete", "list"] }
 path "fabric/metadata"        { capabilities = ["list"] }
 path "fabric/metadata/*"      { capabilities = ["list"] }
@@ -66,10 +66,12 @@ path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
 # fabric role bundle (Keycloak `roles` claim) -> OpenBao policy, through an
 # external identity group per bundle. "admin" is the web UI admin role.
 # Bundles not listed here cannot sign in to OpenBao.
-OIDC_BUNDLE_POLICIES = {"admin": "fabric-admin", "fabric-auditor": "fabric-auditor"}
+OIDC_BUNDLE_POLICIES = {"admin": "fabric-console-admin", "fabric-auditor": "fabric-auditor"}
+# names before 0.6.4, removed by setup: fabric-admin is now the first admin's user name (2.1.6.33)
+RETIRED_NAMES = ("fabric-admin",)
 
 # Sign-in for people: OpenBao's OIDC auth at auth/oidc, a Keycloak client of
 # its own, one role bound to the web UI admin role claim.
 OIDC_MOUNT = "oidc"
 OIDC_CLIENT_ID = "fabric-openbao"
-OIDC_ROLE = "fabric-admin"
+OIDC_ROLE = "people"

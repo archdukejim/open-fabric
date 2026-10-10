@@ -94,23 +94,57 @@ check("the two-label suggestion is a valid AD domain (a sub-domain, never the do
 check("accepted: a sub-domain of fabric's domain too", not refused({**GOOD, "ad_domain": "ad.lan.test"}, ""))
 check("accepted: the suggested sibling", not refused({**GOOD, "ad_domain": "ad.test2", "domain": "lan.test2"}, ""))
 
-print("--- the memory fabric may use (2.1.2.3, manual 1.2.4.2)")
+print("--- what setup asks of the directory: only the AD domain; the policy starts from the default (2.1.2.16)")
 import builtins  # noqa: E402
+import contextlib  # noqa: E402
+import io  # noqa: E402
 import types  # noqa: E402
 
-import fabriclib.setup.ask_ram as m_ram  # noqa: E402
+from fabriclib.samba.check_password_policy import DEFAULT_POLICY, check_password_policy  # noqa: E402
+from fabriclib.setup.ask_ad_domain import ask_ad_domain  # noqa: E402
+
+
+def ask(answers):
+    """setup's directory question with these answers; the AD domain set and what was printed."""
+    feed, real = iter(answers), builtins.input
+    ctx = types.SimpleNamespace(vars={"domain": "lan.test"})
+    builtins.input = lambda prompt="": (print(prompt), next(feed))[1]
+    out = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(out):
+            ask_ad_domain(ctx)
+    finally:
+        builtins.input = real
+    return ctx.vars, out.getvalue()
+
+
+got, said = ask(["lan.test", ""])
+check("only the AD domain is asked: fabric's own domain refused, Enter takes the suggestion; no policy question",
+      got == {"domain": "lan.test", "ad_domain": "ad.lan.test"} and "a domain of two labels or more" in said
+      and "password" not in said.lower(), (got, said))
+try:
+    check_password_policy(dict(DEFAULT_POLICY))
+    ok_default = True
+except ValidationError as e:
+    ok_default = str(e)
+check("the default policy (2.1.6.35): 12 characters, complexity, 5 remembered, never expires, 10 failures in 15 "
+      "minutes lock for 15; AD takes it", ok_default is True and DEFAULT_POLICY == {
+          "minimum_length": 12, "complexity": True, "history": 5, "minimum_age_days": 0, "maximum_age_days": 0,
+          "lockout_threshold": 10, "lockout_window_minutes": 15, "lockout_minutes": 15}, ok_default)
+
+print("--- the memory fabric may use (2.1.2.3, manual 1.2.4.2): all of it unless set, not asked (2.1.2.16)")
+
+import fabriclib.setup.set_ram_capacity as m_ram  # noqa: E402
 from fabriclib.setup.errors import SetupError  # noqa: E402
 
 
-def ram(have, data, interactive=None):
-    """ask_ram with the host's memory faked (pure logic) and, interactively, the answers typed."""
+def ram(have, data):
+    """set_ram_capacity with the host's memory faked (pure logic)."""
     m_ram.host_ram_gb = lambda: have
-    ctx = types.SimpleNamespace(non_interactive=interactive is None)
-    answers = iter(interactive or [])
     real = builtins.input
-    builtins.input = lambda prompt="": next(answers)
+    builtins.input = lambda prompt="": (_ for _ in ()).throw(AssertionError(f"asked: {prompt}"))
     try:
-        m_ram.ask_ram(ctx, data)
+        m_ram.set_ram_capacity(data)
         return data.get("host_ram_capacity")
     except SetupError as e:
         return f"refused: {e}"
@@ -119,12 +153,10 @@ def ram(have, data, interactive=None):
 
 
 check("a host under 4 GB is refused", str(ram(3, {})).startswith("refused"))
-check("unattended: the measured memory is used and kept", ram(8, {}) == 8)
+check("the measured memory is used and kept, nothing asked", ram(8, {}) == 8)
 check("a value set by the admin is kept when it fits", ram(8, {"host_ram_capacity": 6}) == 6)
 check("refused: more than the host has, or under 4", str(ram(8, {"host_ram_capacity": 12})).startswith("refused")
       and str(ram(8, {"host_ram_capacity": 2})).startswith("refused"))
-check("interactive: Enter takes all of it; a smaller answer restricts fabric; a wrong one is asked again",
-      ram(8, {}, [""]) == 8 and ram(8, {}, ["5"]) == 5 and ram(8, {}, ["3", "20", "x", "6"]) == 6)
 
 print("--- the Administrator's password")
 pw = [random_password() for _ in range(200)]

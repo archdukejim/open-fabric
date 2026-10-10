@@ -227,15 +227,16 @@ log_forwarding: {{ log_forwarding | default({}, true) | to_json }}
 # Web management UI (Keycloak OIDC; a client certificate when webui_client_cert). Requires Keycloak.
 install_webui: {{ (install_webui | default(true) | bool) and (install_keycloak | default(false) | bool) }}
 webui_realm: {{ webui_realm | default(domain) }}
-webui_admin_role: {{ webui_admin_role | default('fabric-admin') }}
+webui_admin_role: {{ webui_admin_role | default('fabric-console-admin') }}
 webui_admin_group: {{ webui_admin_group | default('admins') }}
 {# First web UI admin, created by `fabricctl setup` (a person in the domain + client certificate). #}
-webui_admin_user: {{ webui_admin_user | default('fabricadmin', true) }}
+webui_admin_user: {{ webui_admin_user | default('fabric-admin', true) }}
 webui_admin_email: {{ webui_admin_email | default('', true) }}
 webui_client_cert_days: {{ webui_client_cert_days | default(365) }}
 # Sign-in (manual 2.3.6.2.6.1, 2.1.6.23): a password by default; raised in the web console's Security page, lowered only
 # with `sudo fabricctl security lower` (2.1.6.24). Second factors: none | any (TOTP or a passkey) | totp | passkey.
-signin_kerberos: {{ signin_kerberos | default(true) | bool | lower }}
+# Kerberos sign-in (the domain logon): off by default, asked at setup (2.1.6.32).
+signin_kerberos: {{ signin_kerberos | default(false) | bool | lower }}
 signin_admin_second_factor: {{ signin_admin_second_factor | default('none', true) | lower }}
 signin_everyone_second_factor: {{ signin_everyone_second_factor | default('none', true) | lower }}
 # The web console asks for a client certificate from fabric's CA (2.1.8.2: off by default)

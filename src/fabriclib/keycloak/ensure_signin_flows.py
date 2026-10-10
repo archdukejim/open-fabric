@@ -119,7 +119,7 @@ def ensure_signin_flows(kc, realm, v):
     Returns: str, the admin flow's id (the admin tools' clients bind it).
     Fails:   ValidationError from signin_level for an unknown level; SystemExit from kc.call.
     Feeds:   configure_keycloak."""
-    kerberos = bool(v.get("signin_kerberos", True))
+    kerberos = bool(v.get("signin_kerberos", False))
     levels = {SIGNIN: signin_level(v.get("signin_everyone_second_factor")), ADMIN: admin_level(v)}
     base = f"/{q(realm)}/authentication/flows"
     for alias, level in levels.items():

@@ -232,7 +232,7 @@ try:
     st, loc, _, _ = req("POST", "/openbao/rotate", {"csrf": "dev", "confirm": "pi-core"})
     check("rotate: new key version on every present method", "fabric-2" in req("GET", "/openbao?view=unlock")[3])
     st, _, _, page = req("GET", "/preview/denied")
-    check("preview of a refused sign-in", st == 403 and "fabric-admin" in page)
+    check("preview of a refused sign-in", st == 403 and "fabric-console-admin" in page)
 finally:
     proc.terminate()
     proc.wait(timeout=5)

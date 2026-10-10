@@ -92,14 +92,34 @@ EOF
 docker cp "$OUT/vars.yaml" "$NAME:/root/vars.yaml"
 
 echo "--- setup (fresh install)"
-in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes' > "$OUT/setup-noconsent.log" 2>&1
+# the first admin's password, chosen for this run and handed over in a file (2.1.6.33: never on a command line)
+ADMIN_PW="Fx9-$(openssl rand -hex 12)"
+( umask 077; printf '%s\n' "$ADMIN_PW" > "$OUT/admin-pw"; printf 'short\n' > "$OUT/admin-pw-short" )
+docker cp "$OUT/admin-pw" "$NAME:/root/admin-pw"; docker cp "$OUT/admin-pw-short" "$NAME:/root/admin-pw-short"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all' > "$OUT/setup-nopw.log" 2>&1
+check "unattended setup without the first admin's password refuses before any step, naming --admin-password-file" \
+    "grep -q 'needs a password: --admin-password-file' '$OUT/setup-nopw.log' && ! grep -q '\[preflight\]' '$OUT/setup-nopw.log' \
+     && ! in_box 'getent passwd fabric-dns'"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all --admin-password-file /root/admin-pw-short' \
+    > "$OUT/setup-shortpw.log" 2>&1
+check "a password the domain's policy refuses is refused before any step, saying why" \
+    "grep -q 'admin-pw-short is refused: at least' '$OUT/setup-shortpw.log' && ! grep -q '\[preflight\]' '$OUT/setup-shortpw.log'"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --admin-password-file /root/admin-pw' \
+    > "$OUT/setup-noconsent.log" 2>&1
 check "unattended setup without --approve changes nothing and names the groups to answer" \
     "grep -q 'need an answer: packages' '$OUT/setup-noconsent.log' && ! in_box 'test -e /etc/systemd/system/fabric.target' \
      && ! in_box 'getent passwd fabric-dns'"
-in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all' 2>&1 | tee "$OUT/setup.log"
+in_box 'fabricctl setup --file /root/vars.yaml --non-interactive --yes --approve all --admin-password-file /root/admin-pw' 2>&1 \
+    | tee "$OUT/setup.log"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
+check "the first admin is fabric-admin, created with the password chosen for setup (2.1.6.33)" \
+    "grep -q \"admin 'fabric-admin' created in the directory with the password chosen in setup\" '$OUT/setup.log'"
+check "Kerberos sign-in is off on an unattended new install (2.1.6.32)" \
+    "in_box 'grep -qx \"signin_kerberos: false\" /opt/fabric/config/vars.yaml'"
 grep -q "fabric is ready" "$OUT/setup.log" || in_box 'journalctl --no-pager -u samba | tail -60; docker logs samba 2>&1 | tail -80' > "$OUT/setup-dc.log" 2>&1   # diagnosis when setup fails
 check "setup did not shadow the package command" "! in_box 'test -e /usr/local/bin/fabricctl'"
+check "setup wrote nothing beside the package's copy: its records are the install's (0.6.4)" \
+    "! in_box 'test -e /usr/lib/fabricctl/fabric/archive || test -e /usr/lib/fabricctl/fabric/config'"
 check "Docker comes from the Ubuntu archive, no apt source added" \
     "in_box 'dpkg -s docker.io docker-compose-v2 docker-buildx' | grep -c '^Status: install ok installed' | grep -qx 3 \
      && ! in_box 'ls /etc/apt/sources.list.d/' | grep -qv '^ubuntu.sources$'"
@@ -152,7 +172,7 @@ check "setup --undo refuses what fabric needs (accounts), naming uninstall" "gre
 
 echo "--- POSIX identities in the domain (manual 1.6.3.9)"
 check "the admin has fabric's POSIX identity in AD: a uid from the site's block, Domain Users' gid 5000" \
-    "in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=fabricadmin)' uidNumber gidNumber\" | grep -qE '^uidNumber: (500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-9][0-9]{4,5})$'"
+    "in_box \"docker exec samba ldbsearch -H /data/private/sam.ldb '(sAMAccountName=fabric-admin)' uidNumber gidNumber\" | grep -qE '^uidNumber: (500[1-9]|50[1-9][0-9]|5[1-9][0-9]{2}|[1-9][0-9]{4,5})$'"
 
 echo "--- traffic stays on the host (2.1.2.15): containers reach the DC on fabric_net's gateway"
 DC_NAME=$(in_box "python3 -c 'import yaml; print(yaml.safe_load(open(\"/opt/fabric/config/vars.yaml\"))[\"hostname_dc\"])'")
@@ -329,10 +349,11 @@ check "rfc2136.ini for the key: host IP, BIND's port ($BIND_PORT, behind the DNS
     "in_box \"grep -qx 'dns_rfc2136_server = $IP' /opt/npm/rfc2136.ini && grep -qx 'dns_rfc2136_port = $BIND_PORT' /opt/npm/rfc2136.ini && [ \\\$(stat -c %a /opt/npm/rfc2136.ini) = 600 ]\""
 
 echo "--- admin login kit"
-check "kit: .p12, passwords and root CA in ~/fabric-admin" \
-    "in_box 'cd /root/fabric-admin && ls fabricadmin.p12 p12-password.txt initial-password.txt README.txt *.crt' >/dev/null"
+check "kit: .p12, its password and root CA in ~/fabric-admin; no sign-in password written there (2.1.6.33)" \
+    "in_box 'cd /root/fabric-admin && ls fabric-admin.p12 p12-password.txt README.txt *.crt' >/dev/null \
+     && ! in_box 'test -e /root/fabric-admin/initial-password.txt'"
 check "kit: secrets are 0600" \
-    "[ \"\$(in_box 'stat -c %a /root/fabric-admin/fabricadmin.p12 /root/fabric-admin/p12-password.txt /root/fabric-admin/initial-password.txt' | sort -u)\" = 600 ]"
+    "[ \"\$(in_box 'stat -c %a /root/fabric-admin/fabric-admin.p12 /root/fabric-admin/p12-password.txt' | sort -u)\" = 600 ]"
 
 echo "--- OpenBao (core): static-seal auto-unseal, recovery keys once, AppRoles, TLS via nginx"
 check "fabricctl vault status: unsealed, static seal, raft" "in_box 'fabricctl vault status' | grep -q 'unsealed  (static seal, raft storage)'"
@@ -358,7 +379,7 @@ check "core services start and serve while OpenBao is down" \
     "in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP && ! in_box 'systemctl is-active --quiet openbao'"
 in_box 'systemctl start openbao' > /dev/null 2>&1; sleep 10
 
-echo "--- restricted sign-in: HTTPS + client cert from this CA + Keycloak OIDC/TOTP + fabric-admin role"
+echo "--- restricted sign-in: HTTPS + client cert from this CA + Keycloak OIDC/TOTP + the console's admin role"
 # A person of the site who is NOT in admins (bob), and one in auditors (carol), each with a client certificate;
 # their one-time passwords from fabric's own reset, through a root-only file
 docker cp "$REPO/tests/sandbox/make_person.py" "$NAME:/root/make_person.py"
@@ -384,7 +405,7 @@ in_box 'fabricctl vault rotate-db' > "$OUT/rotate-db.log" 2>&1
 check "fabricctl vault rotate-db: rotated, Keycloak restarted with it and healthy; doctor's rotation check passes"     "grep -q 'Keycloak restarted with it and healthy' '$OUT/rotate-db.log' && in_box 'fabricctl doctor' | grep -q 'rotated by OpenBao in the last 40 days'"
 check "the monthly fabric-db-rotate timer is on" "in_box 'systemctl is-enabled fabric-db-rotate.timer' | grep -qx enabled"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
-in_box "CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
+in_box "FABRIC_ADMIN_PW='$ADMIN_PW' CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
 in_box 'journalctl --no-pager CONTAINER_NAME=nginx | grep -iE "oidc|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
 cat > "$OUT/reset_guard.py" <<'PY'
 import sys, yaml
@@ -426,7 +447,7 @@ check "re-run re-issues no certificates" "! grep -q ': issued' '$OUT/setup2.log'
 check "re-run neither re-initialises nor changes OpenBao" \
     "! grep -q 'OpenBao initialised' '$OUT/setup2.log' && grep -q 'OpenBao configured (no changes)' '$OUT/setup2.log'"
 check "re-run keeps the admin and their certificate" \
-    "grep -q \"admin 'fabricadmin' exists\" '$OUT/setup2.log' && grep -q 'is current' '$OUT/setup2.log'"
+    "grep -q \"admin 'fabric-admin' exists\" '$OUT/setup2.log' && grep -q 'is current' '$OUT/setup2.log'"
 check "re-run keeps the images this host runs (a fabric upgrade never changes them)" \
     "[ \"\$(nginx_ref)\" = '$NGX_REF' ]"
 in_box 'fabricctl images rollback nginx' > "$OUT/images-rollback.log" 2>&1
@@ -547,9 +568,15 @@ docker cp "$DEB2" "$NAME:/root/fabricctl-new.deb"
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq /root/fabricctl-new.deb' > "$OUT/apt2.log" 2>&1
 check "newer package installs over the old one" "grep -q 'package updated' '$OUT/apt2.log'"
 check "until setup runs, commands say the package is newer" "in_box 'fabricctl status' 2>&1 | grep -q 'package is newer'"
+# what builds before 0.6.4 left beside the package's copy: one line the install has, one it lacks
+in_box 'mkdir -p /usr/lib/fabricctl/fabric/archive && tail -1 /opt/fabric/archive/audit.log > /usr/lib/fabricctl/fabric/archive/audit.log \
+        && echo "[stray] an earlier build wrote this" >> /usr/lib/fabricctl/fabric/archive/audit.log'
 in_box 'fabricctl setup --non-interactive --yes' > "$OUT/setup-upgrade.log" 2>&1
 check "setup applies the upgrade" "grep -q 'fabric is ready' '$OUT/setup-upgrade.log' && ! in_box 'fabricctl status' 2>&1 | grep -q 'package is newer'"
 check "the install runs the upgraded build" "in_box 'cmp /usr/lib/fabricctl/fabric/BUILD /opt/fabric/BUILD'"
+check "records an earlier build left beside the package's copy adopted once, the stray folder gone" \
+    "[ \"\$(in_box 'grep -cF \"[stray] an earlier build\" /opt/fabric/archive/audit.log')\" = 1 ] \
+     && ! in_box 'test -e /usr/lib/fabricctl/fabric/archive'"
 in_box 'DEBIAN_FRONTEND=noninteractive apt-get remove -y -qq fabricctl' > "$OUT/apt-remove.log" 2>&1
 check "apt remove removes the command but not the running install" \
     "! in_box 'test -e /usr/bin/fabricctl' && in_box 'systemctl is-active fabric.target' | grep -qx active && in_box 'dig +short @$IP ns.lan.test' | grep -qx $IP"

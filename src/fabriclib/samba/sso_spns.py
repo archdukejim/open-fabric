@@ -6,7 +6,7 @@ def sso_spns(v):
              false, or a read-only DC (it cannot make the account).
     Fails:   KeyError for a missing var.
     Feeds:   converge_domain."""
-    if not v.get("install_keycloak") or not v.get("signin_kerberos", True) or v.get("ad_dc_type") == "rodc":
+    if not v.get("install_keycloak") or not v.get("signin_kerberos", False) or v.get("ad_dc_type") == "rodc":
         return []
     names = [v["hostname_keycloak"], f"{v['hostname']}.{v['domain']}".lower()]
     return [f"HTTP/{n}" for n in dict.fromkeys(names)]

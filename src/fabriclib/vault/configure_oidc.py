@@ -2,7 +2,9 @@ import os
 
 from fabriclib.common.errors import ValidationError
 from fabriclib.vault.common.bao_request import bao_request
-from fabriclib.vault.constants import OIDC_BUNDLE_POLICIES, OIDC_CLIENT_ID, OIDC_MOUNT, OIDC_ROLE
+from fabriclib.rbac.permissions import ADMIN_ROLE
+from fabriclib.vault.constants import (OIDC_BUNDLE_POLICIES, OIDC_CLIENT_ID, OIDC_MOUNT, OIDC_ROLE,
+                                      RETIRED_NAMES)
 
 
 def _call(v, token, method, path, body=None):
@@ -21,7 +23,7 @@ def _call(v, token, method, path, body=None):
 def configure_oidc(v, token, client_secret):
     """Purpose: converge sign-in with Keycloak (OIDC) for people using OpenBao's own UI, bundles mapped to policies.
     Inputs:  v — vars: deploy_base_dir (reads stepca/data/certs/root_ca.crt), hostname_keycloak, webui_realm (else
-               domain), hostname_openbao (redirect URI), webui_admin_role (default "fabric-admin");
+               domain), hostname_openbao (redirect URI), webui_admin_role (default "fabric-console-admin");
              token — a fabric-setup token; client_secret — the fabric-openbao Keycloak client's secret.
     Returns: list of changes made (str), e.g. "OIDC auth", "OIDC config", "group <bundle>"; empty when all was in
              place (the config itself is always rewritten).
@@ -54,7 +56,7 @@ def configure_oidc(v, token, client_secret):
     # The client secret is never read back, so the config is always written (idempotent).
     _call(v, token, "POST", f"auth/{OIDC_MOUNT}/config", config)
     base = f"https://{v['hostname_openbao']}"
-    bundles = {(v.get("webui_admin_role", "fabric-admin") if b == "admin" else b): policy
+    bundles = {(v.get("webui_admin_role", ADMIN_ROLE) if b == "admin" else b): policy
                for b, policy in OIDC_BUNDLE_POLICIES.items()}
     _call(v, token, "POST", f"auth/{OIDC_MOUNT}/role/{OIDC_ROLE}", {
         "role_type": "oidc", "user_claim": "preferred_username", "oidc_scopes": ["openid"],
@@ -76,4 +78,11 @@ def configure_oidc(v, token, client_secret):
         if alias.get("name") != bundle or alias.get("mount_accessor") != accessor:
             _call(v, token, "POST", "identity/group-alias", {"name": bundle, "mount_accessor": accessor,
                                                               "canonical_id": gid})
+    for name in RETIRED_NAMES:                    # 2.1.6.33: the sign-in role and admin group before the rename
+        if name != OIDC_ROLE and bao_request(v, "GET", f"auth/{OIDC_MOUNT}/role/{name}", token=token)[0] == 200:
+            _call(v, token, "DELETE", f"auth/{OIDC_MOUNT}/role/{name}")
+            changes.append(f"role {name} removed (renamed {OIDC_ROLE})")
+        if name not in bundles and bao_request(v, "GET", f"identity/group/name/{name}", token=token)[0] == 200:
+            _call(v, token, "DELETE", f"identity/group/name/{name}")
+            changes.append(f"group {name} removed (renamed)")
     return changes

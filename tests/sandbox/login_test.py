@@ -2,18 +2,19 @@
 """Real end-to-end web UI sign-in tests, run inside the sandbox after setup.
 
 Drives the real stack like a browser — nginx (TLS + client certificate) ->
-web UI -> Keycloak (password, forced password change, TOTP) -> OIDC
+web UI -> Keycloak (password, TOTP; a forced change after a reset) -> OIDC
 callback -> dashboard — using only what setup and `fabricctl client-cert`
 handed out. Proves the admin gets in and that everyone else is refused:
 
   - plain HTTP is redirected to HTTPS
   - no client certificate / a certificate from another CA  -> nginx 400
-  - a real directory user without the fabric-admin role   -> 403
+  - a real directory user without the console's admin role -> 403
   - a valid certificate presented for another user        -> 403
-  - the initial password stops working after the first login
+  - the admin's password: the one chosen in setup (FABRIC_ADMIN_PW, no change asked), or a reset's one-time
+    password from the kit, which stops working after the first login
   - a directory group gives a role bundle: an auditor reads, a change is refused
   - OpenBao's own UI: the admin signs in with Keycloak (TOTP) and gets the
-    fabric-admin policy (apps/ yes, fabric's own secrets no); others refused
+    fabric-console-admin policy (apps/ yes, fabric's own secrets no); others refused
   - people: the admin adds a person and resets a sign-in
 
   python3 login_test.py <vars.yaml> <other-user> <other-password> <other-p12-password>
@@ -41,6 +42,7 @@ import yaml
 V = yaml.safe_load(open(sys.argv[1]))
 OTHER, OTHER_PW, OTHER_P12_PW = sys.argv[2], sys.argv[3], sys.argv[4]
 ADMIN = V["webui_admin_user"]
+CHOSEN = bool(os.environ.get("FABRIC_ADMIN_PW"))   # the password chosen in setup (2.1.6.33), not a reset's
 # The login kit lands in the home of the account that ran `sudo fabricctl setup`.
 KIT = os.environ.get("FABRIC_KIT") or os.path.join(os.path.expanduser("~"), "fabric-admin")
 ROOT_CA = os.path.join(V["deploy_base_dir"], "stepca", "data", "certs", "root_ca.crt")
@@ -58,6 +60,10 @@ def check(name, cond, detail=""):
 
 def read(name):
     return open(os.path.join(KIT, name)).read().strip()
+
+
+def admin_pw():
+    return os.environ.get("FABRIC_ADMIN_PW") or read("initial-password.txt")
 
 
 def pem_from_p12(p12, password, name):
@@ -204,7 +210,7 @@ def vault_login(user, password):
     b = Browser()
     cb = f"https://{VAULT}/ui/vault/auth/oidc/oidc/callback"
     st, _, page = b.request("POST", f"https://{VAULT}/v1/auth/oidc/oidc/auth_url",
-                            json_body={"role": "fabric-admin", "redirect_uri": cb})
+                            json_body={"role": "people", "redirect_uri": cb})
     url = (json.loads(page).get("data") or {}).get("auth_url") if page.startswith("{") else ""
     if not url:
         return st, page
@@ -221,9 +227,10 @@ if os.environ.get("SIGNIN_MODE") == "plain":
     st, loc, _ = b.request("GET", f"https://{MGR}/")
     check("no certificate asked: a newcomer is sent to sign in (/login), not refused", st == 303 and
           loc.endswith("/login"), (st, loc))
-    st, page, seen = login(b, ADMIN, read("initial-password.txt"))
-    check("the admin signs in with a password only: a new password asked, no TOTP (2.1.6.23)",
-          st == 200 and "update-password" in seen and "configure-totp" not in seen and "otp" not in seen, (st, seen))
+    st, page, seen = login(b, ADMIN, admin_pw())
+    check("the admin signs in with a password only, no TOTP (2.1.6.23); a new password asked only after a reset "
+          "(2.1.6.33)", st == 200 and ("update-password" in seen) != CHOSEN and "configure-totp" not in seen
+          and "otp" not in seen, (st, seen))
     st, _, page = b.request("GET", f"https://{MGR}/security")
     check("the Security page shows the layers to raise", st == 200 and "admin-2fa" in page, st)
     bob = Browser()
@@ -257,11 +264,11 @@ check("certificate from another CA (even with the admin's name) -> refused", st 
 b = Browser(admin_pem)
 st, loc, _ = b.request("GET", f"https://{MGR}/")
 check("admin cert, no session -> /login", st == 303 and loc.endswith("/login"), (st, loc))
-st, page, seen = login(b, ADMIN, read("initial-password.txt"))
-check("Keycloak required a new password and TOTP enrolment",
-      [p for p in seen if p != "no-kerberos"][:1] == ["login"] and "update-password" in seen
+st, page, seen = login(b, ADMIN, admin_pw())
+check("Keycloak required TOTP enrolment (and a new password only after a reset)",
+      [p for p in seen if p != "no-kerberos"][:1] == ["login"] and ("update-password" in seen) != CHOSEN
       and "configure-totp" in seen, seen)
-check("admin: callback accepted (cert CN = user, fabric-admin role)",
+check("admin: callback accepted (cert CN = user, the console's admin role)",
       st == 200 and "__Host-webui" in b.cookies.get(MGR, {}), (st, page[:300]))
 st, _, page = b.request("GET", f"https://{MGR}/")
 check("admin: overview renders", st == 200 and "services healthy" in page and ADMIN in page, (st, page[:300]))
@@ -273,11 +280,11 @@ check(f"'{OTHER}' (directory user, not in admins) with own valid cert -> 403 mis
 st, page, _ = login(Browser(admin_pem), OTHER, OTHER_PW)
 check(f"admin's certificate used to sign in as '{OTHER}' -> 403 not your certificate",
       st == 403 and "does not belong" in page, (st, page[:300]))
-st, page, _ = login(Browser(other_pem), ADMIN, NEW_PW.get(ADMIN, ""))
+st, page, _ = login(Browser(other_pem), ADMIN, NEW_PW.get(ADMIN, admin_pw()))
 check(f"'{OTHER}''s certificate used to sign in as the admin -> 403 not your certificate",
       st == 403 and "does not belong" in page, (st, page[:300]))
 
-# -- the initial password is dead -------------------------------------------------------
+# -- the reset's one-time password is dead (a chosen one: a wrong password is refused) ----
 fresh = Browser(admin_pem)
 st, loc, _ = fresh.request("GET", f"https://{MGR}/login")
 st, loc, page = fresh.request("GET", loc)
@@ -285,9 +292,10 @@ action, fields = form_of(page)
 if set(fields) == {"continue"}:                   # Kerberos asked for and none given: on to the password form
     st, loc, page = fresh.request("POST", action, fields)
     action, fields = form_of(page)
-fields.update(username=ADMIN, password=read("initial-password.txt"))
+fields.update(username=ADMIN, password=admin_pw() + "x" if CHOSEN else read("initial-password.txt"))
 st, loc, page = fresh.request("POST", action, fields)
-check("initial password no longer accepted", st == 200 and "Invalid" in page, (st, loc))
+check("a wrong password is refused" if CHOSEN else "initial password no longer accepted",
+      st == 200 and "Invalid" in page, (st, loc))
 
 # -- a role bundle through a directory group (real Keycloak composite roles) --------------
 if os.environ.get("CAROL_PW"):
@@ -306,7 +314,7 @@ if os.environ.get("CAROL_PW"):
           (st, page[:300]))
 
 # -- OpenBao's own UI with Keycloak single sign-on ---------------------------------------
-st, res = vault_login(ADMIN, read("initial-password.txt"))
+st, res = vault_login(ADMIN, NEW_PW.get(ADMIN, admin_pw()))
 token = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) else None
 
 
@@ -315,8 +323,8 @@ def policies(res):
     return set(auth.get("policies") or []) | set(auth.get("identity_policies") or [])
 
 
-check("OpenBao UI: the admin signs in with Keycloak (TOTP) and gets the fabric-admin policy (bundle group)",
-      st == 200 and token and "fabric-admin" in policies(res), (st, str(res)[:300]))
+check("OpenBao UI: the admin signs in with Keycloak (TOTP) and gets the fabric-console-admin policy (bundle group)",
+      st == 200 and token and "fabric-console-admin" in policies(res), (st, str(res)[:300]))
 vb = Browser()
 if token:
     st, _, _ = vb.request("POST", f"https://{VAULT}/v1/apps/data/sandbox/probe", json_body={"data": {"v": "1"}},
@@ -331,8 +339,8 @@ check(f"OpenBao UI: '{OTHER}' (no admin role) is refused", st in (400, 403) and 
 if os.environ.get("CAROL_PW"):
     st, res = vault_login("carol", NEW_PW.get("carol", os.environ["CAROL_PW"]))
     ctok = (res.get("auth") or {}).get("client_token") if isinstance(res, dict) else None
-    check("OpenBao UI: carol (auditor bundle) gets fabric-auditor, not fabric-admin",
-          st == 200 and "fabric-auditor" in policies(res) and "fabric-admin" not in policies(res), (st, str(res)[:300]))
+    check("OpenBao UI: carol (auditor bundle) gets fabric-auditor, not fabric-console-admin",
+          st == 200 and "fabric-auditor" in policies(res) and "fabric-console-admin" not in policies(res), (st, str(res)[:300]))
     if ctok:
         st1, _, page = vb.request("LIST", f"https://{VAULT}/v1/apps/metadata", token=ctok)
         st2, _, _ = vb.request("GET", f"https://{VAULT}/v1/apps/data/sandbox/probe", token=ctok)
@@ -345,7 +353,7 @@ NEW = os.environ.get("NEW_PERSON", "dave")
 st, _, page = b.request("GET", f"https://{MGR}/directory?view=people")
 if st == 303:       # the admin's session went idle (session_idle, 900 s) during the slower checks above
     print("    (admin session idle-expired; signing in again)")
-    login(b, ADMIN, NEW_PW.get(ADMIN, ""))
+    login(b, ADMIN, NEW_PW.get(ADMIN, admin_pw()))
     st, _, page = b.request("GET", f"https://{MGR}/directory?view=people")
 csrf = page.split('name="csrf" value="')[1].split('"')[0] if 'name="csrf"' in page else ""
 if not csrf or "/directory/people/_new" not in page:     # what the People page showed instead of its forms

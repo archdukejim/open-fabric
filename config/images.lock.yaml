@@ -88,7 +88,7 @@ published:
     keycloak:   {var: image_fabric_keycloak, tag: "0.6.3-rc.64", digest: "sha256:3960020673c91570df1a545540faa3ac5c8ae8c526a06e509257bfe58cca5f0a", source: "sha256:959fee075a7826341979c0d03be1041f3030429677424512af8d9af92a223f2c"}
     samba:      {var: image_fabric_samba, tag: "0.6.3-rc.64", digest: "sha256:a3a2e684b01cd29ad9a3afcfe57021b13b1195b93ce48873bcaef96eeba7fdf7", source: "sha256:bc9d2e8b51a78105d939031954ae237c63a1e5ca8b762f8545c8bbcf2e239af0", groups: "BIND_GID=600,RADIUS_GID=610"}
     stepca:     {var: image_fabric_stepca, tag: "0.6.3-rc.64", digest: "sha256:604df3205e916f9be1a720b7430574016f1ad1377f2f0f9b2662a1bd2fad2e7b", source: "sha256:c1cfad746580c5a98afc2a1268448efbdb2b610024d2e5adeda45db85175f20e"}
-    webui:      {var: image_fabric_webui, tag: "0.6.3-rc.64", digest: "sha256:7ace53d6659c577e6667f62171d1254f2f5868606c49f23c8b17d9a0fbf4f795", source: "sha256:600113c57cf41abcc4e14acf30cf323fd24b1ab713611a2e1baea1df8c614aed", account: webui, ids: "606:606"}
+    webui:      {var: image_fabric_webui, tag: "", digest: "", pending: "its sources changed since 0.6.3-rc.64 (the OpenBao page names fabric-console-admin, 2.1.6.33): built and published again with 0.6.4", account: webui, ids: "606:606"}
 
 # Packages installed into fabric's own images from an upstream's signed apt
 # repository (not Debian's): the exact version and the signing key's

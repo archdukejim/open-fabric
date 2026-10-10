@@ -202,7 +202,7 @@ sudo umount /mnt</pre>
 {% else %}<p><span class="light bad"></span> Not readable now{% if s.error %}: {{ s.error }}{% endif %}.</p>{% endif %}
 </section>
 <section class="card"><h2>Your applications' secrets</h2>
-<p class="muted">Browse, edit and version secrets under <code>apps/</code> in OpenBao's own UI. Sign in with Keycloak (method OIDC, your web UI account and TOTP); the web UI admin role gets the <code>fabric-admin</code> policy.</p>
+<p class="muted">Browse, edit and version secrets under <code>apps/</code> in OpenBao's own UI. Sign in with Keycloak (method OIDC, your web UI account and TOTP); the web UI admin role gets the <code>fabric-console-admin</code> policy.</p>
 <p><a class="btn" href="{{ s.url }}ui/vault/auth?with=oidc" target="_blank" rel="noopener">Open OpenBao</a></p>
 <p class="muted small">If nobody can sign in (Keycloak down): <code>sudo fabricctl vault break-glass</code> with the recovery keys gives a root token; revoke it with <code>sudo fabricctl vault revoke-token</code>.</p>
 </section>

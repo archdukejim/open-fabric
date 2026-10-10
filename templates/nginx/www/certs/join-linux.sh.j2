@@ -178,7 +178,7 @@ if [[ -d /etc/chrony/sources.d ]]; then
     chronyc reload sources >/dev/null 2>&1 || true
 fi
 
-{% if install_keycloak | default(false) | bool and signin_kerberos | default(true) | bool %}
+{% if install_keycloak | default(false) | bool and signin_kerberos | default(false) | bool %}
 # browsers (manual 2.3.6.2.6.5, 2.1.6.28): Firefox, Chromium and Chrome may use the logon's Kerberos ticket for
 # {{ hostname_keycloak }}, so fabric's sign-in asks no password here. Firefox's policies are merged, never replaced.
 SSO_HOST="{{ hostname_keycloak }}"
