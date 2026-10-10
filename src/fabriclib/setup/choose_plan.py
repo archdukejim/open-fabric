@@ -93,7 +93,7 @@ def choose_plan(ctx):
     """Purpose: show what setup will do (every default is the hardened choice), then Proceed / Advanced / Quit.
              Advanced holds only what cannot be changed later (2.1.2.16): the CA root's lifetime, before the CA
              exists; without it there is no Advanced. Everything else shown is a default changed after the install
-             (fabricctl, the vars editor; the web console's settings page from 0.7).
+             (fabricctl, the vars editor; the web console's settings page after 0.7, 2.1.1.42).
     Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
              webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
     Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
