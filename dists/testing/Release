@@ -1,0 +1,29 @@
+Origin: open-fabric
+Label: fabric
+Suite: testing
+Codename: testing
+Date: Sat, 10 Oct 2026 13:17:30 UTC
+Architectures: amd64 arm64
+Components: main
+Description: fabric release candidates, for testing before a release (manual 3.14.1)
+MD5Sum:
+ 24f89fd661c9616dff753e8b233efa5b 1297 main/binary-amd64/Packages
+ abca294f625f6fd533fe75b52ae77c8d 830 main/binary-amd64/Packages.gz
+ 80c7d9dc59f36441600853376d6d0328 172 main/binary-amd64/Release
+ 24f89fd661c9616dff753e8b233efa5b 1297 main/binary-arm64/Packages
+ abca294f625f6fd533fe75b52ae77c8d 830 main/binary-arm64/Packages.gz
+ ae50d7be3ed1b936b771e3543987f7e7 172 main/binary-arm64/Release
+SHA1:
+ ff1ce01c15684c9cc2b94f7457a08021389ee8a0 1297 main/binary-amd64/Packages
+ b9cdda5186ddf38c8803e25dcbcabdb81ec34b70 830 main/binary-amd64/Packages.gz
+ 05b64b30b3fd16a02b00ce5684dafd142914fb33 172 main/binary-amd64/Release
+ ff1ce01c15684c9cc2b94f7457a08021389ee8a0 1297 main/binary-arm64/Packages
+ b9cdda5186ddf38c8803e25dcbcabdb81ec34b70 830 main/binary-arm64/Packages.gz
+ a2cb9d093193c3c040907b7913b7a082511dfbec 172 main/binary-arm64/Release
+SHA256:
+ b10c629e3cdee4c12792020030888eb933a90584e3cdc98779235df117ed81ec 1297 main/binary-amd64/Packages
+ e946daf82bfe525b3146df963ea17cb264c519d2f6e3ba33f68b87dc003668c5 830 main/binary-amd64/Packages.gz
+ e9cc8027e8c65c30698a50462453eaf72f991acf5bcddfb1f5eca0a465c42e09 172 main/binary-amd64/Release
+ b10c629e3cdee4c12792020030888eb933a90584e3cdc98779235df117ed81ec 1297 main/binary-arm64/Packages
+ e946daf82bfe525b3146df963ea17cb264c519d2f6e3ba33f68b87dc003668c5 830 main/binary-arm64/Packages.gz
+ a21ad7d86dd37fdfdedcb8878c612a32acf0a1c9e9db3d4f6657fc04c095528b 172 main/binary-arm64/Release
