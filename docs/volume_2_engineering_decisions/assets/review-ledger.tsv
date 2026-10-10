@@ -545,7 +545,7 @@ src/fabriclib/dns/builtin_acls.py	d717f787cb20c83fc3606faa4f6dcd5e3473e566	2026-
 src/fabriclib/dns/constants.py	51cffa3c39c6fe0ff6050f16916f929f9a716cf5	2026-09-30	
 src/fabriclib/dns/create_zone_tsig_key.py	a79d0069466e2335014ae53e5b2134078ca5f8b6	2026-10-03	
 src/fabriclib/dns/find_changed_zones.py	f24d107e56c6d530e23753e24910964ff94e3ec9	2026-10-02	
-src/fabriclib/dns/format_value.py	5601768740c3fef11f8adb241061baacd34fa845	2026-10-03	
+src/fabriclib/dns/format_value.py	f896fd8cfb7ecded73e3cc7f4439a50f9272be66	2026-10-10	
 src/fabriclib/dns/install_zone_file.py	e89f2592855190a0e041b1ac95cb3e2a089d79db	2026-10-02	
 src/fabriclib/dns/list_tsig_keys.py	d74bd7c6b6659818c55d651f855fe2b42851c511	2026-10-03	
 src/fabriclib/dns/list_zones.py	09456a9d9cc27252f8ee05362fbe654143b641f0	2026-10-03	
