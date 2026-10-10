@@ -8,6 +8,7 @@ from webui.agentclient.add_radius_client import add_radius_client  # noqa: F401
 from webui.agentclient.add_record import add_record  # noqa: F401
 from webui.agentclient.add_reservation import add_reservation  # noqa: F401
 from webui.agentclient.add_subnet import add_subnet  # noqa: F401
+from webui.agentclient.set_dhcp_on import set_dhcp_on  # noqa: F401
 from webui.agentclient.apply_changes import apply_changes  # noqa: F401
 from webui.agentclient.audit import audit  # noqa: F401
 from webui.agentclient.raise_signin_layer import raise_signin_layer  # noqa: F401

@@ -10,9 +10,11 @@ from fabriclib.dhcp.list_leases import list_leases
 from fabriclib.dhcp.remove_client_class import remove_client_class
 from fabriclib.dhcp.remove_reservation import remove_reservation
 from fabriclib.dhcp.remove_subnet import remove_subnet
+from fabriclib.dhcp.set_dhcp_on import set_dhcp_on
 from fabriclib.dhcp.set_option import set_option
 from fabriclib.dhcp.unset_option import unset_option
 from fabriclib.dhcp.update_subnet import KEEP, update_subnet
+from fabriclib.security.refresh_firewall import refresh_firewall
 from fabriclib.system.apply_changes import apply_changes
 
 
@@ -45,21 +47,26 @@ def _where(data):
 
 
 def post_dhcp(route, actor, data):
-    """Purpose: DHCP changes from the Kea tab, each saved and applied at once (manual 1.10.2.5):
-             POST /v1/dhcp/reservations[/<mac>/delete], /v1/dhcp/subnets, /v1/dhcp/subnets/update,
-             /v1/dhcp/subnets/delete, /v1/dhcp/options, /v1/dhcp/options/delete, /v1/dhcp/classes,
-             /v1/dhcp/classes/<name>/delete.
-    Inputs:  route — segments after /v1/; actor — the verified user; data — the body: mac, ip, hostname
-             (reservations); network, name, vlan, router, pools, notes, allow_overlap (add); subnet (name or
-             network), name, vlan, router, notes, allow_overlap, add_pools, remove_pools (update; a field left out
-             stays, "" clears it); subnet, force
+    """Purpose: DHCP changes from the Kea tab, each saved and applied at once, the host firewall then brought in line
+             (refresh_firewall: the change is the admin's yes to the rules it implies; manual 1.10.2.5, 1.10.3.5):
+             POST /v1/dhcp/on, /v1/dhcp/off, /v1/dhcp/reservations[/<mac>/delete], /v1/dhcp/subnets,
+             /v1/dhcp/subnets/update, /v1/dhcp/subnets/delete, /v1/dhcp/options, /v1/dhcp/options/delete,
+             /v1/dhcp/classes, /v1/dhcp/classes/<name>/delete.
+    Inputs:  route — segments after /v1/; actor — the verified user; data — the body: interface, subnet, pool,
+             router (on, when DHCP has no settings yet); mac, ip, hostname (reservations); network, name, vlan,
+             router, pools, notes, allow_overlap (add); subnet (name or network), name, vlan, router, notes,
+             allow_overlap, add_pools, remove_pools (update; a field left out stays, "" clears it); subnet, force
              (delete); option, data, subnet | class | mac, always_send (options); name, test, next_server,
              boot_file (classes).
-    Returns: the saved item, with "applied" (bool) and the last 2000 characters of the apply's output.
+    Returns: the saved item, with "applied" (bool: the apply and the firewall both done) and the last 2000
+             characters of their output.
     Fails:   ValidationError from the readers and fabriclib (-> 400); RouteNotFound for another route.
     Feeds:   agent/post_route.py."""
     sub = route[1:]
-    if sub == ["reservations"]:
+    if sub in (["on"], ["off"]):
+        result = {"dhcp": set_dhcp_on(actor, sub == ["on"], read_text(data, "interface"), read_text(data, "subnet"),
+                                      read_text(data, "pool"), read_text(data, "router"), source="web")}
+    elif sub == ["reservations"]:
         result = {"reservation": add_reservation(actor, read_text(data, "mac"), read_text(data, "ip"),
                                                  read_text(data, "hostname"), source="web")}
     elif len(sub) == 3 and sub[0] == "reservations" and sub[2] == "delete":
@@ -101,4 +108,7 @@ def post_dhcp(route, actor, data):
     else:
         raise RouteNotFound()
     ok, output = apply_changes(actor, source="web")
+    if ok:
+        ok, more = refresh_firewall()
+        output += "\n" + more
     return {**result, "applied": ok, "output": output[-2000:]}

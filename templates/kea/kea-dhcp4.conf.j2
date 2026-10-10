@@ -25,8 +25,10 @@
     "ddns-replace-client-name": "when-not-present",
     "ddns-generated-prefix": "dhcp",
     "ddns-conflict-resolution-mode": "check-with-dhcid",
-    // a renewal registers again: what BIND lost while down comes back (2.1.10.7)
+    // a renewal registers again: what BIND lost while down comes back (2.1.10.7); lease caching would reuse a
+    // recent lease without any update, so it is off (one lease-file write per renewal)
     "ddns-update-on-renew": true,
+    "cache-threshold": 0.0,
     "hostname-char-set": "[^A-Za-z0-9.-]",
     "hostname-char-replacement": "-",
 {% endif %}

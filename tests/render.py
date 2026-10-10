@@ -429,6 +429,9 @@ assert dhcp_reverse_zones({**kv, "dhcp": wide}) == ["0.50.10.in-addr.arpa", "1.5
                                                     "2.50.10.in-addr.arpa"], "a pool across /24s: each zone"
 rz = reverse_zones(lab)["zones"]
 assert rz.get("0.20.10.in-addr.arpa") == [], "a DHCP zone with no static record is still generated"
+rzf = env.get_template("bind9/data/reverse-zone.j2").render(**{**lab, "reverse_zone_name": "0.20.10.in-addr.arpa",
+                                                            "ptr_records": []})
+assert re.search(r"^\s+300 ; Negative caching TTL", rzf, re.M), "a DHCP zone caches 'no such name' briefly"
 zconf = env.get_template("bind9/config/named.conf.zones.j2").render(
     **{**secrets, **lab, "tsig_keys": [], "tsig_secrets": {}, "reverse_zone_names": list(rz)})
 lz = zconf[zconf.index('zone "0.20.10.in-addr.arpa"'):]
@@ -444,6 +447,9 @@ assert [x["name"] for x in dd["reverse-ddns"]["ddns-domains"]] == [z + "." for z
 assert all(x["key-name"] == "kea-ddns" for x in dd["reverse-ddns"]["ddns-domains"])
 assert json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2").render(**lab).splitlines()
                             if not ln.strip().startswith("//")))["Dhcp4"]["ddns-update-on-renew"] is True
+assert json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2").render(**lab).splitlines()
+                            if not ln.strip().startswith("//")))["Dhcp4"]["cache-threshold"] == 0.0, \
+    "no lease caching: a reused lease would skip the update"
 print("DHCP's reverse DNS: the pools' zones generated even empty, Kea's key granted PTR and DHCID there only, Kea's "
       "reverse domains, registration again on renewal")
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]

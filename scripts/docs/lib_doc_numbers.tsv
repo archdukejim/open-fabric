@@ -194,6 +194,7 @@ file	fabriclib-dhcp|src/fabriclib/dhcp/remove_client_class.py	20
 file	fabriclib-dhcp|src/fabriclib/dhcp/remove_reservation.py	21	
 file	fabriclib-dhcp|src/fabriclib/dhcp/remove_subnet.py	22	
 file	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py	23	
+file	fabriclib-dhcp|src/fabriclib/dhcp/set_dhcp_on.py	31	
 file	fabriclib-dhcp|src/fabriclib/dhcp/set_option.py	24	
 file	fabriclib-dhcp|src/fabriclib/dhcp/unset_option.py	25	
 file	fabriclib-dhcp|src/fabriclib/dhcp/update_subnet.py	26	
@@ -527,6 +528,7 @@ file	fabriclib-security|src/fabriclib/security/check_signin_lowering.py	10
 file	fabriclib-security|src/fabriclib/security/firewall_rules.py	2	
 file	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py	3	
 file	fabriclib-security|src/fabriclib/security/host_own_rules.py	12	
+file	fabriclib-security|src/fabriclib/security/refresh_firewall.py	13	
 file	fabriclib-security|src/fabriclib/security/run_security_command.py	7	
 file	fabriclib-security|src/fabriclib/security/set_signin_layer.py	8	
 file	fabriclib-security|src/fabriclib/security/signin_layers.py	9	
@@ -706,6 +708,7 @@ file	webui|src/webui/agentclient/save_device.py	41
 file	webui|src/webui/agentclient/save_role.py	42	
 file	webui|src/webui/agentclient/security_layers.py	133	
 file	webui|src/webui/agentclient/service_status.py	43	
+file	webui|src/webui/agentclient/set_dhcp_on.py	152	
 file	webui|src/webui/agentclient/set_option.py	44	
 file	webui|src/webui/agentclient/sign_csr.py	45	
 file	webui|src/webui/agentclient/start_job.py	142	
@@ -1124,6 +1127,7 @@ function	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py|_parse	2
 function	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py|_show	4	
 function	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py|_vlan	3	
 function	fabriclib-dhcp|src/fabriclib/dhcp/run_dhcp_command.py|run_dhcp_command	6	
+function	fabriclib-dhcp|src/fabriclib/dhcp/set_dhcp_on.py|set_dhcp_on	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/set_option.py|set_option	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/unset_option.py|unset_option	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/update_subnet.py|update_subnet	1	
@@ -1573,6 +1577,7 @@ function	fabriclib-security|src/fabriclib/security/check_signin_lowering.py|chec
 function	fabriclib-security|src/fabriclib/security/firewall_rules.py|firewall_rules	1	
 function	fabriclib-security|src/fabriclib/security/hardened_daemon_settings.py|hardened_daemon_settings	1	
 function	fabriclib-security|src/fabriclib/security/host_own_rules.py|host_own_rules	1	
+function	fabriclib-security|src/fabriclib/security/refresh_firewall.py|refresh_firewall	1	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_actor	2	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_confirm	3	
 function	fabriclib-security|src/fabriclib/security/run_security_command.py|_lowered	1	0.6.0 / 2026-10-07
@@ -1881,6 +1886,7 @@ function	webui|src/webui/agentclient/save_device.py|save_device	1
 function	webui|src/webui/agentclient/save_role.py|save_role	1	
 function	webui|src/webui/agentclient/security_layers.py|security_layers	1	
 function	webui|src/webui/agentclient/service_status.py|service_status	1	
+function	webui|src/webui/agentclient/set_dhcp_on.py|set_dhcp_on	1	
 function	webui|src/webui/agentclient/set_option.py|set_option	1	
 function	webui|src/webui/agentclient/sign_csr.py|sign_csr	1	
 function	webui|src/webui/agentclient/start_job.py|start_job	1	
