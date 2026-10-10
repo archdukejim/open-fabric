@@ -1,6 +1,52 @@
 {% extends "base.html" %}
 {% macro csrf() %}<input type="hidden" name="csrf" value="{{ ctx.csrf }}">{% endmacro %}
-{% macro rule_button(kind, name, label) %}{% if can('dns:filter') %}<form method="post" action="/dns-filter/rules">{{ csrf() }}<input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="name" value="{{ name }}"><input type="hidden" name="back" value="querylog"><button class="ghost">{{ label }}</button></form>{% endif %}{% endmacro %}
+{# from a query-log line: the rule goes to the line's group (its view), or to everyone #}
+{% macro rule_button(kind, name, label, view) %}{% if can('dns:filter') %}<form method="post" action="/dns-filter/rules">{{ csrf() }}<input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="name" value="{{ name }}"><input type="hidden" name="group" value="{{ '' if view == 'everyone' else view }}"><input type="hidden" name="back" value="querylog"><button class="ghost" title="{{ label }} for {{ view }}">{{ label }}</button></form>{% endif %}{% endmacro %}
+{% macro zone_label(zone, list) %}{{ list or {'owner.rpz': 'your rules', 'fabric.rpz': "fabric's name", 'safesearch-strict.rpz': 'safe search', 'safesearch-ytmoderate.rpz': 'safe search'}.get(zone, ("the group's rules" if zone and zone.startswith('group-') else zone)) }}{% endmacro %}
+{% macro hidden_group(group, back) %}<input type="hidden" name="group" value="{{ group }}"><input type="hidden" name="back" value="{{ back }}">{% endmacro %}
+{# Strict safe search: one switch, the sites it covers named from fabric's own table (manual 1.12.2.15) #}
+{% macro safe_search(group, on, youtube, back) %}
+<form method="post" action="/dns-filter/safe-search" class="stack">{{ csrf() }}{{ hidden_group(group, back) }}
+<label class="check"><input type="checkbox" name="on"{{ ' checked' if on }}{{ ' disabled' if not can('dns:filter') }}> <strong>Strict safe search</strong></label>
+<p class="muted small">Switched on, every one of these answers only its safe results, for HTTPS too:
+{% for e in d.safe_search_sites.engines %}{{ e.engine }} ({{ e.names }} {{ 'site' if e.names == 1 else 'sites' }}){{ ', ' if not loop.last else '. ' }}{% endfor %}
+Not covered (no way to force it through DNS): {{ d.safe_search_sites.not_covered | join(', ') }}; block them with a rule if they must not be used.</p>
+<label>YouTube<select name="youtube"{{ ' disabled' if not can('dns:filter') }}><option value="strict"{{ ' selected' if youtube == 'strict' }}>strict</option><option value="moderate"{{ ' selected' if youtube == 'moderate' }}>moderate</option></select></label>
+{% if can('dns:filter') %}<div><button>Save safe search</button></div>{% endif %}</form>
+{% endmacro %}
+{% macro lists_table(lists, group, back) %}
+{% if lists %}<table><thead><tr><th>List</th><th>Fetched</th><th>Good copy</th><th class="num">Rules</th><th class="num">Skipped</th><th class="num">Memory</th><th></th></tr></thead><tbody>
+{% for l in lists %}<tr><td>{{ l.name }}<br><span class="muted small">{{ l.url }}</span>{% if l.error %}<br><span class="bad-text small">{{ l.error }}</span>{% endif %}{% if l.left_out %}<br><span class="pill warn">left out: it would pass the resolver's memory limit</span>{% endif %}</td>
+<td>{{ ago(l.last_fetch) }}</td><td>{% if l.last_success %}{{ ago(l.last_success) }}{% else %}<span class="pill warn">none yet</span>{% endif %}</td>
+<td class="num">{{ l.rules or '—' }}</td><td class="num">{{ l.skipped if l.skipped is not none else '—' }}</td><td class="num">{{ ('~' ~ l.memory_mb ~ ' MiB') if l.memory_mb is not none else '—' }}</td>
+<td class="num">{% if can('dns:filter') %}<form method="post" action="/dns-filter/lists/delete">{{ csrf() }}{{ hidden_group(group, back) }}<input type="hidden" name="url" value="{{ l.url }}"><button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}
+</tbody></table>{% endif %}
+{% endmacro %}
+{% macro catalogue(group, back, skip) %}
+{% set offered = d.catalogue.lists | rejectattr('url', 'in', skip) | list %}
+{% if offered %}<p class="muted small">AdGuard's registry, read {{ ago(d.catalogue.fetched) }}. Each list adds to the resolver's memory: see its size once fetched.</p>
+{% for cat in ['General', 'Security', 'Regional', 'Other'] %}{% set items = offered | selectattr('group', 'equalto', cat) | list %}{% if items %}
+<details{{ ' open' if cat == 'General' and not group }}><summary>{{ cat }} <span class="muted">({{ items | length }})</span></summary>
+<table><tbody>{% for c in items %}<tr><td><strong>{{ c.name }}</strong><br><span class="muted small">{{ c.description }}</span>{% if c.homepage %} <a class="small" href="{{ c.homepage }}" rel="noopener noreferrer" target="_blank">home page</a>{% endif %}</td>
+<td class="num"><form method="post" action="/dns-filter/lists">{{ csrf() }}{{ hidden_group(group, back) }}<input type="hidden" name="name" value="{{ c.name }}"><input type="hidden" name="url" value="{{ c.url }}"><button>Add</button></form></td></tr>{% endfor %}</tbody></table>
+</details>{% endif %}{% endfor %}
+{% else %}<p class="blank">The catalogue has not been read yet: <em>Fetch every list now</em> (Lists) reads it.</p>{% endif %}
+<details><summary>Add a list by its URL</summary>
+<form method="post" action="/dns-filter/lists" class="grid">{{ csrf() }}{{ hidden_group(group, back) }}
+<label>Name<input name="name" maxlength="200" placeholder="My list"></label>
+<label>URL (hosts, domains, RPZ or AdGuard DNS syntax)<input name="url" required placeholder="https://example.org/list.txt"></label>
+<div><button>Add list</button></div></form></details>
+{% endmacro %}
+{% macro rules_tiles(allow, block, group, back) %}
+<div class="tiles">
+{% for kind, label, names in [('allow', 'Allowed', allow), ('block', 'Blocked', block)] %}
+<div class="tile"><strong>{{ label }}</strong>
+{% if names %}<table><tbody>{% for n in names %}<tr><td><code>{{ n }}</code></td><td class="num">{% if can('dns:filter') %}<form method="post" action="/dns-filter/rules/delete">{{ csrf() }}{{ hidden_group(group, back) }}<input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="name" value="{{ n }}"><button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
+{% else %}<p class="blank">None.</p>{% endif %}
+{% if can('dns:filter') %}<form method="post" action="/dns-filter/rules" class="stack">{{ csrf() }}{{ hidden_group(group, back) }}<input type="hidden" name="kind" value="{{ kind }}"><label>Name<input name="name" required placeholder="example.com"></label><div><button>{{ 'Allow' if kind == 'allow' else 'Block' }}</button></div></form>{% endif %}
+</div>{% endfor %}
+</div>
+{% endmacro %}
 {% block body %}
 <h1>DNS filter</h1>
 {% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
@@ -23,7 +69,8 @@
 <div class="tile"><span class="muted">Blocked, last 7 days</span><strong class="big">{{ s.week.blocked }}</strong>
 <span class="muted small">{{ ((100 * s.week.blocked / s.week.queries) | round(1)) if s.week.queries else 0 }}% of queries</span></div>
 <div class="tile"><span class="muted">Lists in use</span><strong class="big">{{ d.lists | length }}</strong>
-<span class="muted small">memory limit {{ d.memory_limit }}</span></div>
+<span class="muted small">{% if d.memory %}~{{ d.memory.estimate_mb }} MiB of {{ d.memory_limit }}{% else %}memory limit {{ d.memory_limit }}{% endif %}{% if d.groups %} · {{ d.groups | length }} client {{ 'group' if d.groups | length == 1 else 'groups' }}{% endif %}</span>
+{% if d.memory and d.memory.left_out %}<span class="pill warn">{{ d.memory.left_out | length }} left out: memory</span>{% endif %}</div>
 </div>
 <section class="card"><h2>Last 24 hours <span class="muted">UTC</span></h2>
 {% if s.hours %}<table class="hours"><thead><tr><th>Hour</th><th></th><th class="num">Queries</th><th class="num">Blocked</th></tr></thead><tbody>
@@ -31,55 +78,63 @@
 </tbody></table>{% else %}<p class="blank">No queries yet.</p>{% endif %}</section>
 <section class="card"><h2>Most blocked <span class="muted">last 7 days</span></h2>
 {% if s.top_blocked %}<table><thead><tr><th>Name</th><th>Blocked by</th><th class="num">Times</th></tr></thead><tbody>
-{% for t in s.top_blocked %}<tr><td><code>{{ t.name }}</code></td><td>{{ t.list or t.zone }}</td><td class="num">{{ t.count }}</td></tr>{% endfor %}
+{% for t in s.top_blocked %}<tr><td><code>{{ t.name }}</code></td><td>{{ zone_label(t.zone, t.list) }}</td><td class="num">{{ t.count }}</td></tr>{% endfor %}
 </tbody></table>{% else %}<p class="blank">Nothing blocked yet.</p>{% endif %}</section>
 <section class="card"><h2>By list and rules <span class="muted">last 7 days</span></h2>
 {% if s.zones %}<table><thead><tr><th>List or rules</th><th class="num">Blocked</th><th class="num">Rewritten or passed</th></tr></thead><tbody>
-{% for z in s.zones %}<tr><td>{{ z.list or {'owner.rpz': 'Your rules', 'fabric.rpz': "fabric's own names (never filtered)"}.get(z.zone, z.zone) }}</td><td class="num">{{ z.blocked }}</td><td class="num">{{ z.queries }}</td></tr>{% endfor %}
+{% for z in s.zones %}<tr><td>{{ "fabric's own names (never filtered)" if z.zone == 'fabric.rpz' else zone_label(z.zone, z.list) }}{% if z.zone.startswith('group-') %} <span class="muted">({{ z.zone[6:-4] }})</span>{% endif %}</td><td class="num">{{ z.blocked }}</td><td class="num">{{ z.queries }}</td></tr>{% endfor %}
 </tbody></table>{% else %}<p class="blank">No rewrites yet.</p>{% endif %}</section>
 {% endif %}
 {% endif %}
 
 {% if view == 'lists' and d %}
-<section class="card"><h2>Lists in use</h2>
-<p class="muted">Fetched every night and when you add one; a list that cannot be fetched keeps its last good copy. Rules a response policy zone cannot express (regular expressions, wildcards inside a name, AdGuard-only modifiers) are skipped and counted.</p>
-{% if d.lists %}<table><thead><tr><th>List</th><th>Fetched</th><th>Good copy</th><th class="num">Rules</th><th class="num">Skipped</th><th class="num">Memory</th><th></th></tr></thead><tbody>
-{% for l in d.lists %}<tr><td>{{ l.name }}<br><span class="muted small">{{ l.url }}</span>{% if l.error %}<br><span class="bad-text small">{{ l.error }}</span>{% endif %}</td>
-<td>{{ ago(l.last_fetch) }}</td><td>{% if l.last_success %}{{ ago(l.last_success) }}{% else %}<span class="pill warn">none yet</span>{% endif %}</td>
-<td class="num">{{ l.rules or '—' }}</td><td class="num">{{ l.skipped if l.skipped is not none else '—' }}</td><td class="num">{{ ('~' ~ l.memory_mb ~ ' MiB') if l.memory_mb is not none else '—' }}</td>
-<td class="num">{% if can('dns:filter') %}<form method="post" action="/dns-filter/lists/delete">{{ csrf() }}<input type="hidden" name="url" value="{{ l.url }}"><button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}
-</tbody></table>{% else %}<p class="blank">No lists: nothing is blocked but your own rules.</p>{% endif %}
+<section class="card"><h2>Lists in use <span class="muted">everyone, and every group</span></h2>
+<p class="muted">Fetched every night and when you add one; a list that cannot be fetched keeps its last good copy. Rules a response policy zone cannot express (regular expressions, wildcards inside a name, AdGuard-only modifiers) are skipped and counted. A client group's own lists are on its page (Groups).</p>
+{{ lists_table(d.lists, '', 'lists') }}{% if not d.lists %}<p class="blank">No lists: nothing is blocked but your own rules.</p>{% endif %}
 {% if can('dns:filter') %}<form method="post" action="/dns-filter/fetch">{{ csrf() }}<button class="ghost">Fetch every list now</button></form>{% endif %}
 </section>
 {% if can('dns:filter') %}
 <section class="card"><h2>Add a list from AdGuard's catalogue</h2>
-{% if d.catalogue.lists %}<p class="muted small">AdGuard's registry, read {{ ago(d.catalogue.fetched) }}. Each list adds to the resolver's memory: see its size once fetched.</p>
-{% for group in ['General', 'Security', 'Regional', 'Other'] %}{% set items = d.catalogue.lists | selectattr('group', 'equalto', group) | list %}{% if items %}
-<details{{ ' open' if group == 'General' }}><summary>{{ group }} <span class="muted">({{ items | length }})</span></summary>
-<table><tbody>{% for c in items %}<tr><td><strong>{{ c.name }}</strong><br><span class="muted small">{{ c.description }}</span>{% if c.homepage %} <a class="small" href="{{ c.homepage }}" rel="noopener noreferrer" target="_blank">home page</a>{% endif %}</td>
-<td class="num"><form method="post" action="/dns-filter/lists">{{ csrf() }}<input type="hidden" name="name" value="{{ c.name }}"><input type="hidden" name="url" value="{{ c.url }}"><button>Add</button></form></td></tr>{% endfor %}</tbody></table>
-</details>{% endif %}{% endfor %}
-{% else %}<p class="blank">The catalogue has not been read yet: <em>Fetch every list now</em> reads it.</p>{% endif %}
-<details><summary>Add a list by its URL</summary>
-<form method="post" action="/dns-filter/lists" class="grid">{{ csrf() }}
-<label>Name<input name="name" maxlength="200" placeholder="My list"></label>
-<label>URL (hosts, domains, RPZ or AdGuard DNS syntax)<input name="url" required placeholder="https://example.org/list.txt"></label>
-<div><button>Add list</button></div></form></details>
+{{ catalogue('', 'lists', []) }}
 </section>
 {% endif %}
 {% endif %}
 
 {% if view == 'rules' and d %}
-<section class="card"><h2>Your rules</h2>
-<p class="muted">Each name counts with every name below it. An allowed name passes every list; a blocked name is blocked whatever the lists say. fabric's own names are never filtered.</p>
-<div class="tiles">
-{% for kind, label, names in [('allow', 'Allowed', d.allow), ('block', 'Blocked', d.block)] %}
-<div class="tile"><strong>{{ label }}</strong>
-{% if names %}<table><tbody>{% for n in names %}<tr><td><code>{{ n }}</code></td><td class="num">{% if can('dns:filter') %}<form method="post" action="/dns-filter/rules/delete">{{ csrf() }}<input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="name" value="{{ n }}"><button class="ghost">Remove</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table>
-{% else %}<p class="blank">None.</p>{% endif %}
-{% if can('dns:filter') %}<form method="post" action="/dns-filter/rules" class="stack">{{ csrf() }}<input type="hidden" name="kind" value="{{ kind }}"><label>Name<input name="name" required placeholder="example.com"></label><div><button>{{ 'Allow' if kind == 'allow' else 'Block' }}</button></div></form>{% endif %}
-</div>{% endfor %}
-</div></section>
+<section class="card"><h2>Your rules <span class="muted">everyone, and every group</span></h2>
+<p class="muted">Each name counts with every name below it. An allowed name passes every list; a blocked name is blocked whatever the lists say. fabric's own names are never filtered. A client group's own rules are on its page (Groups).</p>
+{{ rules_tiles(d.allow, d.block, '', 'rules') }}
+</section>
+{% endif %}
+
+{% if view == 'groups' and d %}
+<section class="card"><h2>Client groups</h2>
+<p class="muted">A group is a set of addresses and subnets with its own safe search, lists and rules, <strong>added</strong> to everyone's: a group cannot switch off a list on everyone, only allow names past it. A client in no group is answered as everyone. When a client is in a group's subnet and another group names its address, the address wins.</p>
+{% if not d.groups %}<p class="blank">No groups: every client is answered as everyone.</p>{% endif %}
+</section>
+{% for g in d.groups %}
+<section class="card"><h2>{{ g.name }} <span class="muted">{{ g.clients | join(', ') }}</span>{% if g.safe_search %} <span class="pill ok">strict safe search</span>{% endif %}</h2>
+{% if can('dns:filter') %}<form method="post" action="/dns-filter/groups" class="grid">{{ csrf() }}<input type="hidden" name="name" value="{{ g.name }}">
+<label>Addresses and subnets<input name="clients" required value="{{ g.clients | join(' ') }}"></label><div><button class="ghost">Save addresses</button></div></form>{% endif %}
+<h3>Safe search</h3>
+{{ safe_search(g.name, g.safe_search, g.youtube, 'groups') }}
+<h3>Its own lists</h3>
+{{ lists_table(g.lists, g.name, 'groups') }}{% if not g.lists %}<p class="blank">None: everyone's lists only.</p>{% endif %}
+{% if can('dns:filter') %}<details><summary>Add a list for {{ g.name }}</summary>{{ catalogue(g.name, 'groups', g.lists | map(attribute='url') | list) }}</details>{% endif %}
+<h3>Its own rules</h3>
+<p class="muted small">An allowed name goes straight to the internet for this group, past everyone's lists and rules.</p>
+{{ rules_tiles(g.allow, g.block, g.name, 'groups') }}
+{% if can('dns:filter') %}<form method="post" action="/dns-filter/groups/delete">{{ csrf() }}<input type="hidden" name="name" value="{{ g.name }}"><button class="ghost">Remove the group {{ g.name }}</button></form>{% endif %}
+</section>
+{% endfor %}
+{% if can('dns:filter') %}
+<section class="card"><h2>Add a client group</h2>
+<form method="post" action="/dns-filter/groups" class="grid">{{ csrf() }}
+<label>Name (lowercase letters, digits, -)<input name="name" required maxlength="32" pattern="[a-z0-9][a-z0-9-]*" placeholder="kids"></label>
+<label>Addresses and subnets (IPv4, separated by spaces)<input name="clients" required placeholder="192.168.4.50 192.168.10.0/24"></label>
+<div><button>Add group</button></div></form>
+</section>
+{% endif %}
 {% endif %}
 
 {% if view == 'querylog' %}
@@ -93,13 +148,17 @@
 {% if log and log.off %}<p class="blank">The query log is off: {{ log.off }}.</p>
 {% elif log %}{% if log.entries %}<table><thead><tr><th>Time (UTC)</th><th>Client</th><th>Group</th><th>Type</th><th>Name</th><th>What happened</th><th></th></tr></thead><tbody>
 {% for e in log.entries %}<tr><td class="small">{{ e.at[5:16] | replace('T', ' ') }}</td><td>{{ e.client }}</td><td class="muted">{{ e.view }}</td><td>{{ e.qtype }}</td><td><code>{{ e.name }}</code></td>
-<td>{% if e.blocked %}<span class="pill bad">blocked</span> {{ e.list or {'owner.rpz': 'your rules'}.get(e.zone, e.zone) }}{% elif e.action == 'PASSTHRU' %}<span class="pill ok">allowed</span> {{ {'owner.rpz': 'your rules', 'fabric.rpz': "fabric's name"}.get(e.zone, e.list or e.zone) }}{% elif e.action %}<span class="pill">{{ e.action }}</span>{% else %}<span class="muted">answered</span>{% endif %}</td>
-<td class="num">{% if e.blocked %}{{ rule_button('allow', e.name, 'Allow') }}{% elif e.zone != 'fabric.rpz' %}{{ rule_button('block', e.name, 'Block') }}{% endif %}</td></tr>{% endfor %}
+<td>{% if e.blocked %}<span class="pill bad">blocked</span> {{ zone_label(e.zone, e.list) }}{% elif e.action == 'PASSTHRU' %}<span class="pill ok">allowed</span> {{ zone_label(e.zone, e.list) }}{% elif e.action %}<span class="pill">{{ 'rewritten' if e.action == 'Local-Data' else e.action }}</span> {{ zone_label(e.zone, e.list) }}{% else %}<span class="muted">answered</span>{% endif %}</td>
+<td class="num">{% if e.blocked %}{{ rule_button('allow', e.name, 'Allow', e.view) }}{% elif e.zone != 'fabric.rpz' %}{{ rule_button('block', e.name, 'Block', e.view) }}{% endif %}</td></tr>{% endfor %}
 </tbody></table>{% else %}<p class="blank">No queries match.</p>{% endif %}{% endif %}
 </section>
 {% endif %}
 
 {% if view == 'settings' and d %}
+<section class="card"><h2>Safe search <span class="muted">everyone</span></h2>
+{{ safe_search('', d.safe_search.on, d.safe_search.youtube, 'settings') }}
+<p class="muted small">On for everyone, it reaches every client group too; a group may still choose YouTube moderate.</p>
+</section>
 <section class="card"><h2>Internet lookups</h2>
 <p class="muted">Sent over DNS-over-TLS, each upstream's certificate checked against its name; with none, the resolver asks the internet's root servers itself (unencrypted).</p>
 {% if d.upstreams %}<table><thead><tr><th>Address</th><th>Certificate name</th></tr></thead><tbody>

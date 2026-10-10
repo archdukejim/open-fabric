@@ -1,0 +1,13 @@
+; {{ what }}'s rules (manual 1.12.2.15): its allows pass its own policy (and go straight to the upstream), its blocks
+; apply whatever everyone's lists say; each name with every name below it
+$TTL 300
+@ SOA localhost. hostmaster.{{ zone }}. 1 3600 600 86400 300
+@ NS localhost.
+{% for n in allow %}
+{{ n }} CNAME rpz-passthru.
+*.{{ n }} CNAME rpz-passthru.
+{% endfor %}
+{% for n in block %}
+{{ n }} CNAME .
+*.{{ n }} CNAME .
+{% endfor %}

@@ -2,7 +2,7 @@ import ipaddress
 import json
 
 from fabriclib.common.errors import ValidationError
-from fabriclib.dns_filter.check_filter_settings import NAME_RE
+from fabriclib.dns_filter.common.rule_names import NAME_RE
 from fabriclib.dns_filter.common.dnslog_psql import dnslog_psql
 from fabriclib.dns_filter.common.list_zone import list_zone
 from fabriclib.dns_filter.ingest_dns_log import ingest_dns_log

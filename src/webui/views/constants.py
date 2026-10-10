@@ -14,8 +14,8 @@ TABS = [
     ("security", "/security", "Security", False),
 ]
 # DNS filter tab sections: (view, label); the query log needs dns:querylog (MENU_PERMS)
-DNS_FILTER_SECTIONS = [("overview", "Overview"), ("lists", "Lists"), ("rules", "Rules"), ("querylog", "Query log"),
-                       ("settings", "Settings")]
+DNS_FILTER_SECTIONS = [("overview", "Overview"), ("lists", "Lists"), ("rules", "Rules"), ("groups", "Groups"),
+                       ("querylog", "Query log"), ("settings", "Settings")]
 # BIND9 tab sections: (view, label)
 FREERADIUS_SECTIONS = [("overview", "Overview"), ("switches", "Connect a switch"), ("windows", "Connect Windows")]
 BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]

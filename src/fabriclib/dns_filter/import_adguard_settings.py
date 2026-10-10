@@ -2,7 +2,9 @@ import ipaddress
 import re
 import urllib.parse
 
-from fabriclib.dns_filter.check_filter_settings import NAME_RE
+from fabriclib.common.errors import ValidationError
+from fabriclib.dns_filter.check_filter_groups import check_filter_groups
+from fabriclib.dns_filter.common.rule_names import NAME_RE
 
 # the providers whose DoT certificate name is known, by address and by name (AdGuard's own upstream examples)
 BY_ADDRESS = {"1.1.1.1": "cloudflare-dns.com", "1.0.0.1": "cloudflare-dns.com", "8.8.8.8": "dns.google",
@@ -65,16 +67,95 @@ def _rule(rule, own, settings, not_carried):
     not_carried.append(f"rule {rule}: only ||name^ and @@||name^ rules move (each name with every name below it)")
 
 
+def _safe_search(ss, who, not_carried):
+    """Purpose: AdGuard's safe search (global or a client's) as fabric's one switch and YouTube level (1.12.2.15).
+    Inputs:  ss — AdGuard's safe_search block ({enabled, google, youtube, ...}; an engine left out counts as on, as
+             AdGuard's default); who — "everyone" or the group, for the messages; not_carried — appended to.
+    Returns: (on: bool, youtube: "strict" or "moderate"). AdGuard enforces YouTube's moderate level, so YouTube on
+             stays moderate; YouTube off becomes strict, and is said.
+    Fails:   never.
+    Feeds:   import_adguard_settings, _groups."""
+    ss = ss or {}
+    if not ss.get("enabled"):
+        return False, "strict"
+    off = [e for e in ("bing", "duckduckgo", "ecosia", "google", "pixabay", "yandex", "youtube")
+           if ss.get(e, True) is False]
+    if off:
+        not_carried.append(f"safe search for {who}: {', '.join(off)} was left out in AdGuard; fabric's strict safe "
+                           "search covers every engine at once" + (" (YouTube strict)" if "youtube" in off else ""))
+    return True, "strict" if "youtube" in off else "moderate"
+
+
+def _group_name(name, taken):
+    """Purpose: an AdGuard client's name as a group name: lowercase letters, digits and '-', at most 32, unique.
+    Inputs:  name — AdGuard's client name; taken — set of names already used (changed: the result is added).
+    Returns: str.
+    Fails:   never.
+    Feeds:   _groups."""
+    base = re.sub(r"[^a-z0-9]+", "-", str(name or "client").lower()).strip("-")[:28].strip("-") or "client"
+    base = "everyone-1" if base == "everyone" else base
+    out, n = base, 1
+    while out in taken:
+        n += 1
+        out = f"{base}-{n}"
+    taken.add(out)
+    return out
+
+
+def _groups(cfg, v, own, everyone, not_carried):
+    """Purpose: AdGuard's persistent clients as client groups (1.12.2.15): each client's IPv4 addresses and subnets
+             the resolver may answer, its safe search (its own, or everyone's when it used the global settings).
+    Inputs:  cfg — AdGuardHome.yaml as a dict; v — the vars (lan_cidr, fabric_subnet, security.firewall_allow); own —
+             fabric's domains; everyone — (on, youtube) from the global safe search; not_carried — appended to.
+    Returns: list of groups as dns_filter_groups holds them.
+    Fails:   never (an id fabric cannot use is listed in not_carried with the reason).
+    Feeds:   import_adguard_settings."""
+    taken, used, groups = set(), set(), []
+    for c in (cfg.get("clients") or {}).get("persistent") or []:
+        label = str(c.get("name") or "client")
+        name = _group_name(label, taken)
+        clients = []
+        for raw in c.get("ids") or []:
+            try:                      # an id is kept only where the settings check takes it (and no other group)
+                probe = {**v, "dns_filter_groups": [{"name": "probe", "clients": [str(raw)]}]}
+                check_filter_groups(probe, own, set())
+                ident = probe["dns_filter_groups"][0]["clients"][0]
+            except ValidationError as e:
+                not_carried.append(f"client {label}: {raw} ({str(e).removeprefix('group probe: ')}; MAC addresses and "
+                                   "client IDs come with device groups in 0.8)")
+                continue
+            if ident in used:
+                not_carried.append(f"client {label}: {raw} is already another client's")
+                continue
+            used.add(ident)
+            clients.append(ident)
+        if not clients:
+            not_carried.append(f"client {label}: nothing to match it by (no IPv4 address or subnet fabric answers)")
+            taken.discard(name)
+            continue
+        on, youtube = everyone if c.get("use_global_settings", True) else \
+            _safe_search(c.get("safe_search"), name, not_carried)
+        if c.get("upstreams"):
+            not_carried.append(f"client {label}: its own upstreams (every group uses the resolver's)")
+        if c.get("blocked_services"):
+            not_carried.append(f"client {label}: blocked services (fabric does not block services as such)")
+        groups.append({"name": name, "clients": clients, "safe_search": on, "youtube": youtube, "lists": [],
+                       "allow": [], "block": []})
+    return groups
+
+
 def import_adguard_settings(cfg, v):
     """Purpose: AdGuard Home's settings as the BIND resolver's (manual 2.3.12.1.9, decision 2.1.12.3): its upstreams
              (as DNS-over-TLS where the provider's certificate name is known), its enabled lists by URL, its
-             `||name^` and `@@||name^` rules; everything else is listed, never dropped silently.
+             `||name^` and `@@||name^` rules, its safe search and its persistent clients as groups (1.12.2.15);
+             everything else is listed, never dropped silently.
     Inputs:  cfg — AdGuardHome.yaml as a dict, or None when AdGuard never ran (then the adguard_* vars are used: what
              a first deploy would have started with); v — the vars (adguard_upstreams, adguard_filter_lists,
-             adguard_rules, ip_bind9, domain, org_domain, ad_domain, host_ip).
+             adguard_rules, ip_bind9, domain, org_domain, ad_domain, host_ip, and what check_filter_groups reads).
     Returns: {"settings": {dns_filter: "bind", dns_filter_upstreams, dns_filter_lists, dns_filter_allow,
-             dns_filter_block}, "not_carried": [str, one per item that did not move], "clients": [AdGuard's
-             persistent clients, as they were: groups come with step 6 of 0.7]}.
+             dns_filter_block, dns_filter_safe_search, dns_filter_youtube, dns_filter_groups (its persistent clients,
+             1.12.2.15)}, "not_carried": [str, one per item that did not move], "clients": [AdGuard's persistent
+             clients, as they were (kept in the import record)]}.
     Fails:   never (a missing or odd key reads as empty).
     Feeds:   setup/move_dns_filter; tests/resolver/run.py."""
     cfg = cfg or {}
@@ -118,8 +199,9 @@ def import_adguard_settings(cfg, v):
         if str(rule) != SETTING_END:
             _rule(str(rule), own, settings, not_carried)
     filtering = cfg.get("filtering") or {}
-    if (filtering.get("safe_search") or {}).get("enabled"):
-        not_carried.append("safe search was on for everyone: it comes back per group with step 6 of 0.7")
+    on, youtube = _safe_search(filtering.get("safe_search"), "everyone", not_carried)
+    settings["dns_filter_safe_search"], settings["dns_filter_youtube"] = on, youtube
+    settings["dns_filter_groups"] = _groups(cfg, v, own, (on, youtube), not_carried)
     if filtering.get("parental_enabled"):
         not_carried.append("AdGuard's parental service: not carried (add an adult-content list from the catalogue)")
     if filtering.get("safebrowsing_enabled"):
@@ -128,8 +210,5 @@ def import_adguard_settings(cfg, v):
         not_carried.append("blocked services: not carried (fabric does not block services as such)")
     for r in filtering.get("rewrites") or []:
         not_carried.append(f"DNS rewrite {r.get('domain')} → {r.get('answer')}: add it as a DNS record in fabric")
-    clients = list((cfg.get("clients") or {}).get("persistent") or [])
-    for c in clients:
-        not_carried.append(f"client {c.get('name')} ({', '.join(map(str, c.get('ids') or []))}): its own settings "
-                           "come back with client groups, step 6 of 0.7 (kept in the import file)")
-    return {"settings": settings, "not_carried": not_carried, "clients": clients}
+    return {"settings": settings, "not_carried": not_carried,
+            "clients": list((cfg.get("clients") or {}).get("persistent") or [])}

@@ -42,6 +42,38 @@ logging {
     category lame-servers { null; };
 };
 
+{% for g in groups %}
+// client group {{ g.name }} (manual 1.12.2.15): its own policy, then everything else through the main view
+view "{{ g.name }}" {
+    match-clients { {% for m in g.match %}{{ m }}; {% endfor %}};
+    forward only;
+    forwarders { 127.0.0.1 port 53; };
+    // the main view validates what it answers (a group's DS lookups for a listed name would be blocked there)
+    dnssec-validation no;
+    // never cache a blocked answer here: every blocked query reaches the main view and is logged as blocked
+    max-ncache-ttl 0;
+{% for n in g.allow %}
+    zone "{{ n }}" { type forward; forward only; forwarders { {% for u in dns_filter_upstreams %}{{ u.address }} port 853 tls "upstream-{{ upstream_names.index(u.name) + 1 }}"; {% endfor %}}; };
+{% endfor %}
+    zone "{{ g.rules_zone }}" { type primary; file "/etc/bind/{{ g.rules_zone }}"; };
+{% if g.safe_zone %}
+    zone "{{ g.safe_zone }}" { type primary; file "/etc/bind/{{ g.safe_zone }}"; };
+{% endif %}
+{% for l in g.lists %}
+    zone "{{ l.zone }}" { type primary; file "/etc/bind-lists/{{ l.zone }}"; };  // {{ l.name | replace('*/', '') | replace('\n', ' ') }}
+{% endfor %}
+    response-policy {
+        zone "{{ g.rules_zone }}";
+{% if g.safe_zone %}
+        zone "{{ g.safe_zone }}";
+{% endif %}
+{% for l in g.lists %}
+        zone "{{ l.zone }}";
+{% endfor %}
+    } break-dnssec yes qname-wait-recurse no;
+};
+
+{% endfor %}
 view "everyone" {
     match-clients { any; };
 {% for z in zones %}
@@ -49,13 +81,19 @@ view "everyone" {
 {% endfor %}
     zone "fabric.rpz" { type primary; file "/etc/bind/fabric.rpz"; };
     zone "owner.rpz" { type primary; file "/etc/bind/owner.rpz"; };
+{% if safe_zone %}
+    zone "{{ safe_zone }}" { type primary; file "/etc/bind/{{ safe_zone }}"; };
+{% endif %}
 {% for l in lists %}
     zone "{{ l.zone }}" { type primary; file "/etc/bind-lists/{{ l.zone }}"; };  // {{ l.name | replace('*/', '') | replace('\n', ' ') }}
 {% endfor %}
-    // first match wins: fabric's zones are never filtered, then the owner's rules, then the lists in order
+    // first match wins: fabric's zones are never filtered, then the owner's rules, safe search, the lists in order
     response-policy {
         zone "fabric.rpz";
         zone "owner.rpz";
+{% if safe_zone %}
+        zone "{{ safe_zone }}";
+{% endif %}
 {% for l in lists %}
         zone "{{ l.zone }}";
 {% endfor %}

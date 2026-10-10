@@ -134,12 +134,21 @@ def ingest_dns_log(v):
             sql += ["CREATE TEMP TABLE q_in (at timestamptz, client inet, port int, view text, name text, qtype text)"
                     " ON COMMIT DROP;",
                     "COPY q_in FROM STDIN;", *queries, "\\.",
-                    "INSERT INTO queries (at, client, port, view, name, qtype) SELECT * FROM q_in;",
+                    # a group's view passes what it does not answer to the main view from 127.0.0.1 (1.12.2.15):
+                    # that copy is not a client's query
+                    "INSERT INTO queries (at, client, port, view, name, qtype) SELECT * FROM q_in"
+                    " WHERE client <> '127.0.0.1';",
                     "CREATE TEMP TABLE r_in (at timestamptz, client inet, port int, view text, name text, qtype text,"
                     " action text, zone text) ON COMMIT DROP;",
                     "COPY r_in FROM STDIN;", *rewrites, "\\.",
                     """UPDATE queries q SET action = r.action, zone = r.zone, blocked = (r.action = 'NXDOMAIN')
                        FROM r_in r WHERE q.client = r.client AND q.port = r.port AND q.name = r.name
+                       AND q.at BETWEEN r.at - interval '2 seconds' AND r.at + interval '2 seconds';""",
+                    # the main view's rewrite for a group's query: on that group query (the same name, no rewrite of
+                    # its own, within 2 seconds), so the log names the real client and the list that blocked it
+                    """UPDATE queries q SET action = r.action, zone = r.zone, blocked = (r.action = 'NXDOMAIN')
+                       FROM r_in r WHERE r.client = '127.0.0.1' AND q.view <> 'everyone' AND q.zone IS NULL
+                       AND q.name = r.name
                        AND q.at BETWEEN r.at - interval '2 seconds' AND r.at + interval '2 seconds';""",
                     """CREATE TEMP TABLE touched ON COMMIT DROP AS SELECT DISTINCT date_trunc('hour', at) AS hour
                        FROM (SELECT at FROM q_in UNION ALL SELECT at FROM r_in) t;""",

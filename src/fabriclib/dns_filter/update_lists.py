@@ -7,6 +7,7 @@ import urllib.request
 from fabriclib.common.ensure_dir import ensure_dir
 from fabriclib.common.service_user import service_user
 from fabriclib.common.write_file_if_changed import write_file_if_changed
+from fabriclib.dns_filter.common.all_lists import all_lists
 from fabriclib.dns_filter.common.list_zone import list_zone
 from fabriclib.dns_filter.common.resolver_paths import resolver_paths
 from fabriclib.dns_filter.common.resolver_rndc import resolver_rndc
@@ -52,10 +53,11 @@ def _check_zone(zone, text):
 
 
 def update_lists(v, only_missing=False, reload=True, timeout=120):
-    """Purpose: the DNS filter's lists (manual 1.12.2.6): fetch each list in dns_filter_lists, convert it to a response
-             policy zone, check it, write it when it changed and reload only that zone in the resolver; record each
-             list's state. A list that fails keeps its last good copy.
-    Inputs:  v — rendered vars (dns_filter_lists, deploy_base_dir, service_users.resolver); only_missing — True to
+    """Purpose: the DNS filter's lists (manual 1.12.2.6): fetch each list (everyone's and each group's, all_lists),
+             convert it to a response policy zone, check it, write it when it changed and reload only that zone in the
+             resolver; record each list's state. A list that fails keeps its last good copy.
+    Inputs:  v — rendered vars (dns_filter_lists, dns_filter_groups, deploy_base_dir, service_users.resolver);
+             only_missing — True to
              fetch only the lists with no converted copy yet (an apply); reload — False to leave the resolver alone
              (an apply reconfigures it afterwards); timeout — seconds per download.
     Returns: {"changed": [zones written], "failed": [list names that failed this time], "lists": {zone: state}} —
@@ -74,7 +76,7 @@ def update_lists(v, only_missing=False, reload=True, timeout=120):
             state = json.load(f)
     except (OSError, ValueError):
         state = {}
-    wanted = {list_zone(item["url"]): item for item in v.get("dns_filter_lists") or []}
+    wanted = {list_zone(item["url"]): item for item in all_lists(v)}
     result = {"changed": [], "failed": [], "lists": {}}
     for zone, item in wanted.items():
         st = {**state.get(zone, {}), "name": item.get("name") or item["url"], "url": item["url"]}

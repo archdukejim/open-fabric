@@ -148,9 +148,10 @@ check("import: enabled lists by URL; the owner's ||name^ and @@||name^ rules (va
       and st["dns_filter_allow"] == ["ui-allow.example"] and st["dns_filter"] == "bind", st)
 nc = "\n".join(imp["not_carried"])
 check("import: what cannot move is listed — an unknown upstream, plain DNS, a switched-off list, an allowlist, regex "
-      "and exact rules, safe search, parental control, blocked services, a rewrite, a client",
+      "and exact rules, parental control, blocked services, a rewrite, a client outside the networks answered",
       all(x in nc for x in ("doh.example.net", "192.168.1.1", "Off list", "Allow list", "/regex/", "plain.example",
-                            "safe search", "parental", "blocked services", "nas.home", "kid-tablet"))
+                            "parental", "blocked services", "nas.home", "kid-tablet"))
+      and st["dns_filter_safe_search"] is True
       and "www.lan.test" not in nc, imp["not_carried"])
 plain = import_adguard_settings(None, {**VV, "adguard_rules": ["||a.example^"]})["settings"]
 check("import without AdGuard's config: what the adguard_* settings (or their defaults) would have started",

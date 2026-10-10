@@ -212,6 +212,20 @@ SAMPLE_DNS_FILTER = {
     "allow": ["doubleclick.net"], "block": ["ads.example.org"],
     "upstreams": [{"address": "1.1.1.1", "name": "cloudflare-dns.com"},
                   {"address": "1.0.0.1", "name": "cloudflare-dns.com"}],
+    "memory": {"estimate_mb": 201.2, "limit_mb": 384.0, "left_out": []},
+    "safe_search": {"on": False, "youtube": "strict"},
+    "groups": [{"name": "kids", "clients": ["192.168.1.64/27"], "safe_search": True, "youtube": "strict",
+                "lists": [], "allow": ["khanacademy.org"], "block": ["roblox.com"]},
+               {"name": "teen-laptop", "clients": ["192.168.1.70"], "safe_search": True, "youtube": "moderate",
+                "lists": [], "allow": [], "block": []}],
+    # the same engines and counts as fabriclib's table (dns_filter/common/safe_search), which the agent sends
+    "safe_search_sites": {"engines": [{"engine": e, "names": n, "answer": a} for e, n, a in (
+        ("Google", 187, "forcesafesearch.google.com"),
+        ("YouTube", 5, "restrict.youtube.com or restrictmoderate.youtube.com"), ("Bing", 2, "strict.bing.com"),
+        ("DuckDuckGo", 3, "safe.duckduckgo.com"), ("Yandex", 52, "213.180.193.56"),
+        ("Pixabay", 1, "safesearch.pixabay.com"), ("Ecosia", 1, "strict-safe-search.ecosia.org"))],
+        "not_covered": ["Brave Search", "Startpage"],
+        "youtube": {"strict": "restrict.youtube.com", "moderate": "restrictmoderate.youtube.com"}},
     "stats": {"hours": [{"hour": f"2026-10-09T{h:02d}:00Z", "queries": q, "blocked": b}
                         for h, q, b in ((0, 412, 61), (1, 288, 40), (2, 190, 22), (3, 175, 19), (4, 230, 31),
                                         (5, 640, 98), (6, 1210, 170), (7, 1620, 233), (8, 1488, 206), (9, 1302, 188))],
@@ -238,6 +252,8 @@ SAMPLE_DNS_FILTER = {
 SAMPLE_QUERY_LOG = {"entries": [
     {"at": "2026-10-09T09:58:12Z", "client": "192.168.1.20", "view": "everyone", "name": "browser.events.data.msn.com",
      "qtype": "A", "action": "NXDOMAIN", "zone": _ZONE, "list": "AdGuard DNS filter", "blocked": True},
+    {"at": "2026-10-09T09:58:11Z", "client": "192.168.1.66", "view": "kids", "name": "www.roblox.com",
+     "qtype": "A", "action": "NXDOMAIN", "zone": "group-kids.rpz", "list": None, "blocked": True},
     {"at": "2026-10-09T09:58:10Z", "client": "192.168.1.20", "view": "everyone", "name": "www.wikipedia.org",
      "qtype": "AAAA", "action": None, "zone": None, "list": None, "blocked": False},
     {"at": "2026-10-09T09:57:55Z", "client": "192.168.1.31", "view": "everyone", "name": "nas.home.arpa",

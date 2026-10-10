@@ -136,6 +136,25 @@ try:
     kept = psql("SELECT count(*) FROM stats_hourly WHERE zone = '' AND hour < now() - interval '7 days';").stdout.strip()
     check("statistics stay past 7 days (90): the old hour's count kept though its query is gone", kept == "1", kept)
 
+    # a client group (1.12.2.15): its view's query, the main view's copy from 127.0.0.1 and the main view's rewrite;
+    # a rewrite of the group's own rules on its query
+    append("query.log", query("192.168.1.40", 7001, "tracker.example", 5, view="kids")
+           + query("127.0.0.1", 7101, "tracker.example", 5)
+           + query("192.168.1.40", 7002, "kids-only.example", 4, view="kids"))
+    append("rpz.log", rewrite("127.0.0.1", 7101, "tracker.example", "NXDOMAIN", f"tracker.example.{ZONE}", 5)
+           + rewrite("192.168.1.40", 7002, "kids-only.example", "NXDOMAIN", "kids-only.example.group-kids.rpz", 4,
+                     view="kids"))
+    ingest_dns_log(V)
+    kid = {e["name"]: e for e in read_query_log(V, client="192.168.1.40")["entries"]}
+    check("groups: the main view's rewrite is put on the group's query (the real client, its view, the list)",
+          set(kid) == {"tracker.example", "kids-only.example"}
+          and (kid["tracker.example"]["view"], kid["tracker.example"]["zone"], kid["tracker.example"]["blocked"])
+          == ("kids", ZONE, True), kid)
+    check("groups: the group's own rule is on its query (group-kids.rpz)",
+          (kid["kids-only.example"]["zone"], kid["kids-only.example"]["blocked"]) == ("group-kids.rpz", True), kid)
+    check("groups: the chain's own hop (127.0.0.1) is not a client's query",
+          read_query_log(V, client="127.0.0.1")["entries"] == [])
+
     # reading on: only new lines; a rotated file finished first; Postgres down keeps the lines for the next run
     r = ingest_dns_log(V)
     check("ingest again with nothing new: nothing added", r["queries"] == 0 and r["rewrites"] == 0, r)

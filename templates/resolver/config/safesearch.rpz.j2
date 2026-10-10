@@ -1,0 +1,7 @@
+; Strict safe search (manual 1.12.2.15), YouTube {{ level }}: each engine's search names answer its enforced name
+$TTL 300
+@ SOA localhost. hostmaster.{{ zone }}. 1 3600 600 86400 300
+@ NS localhost.
+{% for name, rtype, answer in records %}
+{{ name }} {{ rtype }} {{ answer }}
+{% endfor %}

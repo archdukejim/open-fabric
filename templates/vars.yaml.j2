@@ -208,6 +208,12 @@ dns_filter_allow: {{ dns_filter_allow | default([], true) | to_json }}
 dns_filter_block: {{ dns_filter_block | default([], true) | to_json }}
 # Forwarded to over DNS-over-TLS, the certificate's name verified; [] = resolve from the root servers.
 dns_filter_upstreams: {{ (dns_filter_upstreams if dns_filter_upstreams is defined and dns_filter_upstreams is not none else [{'address': '1.1.1.1', 'name': 'cloudflare-dns.com'}, {'address': '1.0.0.1', 'name': 'cloudflare-dns.com'}]) | to_json }}
+# Strict safe search for everyone (Google, YouTube, Bing, DuckDuckGo, Yandex, Pixabay, Ecosia); YouTube strict or moderate.
+dns_filter_safe_search: {{ dns_filter_safe_search | default(false) | to_json }}
+dns_filter_youtube: {{ dns_filter_youtube | default('strict', true) }}
+# Client groups (manual 1.12.2.15): [{name, clients: [addresses, subnets], safe_search, youtube, lists, allow, block}];
+# a group only adds to everyone's lists and rules. The most specific address wins.
+dns_filter_groups: {{ dns_filter_groups | default([], true) | to_json }}
 # Time (manual 1.13.1): chrony on the host keeps its clock and serves the network. ntp_servers: "<host> [nts]
 # [pool] [prefer]" (nts: authenticated time); a federated site asks its upstream site first. [] = the upstream
 # site only (or this host's own clock). ntp_serve: answer the LAN (UDP 123; Kea hands it out as option 42).

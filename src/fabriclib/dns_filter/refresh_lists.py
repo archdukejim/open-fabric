@@ -1,5 +1,6 @@
 import os
 
+from fabriclib.dns_filter.common.all_lists import all_lists
 from fabriclib.dns_filter.common.list_zone import list_zone
 from fabriclib.dns_filter.common.resolver_paths import resolver_paths
 from fabriclib.dns_filter.fetch_catalogue import fetch_catalogue
@@ -29,7 +30,7 @@ def refresh_lists(v, actor="root", source="cli"):
             running = f.read()
     except FileNotFoundError:
         running = ""
-    new = [i for i in v.get("dns_filter_lists") or []
+    new = [i for i in all_lists(v)
            if os.path.exists(os.path.join(paths["lists"], list_zone(i["url"])))
            and f'"{list_zone(i["url"])}"' not in running]
     result["applied"] = None

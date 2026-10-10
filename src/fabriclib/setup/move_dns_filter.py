@@ -52,7 +52,8 @@ def move_dns_filter(data, deploy_base, config_dir):
     s = result["settings"]
     lines = [f"DNS filter: AdGuard Home → the BIND resolver (0.7): {len(s['dns_filter_lists'])} lists, "
              f"{len(s['dns_filter_allow'])} allowed and {len(s['dns_filter_block'])} blocked names, "
-             f"{len(s['dns_filter_upstreams'])} DoT upstreams moved"]
+             f"{len(s['dns_filter_upstreams'])} DoT upstreams, {len(s['dns_filter_groups'])} client groups moved"
+             + ("; strict safe search for everyone" if s["dns_filter_safe_search"] else "")]
     lines += [f"  kept as you set it: {k}" for k in kept]
     lines += [f"  not moved: {item}" for item in result["not_carried"]]
     lines.append(f"  the record (and AdGuard's configuration): {path}")
