@@ -1,8 +1,10 @@
 import ipaddress
 import re
 
+from fabriclib.dhcp.client_networks import client_networks
 from fabriclib.common.errors import ValidationError
 from fabriclib.dns_filter.common.rule_names import rule_names
+from fabriclib.dns_filter.expand_group_clients import expand_group_clients
 
 GROUP_RE = re.compile(r"^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$")
 YOUTUBE = ("strict", "moderate")
@@ -40,20 +42,23 @@ def _clients(raw, name, answered, fabric):
 
 def check_filter_groups(v, own, shared_urls):
     """Purpose: the DNS filter's client groups (manual 1.12.2.15), checked and normalised in place.
-    Inputs:  v — rendered vars (dns_filter_groups, lan_cidr, fabric_subnet, security.firewall_allow); changed in
+    Inputs:  v — rendered vars (dns_filter_groups, lan_cidr, fabric_subnet, security.firewall_allow, DHCP's
+             subnets: client_networks); changed in
              place; own — fabric's own domains; shared_urls — the urls of everyone's lists.
     Returns: None.
     Fails:   ValidationError naming the group: a bad or reserved name, the same name twice; clients (see _clients),
              the same address or subnet in two groups; safe_search not true or false, youtube not strict or moderate;
              a list without an http(s) url, twice, or already on everyone; an allow or block that is not a name, is
-             inside fabric's domains, or is both allowed and blocked.
+             inside fabric's domains, or is both allowed and blocked; a reference to Kea's data that names nothing
+             (expand_group_clients: dhcp:, device:, vlan:, turned into addresses on every apply, manual 1.10.3.7).
     Feeds:   dns_filter/check_filter_settings."""
     groups = v.get("dns_filter_groups") or []
     if not isinstance(groups, list):
         raise ValidationError("dns_filter_groups must be a list of groups")
     security = v.get("security") or {}
     answered = []
-    for c in [v.get("lan_cidr"), *(security.get("firewall_allow") or [])]:
+    nets = client_networks(v)
+    for c in [v.get("lan_cidr"), *(security.get("firewall_allow") or []), *nets["full"], *nets["guest"]]:
         try:
             answered.append(ipaddress.ip_network(str(c), strict=False))
         except ValueError:
@@ -71,7 +76,7 @@ def check_filter_groups(v, own, shared_urls):
         if name in names:
             raise ValidationError(f"group {name} is there twice")
         names.add(name)
-        clients = _clients(g.get("clients"), name, answered, fabric)
+        clients = _clients(expand_group_clients(g.get("clients"), name, v), name, answered, fabric)
         for c in clients:
             if c in owner:
                 raise ValidationError(f"{c} is in group {owner[c]} and group {name}: an address or subnet belongs to "

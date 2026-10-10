@@ -1,22 +1,34 @@
 from fabriclib.common.errors import ValidationError
 from fabriclib.deploy.check_samba_settings import check_samba_settings
+from fabriclib.dhcp.client_networks import client_networks
+from fabriclib.dhcp.dhcp_reverse_zones import dhcp_reverse_zones
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp
+from fabriclib.dhcp.place_subnets import place_subnets
 from fabriclib.dns_filter.check_filter_settings import check_filter_settings
 from fabriclib.keycloak.signin_levels import signin_level
 from fabriclib.ntp.normalize_ntp import normalize_ntp
+from fabriclib.system.host_networks import host_networks
 
 
 def check_settings(final_vars):
     """Purpose: the rendered settings that are checked before anything is rendered or installed.
-    Inputs:  final_vars — rendered settings; its `dhcp` is replaced by the normalized one.
+    Inputs:  final_vars — rendered settings; its `dhcp` is replaced by the normalized one, each subnet placed on
+             this host's interfaces (place_subnets: fabric's address for it), and `dhcp_served` set (client_networks:
+             the subnets and addresses the templates open and listen on, manual 1.10.3.3) and `dhcp_reverse_zones`
+             (where Kea registers PTRs: dns/reverse_zones, BIND's grants, Kea's reverse DDNS; 2.1.10.7).
     Returns: None.
-    Fails:   ValidationError from normalize_dhcp (DHCP subnets, pools, reservations, dhcp.ntp) or normalize_ntp
+    Fails:   ValidationError from normalize_dhcp (DHCP subnets, pools, reservations, dhcp.ntp), place_subnets (an
+             interface this host lacks, a subnet on no served interface and not relayed) or normalize_ntp
              (ntp_servers, ntp_serve, ntp_set_clock), from check_samba_settings (the Windows domain), for a
              dns_filter other than bind or none (0.6's adguard: run setup, which moves it), from
              check_filter_settings (the BIND resolver's lists,
              rules and upstreams), or from signin_level (a second factor that is not a level).
     Feeds:   apply_deployment."""
     final_vars["dhcp"] = normalize_dhcp(final_vars)
+    if final_vars.get("install_kea"):                 # on the host: its interfaces; elsewhere ({}) served from host_ip
+        final_vars["dhcp"] = place_subnets(final_vars["dhcp"], final_vars.get("host_ip"), host_networks() or None)
+    final_vars["dhcp_served"] = client_networks(final_vars)
+    final_vars["dhcp_reverse_zones"] = dhcp_reverse_zones(final_vars)
     normalize_ntp(final_vars)
     if final_vars.get("dns_filter") == "adguard":       # 0.6's: setup moves its settings (manual 2.3.12.1.9)
         raise ValidationError("dns_filter: adguard is gone since 0.7 (the BIND resolver replaces AdGuard Home): run "

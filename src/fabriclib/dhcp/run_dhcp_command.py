@@ -9,12 +9,17 @@ from fabriclib.dhcp.list_leases import list_leases
 from fabriclib.dhcp.remove_client_class import remove_client_class
 from fabriclib.dhcp.remove_reservation import remove_reservation
 from fabriclib.dhcp.remove_subnet import remove_subnet
+from fabriclib.dhcp.set_dhcp_on import set_dhcp_on
 from fabriclib.dhcp.set_option import set_option
 from fabriclib.dhcp.unset_option import unset_option
 from fabriclib.dhcp.update_subnet import KEEP, update_subnet
+from fabriclib.security.refresh_firewall import refresh_firewall
 from fabriclib.system.apply_changes import apply_changes
 
 USAGE = """usage: fabricctl dhcp status                       subnets (name, VLAN, notes), pools, options, classes
+       fabricctl dhcp on [--interface I --subnet N --pool "a - b" [--router IP]]
+                                                   turn DHCP on (the first subnet when it has none yet)
+       fabricctl dhcp off                          turn DHCP off (its settings and leases are kept)
        fabricctl dhcp leases                       active leases (from Kea)
        fabricctl dhcp reserve <mac> <ip> [<hostname>]
        fabricctl dhcp unreserve <mac>
@@ -29,14 +34,15 @@ USAGE = """usage: fabricctl dhcp status                       subnets (name, VLA
        fabricctl dhcp class remove <name>
    every change applies at once unless --no-apply"""
 FLAGS = {"--name", "--vlan", "--router", "--pool", "--notes", "--add-pool", "--remove-pool", "--subnet", "--class",
-         "--mac", "--test", "--next-server", "--boot-file", "--allow-overlap"}
+         "--mac", "--test", "--next-server", "--boot-file", "--allow-overlap", "--interface"}
 
 
 def _apply(args):
-    """Purpose: Apply a just-recorded DHCP change now, unless --no-apply was given.
+    """Purpose: Apply a just-recorded DHCP change now, unless --no-apply was given, then bring the host firewall in
+             line with it (refresh_firewall: the change is the admin's yes to the rules it implies, manual 1.10.3.5).
     Inputs:  args — list of str (looks for "--no-apply"). Runs apply_changes as root (interactive.py --apply).
-    Returns: 0 if skipped or applied; 1 if apply failed (last 2000 characters of its output on stdout).
-    Fails:   subprocess.TimeoutExpired (900 s) and OSError from apply_changes propagate.
+    Returns: 0 if skipped or applied; 1 if apply or the firewall failed (last 2000 characters of its output).
+    Fails:   subprocess.TimeoutExpired (900 s, 300 s) and OSError from apply_changes / refresh_firewall propagate.
     Feeds:   run_dhcp_command (every change).
     """
     if "--no-apply" in args:
@@ -44,6 +50,10 @@ def _apply(args):
         return 0
     ok, output = apply_changes("root", "cli")
     print("applied (Kea reloaded)" if ok else output[-2000:])
+    if not ok:
+        return 1
+    ok, output = refresh_firewall()
+    print("host firewall: in line" if ok else output[-2000:])
     return 0 if ok else 1
 
 
@@ -153,6 +163,12 @@ def run_dhcp_command(v, argv):
                 print(f"{lease['ip']:<15} {lease['mac']}  {lease['hostname'] or '-':<30} {lease['expires']}  "
                       f"{lease['state']}")
             return 0
+        if cmd in ("on", "off") and not pos:
+            r = set_dhcp_on("root", cmd == "on", one.get("--interface", ""), one.get("--subnet", ""),
+                            one.get("--pool", ""), one.get("--router", ""), source="cli")
+            print(f"DHCP {cmd}" + (f": {', '.join(r['subnets'])} on {', '.join(r['interfaces'])}" if r["on"] else
+                                   " (its settings and leases kept)"))
+            return _apply(args)
         if cmd == "reserve" and len(pos) in (2, 3):
             saved = add_reservation("root", pos[0], pos[1], pos[2] if len(pos) == 3 else "", source="cli")
             print(f"reserved {saved['ip']} for {saved['mac']}")

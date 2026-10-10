@@ -333,8 +333,9 @@ check("overview tab renders service health", st == 200 and "Overview" in body an
 check("overview: the host changes through the agent (this test install was never asked: says so)",
       "Host changes" in body and "Not asked yet" in body, body[-600:])
 st, hd, sc, body = req("GET", "/kea", ALICE, cookie=session)
-check("Kea tab: DHCP off on this host, how to turn it on", st == 200 and "DHCP is off" in body and "install_kea" in body,
-      (st, body[:300]))
+check("Kea tab: DHCP off on this host, a form to turn it on (interface, subnet, pool) naming the firewall change",
+      st == 200 and "DHCP is off" in body and 'action="/kea/on"' in body and 'name="interface"' in body
+      and "67/udp" in body, (st, body[:300]))
 st, hd, sc, body = req("GET", "/freeradius", ALICE, cookie=session)
 check("FreeRADIUS tab: 802.1X off on this host, how to turn it on",
       st == 200 and "802.1X is off" in body and "install_freeradius" in body and 'class="tab active"' in body,
@@ -375,6 +376,17 @@ check("invalid record name rejected", st == 303 and "err=" in hd["Location"], hd
 st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                  {"csrf": csrf, "type": "TXT", "name": "x", "text": 'a"\n$INCLUDE /etc/shadow'}, cookie=session)
 check("zone-file injection via TXT rejected", st == 303 and "err=" in hd["Location"], hd)
+# DHCP on and off from the console (manual 1.10.3.5): refusals here, the real turn-on in the lab suite
+for form, why, label in (({}, "give the interface, the subnet and a pool", "no settings and no first subnet"),
+                         ({"interface": "eth9", "subnet": "10.20.0.0/24", "pool": "10.20.0.100 - 10.20.0.199"},
+                          "no interface 'eth9'", "an interface this host does not have")):
+    st, hd, *_ = req("POST", "/kea/on", POSTH, {"csrf": csrf, **form}, cookie=session)
+    loc = urllib.parse.unquote_plus(hd.get("Location", ""))
+    check(f"turn DHCP on refused: {label} (said why, nothing saved)",
+          st == 303 and why in loc and "install_kea: true" not in open(f"{W}/fabric/config/vars.yaml").read(), loc)
+st, hd, *_ = req("POST", "/kea/off", POSTH, {"csrf": csrf}, cookie=session)
+check("turn DHCP off when it is off: refused, saying so", "already off" in urllib.parse.unquote_plus(
+    hd.get("Location", "")), hd)
 st, hd, sc, body = req("GET", "/bind9?zone=dynamic_zone_var", ALICE, cookie=session)
 idx = [row for row in body.split("<tr>") if "shelfmark" in row][0].split('name="index" value="')[1].split('"')[0]
 st, hd, *_ = req("POST", "/bind9/zone/dynamic_zone_var/delete", POSTH,
@@ -507,6 +519,11 @@ st, _, _, body = req("POST", "/bind9/zone/dynamic_zone_var/add", POSTH,
                      {"csrf": cookie_csrf(aud), "type": "A", "name": "sneaky", "ip": "192.168.7.9"}, cookie=aud)
 check("auditor: a crafted POST is refused by fabric-agent (403, permission named)",
       st == 403 and "dns:write" in body and "sneaky" not in open(f"{W}/fabric/config/vars.yaml").read(), (st, body[:200]))
+st, _, _, body = req("POST", "/kea/on", POSTH, {"csrf": cookie_csrf(aud), "interface": "eth0",
+                                                "subnet": "10.20.0.0/24", "pool": "10.20.0.100 - 10.20.0.199"}, cookie=aud)
+check("auditor: turning DHCP on is refused by fabric-agent (403, dhcp:write)",
+      st == 403 and "dhcp:write" in body and "install_kea: true" not in open(f"{W}/fabric/config/vars.yaml").read(),
+      (st, body[:200]))
 netops = bundle_roles("fabric-network-operator")
 (st, hd, sc, body), _, _ = login(roles=tuple(netops))
 net = cookie_val(sc, "__Host-webui")

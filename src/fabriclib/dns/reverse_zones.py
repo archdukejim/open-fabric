@@ -6,7 +6,8 @@ REVERSE_SUFFIXES = (".in-addr.arpa", ".ip6.arpa")
 
 def reverse_zones(v):
     """Purpose: The reverse zones generated from every A and AAAA record in the forward zones.
-    Inputs:  v — the vars dict; reads dns, domain (via zone_name), host_ip and each zone's zone_authority.
+    Inputs:  v — the vars dict; reads dns, domain (via zone_name), host_ip, each zone's zone_authority, and
+             dhcp_reverse_zones (zones DHCP registers in: present even with no static record, 2.1.10.7).
     Returns: {"zones": {zone: [{"label", "target" (FQDN with trailing dot), "ip", "source"}]} sorted by zone and label,
              "skipped": [{"name", "ip", "reason"}] for addresses that get no PTR}.
     Fails:   never — addresses that cannot get a PTR are listed in "skipped".
@@ -48,6 +49,9 @@ def reverse_zones(v):
             continue
         taken.add((zone, label))
         zones[zone].append({"label": label, "target": target, "ip": ip, "source": source})
+    for zone in v.get("dhcp_reverse_zones") or []:
+        if zone not in manual:
+            zones.setdefault(zone, [])
     for recs in zones.values():
         recs.sort(key=lambda r: (0, int(r["label"]), "") if r["label"].isdigit() else (1, 0, r["label"]))
     return {"zones": dict(sorted(zones.items())), "skipped": skipped}

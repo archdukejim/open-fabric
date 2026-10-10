@@ -25,6 +25,10 @@
     "ddns-replace-client-name": "when-not-present",
     "ddns-generated-prefix": "dhcp",
     "ddns-conflict-resolution-mode": "check-with-dhcid",
+    // a renewal registers again: what BIND lost while down comes back (2.1.10.7); lease caching would reuse a
+    // recent lease without any update, so it is off (one lease-file write per renewal)
+    "ddns-update-on-renew": true,
+    "cache-threshold": 0.0,
     "hostname-char-set": "[^A-Za-z0-9.-]",
     "hostname-char-replacement": "-",
 {% endif %}
@@ -53,8 +57,27 @@
 {% if uc %}
             "user-context": {{ uc | to_json }},
 {% endif %}
+{% if s.relay is defined and s.relay %}
+            "relay": { "ip-addresses": [ "{{ s.relay }}" ] },
+{% endif %}
             "pools": [ {% for p in s.pools | default([]) %}{ "pool": "{{ p }}" }{{ ', ' if not loop.last }}{% endfor %} ],
-            "option-data": {{ kea_option_data([{"name": "routers", "data": s.routers}] if s.routers is defined and s.routers else [], s.options) | to_json }},
+{# the subnet's own DNS and time server: fabric's address on the interface that serves it (2.1.10.5), unless
+   dhcp.dns / dhcp.ntp or a global option names them; the subnet's own options still replace these #}
+{% set _global_names = d.options | default([]) | selectattr('name', 'defined') | map(attribute='name') | list %}
+{% set sub_defaults = [{"name": "routers", "data": s.routers}] if s.routers is defined and s.routers else [] %}
+{% if s.server is defined and s.server and s.server != host_ip %}
+{# fabric's names point to host_ip: give the subnet a route to it through fabric's address there (option 121); a
+   client given option 121 ignores the router option (RFC 3442), so the default route goes in too (manual 1.10.3.3) #}
+{% set _routes = [host_ip ~ "/32 - " ~ s.server] + (["0.0.0.0/0 - " ~ s.routers] if s.routers is defined and s.routers else []) %}
+{% set _ = sub_defaults.append({"name": "classless-static-route", "data": _routes | join(", ")}) %}
+{% if d.dns is not defined and 'domain-name-servers' not in _global_names %}
+{% set _ = sub_defaults.append({"name": "domain-name-servers", "data": s.server}) %}
+{% endif %}
+{% if d.ntp is not defined and ntp_serve | default(true) and 'ntp-servers' not in _global_names %}
+{% set _ = sub_defaults.append({"name": "ntp-servers", "data": s.server}) %}
+{% endif %}
+{% endif %}
+            "option-data": {{ kea_option_data(sub_defaults, s.options) | to_json }},
             "reservations": [
 {% for r in s.reservations | default([]) %}
                 { "hw-address": "{{ r.mac | lower }}", "ip-address": "{{ r.ip }}"{% if r.hostname is defined and r.hostname %}, "hostname": "{{ r.hostname }}"{% endif %}{% if r.options is defined and r.options %}, "option-data": {{ kea_option_data([], r.options) | to_json }}{% endif %} }{{ ',' if not loop.last }}

@@ -1,6 +1,7 @@
 import json
 import os
 
+from fabriclib.dhcp.client_networks import client_networks
 from fabriclib.common.ensure_dir import ensure_dir
 from fabriclib.common.service_user import service_user
 from fabriclib.common.write_file_if_changed import write_file_if_changed
@@ -38,7 +39,8 @@ def deploy_resolver(v, secrets, links, jinja_env, fetch=True):
              fetched first, so the configuration only names lists that exist, and a list that would pass the memory
              limit is left out; converted lists no longer used are removed; a running resolver reloads what changed.
     Inputs:  v — rendered vars: deploy_base_dir, service_users.resolver, ip_bind9, lan_cidr, fabric_subnet,
-             security.firewall_allow, dns_filter_lists, dns_filter_allow, dns_filter_block, dns_filter_upstreams,
+             security.firewall_allow, DHCP's subnets (client_networks: full and guest, 2.1.10.4), dns_filter_lists,
+             dns_filter_allow, dns_filter_block, dns_filter_upstreams,
              dns_filter_safe_search, dns_filter_youtube, dns_filter_groups, resolver_mem_limit and what filter_zones
              reads; secrets — resolver_rndc_secret; links — dns_links' result (the linked sites' zones); jinja_env —
              fabric's template environment; fetch — False to skip fetching (tests, offline).
@@ -75,7 +77,8 @@ def deploy_resolver(v, secrets, links, jinja_env, fetch=True):
            "client_tls": client_tls,
            "upstream_names": list(dict.fromkeys(u["name"] for u in upstreams)),
            "clients": list(dict.fromkeys([v["lan_cidr"], v["fabric_subnet"],
-                                          *(security.get("firewall_allow") or [])]))}
+                                          *(security.get("firewall_allow") or []),
+                                          *client_networks(v)["full"], *client_networks(v)["guest"]]))}
     files = {name: jinja_env.get_template(f"resolver/config/{name}.j2").render(**ctx) for name in CONFIG}
     rpz = jinja_env.get_template("resolver/config/rules.rpz.j2")
     for level, zone in SAFE_ZONES.items():

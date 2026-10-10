@@ -29,6 +29,7 @@ from fabriclib.dhcp.check_kea_config import check_kea_config  # noqa: E402
 from fabriclib.common.errors import ValidationError  # noqa: E402
 from fabriclib.dhcp.deploy_kea import deploy_kea  # noqa: E402
 from fabriclib.dhcp.list_leases import list_leases  # noqa: E402
+from fabriclib.dhcp.dhcp_reverse_zones import dhcp_reverse_zones  # noqa: E402
 from fabriclib.dhcp.normalize_dhcp import normalize_dhcp  # noqa: E402
 
 
@@ -99,6 +100,8 @@ V = {"deploy_base_dir": W, "domain": "lan.test", "install_kea": True, "ip_kea_dd
                            "reservations": [{"mac": "02:00:00:00:00:42", "ip": "10.254.23.42",
                                              "hostname": "printer"}]}]}}
 V["dhcp"] = normalize_dhcp(V)
+V["dhcp_reverse_zones"] = dhcp_reverse_zones(V)          # as check_settings sets it (2.1.10.7)
+REV = V["dhcp_reverse_zones"][0]
 env = jinja_env(os.path.join(REPO, "templates"))
 secret = sh("openssl rand -base64 32").stdout.strip()
 check("Kea's configs, lease and socket folders, and the DHCP subzone file written",
@@ -117,7 +120,10 @@ except ValidationError as e:
 check("an option Kea does not know is refused by Kea's own check, and nothing is written",
       "Kea refused" in refused and open(f"{W}/kea/config/kea-dhcp4.conf").read() == cfg4, refused[-300:])
 os.makedirs(f"{W}/bind9/config", exist_ok=True)
-bv = {**V, "dns": {}, "bind_acls": {"lan": ["any"]}, "tsig_keys": [], "tsig_secrets": {}, "kea_ddns_secret": secret}
+bv = {**V, "dns": {}, "bind_acls": {"lan": ["any"]}, "tsig_keys": [], "tsig_secrets": {}, "kea_ddns_secret": secret,
+      "reverse_zone_names": [REV]}
+open(f"{W}/bind9/data/db.{REV}", "w").write(env.get_template("bind9/data/reverse-zone.j2").render(
+    **bv, reverse_zone_name=REV, ptr_records=[]))
 open(f"{W}/bind9/config/named.conf", "w").write(
     'options { directory "/var/cache/bind"; listen-on { any; }; listen-on-v6 { none; }; recursion no; };\n'
     'acl "lan" { any; };\n'
@@ -191,6 +197,10 @@ check("a client in the boot class gets next-server, the boot file and the TFTP s
       and "tftp=10.254.23.30" in outb, outb[-500:])
 ip2, out2 = client("kt-c2", "02:00:00:00:00:42")
 check("a reserved MAC gets its fixed address", ip2 == "10.254.23.42", out2[-400:])
+check(f"the lease's PTR is registered too, in fabric's reverse zone {REV} (2.1.10.7)",
+      until(lambda: sh(["dig", "+short", f"@{BIND_IP}", "-x", ip1], ok=False).stdout.strip()
+            == "laptop1.dhcp.lan.test.", 30), (sh(["dig", "+short", f"@{BIND_IP}", "-x", ip1], ok=False).stdout,
+                                               sh("docker logs kt-ddns", ok=False).stdout[-600:]))
 ip3, out3 = client("kt-c3", "02:00:00:00:00:13", "laptop1")
 time.sleep(3)
 check("another client asking for the same name cannot take it over (DHCID)", ip3 and ip3 != ip1
@@ -201,6 +211,9 @@ check("lease list over the control socket shows the clients", any(lease["ip"] ==
 evil = sh(f"printf 'server {BIND_IP}\\nzone lan.test\\nupdate add evil.lan.test 60 A 1.2.3.4\\nsend\\n' "
           f"| nsupdate -y hmac-sha256:kea-ddns:{secret} 2>&1", ok=False).stdout
 check("the key may not touch anything but the DHCP subzone", "REFUSED" in evil or "NOTAUTH" in evil, evil[-300:])
+evil_rev = sh(f"printf 'server {BIND_IP}\\nzone {REV}\\nupdate add 9.{REV} 60 TXT evil\\nsend\\n' "
+              f"| nsupdate -y hmac-sha256:kea-ddns:{secret} 2>&1", ok=False).stdout
+check("in the reverse zone the key may write PTR and DHCID only (a TXT refused)", "REFUSED" in evil_rev, evil_rev[-300:])
 
 
 def leases_or_none():

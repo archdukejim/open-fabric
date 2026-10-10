@@ -73,7 +73,9 @@ def normalize_dhcp(v):
     Inputs:  v — the vars dict: install_kea; dhcp {interfaces (names up to 15 characters), subnets [{subnet (IPv4
              network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a
              record, fabric configures no switch), notes (at most 500 characters), allow_overlap (why it may
-             overlap another site's network, at most 200 characters), pools, routers, options,
+             overlap another site's network, at most 200 characters), access ("full", the default, or "guest":
+             DNS and NTP only, 2.1.10.4), relay (the DHCP relay's address when it lies outside the subnet: Kea
+             picks a relayed subnet by that address, manual 1.10.3.2), pools, routers, options,
              reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes
              (manual 1.10.2.3), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default
              this host), lease_time (int 300-2592000, default 86400)}; dns (its A records); fabric_subnet
@@ -84,7 +86,8 @@ def normalize_dhcp(v):
              when set; options, option_defs and client_classes normalized (left out when empty).
     Fails:   ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4
              subnet, a subnet overlapping fabric_subnet, a bad or repeated id, name or vlan, notes or
-             allow_overlap too long, a bad pool or two pools overlapping
+             allow_overlap too long, an access that is not full or guest, a relay that is not an IPv4 address, a
+             bad pool or two pools overlapping
              (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
              pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain
              ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options,
@@ -142,6 +145,19 @@ def normalize_dhcp(v):
                 raise ValidationError(f"{net}: allow_overlap is one line of at most 200 characters (why it may "
                                       "overlap another site's network)")
             meta["allow_overlap"] = reason
+        access = s.get("access", "full")
+        if access not in ("full", "guest"):
+            raise ValidationError(f"{net}: access is full (fabric's services, the default) or guest (DNS and NTP only)")
+        if access == "guest":
+            meta["access"] = "guest"
+        if s.get("relay"):
+            try:
+                relay = ipaddress.ip_address(str(s["relay"]))
+            except ValueError:
+                relay = None
+            if relay is None or relay.version != 4:
+                raise ValidationError(f"{net}: relay {s['relay']!r} is the DHCP relay's IPv4 address")
+            meta["relay"] = str(relay)
         if net.overlaps(fabric_net):
             raise ValidationError(f"{net} overlaps fabric's own container network {fabric_net} (fabric_subnet): "
                                   "clients there could not reach this site's services")
@@ -175,7 +191,7 @@ def normalize_dhcp(v):
             reservations.append({"mac": mac, "ip": str(ip), **({"hostname": host} if host else {}),
                                  **({"options": ropts} if ropts else {})})
         sopts = normalize_options(s.get("options"), f"subnet {meta.get('name', net)}")
-        own = ("name", "vlan", "notes", "options", "allow_overlap")
+        own = ("name", "vlan", "notes", "options", "allow_overlap", "access", "relay")
         subnets.append({**{k: x for k, x in s.items() if k not in own},
                         **meta, "subnet": str(net), "reservations": reservations,
                         **({"options": sopts} if sopts else {})})

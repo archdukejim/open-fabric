@@ -25,6 +25,13 @@ services:
       - "{{ host_ip }}:53:53/udp"
       # DNS-over-TLS for clients (1.12.2.16); DoH comes through nginx to 8053 on fabric_net, never published
       - "{{ host_ip }}:853:853/tcp"
+{# fabric's address on each network DHCP serves, full or guest (manual 1.10.3.3) #}
+{% set _served = dhcp_served | default({}) %}
+{% for addr in ((_served.full_addrs | default([])) + (_served.guest_addrs | default([]))) | unique if addr != host_ip %}
+      - "{{ addr }}:53:53/tcp"
+      - "{{ addr }}:53:53/udp"
+      - "{{ addr }}:853:853/tcp"
+{% endfor %}
     volumes:
       - {{ deploy_base_dir }}/resolver/config:/etc/bind:ro
       - {{ deploy_base_dir }}/resolver/lists:/etc/bind-lists:ro

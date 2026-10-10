@@ -3,7 +3,7 @@
 {% if msg %}<p class="flash ok">{{ msg }}</p>{% endif %}
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 <nav class="sections">
-{% for id, label in bind9_sections %}<a href="/bind9{{ '' if id == 'forward' else '?view=' ~ id }}" class="section{{ ' active' if id == section }}">{{ label }}</a>{% endfor %}
+{% for id, label in bind9_sections if id != 'dhcp' or can('dhcp:read') %}<a href="/bind9{{ '' if id == 'forward' else '?view=' ~ id }}" class="section{{ ' active' if id == section }}">{{ label }}</a>{% endfor %}
 </nav>
 
 {% if section == 'forward' %}
@@ -65,6 +65,19 @@ delete the record and add it again).</p></section>
 {% for r in reverse.skipped %}<tr><td>{{ r.name }}</td><td><code>{{ r.ip }}</code></td><td class="muted">{{ r.reason }}</td></tr>{% endfor %}
 </tbody></table></section>
 {% endif %}
+
+{% elif section == 'dhcp' %}
+<section class="card"><h2>Names DHCP registered</h2>
+{% if not dhcp or not dhcp.enabled %}<p class="muted">DHCP is off: no names are registered (the Kea tab turns it on).</p>
+{% elif not dhcp.ddns_zone %}<p class="muted">DHCP does not register names here (dhcp.ddns is off).</p>
+{% else %}
+<p class="muted">Each client's name in <code>{{ dhcp.ddns_zone }}</code> and its reverse (PTR) record, as Kea registered them for its leases. Read-only: names come from the clients, or from a reservation's hostname in the Kea tab.</p>
+{% if dhcp.leases_error %}<p class="flash bad">Kea's leases could not be read: {{ dhcp.leases_error }}</p>
+{% elif not dhcp.leases %}<p class="muted">No leases yet.</p>
+{% else %}<table><thead><tr><th>Name</th><th>Address</th><th>Reverse name</th><th>Lease ends</th></tr></thead><tbody>
+{% for l in dhcp.leases if l.hostname %}<tr><td>{{ l.hostname }}</td><td>{{ l.ip }}</td><td>{{ (l.ip.split('.') | reverse | join('.')) ~ '.in-addr.arpa' }}</td><td>{{ l.expires }}</td></tr>
+{% endfor %}</tbody></table>{% endif %}
+{% endif %}</section>
 
 {% else %}
 <section class="card"><h2>TSIG keys</h2>

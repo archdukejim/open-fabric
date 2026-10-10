@@ -18,7 +18,8 @@ DNS_FILTER_SECTIONS = [("overview", "Overview"), ("lists", "Lists"), ("rules", "
                        ("querylog", "Query log"), ("settings", "Settings")]
 # BIND9 tab sections: (view, label)
 FREERADIUS_SECTIONS = [("overview", "Overview"), ("switches", "Connect a switch"), ("windows", "Connect Windows")]
-BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("tsig", "TSIG keys")]
+BIND9_SECTIONS = [("forward", "Forward zones"), ("reverse", "Reverse zones"), ("dhcp", "DHCP names"),
+                  ("tsig", "TSIG keys")]
 # OpenBao tab sections and unlock-method (key slot) types
 OPENBAO_SECTIONS = [("status", "Status"), ("unlock", "Unlock methods"), ("secrets", "Secrets"),
                     ("disk", "Disk encryption")]

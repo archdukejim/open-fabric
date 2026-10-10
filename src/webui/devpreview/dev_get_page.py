@@ -28,13 +28,14 @@ def dev_get_page(h, path, query):
             return h.send(400, views.error_page(400, "no such job"))
         return h.send(200, views.job_page(ctx, job))
     if path == "/bind9":
-        section = query.get("view") if query.get("view") in ("reverse", "tsig") else "forward"
+        section = query.get("view") if query.get("view") in ("reverse", "dhcp", "tsig") else "forward"
         key = query.get("zone") or next(iter(state.data["zones"]))
         zone = state.zone(key) if section == "forward" and key in state.data["zones"] else None
         return h.send(200, views.bind9(ctx, section, state.zones(), zone=zone, types=RECORD_TYPES,
                                        msg=query.get("msg", ""), err=query.get("err", ""),
                                        tsig_keys=state.data["tsig"] if section == "tsig" else None,
-                                       reverse=state.reverse() if section == "reverse" else None))
+                                       reverse=state.reverse() if section == "reverse" else None,
+                                       dhcp=SAMPLE_DHCP if section == "dhcp" else None))
     if path == "/stepca":
         view = query.get("view", "ca")
         view = view if view in views.STEPCA_VIEWS else "ca"
@@ -80,7 +81,10 @@ def dev_get_page(h, path, query):
         return h.send(200, views.dns_filter(ctx, view, SAMPLE_DNS_FILTER, log, search, query.get("msg", ""),
                                             query.get("err", "")))
     if path == "/kea":
-        return h.send(200, views.kea(ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
+        # ?off=1: DHCP off, as a first turn-on shows it (manual 1.10.3.5); ?off=resume: off with settings kept
+        sample = SAMPLE_DHCP if not query.get("off") else {
+            **SAMPLE_DHCP, "enabled": False, "has_settings": query.get("off") == "resume", "leases": []}
+        return h.send(200, views.kea(ctx, sample, query.get("msg", ""), query.get("err", "")))
     if path == "/freeradius":
         view = query.get("view", "overview")
         guides = sample_radius_guides() if view in ("switches", "windows") else None
