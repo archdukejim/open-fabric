@@ -45,12 +45,14 @@ jobs:
         env:
           FABRIC_TEST_OUT: /tmp/fabric-tests
         run: sudo -E tests/run-all.sh ${{ matrix.suite }}
-      - name: Keep the suite's output (30 days)
+      # only the logs: the rest of /tmp/fabric-tests holds the run's keys and secrets (root only), which an artifact
+      # would hand to anyone who can download it
+      - name: Keep the suite's log (30 days)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: suite-${{ matrix.arch }}-${{ matrix.suite }}
-          path: /tmp/fabric-tests
+          path: /tmp/fabric-tests/*.log
           retention-days: 30
           if-no-files-found: ignore
 
@@ -83,11 +85,11 @@ jobs:
       - name: The image-update test on the sandbox
         shell: bash     # with pipefail: tee keeps the test's own exit status
         run: sudo tests/images/update.sh --box fabric-sandbox 2>&1 | tee /tmp/fabric-tests/image-update.log
-      - name: Keep the output (30 days)
+      - name: Keep the logs (30 days)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: full-${{ matrix.arch }}
-          path: /tmp/fabric-tests
+          path: /tmp/fabric-tests/*.log
           retention-days: 30
           if-no-files-found: ignore
