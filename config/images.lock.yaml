@@ -53,20 +53,6 @@ images:
     digest: sha256:d792375ca8e53be72fc25716c28f291f32c6fc6f4f31d12d0d14bc78cefe9226
     track: "5.1.*"
     policy: auto
-  adguard:                           # optional: DNS filter in front of BIND (dns_filter: adguard)
-    var: image_adguard
-    repo: adguard/adguardhome
-    tag: "v0.107.79"
-    digest: sha256:aba9e3bf0613be3ba3755e1fc311b126e2c24bec25e18b6483894a88283074f0
-    track: "v0.107.*"
-    policy: auto
-  oauth2proxy:                       # optional: OIDC sign-in in front of AdGuard's UI
-    var: image_oauth2proxy
-    repo: quay.io/oauth2-proxy/oauth2-proxy
-    tag: "v7.15.5"
-    digest: sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
-    track: "v7.15.*"
-    policy: auto
   cosign:                            # verifies the signatures of fabric's published images (2.1.14.6, 2.1.14.11)
     var: image_cosign
     repo: ghcr.io/sigstore/cosign/cosign
@@ -96,7 +82,6 @@ published:
   signer: ^https://github\.com/archdukejim/open-fabric/\.github/workflows/images\.yml@refs/(heads/main|heads/rc/.+|tags/v.+)$
   issuer: https://token.actions.githubusercontent.com
   images:
-    adguard:    {var: image_fabric_adguard, tag: "0.6.3-rc.64", digest: "sha256:a3b2f4e6dd94ce31ec28b87734c7607c2851333a2f342a854c9be836da23e059", source: "sha256:f443da15acfe0717f70176119317ee78c4a9b8d22c0f45dcb54d25930128cec1"}
     bind9:      {var: image_fabric_bind9, tag: "0.6.3-rc.64", digest: "sha256:ecf6b4c2e327ea7e5e22cc1cc8280a6c3145c2f9d7c3ca10a976b92098de3851", source: "sha256:cfad6ca373441787e72ba1b7bb837f0f0d3f364274f2cfb4b72fd9cb3b34255a", account: bind, ids: "600:600"}
     freeradius: {var: image_fabric_freeradius, tag: "0.6.3-rc.64", digest: "sha256:116230ef60f1657221bf63f39473872c449e71f60b7131303c47fff3e3be5330", source: "sha256:d9dd93ddf40797b22c885f96e1663b65d7c99eee4898a90298ebe58e36969cbf", account: freeradius, ids: "610:610"}
     kea:        {var: image_fabric_kea, tag: "0.6.3-rc.64", digest: "sha256:a34644d26ac2708a95d94ef9753e3097ae3360f951094af305b7c630cef4162c", source: "sha256:78b1e088e11a51e67e1a04de84c174d7acefafafe7e080988c971c6e1bcb592a", account: kea, ids: "609:609"}

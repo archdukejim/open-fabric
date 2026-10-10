@@ -13,14 +13,16 @@ from fabriclib.undo.undo_trust import undo_trust
 
 # ldap, fabric-directory-sync and dirsrv: 389-DS, gone since 0.5.0 (S7); still removed where an older install
 # left them
-UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "samba", "adguard", "adguard-auth", "fabric-agent",
-         "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres", "ldap", "stepca",
-         "bind9", "fabric-firewall", "fabric-certs", "fabric-db-rotate"]
+UNITS = ["fabric-web", "webui", "fluentbit", "kea", "freeradius", "samba", "adguard", "adguard-auth", "bind9-resolver",
+         "fabric-agent", "fabric-federation", "fabric-directory-sync", "nginx", "openbao", "keycloak", "postgres",
+         "ldap", "stepca", "bind9", "fabric-firewall", "fabric-certs", "fabric-db-rotate", "fabric-dns-lists",
+         "fabric-dns-log"]
 TARGET = "/etc/systemd/system/fabric.target"
 CONTAINERS = ["fabric-web", "webui", "fluentbit", "kea-dhcp4", "kea-ddns", "freeradius", "samba", "adguardhome",
-              "oauth2-proxy-adguard", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca", "bind9"]
+              "oauth2-proxy-adguard", "bind9-resolver", "nginx", "openbao", "keycloak", "postgres", "dirsrv", "step-ca",
+              "bind9"]
 DIRS = ["fabric", "nginx", "bind9", "stepca", "dirsrv", "keycloak", "postgres", "webui", "openbao", "fluentbit", "kea",
-        "freeradius", "samba", "federation", "adguard", "adguard-auth"]
+        "freeradius", "samba", "federation", "adguard", "adguard-auth", "resolver"]
 LOCAL_IMAGES = ["fabric/bind9:local", "fabric/stepca:local", "fabric/dirsrv:local", "fabric/keycloak:local",
                 "fabric/web:local", "fabric/webui:local", "fabric/kea:local", "fabric/freeradius:local",
                 "fabric/samba:local"]
@@ -44,7 +46,7 @@ def uninstall(ctx):
     v = ctx.vars
 
     info("stopping and removing services")
-    for timer in ("fabric-directory-sync", "fabric-certs", "fabric-db-rotate"):
+    for timer in ("fabric-directory-sync", "fabric-certs", "fabric-db-rotate", "fabric-dns-lists", "fabric-dns-log"):
         subprocess.run(["systemctl", "disable", "--now", f"{timer}.timer"], capture_output=True)
     for unit in UNITS:
         subprocess.run(["systemctl", "disable", "--now", unit], capture_output=True)

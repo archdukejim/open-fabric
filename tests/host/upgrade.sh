@@ -64,8 +64,8 @@ R 'python3 /tmp/upgrade_state.py seed && fabricctl --apply' > "$OUT/seed.log" 2>
 R "fabricctl client-cert carol | sed -n 's/^.p12 password (shown once): //p' > /root/upgrade-test-carol.pw &&    openssl pkcs12 -in \$(getent passwd \$(logname 2>/dev/null || echo \$SUDO_USER) | cut -d: -f6)/fabric-admin/carol.p12    -nokeys -clcerts -passin file:/root/upgrade-test-carol.pw -out /root/upgrade-test-carol.pem &&    rm -f /root/upgrade-test-carol.pw && echo carol certificate" > "$OUT/client-cert.log" 2>&1
 R 'fabricctl security raise admin-2fa totp' > "$OUT/raise.log" 2>&1
 R 'python3 /tmp/upgrade_state.py snapshot' > "$OUT/before.json" 2>"$OUT/before.err"
-check "seeded: the person, the record, the certificate, the AdGuard rule, the raised layer" \
-    "grep -q '192.0.2.55' '$OUT/before.json' && grep -q '\"adguard rule\": true' '$OUT/before.json' && \
+check "seeded: the person, the record, the certificate, the DNS filter rule, the raised layer" \
+    "grep -q '192.0.2.55' '$OUT/before.json' && grep -q '\"dns filter rule\": true' '$OUT/before.json' && \
      grep -q 'admin-2fa totp' '$OUT/before.json' && grep -q 'objectGUID' '$OUT/before.json' && \
      grep -q 'upgrade-test-carol.pem: OK' '$OUT/before.json' && grep -q 'objectGUID' '$OUT/before.json'"
 
@@ -91,14 +91,26 @@ check "$TO: the console's admin role renamed fabric-console-admin, the old name 
      && grep -q 'fabric-admin removed' '$OUT/setup-to.log'"
 
 R 'python3 /tmp/upgrade_state.py snapshot' > "$OUT/after.json" 2>"$OUT/after.err"
-check "kept: secrets (each one there before, unchanged; new ones may be added, Keycloak's database password rotates)"     "python3 -c \"import json,sys; a=json.load(open('$OUT/before.json'))['secrets']; b=json.load(open('$OUT/after.json'))['secrets']; sys.exit(any(b.get(k) != v for k, v in a.items()))\""
-for key in "root_ca" "person carol" "issued" "dns record" "adguard rule" "security"; do
+# AdGuard Home's three secrets are retired with it (0.7, manual 2.3.12.1.9)
+check "kept: secrets (each one there before, unchanged; new ones may be added, Keycloak's database password rotates)"     "python3 -c \"import json,sys; a=json.load(open('$OUT/before.json'))['secrets']; b=json.load(open('$OUT/after.json'))['secrets']; sys.exit(any(b.get(k) != v for k, v in a.items() if not k.startswith('adguard_')))\""
+for key in "root_ca" "person carol" "issued" "dns record" "dns filter rule" "security"; do
     check "kept: $key" "python3 -c \"import json,sys; a=json.load(open('$OUT/before.json')); \
 b=json.load(open('$OUT/after.json')); sys.exit(a.get('$key') != b.get('$key'))\""
 done
 ADMIN_KEY=$(python3 -c "import json; print([k for k in json.load(open('$OUT/before.json')) if k.startswith('person ') and k != 'person carol'][0])")
 check "kept: the admin ($ADMIN_KEY), password unchanged" "python3 -c \"import json,sys; \
 a=json.load(open('$OUT/before.json')); b=json.load(open('$OUT/after.json')); sys.exit(a['$ADMIN_KEY'] != b['$ADMIN_KEY'])\""
+# 0.6 -> 0.7: AdGuard Home's settings moved to the BIND resolver and AdGuard retired (manual 2.3.12.1.9)
+if grep -q '"dns filter rule": true' "$OUT/before.json" && ! R 'test -d /opt/resolver' >/dev/null 2>&1; then
+    echo "    (no move to the BIND resolver in this upgrade: $FROM -> $TO)"
+elif R 'test -d /opt/resolver' >/dev/null 2>&1; then
+    check "AdGuard retired: no unit, container, folder or account left; the import record kept" \
+        "! R 'test -e /etc/systemd/system/adguard.service || test -d /opt/adguard || getent passwd fabric-dnsfilter' \
+         && ! R 'docker ps -a --format {{.Names}}' | grep -qE '^(adguardhome|oauth2-proxy-adguard)$' \
+         && R 'ls /opt/fabric/config/dns-filter-import-*.json' >/dev/null"
+    check "the rule added in AdGuard's UI blocks through the resolver (owner.rpz)" \
+        "R 'dig @$HOST_IP upgrade-test.invalid >/dev/null; grep -q \"upgrade-test.invalid/A/IN via upgrade-test.invalid.owner.rpz\" /opt/resolver/log/rpz.log'"
+fi
 R 'fabricctl doctor' > "$OUT/doctor.log" 2>&1
 check "doctor passes after the upgrade" "! grep -q '✗' '$OUT/doctor.log' && grep -q '✓' '$OUT/doctor.log'"
 R 'fabricctl status' > "$OUT/status.log" 2>&1

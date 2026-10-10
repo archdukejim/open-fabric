@@ -17,19 +17,20 @@ PLAN = [
 ]
 
 
-CLOUDFLARE = ["https://1.1.1.1/dns-query", "https://1.0.0.1/dns-query"]     # vars.yaml.j2's default (2.1.12.1)
+CLOUDFLARE = [{"address": "1.1.1.1", "name": "cloudflare-dns.com"},
+              {"address": "1.0.0.1", "name": "cloudflare-dns.com"}]           # vars.yaml.j2's default (2.1.12.3)
 
 
 def _upstreams_text(ctx):
     """Purpose: how the plan names the DNS filter's internet upstreams.
-    Inputs:  ctx — SetupContext; reads ctx.vars adguard_upstreams (None: the default).
-    Returns: "Cloudflare (DNS-over-HTTPS)", "local DNS only" or the upstreams joined by ", ".
+    Inputs:  ctx — SetupContext; reads ctx.vars dns_filter_upstreams (None: the default).
+    Returns: "Cloudflare (DNS-over-TLS)", "the root servers (no forwarder)" or "<address> (<name>)" joined by ", ".
     Fails:   never.
     Feeds:   choose_plan."""
-    ups = ctx.vars.get("adguard_upstreams")
+    ups = ctx.vars.get("dns_filter_upstreams")
     if ups is None or list(ups) == CLOUDFLARE:
-        return "Cloudflare (DNS-over-HTTPS)"
-    return ", ".join(ups) or "local DNS only"
+        return "Cloudflare (DNS-over-TLS)"
+    return ", ".join(f"{u.get('address')} ({u.get('name')})" for u in ups) or "the root servers (no forwarder)"
 
 
 def _ca_exists(ctx):
@@ -92,12 +93,12 @@ def choose_plan(ctx):
     """Purpose: show what setup will do (every default is the hardened choice), then Proceed / Advanced / Quit.
              Advanced holds only what cannot be changed later (2.1.2.16): the CA root's lifetime, before the CA
              exists; without it there is no Advanced. Everything else shown is a default changed after the install
-             (fabricctl, the vars editor; the web console's settings page from 0.7).
+             (fabricctl, the vars editor; the web console's settings page after 0.7, 2.1.1.42).
     Inputs:  ctx — SetupContext: vars (PLAN keys, install_* flags, log_forwarding, dhcp, radius_clients,
              webui_admin_user), non_interactive, assume_yes. Interactive unless one of those two is set.
     Returns: None. Every PLAN item's effective value is written into ctx.vars (so what was shown is what gets
-             rendered), and dns_filter (AdGuard on unless set to none, 2.1.12.1); install_webui is forced off when
-             Keycloak is off. deploy_config saves ctx.vars to
+             rendered), and dns_filter (the BIND resolver on unless set to none, 2.1.12.3); install_webui is forced
+             off when Keycloak is off. deploy_config saves ctx.vars to
              fabric.yaml, so a --file can set all of these non-interactively.
     Fails:   SystemExit("setup cancelled") on Quit; EOFError from input().
     Feeds:   run_setup main (full runs only, after collect_vars)."""
@@ -120,11 +121,11 @@ def choose_plan(ctx):
                   "chose; login kit in ~/fabric-admin")
         lf = ctx.vars.get("log_forwarding") or {}
         dests = [d for d in ((lf.get("syslog") or {}).get("host"), (lf.get("elastic") or {}).get("url")) if d]
-        if ctx.vars.get("dns_filter", "adguard") == "adguard":
-            print(f"  ✓ DNS filter: AdGuard Home answers DNS on port 53, internet lookups to {_upstreams_text(ctx)}, "
-                  "AdGuard's DNS filter; its page https://adguard.<domain>")
+        if ctx.vars.get("dns_filter", "bind") == "bind":
+            print("  ✓ DNS filter: fabric's resolver answers DNS on port 53, internet lookups to "
+                  f"{_upstreams_text(ctx)}, AdGuard's DNS filter list (sudo fabricctl dns-filter status)")
         else:
-            print("  · Optional, off: DNS filter (AdGuard Home)")
+            print("  · Optional, off: DNS filter (fabric's resolver)")
         if ctx.vars.get("install_kea"):
             subnets = ", ".join(s.get("subnet", "?") for s in (ctx.vars.get("dhcp") or {}).get("subnets") or [])
             print(f"  ✓ Optional: DHCP with Kea 3.0 on {subnets or '(no subnet yet)'}; hostnames in dhcp.<domain>")
@@ -146,7 +147,7 @@ def choose_plan(ctx):
     # gets rendered (template defaults differ, e.g. install_keycloak).
     for key, default, _, _ in PLAN:
         _set(ctx.vars, key, bool(_get(ctx.vars, key, default)))
-    ctx.vars["dns_filter"] = str(ctx.vars.get("dns_filter") or "adguard").lower()
+    ctx.vars["dns_filter"] = str(ctx.vars.get("dns_filter") or "bind").lower()
     show()
     if ctx.non_interactive or ctx.assume_yes:
         return

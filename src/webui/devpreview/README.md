@@ -4,11 +4,12 @@ The dev preview (`devserver.py`): the real pages over in-memory sample data; no 
 
 | File | What |
 |---|---|
-| `dev_get_page.py` | Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao, /directory, /kea, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks like). No sign-in, no client certificate, no fabric-agent. |
+| `dev_get_page.py` | Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao, /directory, /kea, /dns-filter, /freeradius, /audit, /static/app.css, and /preview/denied (what a refused sign-in looks like). No sign-in, no client certificate, no fabric-agent. |
 | `dev_handler.py` | One dev-preview request: the real pages over in-memory sample data; no sign-in, nothing saved. |
 | `dev_post_action.py` | Act out every form post in memory only (DNS records, TSIG keys, apply, PKI, vault, devices, roles, people, DHCP reservations, subnets, options and classes, RADIUS clients and groups) and show the same result page or redirect as production. Nothing is saved, signed or applied; secrets and passwords shown are fake or throwaway. |
 | `dev_post_directory.py` | People, devices and roles acted out in memory, with the real fabriclib rules when available. |
 | `dev_post_dns.py` | TSIG keys and zone records acted out in memory (secrets are fresh random throwaways). |
+| `dev_post_dns_filter.py` | The DNS filter tab's changes (lists, rules, upstreams) on the sample data |
 | `dev_post_dhcp.py` | The Kea tab's changes (reservations, subnets, options, classes) on the sample data |
 | `dev_post_network.py` | RADIUS groups and clients, acted out on the sample data in memory. |
 | `dev_state.py` | In-memory sample data; nothing leaves this process. |

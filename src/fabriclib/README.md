@@ -24,7 +24,7 @@ and import as `fabriclib.<domain>.<file>`.
 | [keycloak/](keycloak/) | Keycloak over its admin REST API: people, sign-in resets, roles, token checks, the OpenBao OIDC client |
 | [vault/](vault/) | OpenBao: init, configure, status, unlock methods (key slots: USB, security key, KMIP), vault key rotation, root token |
 | [secrets/](secrets/) | fabric's own secrets: the 0600 file until the vault step, then OpenBao; load, save, import, export |
-| [dns_filter/](dns_filter/) | Optional DNS filter (AdGuard Home) in front of BIND: its configuration and deploy |
+| [dns_filter/](dns_filter/) | The DNS filter, a BIND resolver: lists converted to response policy zones, its configuration and deploy |
 | [menu/](menu/) | The vars editor (`fabricctl --interactive`), `--print` and `--apply` — `lib/interactive.py` is their entry point |
 | [deploy/](deploy/) | The deploy engine (apply): secrets, settings, render, install, restart — `lib/deploy.py` is its entry point |
 | [ntp/](ntp/) | Time: chrony on the host, serving the network, its settings and checks |

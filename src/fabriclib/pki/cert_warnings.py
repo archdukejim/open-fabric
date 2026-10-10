@@ -12,7 +12,7 @@ CA_DAYS_LEFT = 180             # the root or intermediate CA (2.1.5.5): replacin
 # where the service certificates are, under the deploy base (mint_service_certs' destinations)
 SERVICE_CERTS = ["nginx/certs/*/fullchain.pem", "bind9/ssl/fullchain.pem", "openbao/certs/fullchain.pem",
                  "keycloak/certs/fullchain.pem", "postgres/certs/fullchain.pem", "samba/tls/fullchain.pem",
-                 "freeradius/certs/server.pem"]
+                 "freeradius/certs/server.pem", "resolver/tls/fullchain.pem"]
 
 
 def _left(path, now):

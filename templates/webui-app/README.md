@@ -13,6 +13,7 @@ The page templates (Jinja2, rendered by `views/render_page.py` with autoescape; 
 | `directory_macros.html` | Macros for the device and role forms |
 | `error.html` | The error page |
 | `freeradius.html` | The freeradius page |
+| `dns_filter.html` | The DNS filter tab |
 | `kea.html` | The kea page |
 | `openbao.html` | The openbao page |
 | `overview.html` | The overview page |

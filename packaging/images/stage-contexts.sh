@@ -17,7 +17,7 @@ trap 'rm -rf "$TREE"' EXIT
 
 bash "$REPO/packaging/deb/assemble-tree.sh" "$TREE"
 rm -rf "$DEST"; mkdir -p "$DEST"
-for image in adguard bind9 freeradius kea keycloak samba stepca webui; do
+for image in bind9 freeradius kea keycloak samba stepca webui; do
     cp -a "$TREE/fabric/jinja/$image/build" "$DEST/$image"
 done
 cp -a "$TREE/fabric/lib/webui" "$DEST/webui/app"

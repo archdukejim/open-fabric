@@ -15,7 +15,7 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `zone` | `zone_test.py` | `deploy.py`'s zone deployment with `rndc` stubbed: unchanged records ignored, changed zones found, fresh mtime, BIND's late write detected and the swap repeated, stale journal removed |
 | `webui` | [webui/](webui/) | The web UI container against a mock Keycloak and the real fabric-agent; the dev preview |
 | `pki` | [pki/](pki/) | Manual PKI against a real Step-CA |
-| `adguard` | [adguard/](adguard/) | The DNS filter: AdGuard Home from fabric's generated config in front of BIND (real containers): resolution, rules, auth, the merge that keeps UI edits |
+| `resolver` | [resolver/](resolver/) | The DNS filter's BIND resolver (real containers, run as its compose file says): the list converter, refused settings and clients, fabric's zone never filtered, lists and the owner's rules, logs, reloads, the list job; the query log and statistics in Postgres |
 | `ntp` | [ntp/](ntp/) | Time: chrony from fabric's generated config (real containers): serving the LAN and refusing others, a site syncing from its upstream site, the settings and what they refuse |
 | `federation` | [federation/](federation/) | Invitations, the federation endpoint, a site joining an upstream (real Step-CA) and directory replication between two real 389-DS (M5) |
 | `openbao` | [openbao/](openbao/) | OpenBao: unlock methods (key file, USB, security key, KMIP), rotation, fabric's secrets, policies, break glass |

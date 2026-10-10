@@ -17,7 +17,7 @@ One decision per topic: what was decided, the chapters it shapes, when and by wh
 - [2.1.9 Decisions: Federation](2.1.9-federation.md)
 - [2.1.10 Decisions: DHCP: Kea](2.1.10-dhcp.md)
 - [2.1.11 Decisions: 802.1X: FreeRADIUS](2.1.11-radius.md)
-- [2.1.12 Decisions: The DNS filter: AdGuard Home](2.1.12-dns-filter.md)
+- [2.1.12 Decisions: The DNS filter](2.1.12-dns-filter.md)
 - [2.1.13 Decisions: Time: chrony](2.1.13-time.md)
 - [2.1.14 Decisions: Container images](2.1.14-images.md)
 - [2.1.15 Decisions: Log forwarding: Fluent Bit](2.1.15-logs.md)

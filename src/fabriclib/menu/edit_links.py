@@ -45,7 +45,7 @@ def edit_links():
             return
         if choice == "a":
             name = input("\n  Name: ").strip()
-            link = input("  Link (e.g. adguard.{{ domain }}): ").strip()
+            link = input("  Link (e.g. nas.{{ domain }}): ").strip()
             if name and link:
                 links.append({"name": name, "link": link})
                 save_menu_change(path, data, "links", "None", f"Added {name}")

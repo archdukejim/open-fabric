@@ -5,6 +5,7 @@ from webui import views
 from webui.constants import SESSION_COOKIE
 from webui.httpio.cookie_header import cookie_header
 from webui.routes.directory_post import directory_post
+from webui.routes.dns_filter_post import dns_filter_post
 from webui.routes.kea_post import kea_post
 from webui.routes.overview_post import overview_post
 from webui.routes.radius_post import radius_post
@@ -45,7 +46,8 @@ def post_action(h, sess, path, form):
     """Purpose: Route a signed-in, CSRF-checked POST to its action.
     Inputs:  h — the request handler (app, send, redirect, deny); sess — dict from find_session; path — str; form —
              dict from read_form. Routes: /logout; /bind9/zone/…; /apply; /stepca/…; /openbao/…; /directory/…;
-             /kea/… (reservations, subnets, options, classes); /overview/… (jobs); /freeradius/clients…;
+             /kea/… (reservations, subnets, options, classes); /dns-filter/… (lists, rules, upstreams, fetch);
+             /overview/… (jobs); /freeradius/clients…;
              /freeradius/people…; /bind9/tsig/….
     Returns: /logout: session dropped, LOGOUT audited, 303 to Keycloak's logout URL clearing the session cookie;
              /apply: 200 apply result; the rest as their route modules.
@@ -76,6 +78,8 @@ def post_action(h, sess, path, form):
         return directory_post(h, sess, _segments(path, 2), form)
     if path.startswith("/kea/"):
         return kea_post(h, _segments(path, 2), form)
+    if path.startswith("/dns-filter/"):
+        return dns_filter_post(h, _segments(path, 2), form)
     if path.startswith("/freeradius/clients"):
         return radius_post(h, sess, _segments(path, 3), form)
     if path.startswith("/freeradius/people"):

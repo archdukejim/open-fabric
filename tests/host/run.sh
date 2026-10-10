@@ -91,12 +91,14 @@ check "LAN clients reach the certificate page over plain HTTP: http://$HOST_IP/c
 BIND_PORT=$(R "awk '/^bind_dns_port:/ {print \$2}' /opt/fabric/config/vars.yaml")    # 5053 behind the DNS filter
 R "bash /tmp/rfc2136_test.sh $HOST_IP $DOMAIN npm '$TSIG_SECRET' npm $BIND_PORT" > "$OUT/rfc2136.log" 2>&1
 check "RFC2136 to BIND's port ($BIND_PORT) with the embedded TSIG key (npm): allowed name only, wrong keys refused" "grep -q '4 passed, 0 failed' '$OUT/rfc2136.log'"
-# the DNS filter is on by default (2.1.12.1): AdGuard on 53 in front of BIND on 5053, Cloudflare upstream, AdGuard's list
-check "DNS filter on by default: AdGuard on 53 answers fabric's names, BIND behind it on 5053" \
+# the DNS filter is on by default (2.1.12.3): the BIND resolver on 53 in front of BIND on 5053, Cloudflare over DoT,
+# AdGuard's DNS filter list
+check "DNS filter on by default: the resolver on 53 answers fabric's names, BIND behind it on 5053" \
     "R 'dig +short @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP && R 'dig +short -p 5053 @$HOST_IP ns.$DOMAIN' | grep -qx $HOST_IP"
-check "DNS filter: internet names through Cloudflare; an ad domain blocked by AdGuard's DNS filter (NXDOMAIN from AdGuard)" \
-    "R 'dig +short @$HOST_IP one.one.one.one' | grep -qE '^1\.(1\.1\.1|0\.0\.1)$' && \
-     R 'for i in \$(seq 30); do dig @$HOST_IP doubleclick.net | grep -q fake-for-negative-caching.adguard.com && exit 0; sleep 2; done; exit 1'"
+check "DNS filter: internet names over DoT, DNSSEC validated; an ad domain blocked by the AdGuard DNS filter list" \
+    "R 'dig @$HOST_IP +dnssec example.com' | grep -q ' ad;' && \
+     R 'dig @$HOST_IP doubleclick.net' | grep -q 'status: NXDOMAIN' && \
+     R 'grep -q \"doubleclick.net/A/IN via doubleclick.net.[0-9a-f]*.list.rpz\" /opt/resolver/log/rpz.log'"
 
 echo "--- restricted sign-in (real Keycloak)"
 cat > "$OUT/bob.py" <<'PY'

@@ -6,7 +6,6 @@ installed as `jinja/<service>/build/`; CI builds and publishes them from the sam
 
 | Path | What |
 |---|---|
-| [adguard/](adguard/) | AdGuard Home |
 | [bind9/](bind9/) | BIND 9 from Debian packages |
 | [freeradius/](freeradius/) | FreeRADIUS |
 | [kea/](kea/) | Kea DHCP 3.0 from ISC's repository (decision 2.1.1.5) |

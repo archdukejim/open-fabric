@@ -4,10 +4,12 @@ Host systemd units, rendered or copied by `deploy.py` to `/etc/systemd/system/`.
 
 | File | What |
 |---|---|
-| `wrapper.service.j2` | One unit per installed service (nginx, bind9, stepca, postgres, keycloak, fabric-web, openbao, fluentbit, kea, freeradius, samba, adguard): `docker compose up` of `/opt/<folder>/docker-compose.yml`, part of `fabric.target`, waits for the container to be healthy, optional ExecCondition/ExecStartPost (OpenBao unlock) → `<service>.service` |
+| `wrapper.service.j2` | One unit per installed service (nginx, bind9, stepca, postgres, keycloak, fabric-web, openbao, fluentbit, kea, freeradius, samba, adguard, bind9-resolver): `docker compose up` of `/opt/<folder>/docker-compose.yml`, part of `fabric.target`, waits for the container to be healthy, optional ExecCondition/ExecStartPost (OpenBao unlock) → `<service>.service` |
 | `fabric-certs.service`, `fabric-certs.timer` | `fabricctl certs --scheduled` every night (03:30, spread over half an hour): renews the service certificates that are due and records the run (manual 2.1.5.4); copied as is by `deploy/install_timers.py`, enabled |
 | `fabric.target` | Groups every fabric unit (`systemctl start/stop/restart fabric.target`), copied as is → `fabric.target` |
 | `fabric-agent.service.j2` | The root `fabric-agent` (`lib/agent/server.py`): the web UI's privileged API on a unix socket only; only with `install_webui` → `fabric-agent.service` |
 | `fabric-federation.service.j2` | The root `fabric-federation` (`lib/federation/server.py`): the federation endpoint on a unix socket mounted into nginx; only with `federation_endpoint` → `fabric-federation.service` |
 | `fabric-db-rotate.service` | Runs `fabricctl vault rotate-db --scheduled` (2.1.7.4) |
 | `fabric-db-rotate.timer` | Monthly, the 1st at night, spread over half an hour; a missed run at the next boot |
+| `fabric-dns-lists.service`, `fabric-dns-lists.timer` | `fabricctl dns-filter lists --scheduled` every night (04:15, spread over half an hour): the DNS filter's lists fetched, converted, the changed ones reloaded (manual 1.12.2.10); installed only while `dns_filter` is `bind` |
+| `fabric-dns-log.service`, `fabric-dns-log.timer` | `fabricctl dns-filter ingest --scheduled` every 5 minutes: the resolver's new log lines read into the query log in Postgres, then what is past its time purged (manual 1.12.2.13); installed only while the resolver and Postgres (`install_keycloak`) are on |

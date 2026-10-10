@@ -11,6 +11,7 @@
 | `errors.py` | `SetupError` — a step cannot continue; message says why and what to do |
 | `collect_vars.py` | Where settings come from: existing install, `--file` (or a checkout's `custom-vars.yaml` on a fresh install) overrides, prompts for anything missing |
 | `upgrade_vars.py` | Existing install's vars before re-render: new release's images (unless pinned) and service accounts (unless changed) |
+| `move_dns_filter.py` | Upgrade to 0.7: AdGuard Home's settings become the BIND resolver's; what cannot move is listed and recorded |
 | `detect_network.py` | Guess hostname, host IP, gateway, LAN CIDR and interface from the default route |
 | `choose_plan.py` | Show the (hardened) default plan; Proceed / Advanced / Quit |
 | `ask_ad_domain.py` | The directory's AD domain (permanent; a sibling suggested), asked when missing; its password policy starts from the default (2.1.6.35) |
@@ -37,6 +38,7 @@
 | `print_first_steps.py` | Setup's last words: the root certificate from the landing page first, then sign in (2.1.1.41) |
 | `verify_install.py` | End-to-end checks (DNS, HTTPS chains, web UI gates, time, services) |
 | `retire_renamed_units.py` | Upgrade: stop and remove units/containers that were renamed (`webui` → `fabric-web`) |
+| `retire_adguard.py` | Upgrade to 0.7: AdGuard Home leaves the host (units, containers, folders, image, secrets, accounts) |
 | `uninstall.py` | Remove fabric (only fabric's own objects) |
 | `run_restore_command.py` | `fabricctl restore <export>`: put an export back and run setup on it (refused while installed) |
 | `run_uninstall_command.py` | `fabricctl uninstall`: asks about an export and the package first, then exports, uninstalls, optionally `apt purge` |

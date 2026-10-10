@@ -10,7 +10,7 @@ client these files use.
 |---|---|
 | `keycloak_admin.py` | Admin REST client (CA-pinned) and realm name |
 | `ensure_rbac_roles.py` | A realm role per fabric permission and a composite role per bundle, converged |
-| `ensure_adguard_client.py` | The OIDC client `fabric-adguard` oauth2-proxy signs people into AdGuard's UI with (realm roles in a `roles` claim) |
+| `remove_retired_client.py` | Remove a client fabric no longer uses (`fabric-adguard`, AdGuard Home retired in 0.7), if it is there |
 | `ensure_openbao_client.py` | The `fabric-openbao` OIDC client for OpenBao's own UI (TOTP flow, fabric roles in a `roles` ID-token claim, exact callback) |
 | `fabric_groups.py` | The directory groups that carry a fabric bundle |
 | `enable_person.py` | Keycloak's copy of a person enabled again after their directory account is |

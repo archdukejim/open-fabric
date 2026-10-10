@@ -1,14 +1,14 @@
 from webui import views
 from webui.devpreview.sample_data import (RECORD_TYPES, SAMPLE_CA, SAMPLE_DEVICES, SAMPLE_DHCP, SAMPLE_DOMAIN,
                                           SAMPLE_FEDERATION, SAMPLE_GPO, SAMPLE_RADIUS, SAMPLE_ACME, SAMPLE_IMAGES,
-                                          SAMPLE_SECURITY, SAMPLE_VAULT)
+                                          SAMPLE_SECURITY, SAMPLE_VAULT, SAMPLE_DNS_FILTER, SAMPLE_QUERY_LOG)
 from webui.devpreview.sample_radius_guides import sample_radius_guides
 
 
 def dev_get_page(h, path, query):
     """Purpose: Render the real pages (src/webui/views) with sample or in-memory data: /, /bind9, /stepca, /openbao,
-             /directory, /kea, /freeradius, /audit, /jobs/<id>, /static/app.css, and /preview/denied (what a refused
-             sign-in looks like). No sign-in, no client certificate, no fabric-agent.
+             /directory, /kea, /dns-filter, /freeradius, /audit, /jobs/<id>, /static/app.css, and /preview/denied
+             (what a refused sign-in looks like). No sign-in, no client certificate, no fabric-agent.
     Inputs:  h — the dev handler (send, state, ctx); path — the URL path; query — dict (msg, err, view, zone, device,
              slot, name).
     Returns: None; sends 200 with the page, 403 for /preview/denied, 404 for anything else.
@@ -71,6 +71,14 @@ def dev_get_page(h, path, query):
         return h.send(200, views.directory(ctx, view, data=data, **kw))
     if path == "/federation":
         return h.send(200, views.federation(ctx, SAMPLE_FEDERATION))
+    if path == "/dns-filter":
+        view = query.get("view") if query.get("view") in [s for s, _ in views.DNS_FILTER_SECTIONS] else "overview"
+        search = {k: query.get(k, "") for k in ("client", "name", "blocked", "limit")}
+        log = SAMPLE_QUERY_LOG if view == "querylog" else None
+        if log and search["blocked"] == "on":
+            log = {"entries": [e for e in log["entries"] if e["blocked"]]}
+        return h.send(200, views.dns_filter(ctx, view, SAMPLE_DNS_FILTER, log, search, query.get("msg", ""),
+                                            query.get("err", "")))
     if path == "/kea":
         return h.send(200, views.kea(ctx, SAMPLE_DHCP, query.get("msg", ""), query.get("err", "")))
     if path == "/freeradius":

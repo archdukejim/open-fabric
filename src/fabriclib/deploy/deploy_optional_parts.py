@@ -4,7 +4,7 @@ from fabriclib.common.service_user import service_user
 from fabriclib.consent.allowed_to_change import allowed_to_change
 from fabriclib.consent.plan_time import plan_time
 from fabriclib.dhcp.deploy_kea import deploy_kea
-from fabriclib.dns_filter.deploy_adguard import deploy_adguard
+from fabriclib.dns_filter.deploy_resolver import deploy_resolver
 from fabriclib.logs.deploy_fluentbit import deploy_fluentbit
 from fabriclib.ntp.deploy_chrony import deploy_chrony
 from fabriclib.radius.deploy_freeradius import deploy_freeradius
@@ -12,27 +12,23 @@ from fabriclib.samba.deploy_samba import deploy_samba
 
 
 def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
-    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter, time (chrony), Kea,
-             FreeRADIUS and the Windows domain — each only when it is on (chrony whenever it is installed and the
-             `time` host change is approved — manual 1.2.9; an install set up before consent existed keeps
-             converging).
+    """Purpose: the parts with a deploy step of their own: Fluent Bit, the DNS filter (the BIND resolver), time
+             (chrony), Kea, FreeRADIUS and the Windows domain — each only when it is on (chrony whenever it is
+             installed and the `time` host change is approved — manual 1.2.9; an install set up before consent
+             existed keeps converging).
     Inputs:  paths — deploy_paths() (federation, config); final_vars — rendered settings; secrets; jinja_env; links —
-             dns_links() (the zones AdGuard forwards to BIND).
-    Returns: {"restart": set of units to restart, "nginx": True if nginx's sign-in snippet for AdGuard changed}.
+             dns_links() (the linked sites' zones, which the resolver forwards to BIND).
+    Returns: {"restart": set of units to restart}.
     Fails:   whatever the parts' deploy functions raise (ValidationError, OSError, CalledProcessError).
     Feeds:   apply_deployment."""
-    restart, nginx = set(), False
+    restart = set()
     # Fluent Bit (optional): its config, destination CAs, credentials, disk buffer
     if final_vars.get("install_fluentbit") and deploy_fluentbit(final_vars, secrets, jinja_env):
         restart.add("fluentbit")
-    # DNS filter (manual 1.12.1): AdGuard's config merged with what it has, oauth2-proxy's, nginx's snippet
-    if final_vars.get("install_adguard"):
-        adg = deploy_adguard(final_vars, secrets, links, jinja_env)
-        if adg["adguard"]:
-            restart.add("adguard")
-        if adg["oauth2proxy"]:
-            restart.add("adguard-auth")
-        nginx = adg["nginx"]
+    # DNS filter, the BIND resolver (manual 1.12.2): its config and rules zones, a list never fetched fetched now;
+    # a running resolver reloads what changed, one that is not running takes it when it starts
+    if final_vars.get("install_resolver"):
+        deploy_resolver(final_vars, secrets, links, jinja_env)
     # Time (manual 1.13.1): chrony on the host, the upstream site first; installed by setup's host step
     if shutil.which("chronyd"):
         if not allowed_to_change(paths["config"], "time", plan_time(), unasked_install=True):
@@ -50,4 +46,4 @@ def deploy_optional_parts(paths, final_vars, secrets, jinja_env, links):
     # the converge code, its resolver (a change restarts it)
     if deploy_samba(final_vars, secrets, jinja_env)["restart"]:
         restart.add("samba")
-    return {"restart": restart, "nginx": nginx}
+    return {"restart": restart}

@@ -56,7 +56,7 @@ Nothing here yet — nothing to install on its own: see [1.10](../volume_1_descr
 
 Nothing here yet — nothing to install on its own: see [1.11](../volume_1_description_and_architecture/README.md).
 
-## 3.12 The DNS filter: AdGuard Home
+## 3.12 The DNS filter
 
 Nothing here yet — nothing to install on its own: see [1.12](../volume_1_description_and_architecture/README.md).
 

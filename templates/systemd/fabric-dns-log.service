@@ -1,0 +1,9 @@
+[Unit]
+Description=fabric: read the DNS filter's new log lines into the query log (manual 1.12.2.13)
+After=docker.service fabric.target
+Wants=docker.service
+
+[Service]
+Type=oneshot
+# also purges what is past its time (7 days; statistics 90 days, 2.1.12.4); a refusal keeps the lines for the next run
+ExecStart=/usr/bin/fabricctl dns-filter ingest --scheduled

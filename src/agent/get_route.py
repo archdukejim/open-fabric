@@ -10,6 +10,7 @@ from fabriclib.dns.list_tsig_keys import list_tsig_keys
 from fabriclib.dns.list_zones import list_zones
 from fabriclib.dns.reverse_zones import reverse_zones
 from fabriclib.dns.zone_detail import zone_detail
+from fabriclib.dns_filter.filter_overview import filter_overview
 from fabriclib.federation.federation_overview import federation_overview
 from fabriclib.directory.device_overview import device_overview
 from fabriclib.directory.list_people import list_people
@@ -53,6 +54,7 @@ READS = {
     ("gpo",): lambda: gpo_overview(load_vars()),
     ("federation",): lambda: federation_overview(load_vars()),
     ("dhcp",): lambda: dhcp_overview(load_vars()),
+    ("dns-filter",): lambda: filter_overview(load_vars()),
     ("radius",): lambda: radius_overview(load_vars()),
     ("radius", "guides"): lambda: radius_guides(load_vars()),
     ("vault",): lambda: vault_status(load_vars()),

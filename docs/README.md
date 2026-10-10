@@ -15,7 +15,7 @@ The manual is fabric's only source of truth (global Rule 5), in four volumes: wh
 - 1.9 Federation
 - 1.10 DHCP: Kea
 - 1.11 802.1X: FreeRADIUS
-- 1.12 The DNS filter: AdGuard Home
+- 1.12 The DNS filter
 - 1.13 Time: chrony
 - 1.14 Container images
 - 1.15 Log forwarding: Fluent Bit
@@ -41,7 +41,7 @@ The manual is fabric's only source of truth (global Rule 5), in four volumes: wh
 - 3.9 Federation
 - 3.10 DHCP: Kea
 - 3.11 802.1X: FreeRADIUS
-- 3.12 The DNS filter: AdGuard Home
+- 3.12 The DNS filter
 - 3.13 Time: chrony
 - 3.14 Container images
 - 3.15 Log forwarding: Fluent Bit
@@ -61,7 +61,7 @@ The manual is fabric's only source of truth (global Rule 5), in four volumes: wh
 - 4.9 Federation
 - 4.10 DHCP: Kea
 - 4.11 802.1X: FreeRADIUS
-- 4.12 The DNS filter: AdGuard Home
+- 4.12 The DNS filter
 - 4.13 Time: chrony
 - 4.14 Container images
 - 4.15 Log forwarding: Fluent Bit

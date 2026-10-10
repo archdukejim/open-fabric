@@ -77,7 +77,7 @@ webui_client_cert: true
 signin_admin_second_factor: totp
 install_freeradius: true
 install_kea: true
-dns_filter: adguard
+dns_filter: bind
 ntp_set_clock: false        # the sandbox shares the PC's kernel clock: chrony keeps time, never sets it
 dhcp:
   interfaces: [eth0]
@@ -131,7 +131,10 @@ check "doctor: all checks pass" "! grep -q 'âœ—' '$OUT/doctor.log' && grep -q 'â
 echo "--- fabric's own images (manual 1.14.3): published and signature-checked once the lock pins them"
 published=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
 print(sum(1 for e in r('$REPO/config')['images'].values() if e['ref']))")
-if [ "$published" -eq 8 ]; then
+# how many images fabric publishes (7 since 0.7: AdGuard's went with it, 2.1.12.3)
+total=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
+print(len(r('$REPO/config')['images']))")
+if [ "$published" -eq "$total" ]; then
     check "the core services run fabric's published images (pulled, not built here)" \
         "in_box 'docker inspect -f {{.Config.Image}} bind9 samba keycloak step-ca fabric-web' \
          | grep -c '^ghcr.io/archdukejim/open-fabric/' | grep -qx 5 && ! in_box 'docker image inspect fabric/bind9:local' >/dev/null 2>&1"
@@ -142,7 +145,7 @@ else
     # some published, some still pending (new or rebuilt on this branch, 3.14.1.4): the pending ones are built here
     pending=$(PYTHONPATH="$REPO/src" python3 -c "from fabriclib.common.read_published_lock import read_published_lock as r
 print(' '.join('fabric/' + {'webui': 'web'}.get(n, n) + ':local' for n, e in r('$REPO/config')['images'].items() if not e['ref']))")
-    check "$published of 8 published: the pending ones are built here ($pending)" \
+    check "$published of $total published: the pending ones are built here ($pending)" \
         "in_box 'docker image inspect $pending' >/dev/null"
 fi
 check "fabricctl status lists the relaxed security settings (none here)" \
@@ -177,23 +180,20 @@ check "the DC listens for LDAPS on fabric_net's gateway (10.255.0.1) as well as 
 check "Keycloak's LDAP federation and FreeRADIUS's LDAPS go to the gateway, never the LAN address" "in_box \"docker exec postgres psql -tA -U fabric_admin -d keycloak -c \\\"SELECT value FROM component_config WHERE name = 'connectionUrl'\\\"\" | grep -qx 'ldaps://10.255.0.1:636' && { ! in_box 'systemctl is-enabled freeradius' >/dev/null 2>&1 || in_box 'grep -q ldaps://10.255.0.1:636 /opt/freeradius/config/fabric-radius.json'; }"
 check "the DC's name in DNS is the LAN address only (the gateway it listens on never published)"     "[ \"\$(in_box 'dig +short @$IP $DC_NAME A' | sort -u)\" = '$IP' ]"
 
-echo "--- DNS filter (AdGuard Home) in front of BIND"
-BIND_PORT=5053                      # dns_filter: adguard moves BIND off 53
-check "AdGuard answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
+echo "--- DNS filter (the BIND resolver) in front of BIND"
+BIND_PORT=5053                      # dns_filter: bind moves BIND off 53
+check "the resolver answers clients on 53 (fabric's names through BIND); BIND answers on 5053" \
     "in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP && in_box 'dig +short +time=3 -p 5053 @$IP ns.lan.test' | grep -qx $IP"
-check "AdGuard runs with no capabilities, its UI is not published (only 53)" \
-    "[ \"\$(in_box \"docker inspect -f '{{.HostConfig.CapAdd}} {{.HostConfig.CapDrop}}' adguardhome\")\" = '[] [ALL]' ] && ! in_box 'docker port adguardhome' | grep -q 3000"
-check "https://adguard.lan.test sends a stranger to sign-in (OIDC), never to AdGuard" \
-    "in_box 'curl -s -o /dev/null -w %{http_code}:%{redirect_url} --cacert /opt/stepca/data/certs/root_ca.crt --resolve adguard.lan.test:443:$IP https://adguard.lan.test/' | grep -q '^302:https://adguard.lan.test/oauth2/sign_in'"
-check "fabricctl status lists the DNS filter" "in_box 'fabricctl status' | grep -qE '^adguard +active'"
-ADG_SINCE=$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value adguard')
-in_box 'systemctl restart bind9'
-check "a BIND restart (every DNS apply) leaves AdGuard running" \
-    "[ \"\$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value adguard')\" = '$ADG_SINCE' ] && in_box 'systemctl is-active adguard' | grep -qx active"
-in_box 'systemctl stop keycloak && systemctl restart adguard-auth' > "$OUT/adguard-no-keycloak.log" 2>&1
-check "with Keycloak down the sign-in still starts and DNS answers through AdGuard" \
-    "in_box 'systemctl is-active adguard-auth' | grep -qx active && in_box 'dig +short +time=3 @$IP ns.lan.test' | grep -qx $IP"
-in_box 'systemctl start keycloak' >> "$OUT/adguard-no-keycloak.log" 2>&1
+check "the resolver runs with no capabilities, as its own account" \
+    "[ \"\$(in_box \"docker inspect -f '{{.HostConfig.CapAdd}} {{.HostConfig.CapDrop}} {{.Config.User}}' bind9-resolver\")\" = '[] [ALL] 613:613' ]"
+check "fabricctl status lists the DNS filter" "in_box 'fabricctl status' | grep -qE '^bind9-resolver +active'"
+check "fabricctl dns-filter status: the resolver answers and every list has a good copy" \
+    "in_box 'fabricctl dns-filter status' > '$OUT/dns-filter-status.log' 2>&1"
+check "the daily list timer is installed and enabled" "in_box 'systemctl is-enabled fabric-dns-lists.timer' | grep -qx enabled"
+RES_SINCE=$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value bind9-resolver')
+in_box 'systemctl restart bind9' > /dev/null 2>&1
+check "a BIND restart (every DNS apply) leaves the resolver running" \
+    "[ \"\$(in_box 'systemctl show -p ActiveEnterTimestampMonotonic --value bind9-resolver')\" = '$RES_SINCE' ] && in_box 'systemctl is-active bind9-resolver' | grep -qx active"
 
 echo "--- Time: chrony on the host serves the LAN (manual 1.13.1)"
 BUSYBOX="busybox:1.37@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
@@ -406,7 +406,7 @@ check "fabricctl vault rotate-db: rotated, Keycloak restarted with it and health
 check "the monthly fabric-db-rotate timer is on" "in_box 'systemctl is-enabled fabric-db-rotate.timer' | grep -qx enabled"
 docker cp "$REPO/tests/sandbox/login_test.py" "$NAME:/root/login_test.py"
 in_box "FABRIC_ADMIN_PW='$ADMIN_PW' CAROL_PW='$CAROL_PW' CAROL_P12_PW='$CAROL_P12_PW' python3 /root/login_test.py /opt/fabric/config/vars.yaml bob '$BOB_PW' '$BOB_P12_PW'" 2>&1 | tee "$OUT/login.log"
-in_box 'journalctl --no-pager CONTAINER_NAME=nginx CONTAINER_NAME=oauth2-proxy-adguard | grep -iE "adguard|oauth|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
+in_box 'journalctl --no-pager CONTAINER_NAME=nginx | grep -iE "oidc|error" | tail -40'     > "$OUT/login-nginx.log" 2>&1     # diagnosis when a sign-in check fails
 cat > "$OUT/reset_guard.py" <<'PY'
 import sys, yaml
 sys.path.insert(0, "/opt/fabric/lib")
@@ -624,7 +624,9 @@ in_box 'fabricctl uninstall --yes --export /root/fabric-export --purge-package' 
 EX=/root/fabric-export
 check "export: config, secrets, CA, directory, Keycloak, the vault and its key, README (root 0700)"     "in_box 'test -s $EX/fabric/config/fabric-secrets.yml && test -d $EX/stepca/data && test -d $EX/samba/data && test -d $EX/postgres && test -d $EX/openbao/data && test -f $EX/@root/etc/fabric/openbao/slots.json && test -f $EX/README.txt && [ \"\$(stat -c %a $EX)\" = 700 ]'"
 check "the package was purged too, and nothing was written to /var/backups"     "! in_box 'dpkg -s fabricctl' >/dev/null 2>&1 && ! in_box 'test -e /var/backups/fabric'"
-check "no fabric container, network or unit is left"     "[ -z \"\$(in_box 'docker ps -aq --filter name=^/(bind9|step-ca|dirsrv|keycloak|postgres|nginx|openbao|fabric-web|webui|kea-dhcp4|kea-ddns|freeradius)\$')\" ]      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,stepca,ldap,keycloak,postgres,nginx,openbao,fabric-web,webui,kea,freeradius,fabric-agent}.service' >/dev/null 2>&1"
+# the container names asked of Docker first, so a failing `docker ps` cannot pass for "none left"
+LEFT_NAMES=$(in_box "docker ps -a --format '{{.Names}}'"); LEFT_RC=$?
+check "no fabric container, network or unit is left"     "[ $LEFT_RC -eq 0 ] && ! grep -qxE 'bind9|bind9-resolver|step-ca|samba|keycloak|postgres|nginx|openbao|fabric-web|kea-dhcp4|kea-ddns|freeradius|fluentbit' <<<\"\$LEFT_NAMES\"      && ! in_box 'docker network inspect fabric_net' >/dev/null 2>&1      && ! in_box 'ls /etc/systemd/system/fabric.target /etc/systemd/system/{bind9,bind9-resolver,stepca,samba,keycloak,postgres,nginx,openbao,fabric-web,kea,freeradius,fabric-agent}.service' >/dev/null 2>&1"
 check "no data, key, kill-switch rule, CA trust, command or service account is left"     "! in_box 'ls -d /opt/fabric /opt/bind9 /opt/stepca /opt/openbao /opt/dirsrv /opt/kea /opt/freeradius /etc/fabric/openbao /run/fabric/openbao /run/fabric/openbao-admin /etc/udev/rules.d/90-fabric-unlock.rules /usr/local/bin/fabricctl /usr/bin/fabricctl /etc/fabric /usr/lib/fabricctl' >/dev/null 2>&1      && ! in_box 'ls /usr/local/share/ca-certificates/fabric-*' >/dev/null 2>&1 && ! in_box 'id fabric-vault' >/dev/null 2>&1"
 check "DNS is gone" "! in_box 'dig +time=2 +tries=1 +short @$IP ns.lan.test' | grep -qx $IP"
 check "uninstall listed every host change first (removed, undone, kept)" \

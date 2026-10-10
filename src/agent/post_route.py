@@ -3,6 +3,7 @@ from agent.post_directory import post_directory
 from agent.post_dhcp import post_dhcp
 from agent.post_domain import post_domain
 from agent.post_dns import post_dns
+from agent.post_dns_filter import post_dns_filter
 from agent.post_network import post_network
 from agent.post_pki import post_pki
 from agent.post_security import post_security
@@ -35,7 +36,7 @@ def post_route(route, actor, data, perms):
              {"uid", "group", "member", "changed"} — each a fabric-group member's only with system:admin (or root);
              jobs/doctor and jobs/images (body: action update|rollback, service): {"id"} of a job read with GET
              /v1/jobs/<id> by the person who started it;
-             events: {} after the login audit line.
+             events: {} after the login audit line; dns-filter/...: post_dns_filter's result.
     Fails:   ValidationError (-> 400) for an unsupported event or what fabriclib refuses; RouteNotFound (-> 404).
     Feeds:   agent/handler.py (dispatch).
     Notes:   POST apply only needs dns:write (rbac/required_permission), though it runs the whole deployment."""
@@ -56,6 +57,8 @@ def post_route(route, actor, data, perms):
         return post_domain(route, actor, data)
     if area == ["security"]:
         return post_security(route, actor, data)
+    if area == ["dns-filter"]:
+        return post_dns_filter(route, actor, data)
     if route == ["apply"]:
         ok, output = apply_changes(actor, source="web")
         return {"ok": ok, "output": output}

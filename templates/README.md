@@ -10,8 +10,7 @@ containers in `src/containers/`.
 | `vars.yaml.j2` | Every setting with its default; rendered over the admin's `vars.yaml` |
 | [bind9/](bind9/) | Authoritative DNS: named.conf parts, zones |
 | [fluentbit/](fluentbit/) | Optional log forwarding |
-| [adguard/](adguard/) | Optional DNS filter: AdGuard Home in front of BIND, its configuration and oauth2-proxy's |
-| [adguard-auth/](adguard-auth/) | The DNS filter's sign-in (oauth2-proxy), a unit of its own |
+| [resolver/](resolver/) | The DNS filter, a BIND resolver: its container and configuration, filtering with response policy zones |
 | [chrony/](chrony/) | Time on the host (chrony's configuration; not a container) |
 | [freeradius/](freeradius/) | Optional 802.1X: config |
 | [kea/](kea/) | Optional DHCP: Kea configs |

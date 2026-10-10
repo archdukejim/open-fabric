@@ -13,7 +13,7 @@ set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}"
 W="$OUT/images"
-IMAGES=(adguard bind9 freeradius kea keycloak samba stepca webui)
+IMAGES=(bind9 freeradius kea keycloak samba stepca webui)
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 rm -rf "$W"; mkdir -p "$W"

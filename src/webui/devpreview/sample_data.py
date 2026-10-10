@@ -1,4 +1,5 @@
 """The dev preview's sample data: what a small home install looks like (nothing here is real)."""
+import time
 
 RECORD_TYPES = ["A", "AAAA", "CNAME", "MX", "TXT", "SRV"]
 SAMPLE_RADIUS = {"enabled": True, "server_name": "radius.home.arpa", "host_ip": "192.168.1.2",
@@ -169,7 +170,7 @@ SAMPLE_GPO = {"site": "lan", "templates": ["fabric-starter", "samba"], "match": 
                             "class": "Machine", "elements": ["text:ExampleText"]}], "more": False}
 SAMPLE_SECURITY = [
     {"layer": "admin-2fa",
-     "what": "a second factor for the admin tools (the web console, OpenBao's UI, AdGuard's page)",
+     "what": "a second factor for the admin tools (the web console, OpenBao's UI)",
      "value": "totp", "effective": "totp", "choices": ["passkey"], "lowered": None},
     {"layer": "everyone-2fa", "what": "a second factor for every sign-in (every app signing in through Keycloak)",
      "value": "none", "effective": "none", "choices": ["any", "totp", "passkey"],
@@ -201,3 +202,63 @@ SAMPLE_ACME = {"domain": "home.arpa", "machines": [{"name": "nas", "fqdn": "nas.
                         "names: <name>.home.arpa only; certificates live 47 days: let the client renew at 30 days old",
                         "http-01: the machine answers on port 80 for its name (nothing to enroll)",
                         "dns-01: enroll it below; its client sends RFC2136 updates with its key"]}
+_REG_LIST = "https://adguardteam.github.io/HostlistsRegistry/assets/filter_{}.txt"
+_ZONE = "8f1c2d3e4a5b.list.rpz"
+_NOW = int(time.time())          # the sample's lists were fetched a few hours ago
+SAMPLE_DNS_FILTER = {
+    "on": True, "memory_limit": "384m",
+    "lists": [{"name": "AdGuard DNS filter", "url": _REG_LIST.format(1), "zone": _ZONE, "last_fetch": _NOW - 3 * 3600,
+               "last_success": _NOW - 3 * 3600, "rules": 178979, "skipped": 714, "memory_mb": 185.2, "error": None}],
+    "allow": ["doubleclick.net"], "block": ["ads.example.org"],
+    "upstreams": [{"address": "1.1.1.1", "name": "cloudflare-dns.com"},
+                  {"address": "1.0.0.1", "name": "cloudflare-dns.com"}],
+    "memory": {"estimate_mb": 201.2, "limit_mb": 384.0, "left_out": []},
+    "safe_search": {"on": False, "youtube": "strict"},
+    "groups": [{"name": "kids", "clients": ["192.168.1.64/27"], "safe_search": True, "youtube": "strict",
+                "lists": [], "allow": ["khanacademy.org"], "block": ["roblox.com"]},
+               {"name": "teen-laptop", "clients": ["192.168.1.70"], "safe_search": True, "youtube": "moderate",
+                "lists": [], "allow": [], "block": []}],
+    # the same engines and counts as fabriclib's table (dns_filter/common/safe_search), which the agent sends
+    "safe_search_sites": {"engines": [{"engine": e, "names": n, "answer": a} for e, n, a in (
+        ("Google", 187, "forcesafesearch.google.com"),
+        ("YouTube", 5, "restrict.youtube.com or restrictmoderate.youtube.com"), ("Bing", 2, "strict.bing.com"),
+        ("DuckDuckGo", 3, "safe.duckduckgo.com"), ("Yandex", 52, "213.180.193.56"),
+        ("Pixabay", 1, "safesearch.pixabay.com"), ("Ecosia", 1, "strict-safe-search.ecosia.org"))],
+        "not_covered": ["Brave Search", "Startpage"],
+        "youtube": {"strict": "restrict.youtube.com", "moderate": "restrictmoderate.youtube.com"}},
+    "stats": {"hours": [{"hour": f"2026-10-09T{h:02d}:00Z", "queries": q, "blocked": b}
+                        for h, q, b in ((0, 412, 61), (1, 288, 40), (2, 190, 22), (3, 175, 19), (4, 230, 31),
+                                        (5, 640, 98), (6, 1210, 170), (7, 1620, 233), (8, 1488, 206), (9, 1302, 188))],
+              "week": {"queries": 48210, "blocked": 6940},
+              "zones": [{"zone": _ZONE, "list": "AdGuard DNS filter", "queries": 6912, "blocked": 6912},
+                        {"zone": "owner.rpz", "list": None, "queries": 140, "blocked": 28},
+                        {"zone": "fabric.rpz", "list": None, "queries": 3920, "blocked": 0}],
+              "top_blocked": [{"name": "browser.events.data.msn.com", "zone": _ZONE, "list": "AdGuard DNS filter",
+                               "count": 1204},
+                              {"name": "app-measurement.com", "zone": _ZONE, "list": "AdGuard DNS filter",
+                               "count": 640},
+                              {"name": "ads.example.org", "zone": "owner.rpz", "list": None, "count": 28}]},
+    "catalogue": {"fetched": _NOW - 3 * 3600, "lists": [
+        {"name": "OISD Blocklist Small", "url": _REG_LIST.format(5), "group": "General",
+         "description": "Blocks ads, mobile app ads, phishing and malware; few false positives.",
+         "homepage": "https://oisd.nl/"},
+        {"name": "HaGeZi's Pro Blocklist", "url": _REG_LIST.format(48), "group": "General",
+         "description": "Ads, affiliate, tracking, metrics, telemetry, phishing, malware, scam.",
+         "homepage": "https://github.com/hagezi/dns-blocklists"},
+        {"name": "Phishing Army", "url": _REG_LIST.format(18), "group": "Security", "description": "Phishing domains.",
+         "homepage": "https://phishing.army/"},
+        {"name": "POL: Polish filters for Pi-hole", "url": _REG_LIST.format(14), "group": "Regional",
+         "description": "Polish ad and tracker domains.", "homepage": ""}]}}
+SAMPLE_QUERY_LOG = {"entries": [
+    {"at": "2026-10-09T09:58:12Z", "client": "192.168.1.20", "view": "everyone", "name": "browser.events.data.msn.com",
+     "qtype": "A", "action": "NXDOMAIN", "zone": _ZONE, "list": "AdGuard DNS filter", "blocked": True},
+    {"at": "2026-10-09T09:58:11Z", "client": "192.168.1.66", "view": "kids", "name": "www.roblox.com",
+     "qtype": "A", "action": "NXDOMAIN", "zone": "group-kids.rpz", "list": None, "blocked": True},
+    {"at": "2026-10-09T09:58:10Z", "client": "192.168.1.20", "view": "everyone", "name": "www.wikipedia.org",
+     "qtype": "AAAA", "action": None, "zone": None, "list": None, "blocked": False},
+    {"at": "2026-10-09T09:57:55Z", "client": "192.168.1.31", "view": "everyone", "name": "nas.home.arpa",
+     "qtype": "A", "action": "PASSTHRU", "zone": "fabric.rpz", "list": None, "blocked": False},
+    {"at": "2026-10-09T09:57:41Z", "client": "192.168.1.31", "view": "everyone", "name": "ad.doubleclick.net",
+     "qtype": "A", "action": "PASSTHRU", "zone": "owner.rpz", "list": None, "blocked": False},
+    {"at": "2026-10-09T09:57:02Z", "client": "192.168.1.44", "view": "everyone", "name": "ads.example.org",
+     "qtype": "A", "action": "NXDOMAIN", "zone": "owner.rpz", "list": None, "blocked": True}]}

@@ -16,7 +16,6 @@ variable "REVISION" { default = "" }
 variable "BASE_DEBIAN" { default = "" }
 variable "BASE_STEPCA" { default = "" }
 variable "BASE_KEYCLOAK" { default = "" }
-variable "BASE_ADGUARD" { default = "" }
 variable "KEA_VERSION" { default = "" }
 variable "KEA_REPO" { default = "" }
 variable "KEA_SUITE" { default = "" }
@@ -24,7 +23,7 @@ variable "KEA_KEY_URL" { default = "" }
 variable "KEA_KEY_FINGERPRINT" { default = "" }
 
 group "default" {
-  targets = ["adguard", "bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
+  targets = ["bind9", "freeradius", "kea", "keycloak", "samba", "stepca", "webui"]
 }
 
 target "_fabric" {
@@ -34,13 +33,6 @@ target "_fabric" {
     "org.opencontainers.image.version"  = TAG
     "org.opencontainers.image.licenses" = "MIT"
   }
-}
-
-target "adguard" {
-  inherits = ["_fabric"]
-  context  = "${CONTEXTS}/adguard"
-  args     = { BASE_IMAGE = BASE_ADGUARD }
-  tags     = ["${REGISTRY}/adguard:${TAG}"]
 }
 
 target "bind9" {

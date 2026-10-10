@@ -23,6 +23,8 @@ from webui.agentclient.delete_tsig_key import delete_tsig_key  # noqa: F401
 from webui.agentclient.describe_csr import describe_csr  # noqa: F401
 from webui.agentclient.device_overview import device_overview  # noqa: F401
 from webui.agentclient.dhcp_overview import dhcp_overview  # noqa: F401
+from webui.agentclient.dns_filter_change import dns_filter_change  # noqa: F401
+from webui.agentclient.dns_filter_overview import dns_filter_overview  # noqa: F401
 from webui.agentclient.host_changes import host_changes  # noqa: F401
 from webui.agentclient.inspect_pem import inspect_pem  # noqa: F401
 from webui.agentclient.issue_key_pair import issue_key_pair  # noqa: F401
@@ -31,6 +33,7 @@ from webui.agentclient.list_issued import list_issued  # noqa: F401
 from webui.agentclient.list_people import list_people  # noqa: F401
 from webui.agentclient.list_tsig_keys import list_tsig_keys  # noqa: F401
 from webui.agentclient.list_zones import list_zones  # noqa: F401
+from webui.agentclient.query_log import query_log  # noqa: F401
 from webui.agentclient.map_radius_group import map_radius_group  # noqa: F401
 from webui.agentclient.radius_guides import radius_guides  # noqa: F401
 from webui.agentclient.radius_overview import radius_overview  # noqa: F401

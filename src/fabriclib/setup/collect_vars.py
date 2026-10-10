@@ -16,6 +16,7 @@ from fabriclib.secrets.save_secrets import save_secrets
 from fabriclib.security.check_signin_lowering import check_signin_lowering
 from fabriclib.setup.ask_ad_domain import ask_ad_domain
 from fabriclib.setup.errors import SetupError
+from fabriclib.setup.move_dns_filter import move_dns_filter
 from fabriclib.setup.set_ram_capacity import set_ram_capacity
 from fabriclib.setup.upgrade_vars import upgrade_vars
 
@@ -162,7 +163,8 @@ def collect_vars(ctx):
     Returns: path of fabric.yaml (str). Leaves ctx.vars = the data written. Precedence: an existing
              vars.yaml is the base and --file overrides the keys it sets; on a fresh install without --file a
              checkout's custom-vars.yaml is used. Existing installs keep their digest-pinned images
-             (upgrade_vars); image_* keys set explicitly are recorded in image_pins. Missing/invalid required
+             (upgrade_vars); image_* keys set explicitly are recorded in image_pins. AdGuard Home's settings move to
+             the BIND resolver's (move_dns_filter, 0.7). Missing/invalid required
              values are asked for (defaults from detect_network); webui_admin_user is chosen once; the AD domain
              is asked when missing (ask_ad_domain); the rest takes defaults changed later (2.1.2.16): the password
              policy (DEFAULT_POLICY, a vars file's keys kept, 2.1.6.35) and the memory (set_ram_capacity).
@@ -202,6 +204,9 @@ def collect_vars(ctx):
             raise SetupError(str(e))
         data.update(user)
         info(f"overrides from {user_file}")
+    # 0.7: AdGuard Home's settings move to the BIND resolver (2.1.12.3); nothing to do on a host without them
+    for line in move_dns_filter(data, ctx.deploy_base, ctx.config_dir):
+        info(line)
 
     if ctx.join_invitation:
         _join_defaults(ctx, data)

@@ -5,7 +5,7 @@ R="$1/nginx"   # render.py output dir
 W=$(mktemp -d)
 rm -rf "$W"; mkdir -p "$W/certs" "$W/www" "$W/conf.d"
 # the snippets setup writes at run time (nginx includes them by name)
-for inc in adguard-auth.inc client-crl.inc; do echo "# test" > "$W/conf.d/$inc"; done
+echo "# test" > "$W/conf.d/client-crl.inc"
 openssl req -x509 -newkey rsa:2048 -nodes -keyout "$W/k.pem" -out "$W/c.pem" -days 1 -subj /CN=x 2>/dev/null
 grep -oE '/etc/nginx/certs/[^;]+' "$R/nginx.conf" | sort -u | while read -r p; do
   rel="${p#/etc/nginx/certs/}"; mkdir -p "$W/certs/$(dirname "$rel")"

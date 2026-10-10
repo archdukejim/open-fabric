@@ -16,6 +16,8 @@
   fabricctl tsig list|add|update|set-secret|rotate|remove
                                  TSIG keys for RFC2136 updates (fabricctl tsig --help)
   fabricctl acl list|add|remove  BIND ACLs (who may query the zones)
+  fabricctl dns-filter lists|status|log|stats|ingest
+                                 the DNS filter's BIND resolver: its lists, their state, the query log
   fabricctl dhcp status|leases|reserve|unreserve|add-subnet|set-subnet|remove-subnet|option|class
                                  DHCP (optional Kea): subnets, leases, reservations, options, client classes
   fabricctl radius status|log|add-client|rotate-secret|remove-client
@@ -68,6 +70,7 @@ sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 from fabriclib.consent.show_consent_status import show_consent_status  # noqa: E402
 from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
+from fabriclib.dns_filter.run_dns_filter_command import run_dns_filter_command  # noqa: E402
 from fabriclib.radius.run_radius_command import run_radius_command  # noqa: E402
 from fabriclib.samba.run_domain_command import run_domain_command  # noqa: E402
 from fabriclib.directory.run_people_command import run_people_command  # noqa: E402
@@ -224,6 +227,8 @@ def main(argv):
         return run_federation_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "dhcp":
         return run_dhcp_command(SetupContext(deploy_base=_base(args)).load_state().vars, args)
+    if cmd == "dns-filter":
+        return run_dns_filter_command(SetupContext(deploy_base=_base(args)).load_state().vars, _without_base(args))
     if cmd == "images":
         return run_images_command(SetupContext(deploy_base=_base(args)).load_state(), args)
     if cmd == "vault":
