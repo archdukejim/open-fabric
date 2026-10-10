@@ -38,6 +38,9 @@ for line in sys.stdin:
         print(f\"{r['state']}|{r['running'] or ''}\")"
 }
 running_is() { [ "$(row "$1" | cut -d'|' -f2)" = "$2" ]; }
+# whether fabricctl said it moved this service: services sharing an image move together, named in one list
+# ("updated bind9, resolver")
+said() { echo "$out" | grep -Eq "$1 ([a-z0-9-]+, )*$service( |,|$)"; }
 
 rows=$(on_host 'python3 /root/host_images.py status')
 behind=$(echo "$rows" | grep -vc '"state": "current"')
@@ -62,17 +65,17 @@ print(f\"{e['tag']} {e['digest']}\" if e else 'skip ' + ((p.get('skipped') or {}
     on_host "python3 /root/host_images.py pin $var $ptag $pdigest"
     out=$(on_host "fabricctl images update $service" 2>&1)
     check "$service: moved to the previous version ($ptag) by an update, healthy" \
-        "echo \"\$out\" | grep -q 'updated $service' && running_is $service '$pref'"
+        "said updated && running_is $service '$pref'"
     on_host "python3 /root/host_images.py pin $var $ctag $cdigest"
     check "$service: the current pin back: status shows the update" \
         "[ \"\$(row $service | cut -d'|' -f1)\" = 'update available' ]"
     out=$(on_host "fabricctl images update $service" 2>&1)
-    check "$service: update to $ctag, healthy" "echo \"\$out\" | grep -q 'updated $service' && running_is $service '$cur'"
+    check "$service: update to $ctag, healthy" "said updated && running_is $service '$cur'"
     out=$(on_host "fabricctl images rollback $service" 2>&1)
     check "$service: rollback to $ptag, healthy" \
-        "echo \"\$out\" | grep -q 'rolled back $service' && running_is $service '$pref'"
+        "said 'rolled back' && running_is $service '$pref'"
     out=$(on_host "fabricctl images update $service" 2>&1)
-    check "$service: update again, current" "echo \"\$out\" | grep -q 'updated $service' && running_is $service '$cur'"
+    check "$service: update again, current" "said updated && running_is $service '$cur'"
 done < <(echo "$rows" | python3 -c "
 import json, sys
 for line in sys.stdin:

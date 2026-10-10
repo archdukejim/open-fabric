@@ -36,16 +36,26 @@ def install_service_units(paths, final_vars, units):
     Returns: {"restart": set of units whose compose file, image or unit changed, "rebuild": set of folders whose
              image must be prepared: a local image to build (its build context changed, or its base is not the
              pinned one) or fabric's published image to pull (not on the host yet),
-             "daemon_reload": bool}.
+             "daemon_reload": bool, "stopped": set of units of parts turned off, stopped and removed now}.
     Fails:   OSError from copying or setting owners.
     Feeds:   apply_deployment.
     Notes:   every service gets its <base>/<folder> (owned by its service user) except Keycloak/Postgres
              when they are off; only rendered (enabled) services get files. The web UI's build context also carries
-             its app code (fabric's lib/webui)."""
+             its app code (fabric's lib/webui). A part turned off (DHCP from the console, manual 1.10.3.5, or any
+             optional one) has its unit stopped, disabled and removed; its folder and data stay, so turning it on
+             again resumes (Kea's leases)."""
     base, out = paths["base"], paths["render"]
-    restart, rebuild, reload_ = set(), set(), False
+    restart, rebuild, reload_, stopped = set(), set(), False, set()
     for u in units:
         folder, name = u["folder"], u["service"]
+        unit_file = f"/etc/systemd/system/{name}.service"
+        if not u["enabled"]:
+            if os.path.exists(unit_file):          # turned off since the last apply: stop it, keep its data
+                subprocess.run(["systemctl", "disable", "--now", name], capture_output=True, timeout=120)
+                os.remove(unit_file)
+                stopped.add(name)
+                reload_ = True
+            continue
         if folder in ("keycloak", "postgres") and not final_vars.get("install_keycloak"):
             continue
         uid, gid = service_user(final_vars, OWNER.get(folder, folder))
@@ -68,8 +78,8 @@ def install_service_units(paths, final_vars, units):
             elif not _present(src_dc):      # fabric's published image (manual 1.14.3.3): pulled, not built
                 rebuild.add(folder)
         src_unit = os.path.join(out, "systemd", f"{name}.service")
-        if os.path.exists(src_unit) and copy_if_changed(src_unit, f"/etc/systemd/system/{name}.service", 0o644):
+        if os.path.exists(src_unit) and copy_if_changed(src_unit, unit_file, 0o644):
             changed = reload_ = True
         if changed:
             restart.add(name)
-    return {"restart": restart, "rebuild": rebuild, "daemon_reload": reload_}
+    return {"restart": restart, "rebuild": rebuild, "daemon_reload": reload_, "stopped": stopped}

@@ -24,6 +24,10 @@ services:
     ports:
       - 80:80
       - "{{ host_ip }}:443:443"
+{# fabric's pages on each network DHCP serves in full, not guest ones (manual 1.10.3.3) #}
+{% for addr in (dhcp_served | default({})).full_addrs | default([]) | unique if addr != host_ip %}
+      - "{{ addr }}:443:443"
+{% endfor %}
     volumes:
       - {{ deploy_base_dir }}/nginx/config/nginx.conf:/etc/nginx/nginx.conf:ro
       - {{ deploy_base_dir }}/nginx/config/conf.d:/etc/nginx/conf.d:ro

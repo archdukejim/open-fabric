@@ -12,6 +12,7 @@ Home in 0.7, decision 2.1.12.3).
 | `resolver_views.py` | What each view loads: everyone's lists, each group's match-clients (the most specific address wins), rules, safe search and own lists; the memory guard |
 | `check_filter_settings.py` | Refuse resolver settings that cannot work: lists, allows and blocks, upstreams, safe search, groups |
 | `check_filter_groups.py` | Refuse client groups that cannot work: names, clients, safe search, their own lists and rules |
+| `expand_group_clients.py` | A group's `dhcp:`, `device:` and `vlan:` clients turned into addresses from Kea's settings on every apply (manual 1.10.3.7) |
 | `import_adguard_settings.py` | 0.6's AdGuard Home settings as the resolver's (upgrade to 0.7): upstreams, lists, rules, safe search, persistent clients as groups; what cannot move is listed |
 | `ensure_dnslog_db.py` | The query log's database in fabric's Postgres: its own role and database, its tables |
 | `ingest_dns_log.py` | Read the resolver's new log lines into the query log, mark rewrites, recompute the statistics, purge |

@@ -109,6 +109,8 @@ def _deploy(paths, start_services):
     install_fabric_tree(paths, final_vars)
     svc = install_service_units(paths, final_vars, units)
     restart = svc["restart"]
+    for name in sorted(svc["stopped"]):
+        print(f"  {name}: turned off, stopped and removed (its data is kept)")
     if install_openbao_config(paths, final_vars):
         restart.add("openbao")
     ngx = install_nginx_config(paths, final_vars)

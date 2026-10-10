@@ -88,6 +88,7 @@ The home chapter for security is 1.2.8 (Rule 5.8).
 
 - [1.10.1 Kea DHCP](1.10.1-kea-design.md)
 - [1.10.2 DHCP management and the address plan](1.10.2-dhcp-management.md)
+- [1.10.3 Serving networks beyond the host's LAN (0.8)](1.10.3-serving-networks.md)
 
 ## 1.11 802.1X: FreeRADIUS
 

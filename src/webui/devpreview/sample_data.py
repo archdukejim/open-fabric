@@ -16,6 +16,9 @@ SAMPLE_RADIUS = {"enabled": True, "server_name": "radius.home.arpa", "host_ip": 
                           "vlan": "-", "mac": "02:aa:bb:cc:dd:01", "nas": "switch1", "reason": "device disabled"}],
                  "log_error": ""}
 SAMPLE_DHCP = {"enabled": True, "interfaces": ["eth0"], "lease_time": 86400, "ddns_zone": "dhcp.home.arpa",
+               "has_settings": True,
+               "host_interfaces": [{"name": "eth0", "address": "192.168.1.2", "network": "192.168.1.0/24"},
+                                   {"name": "eth1", "address": "10.20.0.10", "network": "10.20.0.0/24"}],
                "subnets": [{"subnet": "192.168.1.0/24", "id": 1, "name": "main", "vlan": 1,
                             "notes": "the house LAN", "pools": ["192.168.1.100 - 192.168.1.199"],
                             "routers": "192.168.1.1", "options": [{"name": "ntp-servers", "data": "192.168.1.2"}],

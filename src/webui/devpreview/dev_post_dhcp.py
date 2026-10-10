@@ -29,7 +29,9 @@ def dev_post_dhcp(h, path, form):
         return None
     parts = [urllib.parse.unquote(p) for p in path.split("/")[2:]]
     subnets = SAMPLE_DHCP["subnets"]
-    if parts == ["reservations"]:
+    if parts in (["on"], ["off"]):
+        msg = "DHCP is on" if parts == ["on"] else "DHCP is off: Kea stopped; its settings and leases are kept"
+    elif parts == ["reservations"]:
         subnets[0]["reservations"].append({"mac": form.get("mac", "").lower(), "ip": form.get("ip", ""),
                                            "hostname": form.get("hostname", "")})
         msg = f"Reserved {form.get('ip', '')}"

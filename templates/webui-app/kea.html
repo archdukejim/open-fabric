@@ -8,16 +8,26 @@
 {% if err %}<p class="flash bad">{{ err }}</p>{% endif %}
 {% if not d.enabled %}
 <section class="card"><h2>DHCP is off</h2>
-<p class="muted">Kea 3.0 LTS hands out addresses on your LAN and registers clients' hostnames in their own DNS zone (<code>dhcp.&lt;domain&gt;</code>). Turn it on in <code>vars.yaml</code> and re-run setup:</p>
-<pre>install_kea: true
-dhcp:
-  interfaces: [eth0]
-  subnets:
-    - subnet: 192.168.4.0/22
-      name: main
-      pools: ["192.168.5.100 - 192.168.5.200"]
-      routers: 192.168.4.1</pre></section>
+<p class="muted">Kea 3.0 LTS hands out addresses on a network and registers clients' names in their own DNS zone (<code>{{ d.ddns_zone or 'dhcp.<domain>' }}</code>) and their reverse zones.</p>
+{% if can('dhcp:write') %}
+<form method="post" action="/kea/on">{{ csrf() }}
+{% if d.has_settings %}
+<p>Turning it on serves again what it served before: {% for s in d.subnets %}{{ s.subnet }}{{ ', ' if not loop.last }}{% endfor %} on {{ d.interfaces | join(', ') }}.</p>
 {% else %}
+<div class="grid">
+<label>Interface<select name="interface" required>{% for i in d.host_interfaces %}<option value="{{ i.name }}">{{ i.name }} — {{ i.address }} ({{ i.network }})</option>{% endfor %}</select></label>
+<label>Subnet<input name="subnet" required placeholder="10.20.0.0/24"></label>
+<label>Pool<input name="pool" required placeholder="10.20.0.100 - 10.20.0.199"></label>
+<label>Router <span class="muted">(optional)</span><input name="router" placeholder="none: an isolated network"></label>
+</div>
+{% endif %}
+<p class="muted">This also changes the host firewall: DHCP (67/udp) on the interface, and the subnet's clients let in to fabric's DNS, time, pages and the domain's ports. Turning it on is your yes to that.</p>
+<button>Turn DHCP on</button></form>
+{% else %}<p class="muted">Turning it on needs the <code>dhcp:write</code> permission.</p>{% endif %}
+</section>
+{% else %}
+{% if can('dhcp:write') %}<section class="card"><h2>Turn DHCP off</h2>
+<form method="post" action="/kea/off" class="inline">{{ csrf() }}<p class="muted">Kea stops; its DNS key and zones and its subnets' firewall rules go. Its settings and leases are kept, so turning it on again resumes.</p><button class="ghost">Turn DHCP off</button></form></section>{% endif %}
 <section class="card"><h2>Subnets</h2>
 <p class="muted">Serving on {{ d.interfaces | join(', ') }} · lease {{ d.lease_time }} s{% if d.ddns_zone %} · hostnames registered in <code>{{ d.ddns_zone }}</code>{% endif %}. A VLAN here is a record of what the network is for: fabric does not configure switches.</p>
 <table><thead><tr><th>Subnet</th><th>Name</th><th>VLAN</th><th>Pools</th><th>Router</th><th>Notes</th><th>Reservations</th></tr></thead><tbody>

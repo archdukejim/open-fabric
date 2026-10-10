@@ -23,12 +23,19 @@ def _where(form):
 
 def _kea(parts, form):
     """Purpose: one Kea tab change, saved and applied by fabric-agent: reservations, subnets, options, classes.
-    Inputs:  parts — segments after /kea/: ["reservations"], ["reservations", <mac>, "delete"], ["subnets"],
+    Inputs:  parts — segments after /kea/: ["on"], ["off"] (manual 1.10.3.5), ["reservations"],
+             ["reservations", <mac>, "delete"], ["subnets"],
              ["subnets", "update"], ["subnets", "delete"], ["options"], ["options", "delete"], ["classes"],
              ["classes", <name>, "delete"]; form — dict.
     Returns: (agent result, message), or None for another path.
     Fails:   agent errors propagate (saved_and_applied handles ValidationError).
     Feeds:   kea_post."""
+    if parts in (["on"], ["off"]):
+        res = actions.set_dhcp_on(parts == ["on"], form.get("interface", ""), form.get("subnet", ""),
+                                  form.get("pool", ""), form.get("router", ""))
+        nets = ", ".join(res["dhcp"]["subnets"])
+        return res, (f"DHCP is on: {nets} on {', '.join(res['dhcp']['interfaces'])}." if parts == ["on"]
+                     else "DHCP is off: Kea stopped; its settings and leases are kept.")
     if parts == ["reservations"]:
         res = actions.add_reservation(form.get("mac", ""), form.get("ip", ""), form.get("hostname", ""))
         return res, f"Reserved {res['reservation']['ip']} for {res['reservation']['mac']}."

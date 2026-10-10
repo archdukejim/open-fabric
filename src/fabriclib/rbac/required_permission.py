@@ -43,6 +43,7 @@ POST = {
     ("machines",): "machines:admin", ("machines", "*", "enable"): "machines:admin",
     ("machines", "*", "disable"): "machines:admin", ("machines", "*", "delete"): "machines:admin",
     ("gpo", "search"): "domain:read", ("gpo", "set"): "gpo:admin", ("gpo", "clear"): "gpo:admin",
+    ("dhcp", "on"): "dhcp:write", ("dhcp", "off"): "dhcp:write",
     ("dhcp", "reservations"): "dhcp:write", ("dhcp", "reservations", "*", "delete"): "dhcp:write",
     ("dhcp", "subnets"): "dhcp:write", ("dhcp", "subnets", "update"): "dhcp:write",
     ("dhcp", "subnets", "delete"): "dhcp:write", ("dhcp", "options"): "dhcp:write",

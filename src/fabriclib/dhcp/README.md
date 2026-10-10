@@ -10,10 +10,14 @@ zone `dhcp.<domain>` through kea-dhcp-ddns.
 | `normalize_options.py` | Check a list of DHCP options (name or code, data, space, flags) at any level |
 | `normalize_option_defs.py` | Check `dhcp.option_defs` (options Kea has no name for) |
 | `normalize_client_classes.py` | Check `dhcp.client_classes` (Kea expression, options, network-boot fields) |
+| `place_subnets.py` | Each subnet placed on the host: the served interface that holds it, or a relay; fabric's address there is what its clients are told (manual 1.10.3.2) |
+| `dhcp_reverse_zones.py` | The reverse zones Kea registers PTRs in: every zone holding a pool or reservation address (2.1.10.7) |
+| `client_networks.py` | DHCP's full and guest subnets and fabric's addresses facing them: what the firewall, BIND's ACL and the resolver open, and where the resolver and nginx listen (2.1.10.4) |
 | `kea_option_data.py` | Kea's option-data for one level: fabric's own options, the admin's replacing them by name |
 | `kea_option_defs.py` | Kea's option-def list |
 | `kea_client_classes.py` | Kea's client-classes list |
 | `check_kea_config.py` | Kea's own check (`kea-dhcp4 -t`) of a configuration before it is saved or installed |
+| `set_dhcp_on.py` | Turn DHCP on (its first subnet when it has none) or off, settings and leases kept (manual 1.10.3.5) |
 | `add_subnet.py` | Add a subnet (name, VLAN record, router, pools, notes) with the next id |
 | `update_subnet.py` | Change a subnet's name, VLAN, router, notes or pools (its network and id stay) |
 | `remove_subnet.py` | Remove a subnet (refused with active leases unless forced; the others keep their ids) |
