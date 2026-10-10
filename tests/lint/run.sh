@@ -1,11 +1,13 @@
 #!/bin/bash
-# The lint suite (decision 2.1.1.15, manual 3.1.2): ruff for Python, shellcheck for shell scripts. Both run from
-# their published images, pinned by digest (nothing is installed on the host).
+# The lint suite (decision 2.1.1.15, manual 3.1.2): ruff for Python, shellcheck for shell scripts, and every Python file
+# parsed by the oldest supported Python (3.10, Ubuntu 22.04: 2.1.1.43). All run from their published images, pinned by
+# digest (nothing is installed on the host).
 #   sudo tests/run-all.sh lint
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 RUFF="ghcr.io/astral-sh/ruff:0.13.3@sha256:97b6a4512a9f50f50bd10ce64363b35c1f384d6615ceb6b6b9b0d05654908a55"
 SHELLCHECK="koalaman/shellcheck:v0.11.0@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d"
+PY310="python:3.10-slim@sha256:6ff506466f8b1e981719b468cc0023b8ef000b983cdec0eafe119d01f379e31d"
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
 cd "$REPO" || exit 1
@@ -27,11 +29,16 @@ shell_files() {
 }
 
 # pulled first, so a check's output is only the tool's findings (a pull reports its progress on stderr)
-for image in "$RUFF" "$SHELLCHECK"; do docker pull -q "$image" >/dev/null || { echo "FAIL cannot pull $image"; exit 1; }; done
+for image in "$RUFF" "$SHELLCHECK" "$PY310"; do docker pull -q "$image" >/dev/null || { echo "FAIL cannot pull $image"; exit 1; }; done
 
 out=$(docker run --rm -v "$REPO:/io" -w /io "$RUFF" check src scripts tests 2>&1); rc=$?
 echo "$out" | tail -15 | sed 's/^/    /'
 check "ruff: no findings in src/, scripts/ and tests/ (pyproject.toml)" "[ $rc -eq 0 ]"
+
+# ruff parses with the newest grammar whatever its target: only a real 3.10 refuses 3.12-only syntax (2.1.1.43)
+out=$(docker run --rm -v "$REPO:/io:ro" -w /io "$PY310" python3 tests/lint/parse_py.py src scripts 2>&1); rc=$?
+echo "$out" | tail -15 | sed 's/^/    /'
+check "Python 3.10 parses every file in src/ and scripts/ (the oldest supported host, Ubuntu 22.04)" "[ $rc -eq 0 ]"
 
 mapfile -t product < <(shell_files src packaging scripts)
 out=$(docker run --rm -v "$REPO:/mnt" -w /mnt "$SHELLCHECK" -S warning "${product[@]}" 2>&1); rc=$?
