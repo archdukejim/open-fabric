@@ -211,8 +211,10 @@ assert off['install_resolver'] is False and off['bind_dns_port'] == 53, 'with th
 kept = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none',
                                                                   'bind_dns_port': 5053}))
 assert kept['bind_dns_port'] == 5053, 'with the filter off a chosen port is kept (a resolver of your own)'
-dflt = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{k: w for k, w in copy.deepcopy(PRISTINE).items()
-                                                                 if not k.startswith('dns_filter')}))
+# the default filter with an old install's port 53 (bind_dns_port given: the hardening suite renders with 10053)
+dflt = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**{k: w for k, w in copy.deepcopy(PRISTINE).items()
+                                                                    if not k.startswith('dns_filter')},
+                                                                 'bind_dns_port': 53}))
 res = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'BIND',
                                                                  'bind_dns_port': 53}))
 for r in (dflt, res):
@@ -353,6 +355,8 @@ import ipaddress  # noqa: E402
 from fabriclib.dhcp.client_networks import client_networks  # noqa: E402
 from fabriclib.dhcp.place_subnets import place_subnets  # noqa: E402
 from fabriclib.security.apply_docker_firewall import _rules as docker_rules  # noqa: E402
+# fabric's LAN address in this block is the PRISTINE LAN's (the hardening suite renders with host_ip 127.0.0.1)
+kv_any_host, kv = kv, {**kv, "host_ip": "192.168.7.53"}
 nets = {"eth0": [ipaddress.ip_interface(f"{kv['host_ip']}/24")], "eth1": [ipaddress.ip_interface("10.20.0.10/24")]}
 lab = {**kv, "dhcp": normalize_dhcp({**kv, "dhcp": {"interfaces": ["eth0", "eth1"], "subnets": [
     kv["dhcp"]["subnets"][0],
@@ -408,6 +412,7 @@ rports = next(iter(rc["services"].values()))["ports"]
 assert {"10.20.0.10:53:53/udp", "10.20.0.10:853:853/tcp", f"{kv['host_ip']}:53:53/udp"} <= set(rports), rports
 nports = yaml.safe_load(env.get_template("nginx/docker-compose.yml.j2").render(**lab))["services"]["nginx"]["ports"]
 assert "10.20.0.10:443:443" in nports and nports.count(f"{kv['host_ip']}:443:443") == 1, nports
+kv = kv_any_host                  # the rest takes host_ip as the caller gave it
 labvars = yaml.safe_load(env.get_template("vars.yaml.j2").render(**{**lab, "install_kea": True}))
 assert {"10.20.0.0/24", "192.168.7.0/24"} <= set(labvars["bind_acls"]["dns-resolvers"]) \
     and "10.30.0.0/24" not in labvars["bind_acls"]["dns-resolvers"], labvars["bind_acls"]
