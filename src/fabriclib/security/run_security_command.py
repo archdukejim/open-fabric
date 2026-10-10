@@ -12,6 +12,13 @@ from fabriclib.security.apply_signin import apply_signin
 from fabriclib.security.set_signin_layer import set_signin_layer
 from fabriclib.security.signin_layers import LAYERS, read_lowered, signin_rows
 
+USAGE = """usage: fabricctl security                         the sign-in layers and their values
+       fabricctl security raise <layer> [<value>]
+                                                  raise a layer (the web console's Security page does the same)
+       fabricctl security lower <layer> [<value>]
+                                                  lower a layer (asks for the layer's name; audited)
+       fabricctl security kerberos on|off         signing in with the domain logon"""
+
 
 def _actor():
     """Purpose: who changes a layer from the host, for the audit log: root, and the account that ran sudo.
@@ -58,6 +65,7 @@ def run_security_command(argv, vars_file=VARS_FILE):
         p.add_argument("--yes", action="store_true", help=argparse.SUPPRESS)
     k = sub.add_parser("kerberos", help="signing in with the domain logon: on or off")
     k.add_argument("value", choices=["on", "off"])
+    ap.usage = USAGE.removeprefix("usage: ")    # after the subparsers: they take their prog from it
     args = ap.parse_args(argv)
     config_dir = os.path.dirname(vars_file)
     rows = {r["layer"]: r for r in signin_rows(load_vars(vars_file), read_lowered(config_dir))}

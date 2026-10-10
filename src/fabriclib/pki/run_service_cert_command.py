@@ -5,6 +5,9 @@ import subprocess
 from fabriclib.common.ask import ask
 from fabriclib.setup.renew_service_certs import renew_service_certs
 
+USAGE = """usage: fabricctl --service-cert                   their expiry dates, then asks to re-issue them all
+       fabricctl --service-cert --apply           re-issue every service certificate without asking"""
+
 
 def run_service_cert_command(ctx, args):
     """Purpose: `fabricctl --service-cert`: re-issue every core service certificate (which restarts the affected

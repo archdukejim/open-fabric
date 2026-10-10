@@ -569,8 +569,8 @@ src/fabriclib/dns/reverse_zones.py	5391a1c8887fdd4582fb8d7f7eb67f7e4be7e8b8	2026
 src/fabriclib/dns/rfc2136_settings.py	cb9ce341ea737b5ece695ad067504237822dca7c	2026-10-02	
 src/fabriclib/dns/rndc.py	58f23cab0b24c5d75fdc7e026ea38b662581b289	2026-10-02	
 src/fabriclib/dns/rotate_tsig_key.py	ee55af98c186245da8dd5b5cb34824c8c9a35981	2026-10-03	
-src/fabriclib/dns/run_acl_command.py	142439593b4f565b384a47feb5b63b178a2c6ff5	2026-09-30	
-src/fabriclib/dns/run_tsig_command.py	99418e24d4f77868a0384d7e4df999efab2b374d	2026-10-10	
+src/fabriclib/dns/run_acl_command.py	7fb236f1ca4c7efc67435b868d3286488320eaa2	2026-10-10	
+src/fabriclib/dns/run_tsig_command.py	9d29d97a11b8682a1c5ed17f9cc39b77fd4c2cc3	2026-10-10	
 src/fabriclib/dns/set_acl_policy.py	4a89fcbfa43d79bd27564d64288e15a10ed7e13b	2026-09-30	
 src/fabriclib/dns/set_key_acls.py	c34f34101a80a885701f2557e0f76752c40adbdb	2026-09-30	
 src/fabriclib/dns/sync_status.py	a73f4e9cf9c7c2ecef0ace2725998513353e1d15	2026-10-02	
@@ -693,7 +693,7 @@ src/fabriclib/keycloak/quote.py	a36d6cebc19c9f0db56bf597f61d7bbeb46dd190	2026-10
 src/fabriclib/keycloak/remove_app_client.py	e01694180f66797e2b3ddfe851fbd10c6cdc118a	2026-10-08	
 src/fabriclib/keycloak/remove_retired_client.py	33d47a6db0f054bcb179555b0cf35822f5a4da5f	2026-10-09	
 src/fabriclib/keycloak/retire_old_admin_role.py	c0916248e5cb17e065805ff9e906731d7b7f42aa	2026-10-09	
-src/fabriclib/keycloak/run_sso_command.py	124e51e71165ee5e4eb5995d86bd432a6157f42f	2026-10-08	
+src/fabriclib/keycloak/run_sso_command.py	fb5cb4ec3e6871128c1698a402899fcec415624f	2026-10-10	
 src/fabriclib/keycloak/sign_out_person.py	24317323f1854be001d99c71fcb264f27fe408a2	2026-10-09	
 src/fabriclib/keycloak/signin_levels.py	e1e33cf07c172b5fedcaa14182196a41d16e005e	2026-10-08	
 src/fabriclib/keycloak/step.py	75f102ba525f6c9297a649f19bc3df9aec6df3dc	2026-10-02	
@@ -771,8 +771,8 @@ src/fabriclib/pki/replace_site_ca.py	f3d7e0fcdd40976c489eed563819d3b9773c9e20	20
 src/fabriclib/pki/revoke_cert.py	49d3ce9badfdc738aaa3e23690069c59e89b56df	2026-10-08	
 src/fabriclib/pki/run_acme_command.py	0904f68ae3e0725dbb9b27d2622db8e03a59eaa2	2026-10-09	
 src/fabriclib/pki/run_certs_command.py	3adadb6655a6eccba28035b42cf3f4586ad0c3e9	2026-10-08	
-src/fabriclib/pki/run_mint_certs_command.py	4229424d61e6b7ea61e42a3cb0988d066c52a3fa	2026-10-10	
-src/fabriclib/pki/run_service_cert_command.py	956fbaca3ce8fb966d0f8e634d81fef5ae9ac9c1	2026-10-10	
+src/fabriclib/pki/run_mint_certs_command.py	d65473b2acdeab1e22a4c8cdd5762cac0785ddc1	2026-10-10	
+src/fabriclib/pki/run_service_cert_command.py	0601146f4a31770f109a9978ed978568ed88947d	2026-10-10	
 src/fabriclib/pki/show_cert_warnings.py	d45be80608c1f1ab62d9164e9d92fd5ac15e2b02	2026-10-08	
 src/fabriclib/pki/sign_csr.py	f8128362f83d0d7e96cc70841575cf71bc7354a8	2026-10-05	
 src/fabriclib/pki/sign_site_ca.py	6be743e2bd26f68aa9a8af822e8ac142515baa7d	2026-10-08	
@@ -835,7 +835,7 @@ src/fabriclib/secrets/import_secrets.py	704a6d7deb41557e103dbc9387771e299aa3fee7
 src/fabriclib/secrets/load_secrets.py	8808010228971cc57e3b274e804b8fee0da547a7	2026-10-05	
 src/fabriclib/secrets/random_password.py	0a8f62427ff7fab83c2a6c42fc113ffc7dd80561	2026-10-04	
 src/fabriclib/secrets/random_secret.py	12a8b476ea333570b3dfda750cc5364458eb9134	2026-10-02	
-src/fabriclib/secrets/run_secrets_command.py	17c361430dd229fbbe042c37381ea01e60edc90a	2026-09-30	
+src/fabriclib/secrets/run_secrets_command.py	f1905cec1f3c58dcef71f12fca96108475bde9c6	2026-10-10	
 src/fabriclib/secrets/save_secrets.py	8444c73d6ebecdabb4a78eaedece15aa6e19958c	2026-10-02	
 src/fabriclib/secrets/secrets_in_openbao.py	92c573bf5f48cc9a4a5cc253090190b98589c215	2026-09-30	
 src/fabriclib/security/README.md	a8d8efbced99b89662bdae0718ce43177de905e7	2026-10-10	
@@ -847,7 +847,7 @@ src/fabriclib/security/firewall_rules.py	6f19ffc23dcdfe024b95fff188c1ba9def669af
 src/fabriclib/security/hardened_daemon_settings.py	0a8808c4d21b5abcd2d9d6525ecb88df00081be8	2026-10-02	
 src/fabriclib/security/host_own_rules.py	3b67c1abfb9f7c214a2ad8860cc68f4726c025e8	2026-10-08	
 src/fabriclib/security/refresh_firewall.py	8608eb3e3559725c51719f593d06f41848347440	2026-10-10	
-src/fabriclib/security/run_security_command.py	1d82c442cc91259352aa5e3f8ba089a0fe7e929f	2026-10-10	
+src/fabriclib/security/run_security_command.py	a1feed68b3ad55c1e8897751533b9d710ca38cc1	2026-10-10	
 src/fabriclib/security/set_signin_layer.py	eefb5bbca32cfca1d27c9f45f7e70b8df16520d9	2026-10-09	
 src/fabriclib/security/signin_layers.py	210a594c0fc04bd9f1c4eef7b8f2f73b7be11585	2026-10-09	
 src/fabriclib/security/ssh_ports.py	3859ae3af3751fd7b40409678ada25e3846fb239	2026-10-06	

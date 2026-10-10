@@ -9,6 +9,10 @@ from fabriclib.common.save_vars import save_vars
 from fabriclib.common.vars_lock import vars_lock
 from fabriclib.pki.mint_extra_cert import mint_extra_cert
 
+USAGE = """usage: fabricctl --mint-certs [--intermediate-ca [N]] [--kty RSA|EC|OKP] [--size BITS]
+                                                  ask for one certificate, record it in extra_certs and mint it
+       fabricctl --mint-certs --apply             mint every extra_certs entry in vars.yaml"""
+
 
 def _prompt(text, default=""):
     """Purpose: the text of one prompt with its default shown: "  <text> [<default>]: ".
