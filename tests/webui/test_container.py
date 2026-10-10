@@ -31,7 +31,7 @@ def bundle_roles(bundle, name=None):
     return [name or bundle] + [f"fabric:{p}" for p in BUNDLES[bundle]]
 
 
-ADMIN_ROLES = bundle_roles("admin", "fabric-admin")
+ADMIN_ROLES = bundle_roles("admin", "fabric-console-admin")
 AUDITOR_ROLES = bundle_roles("fabric-auditor")
 W = os.environ.get("FABRIC_TEST_OUT", "/tmp/fabric-tests") + "/webui"
 shutil.rmtree(W, ignore_errors=True)
@@ -86,7 +86,7 @@ JWKS = {"keys": [{"kid": "k1", "kty": "RSA", "alg": "RS256", "use": "sig",
                   "n": b64u(modulus.to_bytes(256, "big")), "e": b64u((65537).to_bytes(3, "big"))}]}
 ISSUER = "https://sso.test/realms/test"
 CODES = {}          # code -> dict(nonce, challenge, user, roles, tamper)
-MOCK = {"user": "alice", "roles": ["fabric-admin"], "tamper": None}
+MOCK = {"user": "alice", "roles": ["fabric-console-admin"], "tamper": None}
 REFRESH = {}        # refresh token -> {"user", "roles", "short"}: what a refresh grant returns (roles can be revoked)
 
 
@@ -151,7 +151,7 @@ class KC(BaseHTTPRequestHandler):
         token = sign_jwt(claims)
         if t == "sig":
             h, p, s = token.split(".")
-            p = b64u(json.dumps({**claims, "roles": ["fabric-admin", "x"]}).encode())
+            p = b64u(json.dumps({**claims, "roles": ["fabric-console-admin", "x"]}).encode())
             token = f"{h}.{p}.{s}"
         rt = f"rt-{os.urandom(6).hex()}"
         REFRESH[rt] = {"user": entry["user"], "roles": entry["roles"], "short": t == "short"}
@@ -194,7 +194,7 @@ sh("docker rm -f cwebui >/dev/null 2>&1; docker network rm cwnet >/dev/null 2>&1
 sh("docker network create --subnet 10.254.8.0/24 --gateway 10.254.8.1 cwnet >/dev/null")
 cfg = {"socket": "/run/webui/web.sock", "socket_gid": 0, "agent_socket": "/agent/agent.sock",
        "public_url": "https://mgr.test", "ca_file": "/certs/root_ca.crt", "intermediate_ca": "/certs/intermediate_ca.crt",
-       "admin_role": "fabric-admin", "session_idle": 900, "session_max": 28800,
+       "admin_role": "fabric-console-admin", "session_idle": 900, "session_max": 28800,
        "keycloak": {"ip": "10.254.8.1", "port": 18443, "hostname": "sso.test", "realm": "test",
                     "client_id": "fabric-webui", "client_secret": "s3cret"}}
 json.dump(cfg, open(f"{W}/config/webui.json", "w"))
@@ -310,7 +310,7 @@ check("login cookie is __Host-, Secure, HttpOnly", "__Host-webui-login=" in sc a
 
 (st, hd, sc, body), _, _ = login(user="bob")
 check("Keycloak user != cert CN -> 403", st == 403, st)
-(st, hd, sc, body), _, _ = login(roles=("offline_access", "fabric-admin"))
+(st, hd, sc, body), _, _ = login(roles=("offline_access", "fabric-console-admin"))
 check("user without any fabric permission -> 403 (a bundle name alone grants nothing)",
       st == 403 and "no fabric role" in body, (st, body[:200]))
 for t in ("nonce", "aud", "expired", "sig"):

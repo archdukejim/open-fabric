@@ -64,7 +64,14 @@ put "$OUT/vars.yaml"
 
 echo "--- setup (this host builds its images; takes a while on a Pi)"
 start=$(date +%s)
-R "fabricctl setup --file /tmp/vars.yaml --non-interactive --yes --approve all" > "$OUT/setup.log" 2>&1
+# the first admin's password for a fresh install, in a 0600 file (2.1.6.33: never on a command line); a re-run on an
+# install that has its admin ignores it
+ADMIN_PW="Fx9-$(openssl rand -hex 12)"
+( umask 077; printf '%s\n' "$ADMIN_PW" > "$OUT/admin-pw" )
+scp -q -p -o BatchMode=yes -i "$KEY" "$OUT/admin-pw" "$TARGET:/tmp/admin-pw"
+R "fabricctl setup --file /tmp/vars.yaml --non-interactive --yes --approve all --admin-password-file /tmp/admin-pw" \
+    > "$OUT/setup.log" 2>&1
+R "rm -f /tmp/admin-pw"
 echo "    setup took $(( ($(date +%s) - start) / 60 )) min"
 check "setup completes" "grep -q 'fabric is ready' '$OUT/setup.log'"
 R 'fabricctl doctor' > "$OUT/doctor.log" 2>&1

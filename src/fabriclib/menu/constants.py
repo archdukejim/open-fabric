@@ -1,18 +1,18 @@
 """What the vars editor (`fabricctl --interactive`) treats specially."""
 
-# fixed once installed: never edited or deleted from the menu
+# fixed once installed: never edited or deleted from the menu (ad_domain: 2.1.6.11; hostname: the DC's name, 2.1.2.16)
 IMMUTABLE_KEYS = {
-    "ca_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou",
+    "ad_domain", "ca_name", "cert_country", "cert_province", "cert_city", "cert_org", "cert_ou",
     "cert_root_digest", "cert_root_key_type", "cert_root_key_param", "cert_root_ca_days",
     "cert_intermediate_days", "cert_intermediate_digest", "cert_intermediate_key_type",
     "cert_intermediate_key_param", "cert_service_days", "cert_acme_lifetime_hours",
     "stepca_port", "stepca_cert_allow_subordinate_ca", "stepca_cert_max_lifetime_hours",
     "byoc", "ca_crt_path", "ica_crt_path", "ica_key_path", "extra_certs",
-    "deploy_base_dir", "domain", "org_domain", "site_name",
+    "deploy_base_dir", "domain", "org_domain", "site_name", "hostname",
 }
 
 # changing these can cut the host off its network: the menu asks before applying
-WARNED_KEYS = {"hostname", "host_ip", "lan_cidr", "lan_gateway", "fabric_subnet"}
+WARNED_KEYS = {"host_ip", "lan_cidr", "lan_gateway", "fabric_subnet"}
 
 # the "Docker & Services" screen
 SERVICE_KEYS = [

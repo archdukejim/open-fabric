@@ -208,8 +208,8 @@ check("break glass: the recovery keys give a working root token",
       bao_request(V, "GET", "auth/token/lookup-self", token=glass)[1].get("data", {}).get("policies") == ["root"])
 bao_request(V, "POST", "fabric/data/glass-probe", token=glass, body={"data": {"v": "fabric-only"}})
 person = bao_request(V, "POST", "auth/token/create", token=glass,
-                     body={"policies": ["fabric-admin"], "ttl": "5m"})[1]["auth"]["client_token"]
-check("people (fabric-admin): their applications' secrets, read and write",
+                     body={"policies": ["fabric-console-admin"], "ttl": "5m"})[1]["auth"]["client_token"]
+check("people (fabric-console-admin): their applications' secrets, read and write",
       bao_request(V, "POST", "apps/data/team/db", token=person, body={"data": {"pw": "x"}})[0] == 200
       and bao_request(V, "GET", "apps/data/team/db", token=person)[0] == 200)
 check("people: fabric's own secrets are listed, never read",
@@ -217,8 +217,8 @@ check("people: fabric's own secrets are listed, never read",
       and bao_request(V, "GET", "fabric/data/glass-probe", token=person)[0] == 403
       and bao_request(V, "POST", "fabric/data/glass-probe", token=person, body={"data": {"v": "x"}})[0] == 403)
 check("people: configuration readable, not writable",
-      bao_request(V, "GET", "sys/policies/acl/fabric-admin", token=person)[0] == 200
-      and bao_request(V, "PUT", "sys/policies/acl/fabric-admin", token=person, body={"policy": ""})[0] == 403
+      bao_request(V, "GET", "sys/policies/acl/fabric-console-admin", token=person)[0] == 200
+      and bao_request(V, "PUT", "sys/policies/acl/fabric-console-admin", token=person, body={"policy": ""})[0] == 403
       and bao_request(V, "POST", "sys/auth/userpass", token=person, body={"type": "userpass"})[0] == 403)
 auditor = bao_request(V, "POST", "auth/token/create", token=glass,
                       body={"policies": ["fabric-auditor"], "ttl": "5m"})[1]["auth"]["client_token"]

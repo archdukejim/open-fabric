@@ -32,7 +32,7 @@ def ensure_rbac_roles(kc, realm, admin_role):
     """Purpose: Converge fabric's access control in Keycloak (design 2.1.6.1): one realm role per permission
              (fabric:<area>:<action>) and one composite role per bundle holding exactly its permissions.
     Inputs:  kc — admin_client.Admin; realm — realm name; admin_role — name of the "admin" bundle
-             (webui_admin_role, default fabric-admin). Reads rbac/permissions PERMISSIONS, BUNDLES, PREFIX.
+             (webui_admin_role, default fabric-console-admin). Reads rbac/permissions PERMISSIONS, BUNDLES, PREFIX.
     Returns: {role name: representation} for every fabric role (permissions and bundles).
     Fails:   SystemExit from kc.call on any admin API error; OSError / ssl errors if Keycloak is unreachable.
     Feeds:   configure_keycloak: group grants (grant_role_to_group) and client scope mappings

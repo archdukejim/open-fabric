@@ -134,7 +134,8 @@ shutil.rmtree(W, ignore_errors=True)
 # the DC first: Keycloak's account and the first admin come from it
 dc = start_dc(os.path.join(W, "dc"), DC, NET, SUBNET, DC_IP, extra_vars={
     "ip_keycloak": KC_IP, "hostname_keycloak": HOST, "webui_realm": REALM, "install_webui": True, "install_keycloak": True,
-    "hostname_mgr": "mgr.lan.j-j.family", "webui_hostname": "mgr.lan.j-j.family", "webui_admin_group": "admins"})
+    "hostname_mgr": "mgr.lan.j-j.family", "webui_hostname": "mgr.lan.j-j.family", "webui_admin_group": "admins",
+    "signin_kerberos": True})     # off by default since 0.6.4 (2.1.6.32): this suite proves it on
 v, secrets, root_ca = dc["v"], dc["secrets"], dc["root_ca"]
 check("a real DC from fabric's image, converged (Keycloak's service account made)", True)
 state, otp = ensure_admin(v, secrets, "jim", "jim@lan.j-j.family", container=DC)
@@ -232,7 +233,7 @@ users = kc.call("GET", f"{R}/users?username=jim&exact=true")[1]
 check("jim (in the site's people) is visible in Keycloak", len(users) == 1, users)
 if users:
     roles = kc.call("GET", f"{R}/users/{users[0]['id']}/role-mappings/realm/composite")[1]
-    check("jim gets fabric-admin through AD's admins group", any(r["name"] == "fabric-admin" for r in roles),
+    check("jim gets fabric-console-admin through AD's admins group", any(r["name"] == "fabric-console-admin" for r in roles),
           [r["name"] for r in roles])
 client = kc.call("GET", f"{R}/clients?clientId=fabric-webui")[1][0]
 check("client: confidential, code flow only, exact redirect, PKCE S256, fullScopeAllowed off",

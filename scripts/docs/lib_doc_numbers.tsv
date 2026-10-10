@@ -331,6 +331,7 @@ file	fabriclib-keycloak|src/fabriclib/keycloak/quote.py	15
 file	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py	24	
 file	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py	16	0.5.0 / 2026-10-04
 file	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py	17	0.5.0 / 2026-10-04
+file	fabriclib-keycloak|src/fabriclib/keycloak/retire_old_admin_role.py	31	
 file	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py	25	
 file	fabriclib-keycloak|src/fabriclib/keycloak/sign_out_person.py	29	
 file	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py	28	
@@ -457,6 +458,7 @@ file	fabriclib-samba|src/fabriclib/samba/gpo_overview.py	13
 file	fabriclib-samba|src/fabriclib/samba/gpo_request.py	9	
 file	fabriclib-samba|src/fabriclib/samba/id_range.py	8	
 file	fabriclib-samba|src/fabriclib/samba/list_conflicts.py	18	
+file	fabriclib-samba|src/fabriclib/samba/password_meets_policy.py	24	
 file	fabriclib-samba|src/fabriclib/samba/prepare_site.py	16	
 file	fabriclib-samba|src/fabriclib/samba/replication_status.py	19	
 file	fabriclib-samba|src/fabriclib/samba/run_converge.py	17	
@@ -489,8 +491,11 @@ file	fabriclib-security|src/fabriclib/security/signin_layers.py	9
 file	fabriclib-security|src/fabriclib/security/ssh_ports.py	5	
 file	fabriclib-security|src/fabriclib/security/ufw_active.py	11	
 file	fabriclib-security|src/fabriclib/security/ufw_rule.py	4	
+file	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py	43	
 file	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py	39	
-file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	
+file	fabriclib-setup|src/fabriclib/setup/ask_first_admin.py	45	
+file	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py	46	0.6.4 / 2026-10-09
+file	fabriclib-setup|src/fabriclib/setup/ask_ram.py	40	0.6.4 / 2026-10-09
 file	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py	38	0.5.0 / 2026-10-04
 file	fabriclib-setup|src/fabriclib/setup/backup_install.py	1	
 file	fabriclib-setup|src/fabriclib/setup/check_export_dir.py	2	
@@ -516,6 +521,7 @@ file	fabriclib-setup|src/fabriclib/setup/join_federation.py	19
 file	fabriclib-setup|src/fabriclib/setup/mint_extra_certs.py	20	
 file	fabriclib-setup|src/fabriclib/setup/mint_service_certs.py	21	
 file	fabriclib-setup|src/fabriclib/setup/preflight.py	22	
+file	fabriclib-setup|src/fabriclib/setup/print_first_steps.py	44	
 file	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py	23	
 file	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py	24	
 file	fabriclib-setup|src/fabriclib/setup/restore_install.py	25	
@@ -523,6 +529,7 @@ file	fabriclib-setup|src/fabriclib/setup/retire_renamed_units.py	26
 file	fabriclib-setup|src/fabriclib/setup/run_restore_command.py	27	
 file	fabriclib-setup|src/fabriclib/setup/run_setup.py	28	
 file	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py	29	
+file	fabriclib-setup|src/fabriclib/setup/set_ram_capacity.py	47	
 file	fabriclib-setup|src/fabriclib/setup/setup_openbao.py	30	
 file	fabriclib-setup|src/fabriclib/setup/stage_source.py	31	
 file	fabriclib-setup|src/fabriclib/setup/start_bootstrap.py	32	
@@ -1248,6 +1255,7 @@ function	fabriclib-keycloak|src/fabriclib/keycloak/remove_app_client.py|remove_a
 function	fabriclib-keycloak|src/fabriclib/keycloak/require_password_change.py|require_password_change	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|_q	1	0.5.0 / 2026-10-04
 function	fabriclib-keycloak|src/fabriclib/keycloak/reset_sign_in.py|reset_sign_in	2	0.5.0 / 2026-10-04
+function	fabriclib-keycloak|src/fabriclib/keycloak/retire_old_admin_role.py|retire_old_admin_role	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/run_sso_command.py|run_sso_command	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/sign_out_person.py|sign_out_person	1	
 function	fabriclib-keycloak|src/fabriclib/keycloak/signin_levels.py|admin_level	2	
@@ -1407,6 +1415,7 @@ function	fabriclib-samba|src/fabriclib/samba/gpo_overview.py|gpo_overview	1
 function	fabriclib-samba|src/fabriclib/samba/gpo_request.py|gpo_request	1	
 function	fabriclib-samba|src/fabriclib/samba/id_range.py|id_range	1	
 function	fabriclib-samba|src/fabriclib/samba/list_conflicts.py|list_conflicts	1	
+function	fabriclib-samba|src/fabriclib/samba/password_meets_policy.py|password_meets_policy	1	
 function	fabriclib-samba|src/fabriclib/samba/prepare_site.py|prepare_site	1	
 function	fabriclib-samba|src/fabriclib/samba/replication_status.py|replication_status	1	
 function	fabriclib-samba|src/fabriclib/samba/run_converge.py|run_converge	1	
@@ -1455,19 +1464,23 @@ function	fabriclib-security|src/fabriclib/security/signin_layers.py|signin_rows	
 function	fabriclib-security|src/fabriclib/security/ssh_ports.py|ssh_ports	1	
 function	fabriclib-security|src/fabriclib/security/ufw_active.py|ufw_active	1	
 function	fabriclib-security|src/fabriclib/security/ufw_rule.py|ufw_rule	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	
+function	fabriclib-setup|src/fabriclib/setup/adopt_stray_records.py|adopt_stray_records	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_number	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|_rule	3	0.6.4 / 2026-10-09
 function	fabriclib-setup|src/fabriclib/setup/ask_ad_domain.py|ask_ad_domain	2	
-function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	
-function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	
+function	fabriclib-setup|src/fabriclib/setup/ask_first_admin.py|ask_first_admin	1	
+function	fabriclib-setup|src/fabriclib/setup/ask_kerberos.py|ask_kerberos	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|_plan	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/ask_ram.py|ask_ram	2	0.6.4 / 2026-10-09
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|_number	1	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/ask_windows_domain.py|ask_windows_domain	2	0.5.0 / 2026-10-04
 function	fabriclib-setup|src/fabriclib/setup/backup_install.py|backup_install	1	
 function	fabriclib-setup|src/fabriclib/setup/check_export_dir.py|check_export_dir	1	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_ca_lifetime	10	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dns_filter	8	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_log_forwarding	1	
-function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_radius	3	
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dhcp	2	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_dns_filter	8	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_log_forwarding	1	0.6.4 / 2026-10-09
+function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ask_radius	3	0.6.4 / 2026-10-09
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_ca_exists	9	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_get	4	
 function	fabriclib-setup|src/fabriclib/setup/choose_plan.py|_set	5	
@@ -1541,6 +1554,7 @@ function	fabriclib-setup|src/fabriclib/setup/preflight.py|_foreign_listeners	3
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_mem_gb	2	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|_os_release	1	
 function	fabriclib-setup|src/fabriclib/setup/preflight.py|run	4	
+function	fabriclib-setup|src/fabriclib/setup/print_first_steps.py|print_first_steps	1	
 function	fabriclib-setup|src/fabriclib/setup/read_join_invitation.py|read_join_invitation	1	
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|_record	2	
 function	fabriclib-setup|src/fabriclib/setup/renew_service_certs.py|renew_service_certs	1	
@@ -1552,6 +1566,8 @@ function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|_opt	1
 function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|_package_installed	2	
 function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|_show_plan	3	
 function	fabriclib-setup|src/fabriclib/setup/run_uninstall_command.py|run_uninstall_command	4	
+function	fabriclib-setup|src/fabriclib/setup/set_ram_capacity.py|_plan	1	
+function	fabriclib-setup|src/fabriclib/setup/set_ram_capacity.py|set_ram_capacity	2	
 function	fabriclib-setup|src/fabriclib/setup/setup_openbao.py|_save_recovery	1	
 function	fabriclib-setup|src/fabriclib/setup/setup_openbao.py|run	2	
 function	fabriclib-setup|src/fabriclib/setup/stage_source.py|stage_source	1	

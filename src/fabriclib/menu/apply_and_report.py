@@ -5,7 +5,7 @@ import traceback
 
 from fabriclib.common.console import BLUE, BOLD, GREEN, NC, RED, YELLOW
 from fabriclib.common.load_vars import load_vars
-from fabriclib.common.paths import DEPLOY_BASE_DIR, FABRIC_DIR, SECRETS_FILE, VARS_FILE
+from fabriclib.common.paths import DEPLOY_BASE_DIR, INSTALL_DIR, SECRETS_FILE, VARS_FILE
 from fabriclib.deploy.apply_deployment import apply_deployment
 
 
@@ -23,7 +23,7 @@ def apply_and_report():
     Notes:   the engine restarts and reloads what changed itself; this only reports (it used to restart each of those
              services a second time)."""
     print(f"{BOLD}Applying changes natively...{NC}")
-    archives = glob.glob(os.path.join(FABRIC_DIR, "archive", "*-vars.yaml"))
+    archives = glob.glob(os.path.join(INSTALL_DIR, "archive", "*-vars.yaml"))
     old_vars = load_vars(max(archives)) if archives else load_vars(VARS_FILE)
     print(f"  {BLUE}[1/2]{NC} Rendering and deploying configurations...")
     os.environ.update({"CUSTOM_VARS_PATH": VARS_FILE, "SECRETS_FILE_OVERRIDE": SECRETS_FILE,

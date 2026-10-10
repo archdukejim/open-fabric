@@ -1,51 +1,19 @@
 import re
 
 from fabriclib.common.console import BOLD, NC, YELLOW
-from fabriclib.common.errors import ValidationError
-from fabriclib.samba.check_password_policy import POLICY_KEYS, check_password_policy
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
 _LABEL = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$")    # as check_samba_settings takes them
 
-# what each policy question asks (2.1.6.13: nothing is preselected)
-POLICY_QUESTIONS = [
-    ("minimum_length", "Minimum password length (0–64)"),
-    ("history", "Previous passwords remembered and refused again (0–24)"),
-    ("minimum_age_days", "Days before a new password may be changed again (0 = at once)"),
-    ("maximum_age_days", "Days a password is valid (0 = it never expires)"),
-    # the lockout as one story, each answer building on the last (the owner was misled by the old order, 2026-10-08)
-    ("lockout_threshold", "Lock an account after how many failed sign-ins in a row (0 = never lock)"),
-    ("lockout_window_minutes", "  ...counting the failures over how many minutes (older ones are forgotten)"),
-    ("lockout_minutes", "  ...then keep it locked for how many minutes (at least the minutes above; "
-                        "0 = until an admin unlocks it)"),
-]
-
-
-def _number(prompt, low, high, current):
-    """Purpose: ask for a whole number within a range, again until one is given.
-    Inputs:  prompt — the question; low, high — the allowed range; current — the value already set, or None (then
-             there is no default: an empty answer asks again). Interactive.
-    Returns: int.
-    Fails:   EOFError from input().
-    Feeds:   ask_windows_domain."""
-    hint = f" [{current}]" if current is not None else ""
-    while True:
-        answer = input(f"    {prompt}{hint}: ").strip()
-        if not answer and current is not None:
-            return current
-        if answer.isdigit() and low <= int(answer) <= high:
-            return int(answer)
-        print(f"    {YELLOW}a whole number from {low} to {high}{NC}")
-
 
 def ask_ad_domain(ctx):
-    """Purpose: the directory's questions (manual 1.6.3, 1.1.9.8), asked by setup when they are not set: the AD domain
-             (2.1.6.11: chosen once, permanent; a sibling of fabric's domain suggested) and the whole password policy
-             (2.1.6.13: asked, never preselected). Fabric's directory is a Samba AD domain on every install.
-    Inputs:  ctx — SetupContext; reads and sets ctx.vars ad_domain, ad_password_policy; domain for the suggestion.
-             Interactive.
-    Returns: None; ctx.vars set (an empty answer keeps a value already set, and is refused where none is). A policy AD
-             would refuse (check_password_policy) is explained and asked again, its answers kept as defaults.
+    """Purpose: the directory's question (manual 1.6.3, 1.1.9.8), asked by setup when it is not set: the AD domain
+             (2.1.6.11: chosen once, permanent; a sibling of fabric's domain suggested). Fabric's directory is a Samba
+             AD domain on every install. Its password policy is not asked: a new domain starts from the default
+             (collect_vars, 2.1.6.35; 2.1.2.16).
+    Inputs:  ctx — SetupContext; reads and sets ctx.vars ad_domain; domain for the suggestion. Interactive.
+    Returns: None; ctx.vars["ad_domain"] set (Enter takes the value already set or the suggestion; a domain AD
+             cannot use is refused, saying why, and asked again).
     Fails:   EOFError from input().
     Feeds:   setup/collect_vars."""
     print("\n  fabric's directory is a Samba AD domain (people, groups, devices; Windows and Linux machines may join).")
@@ -69,27 +37,3 @@ def ask_ad_domain(ctx):
             break
         print(f"    {YELLOW}a domain of two labels or more (letters, digits, hyphens), not .local, not {domain} itself "
               f"nor a parent of it{NC}")
-    print("    The password policy is yours: nothing is preselected (2.1.6.13).")
-    policy = dict(ctx.vars.get("ad_password_policy") or {})
-    while True:                           # checked as AD takes it, so a bad pair is asked again here, not at deploy
-        for key, question in POLICY_QUESTIONS:
-            if key in ("lockout_window_minutes", "lockout_minutes") and policy.get("lockout_threshold") == 0:
-                policy[key] = 0           # never locked: neither the window nor the lock time applies
-                continue
-            low, high = POLICY_KEYS[key]
-            policy[key] = _number(question, low, high, policy.get(key))
-        while True:
-            hint = {True: " [y]", False: " [n]"}.get(policy.get("complexity"), "")
-            answer = input(f"    Require letters of both cases, digits or symbols (complexity) [y/n]{hint}: ")
-            answer = answer.strip().lower()
-            if not answer and isinstance(policy.get("complexity"), bool):
-                break
-            if answer[:1] in ("y", "n"):
-                policy["complexity"] = answer.startswith("y")
-                break
-        try:
-            check_password_policy(policy)
-            break
-        except ValidationError as e:
-            print(f"    {YELLOW}{e}{NC}\n    Again (Enter keeps an answer):")
-    ctx.vars["ad_password_policy"] = policy

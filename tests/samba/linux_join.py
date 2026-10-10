@@ -102,7 +102,8 @@ sh(["docker", "run", "-d", "--name", WEB, "--network", NET, "--ip", WEB_IP, "-v"
     "--entrypoint", "python3", "fabric/samba:test", "-m", "http.server", "80", "--directory", "/srv"])
 fp = sh(["openssl", "x509", "-in", dc["root_ca"], "-noout", "-fingerprint", "-sha256"]).stdout.strip().split("=")[1]
 # as on a site with Keycloak (Kerberos sign-in on): the join also sets the browsers' policies (2.1.6.28)
-script = dc["env"].get_template("nginx/www/certs/join-linux.sh.j2").render(**{**V, "install_keycloak": True})
+script = dc["env"].get_template("nginx/www/certs/join-linux.sh.j2").render(
+    **{**V, "install_keycloak": True, "signin_kerberos": True})      # Kerberos sign-in is off by default (2.1.6.32)
 with open(os.path.join(W, "join-linux.sh"), "w") as f:
     f.write(script)
 SHIM = r"""#!/bin/bash

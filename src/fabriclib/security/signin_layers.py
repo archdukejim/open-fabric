@@ -88,5 +88,5 @@ def signin_rows(v, lowered):
         rows.append({"layer": layer, "what": spec["what"], "value": shown, "effective": effective,
                      "choices": choices, "lowered": lowered.get(layer)})
     rows.append({"layer": "kerberos", "what": "signing in with the domain logon (Kerberos)",
-                 "value": "on" if v.get(KERBEROS, True) else "off", "effective": None, "choices": [], "lowered": None})
+                 "value": "on" if v.get(KERBEROS, False) else "off", "effective": None, "choices": [], "lowered": None})
     return rows

@@ -14,14 +14,16 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from fabriclib.common.console import BOLD, NC, err, heading, ok  # noqa: E402
+from fabriclib.common.console import BOLD, NC, err, heading  # noqa: E402
 from fabriclib.consent.ask_consent import ask_consent  # noqa: E402
 from fabriclib.consent.plan_host_changes import plan_host_changes  # noqa: E402
 from fabriclib.consent.planned_vars import planned_vars  # noqa: E402
+from fabriclib.setup.ask_first_admin import ask_first_admin  # noqa: E402
 from fabriclib.setup.choose_plan import choose_plan  # noqa: E402
 from fabriclib.setup.collect_vars import collect_vars  # noqa: E402
 from fabriclib.setup.context import SetupContext  # noqa: E402
 from fabriclib.setup.errors import SetupError  # noqa: E402
+from fabriclib.setup.print_first_steps import print_first_steps  # noqa: E402
 from fabriclib.setup.read_join_invitation import read_join_invitation  # noqa: E402
 from fabriclib.setup.steps import STEPS  # noqa: E402
 from fabriclib.setup.verify_install import run as verify  # noqa: E402
@@ -61,6 +63,8 @@ def main(argv=None):
     ap.add_argument("--decline", action="append", metavar="GROUPS",
                     help="refuse these host changes (recommended ones are then left unmanaged and shown in status)")
     ap.add_argument("--step", action="append", help="run only this step (repeatable)")
+    ap.add_argument("--admin-password-file", metavar="FILE",
+                    help="the first admin's password, read from FILE (unattended; never on the command line)")
     ap.add_argument("--undo", metavar="GROUP",
                     help="undo one kind of host change fabric made (runtime, firewall, trust, time, resolver) and "
                          "record it as declined; nothing else runs")
@@ -82,7 +86,8 @@ def main(argv=None):
         err(str(e))
         return 1
     ctx = SetupContext(deploy_base=args.deploy_base, user_vars_file=args.file, offline=args.offline,
-                       non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=invitation)
+                       non_interactive=args.non_interactive, assume_yes=args.yes, join_invitation=invitation,
+                       admin_password_file=args.admin_password_file)
     try:
         if args.undo:
             ctx.load_state()
@@ -103,6 +108,7 @@ def main(argv=None):
             collect_vars(ctx)
             if args.step is None:
                 choose_plan(ctx)
+            ask_first_admin(ctx)
         else:
             ctx.load_state()
         planned = planned_vars(ctx) if any(s in NEEDS_INPUT for s in selected) else ctx.vars
@@ -127,9 +133,7 @@ def main(argv=None):
             if name == "deploy":
                 ctx.load_state()
         heading(f"{BOLD}fabric is ready{NC} ({time.monotonic() - start:.0f}s)")
-        if ctx.vars.get("install_webui"):
-            ok(f"web UI: https://{ctx.vars.get('hostname_mgr')}  (login kit: ~/fabric-admin/README.txt)")
-        ok("checks any time: sudo fabricctl doctor")
+        print_first_steps(ctx)
         return 0
     except SetupError as e:
         err(str(e))
