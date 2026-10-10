@@ -89,6 +89,7 @@ file	fabricctl-jinja|src/containers/samba/site_roles.py	64
 file	fabricctl-jinja|src/containers/samba/windows_baseline_policy.py	48	
 file	fabricctl-lib|src/federation/server.py	1	
 file	fabricctl-lib|src/ux/cli/keycloak_bootstrap.py	2	
+file	fabriclib-common|src/fabriclib/common/ask.py	28	
 file	fabriclib-common|src/fabriclib/common/console.py	1	
 file	fabriclib-common|src/fabriclib/common/copy_if_changed.py	2	
 file	fabriclib-common|src/fabriclib/common/copy_tree_with_perms.py	3	
@@ -982,6 +983,9 @@ function	fabricctl-lib|src/federation/server.py|Handler.reply	4
 function	fabricctl-lib|src/federation/server.py|UnixServer.verify_request	7	
 function	fabricctl-lib|src/federation/server.py|main	8	
 function	fabricctl-lib|src/ux/cli/keycloak_bootstrap.py|main	1	
+function	fabriclib-common|src/fabriclib/common/ask.py|_check	1	
+function	fabriclib-common|src/fabriclib/common/ask.py|ask	2	
+function	fabriclib-common|src/fabriclib/common/ask.py|ask_secret	3	
 function	fabriclib-common|src/fabriclib/common/console.py|err	5	
 function	fabriclib-common|src/fabriclib/common/console.py|heading	1	
 function	fabriclib-common|src/fabriclib/common/console.py|info	2	
@@ -1503,7 +1507,8 @@ function	fabriclib-pki|src/fabriclib/pki/revoke_cert.py|revoke_cert	2
 function	fabriclib-pki|src/fabriclib/pki/run_acme_command.py|_info	1	0.6.2 / 2026-10-08
 function	fabriclib-pki|src/fabriclib/pki/run_acme_command.py|run_acme_command	2	
 function	fabriclib-pki|src/fabriclib/pki/run_certs_command.py|run_certs_command	1	
-function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_ask	1	
+function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_ask	1	0.8.0 / 2026-10-10
+function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_prompt	4	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|_show	2	
 function	fabriclib-pki|src/fabriclib/pki/run_mint_certs_command.py|run_mint_certs_command	3	
 function	fabriclib-pki|src/fabriclib/pki/run_service_cert_command.py|run_service_cert_command	1	

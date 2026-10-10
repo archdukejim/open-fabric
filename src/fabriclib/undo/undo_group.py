@@ -1,6 +1,7 @@
 import datetime
 import os
 
+from fabriclib.common.ask import ask
 from fabriclib.common.console import BOLD, NC, YELLOW, heading, ok
 from fabriclib.consent.groups import GROUPS
 from fabriclib.consent.load_consent import load_consent
@@ -66,7 +67,7 @@ def undo_group(ctx, group, interactive, assume_yes):
         if not interactive:
             raise SetupError("pass --yes to undo without asking")
         while True:
-            answer = input(f"  {BOLD}Undo it?{NC} [y/n] ").strip().lower()
+            answer = ask(f"undo.{group}", f"  {BOLD}Undo it?{NC} [y/n] ").lower()
             if answer in ("y", "yes", "n", "no"):
                 break
         if answer.startswith("n"):

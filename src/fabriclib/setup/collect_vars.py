@@ -5,6 +5,7 @@ import subprocess
 
 import yaml
 
+from fabriclib.common.ask import ask
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
 from fabriclib.samba.check_password_policy import DEFAULT_POLICY, POLICY_KEYS
@@ -118,7 +119,7 @@ def _ask(key, default):
     Fails:   EOFError from input() when stdin is closed; loops forever on invalid input by design.
     Feeds:   collect_vars."""
     while True:
-        answer = input(f"  {LABELS.get(key, key)} [{default or ''}]: ").strip() or (default or "")
+        answer = ask(f"setup.vars.{key}", f"  {LABELS.get(key, key)} [{default or ''}]: ", default or "")
         if _valid(key, answer):
             return answer
         print(f"    not a valid {key}")

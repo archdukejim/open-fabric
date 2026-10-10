@@ -3,20 +3,24 @@ import shutil
 import subprocess
 from datetime import datetime, timezone
 
+from fabriclib.common.ask import ask
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.save_vars import save_vars
 from fabriclib.common.vars_lock import vars_lock
 from fabriclib.pki.mint_extra_cert import mint_extra_cert
 
+USAGE = """usage: fabricctl --mint-certs [--intermediate-ca [N]] [--kty RSA|EC|OKP] [--size BITS]
+                                                  ask for one certificate, record it in extra_certs and mint it
+       fabricctl --mint-certs --apply             mint every extra_certs entry in vars.yaml"""
 
-def _ask(prompt, default=""):
-    """Purpose: one prompt with a default.
-    Inputs:  prompt — text; default — returned for an empty answer.
-    Returns: the answer (str), stripped.
-    Fails:   EOFError when stdin is closed.
-    Feeds:   run_mint_certs_command."""
-    answer = input(f"  {prompt}{f' [{default}]' if default else ''}: ").strip()
-    return answer or default
+
+def _prompt(text, default=""):
+    """Purpose: the text of one prompt with its default shown: "  <text> [<default>]: ".
+    Inputs:  text — what is asked; default — the value an empty answer takes ("" shows none).
+    Returns: str.
+    Fails:   never.
+    Feeds:   run_mint_certs_command (its ask() calls)."""
+    return f"  {text}{f' [{default}]' if default else ''}: "
 
 
 def _show(crt):
@@ -66,7 +70,7 @@ def run_mint_certs_command(vars_path, archive_dir, args):
 
     print(f"[*] Interactive {'subordinate CA' if is_ca else 'certificate'} minting (signed by Step-CA"
           f"{f', pathLen={path_len}' if is_ca else ''})\n")
-    cn = _ask("Common Name (e.g. myservice.internal)")
+    cn = ask("mint_certs.cn", _prompt("Common Name (e.g. myservice.internal)"))
     if not cn:
         print("[✗] Common Name is required.")
         return 1
@@ -74,14 +78,14 @@ def run_mint_certs_command(vars_path, archive_dir, args):
     if not is_ca:
         print("  Additional SANs (blank to finish):")
         while True:
-            san = input("    SAN: ").strip()
+            san = ask("mint_certs.san", "    SAN: ")
             if not san:
                 break
             sans.append(san)
-    days = int(_ask("Validity in days", "365"))
-    out_dir = _ask("Output directory [caller's home]")
-    kty = _ask("Key type", kty)
-    size = int(_ask("Key size", str(size)))
+    days = int(ask("mint_certs.days", _prompt("Validity in days", "365"), "365"))
+    out_dir = ask("mint_certs.out_dir", _prompt("Output directory [caller's home]"))
+    kty = ask("mint_certs.key_type", _prompt("Key type", kty), kty)
+    size = int(ask("mint_certs.key_size", _prompt("Key size", str(size)), str(size)))
 
     entry = {"cn": cn, "sans": sans, "days": days, "kty": kty, "size": size}
     if is_ca:
@@ -91,7 +95,7 @@ def run_mint_certs_command(vars_path, archive_dir, args):
     kind = (f"Subordinate CA (pathLen={path_len})" if is_ca else "Leaf")
     print(f"\n  CN: {cn}\n  Type: {kind}\n  Key: {kty} {size}\n  Days: {days}"
           + "".join(f"\n    SAN {s}" for s in sans) + f"\n  Output: {out_dir or 'caller home'}\n")
-    if input("  Add to vars.yaml and mint? [y/N] ").strip().lower() not in ("y", "yes"):
+    if ask("mint_certs.confirm", "  Add to vars.yaml and mint? [y/N] ").lower() not in ("y", "yes"):
         print("[*] Cancelled.")
         return 0
 

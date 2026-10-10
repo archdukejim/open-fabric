@@ -1,5 +1,6 @@
 import os
 
+from fabriclib.common.ask import ask
 from fabriclib.common.console import BOLD, NC, YELLOW, heading
 
 # (settings key, default, what enabling it does, what relaxing it costs)
@@ -54,8 +55,8 @@ def _ask_ca_lifetime(ctx):
         return
     years = round(int(ctx.vars.get("cert_root_ca_days") or 3650) / 365)
     while True:
-        answer = input(f"\n  The internal CA's root is valid for how many years (its intermediate a year less; fixed "
-                       f"once made)? [{years}] ").strip() or str(years)
+        answer = ask("setup.ca_years", f"\n  The internal CA's root is valid for how many years (its intermediate a "
+                     f"year less; fixed once made)? [{years}] ", str(years))
         if answer.isdigit() and 1 <= int(answer) <= 30:
             ctx.vars["cert_root_ca_days"] = int(answer) * 365
             return
@@ -155,7 +156,7 @@ def choose_plan(ctx):
     prompt = (f"\n  {BOLD}[P]roceed{NC}, [A]dvanced (the CA's lifetime), or [Q]uit? " if advanced
               else f"\n  {BOLD}[P]roceed{NC} or [Q]uit? ")
     while True:
-        choice = input(prompt).strip().lower() or "p"
+        choice = ask("setup.plan", prompt, "p").lower()
         if choice.startswith("q"):
             raise SystemExit("setup cancelled")
         if choice.startswith("p"):
