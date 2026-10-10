@@ -89,5 +89,56 @@ with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as dst:
     print("stale journal removed:", not os.path.exists(os.path.join(dst, "db.lan.test.jnl")))
     ok &= not os.path.exists(os.path.join(dst, "db.lan.test.jnl"))
 
+# DHCP's PTRs survive a regenerated reverse zone (2.1.10.7): BIND's frozen file, as BIND writes it ($ORIGIN, relative
+# owners, a DHCID under the same owner), merged into fabric's new file; fabric's own PTR wins on a shared owner
+from fabriclib.dns.install_zone_file import install_zone_file  # noqa: E402
+from fabriclib.dns.merge_dynamic_records import merge_dynamic_records  # noqa: E402
+rev = "0.20.10.in-addr.arpa"
+fabric_new = f"""$TTL 86400
+$ORIGIN {rev}.
+@       IN      SOA     ns.lan.test. hostmaster.lan.test. (
+                        2000000002 3600 1800 604800 86400 )
+@       IN      NS      ns.lan.test.
+5                       PTR     printer.lan.test.
+"""
+bind_old = f"""$ORIGIN .
+$TTL 86400\t; 1 day
+{rev}\t\tIN SOA\tns.lan.test. hostmaster.lan.test. (
+\t\t\t\t2000000001 ; serial
+\t\t\t\t3600 1800 604800 86400 )
+\t\t\tNS\tns.lan.test.
+$ORIGIN {rev}.
+5\t\t\tPTR\told-name.lan.test.
+100\t\t\tPTR\tlaptop.dhcp.lan.test.
+$TTL 3600\t; 1 hour
+\t\t\tDHCID\t( AAIBY2/AuCccgoJbsaxcQc9TUapptP69lOjxfNuVAA2kjEA= )
+101\t300\tIN\tPTR\tphone.dhcp.lan.test.
+"""
+merged = merge_dynamic_records(rev, fabric_new, bind_old)
+checks = {
+    "a lease's PTR kept (relative owner)": "100.0.20.10.in-addr.arpa." in merged and "laptop.dhcp.lan.test." in merged,
+    "its DHCID kept (owner repeated by indentation)": "DHCID" in merged,
+    "a PTR written with TTL and class kept": "phone.dhcp.lan.test." in merged,
+    "fabric's own PTR wins over BIND's older one": "old-name" not in merged and "printer.lan.test." in merged,
+    "nothing to keep: the file unchanged": merge_dynamic_records(rev, fabric_new, "") == fabric_new,
+    "merging twice keeps one copy": merge_dynamic_records(rev, merged, merged).count("laptop.dhcp") == 1,
+}
+with tempfile.TemporaryDirectory() as d:
+    src, dst = os.path.join(d, "new"), os.path.join(d, f"db.{rev}")
+    open(src, "w").write(fabric_new)
+    open(dst, "w").write(bind_old)
+    open(dst + ".jnl", "w").write("x")
+    install_zone_file(src, dst, os.getuid(), os.getgid())
+    got = open(dst).read()
+    checks["install_zone_file keeps them in a reverse zone and drops the journal"] = \
+        "laptop.dhcp.lan.test." in got and not os.path.exists(dst + ".jnl")
+    fwd = os.path.join(d, "db.lan.test")
+    open(fwd, "w").write("old forward with a PTR-looking line\n100 PTR x.\n")
+    install_zone_file(src, fwd, os.getuid(), os.getgid())
+    checks["a forward zone is replaced as before"] = open(fwd).read() == fabric_new
+for name, passed in checks.items():
+    print(("PASS " if passed else "FAIL ") + "DHCP's PTRs: " + name)
+    ok &= passed
+
 print("ZONE TEST", "PASSED" if ok else "FAILED")
 sys.exit(0 if ok else 1)

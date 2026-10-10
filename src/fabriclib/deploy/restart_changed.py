@@ -47,7 +47,8 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
     Fails:   ValidationError when BIND refuses `rndc reconfig` (a silent failure would leave a removed TSIG key
              working). Timeouts of systemctl/docker and a domain that cannot be converged are reported, not raised.
     Feeds:   apply_deployment (start_services=True: `fabricctl --apply`, the web UI's Apply).
-    Notes:   BIND down or about to restart reads its zone files on start, so they are installed first. The web UI is
+    Notes:   BIND down or about to restart reads its zone files on start, so they are installed first (a running
+             BIND frozen before, so the files hold what DHCP registered: 2.1.10.7). The web UI is
              restarted last with --no-block: this apply may have come from it. No --pull on image builds."""
     restart = set(state["restart"])
     if state["daemon_reload"]:
@@ -59,6 +60,8 @@ def restart_changed(paths, final_vars, secrets, state, bind_ids):
     bind9_live = "bind9" in running and "bind9" not in restart
     if not bind9_live:
         for zone, src, dst in state["zones"]:
+            if "bind9" in running:               # about to restart: sync its journal first (DHCP's PTRs, 2.1.10.7)
+                rndc(["freeze", zone])
             install_zone_file(src, dst, *bind_ids)
     restart_webui = "fabric-web" in restart or state["webui"]
     restart.discard("fabric-web")

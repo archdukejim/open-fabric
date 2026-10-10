@@ -389,6 +389,16 @@ assert {"name": "domain-name-servers", "data": "10.20.0.10"} in by["10.20.0.0/24
 assert not any(o["name"] in ("domain-name-servers", "ntp-servers") for o in by["192.168.7.0/24"]["option-data"]), \
     "the LAN keeps the global options (host_ip)"
 assert by["10.30.0.0/24"]["relay"] == {"ip-addresses": ["10.30.0.1"]} and "relay" not in by["10.20.0.0/24"]
+assert {"name": "classless-static-route", "data": f"{kv['host_ip']}/32 - 10.20.0.10"} in by["10.20.0.0/24"]["option-data"], \
+    "the lab gets a route to host_ip (fabric's names) through fabric's address there"
+assert not any(o["name"] == "classless-static-route" for o in by["192.168.7.0/24"]["option-data"]
+               + by["10.30.0.0/24"]["option-data"]), "the LAN and a relayed subnet reach host_ip already"
+routed = place_subnets(normalize_dhcp({**kv, "dhcp": {"interfaces": ["eth1"], "subnets": [
+    {"subnet": "10.20.0.0/24", "pools": ["10.20.0.100 - 10.20.0.199"], "routers": "10.20.0.1"}]}}), kv["host_ip"], nets)
+r4 = json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2").render(**{**lab, "dhcp": routed})
+                          .splitlines() if not ln.strip().startswith("//")))["Dhcp4"]["subnet4"][0]["option-data"]
+assert {"name": "classless-static-route", "data": f"{kv['host_ip']}/32 - 10.20.0.10, 0.0.0.0/0 - 10.20.0.1"} in r4, \
+    "with a router, its default route rides in option 121 too (RFC 3442)"
 k4dns = json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2").render(
     **{**lab, "dhcp": {**lab["dhcp"], "dns": ["10.20.0.53"]}}).splitlines() if not ln.strip().startswith("//")))
 assert not any(o["name"] == "domain-name-servers" for s in k4dns["Dhcp4"]["subnet4"] for o in s["option-data"]), \
@@ -406,6 +416,36 @@ assert sorted(r[r.index("--ctorigdstport") + 1] + "/" + r[r.index("-p") + 1] for
     == ["53/tcp", "53/udp", "853/tcp"], guest
 print("DHCP beyond the host's LAN: subnets placed on their interfaces (or a relay), each told fabric's address there, "
       "the resolver and nginx listening on it, guests DNS only")
+# reverse DNS for DHCP's clients (2.1.10.7, manual 1.10.3.4)
+from fabriclib.dhcp.dhcp_reverse_zones import dhcp_reverse_zones  # noqa: E402
+from fabriclib.dns.reverse_zones import reverse_zones  # noqa: E402
+lab["dhcp_reverse_zones"] = dhcp_reverse_zones(lab)
+assert lab["dhcp_reverse_zones"] == ["0.20.10.in-addr.arpa", "0.30.10.in-addr.arpa", "7.168.192.in-addr.arpa"], \
+    lab["dhcp_reverse_zones"]
+assert dhcp_reverse_zones({**lab, "dhcp": {**lab["dhcp"], "ddns": False}}) == [], "no DNS registration: no zones"
+wide = normalize_dhcp({**kv, "dhcp": {"interfaces": ["eth0"], "subnets": [
+    {"subnet": "10.50.0.0/22", "pools": ["10.50.0.200 - 10.50.2.10"]}]}})
+assert dhcp_reverse_zones({**kv, "dhcp": wide}) == ["0.50.10.in-addr.arpa", "1.50.10.in-addr.arpa",
+                                                    "2.50.10.in-addr.arpa"], "a pool across /24s: each zone"
+rz = reverse_zones(lab)["zones"]
+assert rz.get("0.20.10.in-addr.arpa") == [], "a DHCP zone with no static record is still generated"
+zconf = env.get_template("bind9/config/named.conf.zones.j2").render(
+    **{**secrets, **lab, "tsig_keys": [], "tsig_secrets": {}, "reverse_zone_names": list(rz)})
+lz = zconf[zconf.index('zone "0.20.10.in-addr.arpa"'):]
+lz = lz[:lz.index("\n};") + 3]
+assert 'grant "kea-ddns" zonesub PTR DHCID;' in lz, lz
+others = [z for z in rz if z not in lab["dhcp_reverse_zones"]]
+for z in others:
+    oz = zconf[zconf.index(f'zone "{z}"'):]
+    assert "kea-ddns" not in oz[:oz.index("\n};")], f"{z} is no DHCP zone: no grant"
+dd = json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp-ddns.conf.j2").render(**lab).splitlines()
+                          if not ln.strip().startswith("//")))["DhcpDdns"]
+assert [x["name"] for x in dd["reverse-ddns"]["ddns-domains"]] == [z + "." for z in lab["dhcp_reverse_zones"]], dd
+assert all(x["key-name"] == "kea-ddns" for x in dd["reverse-ddns"]["ddns-domains"])
+assert json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2").render(**lab).splitlines()
+                            if not ln.strip().startswith("//")))["Dhcp4"]["ddns-update-on-renew"] is True
+print("DHCP's reverse DNS: the pools' zones generated even empty, Kea's key granted PTR and DHCID there only, Kea's "
+      "reverse domains, registration again on renewal")
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]
 assert kc["kea-dhcp4"]["cap_add"] == ["NET_RAW", "NET_BIND_SERVICE"] and kc["kea-dhcp4"]["network_mode"] == "host"
 assert kc["kea-ddns"]["user"] == "609:609" and not kc["kea-ddns"].get("cap_add")

@@ -11,6 +11,7 @@ zone `dhcp.<domain>` through kea-dhcp-ddns.
 | `normalize_option_defs.py` | Check `dhcp.option_defs` (options Kea has no name for) |
 | `normalize_client_classes.py` | Check `dhcp.client_classes` (Kea expression, options, network-boot fields) |
 | `place_subnets.py` | Each subnet placed on the host: the served interface that holds it, or a relay; fabric's address there is what its clients are told (manual 1.10.3.2) |
+| `dhcp_reverse_zones.py` | The reverse zones Kea registers PTRs in: every zone holding a pool or reservation address (2.1.10.7) |
 | `client_networks.py` | DHCP's full and guest subnets and fabric's addresses facing them: what the firewall, BIND's ACL and the resolver open, and where the resolver and nginx listen (2.1.10.4) |
 | `kea_option_data.py` | Kea's option-data for one level: fabric's own options, the admin's replacing them by name |
 | `kea_option_defs.py` | Kea's option-def list |
