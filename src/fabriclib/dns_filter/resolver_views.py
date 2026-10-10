@@ -5,7 +5,7 @@ from fabriclib.dns_filter.common.list_zone import list_zone
 from fabriclib.dns_filter.common.safe_search import ZONES as SAFE_ZONES
 
 BASE_MB = 16                     # the resolver itself, its cache and fabric's own zones (2.3.12.1.17: 9 MiB measured)
-HEADROOM = 0.9                   # the lists may take the estimate to 90% of the memory limit, never further
+HEADROOM = 0.8                   # lists may take the estimate to 80% of the memory limit, never further (2.3.12.1.25)
 
 
 def _limit_mb(value):
@@ -45,7 +45,7 @@ def _matches(groups):
 def resolver_views(v, present, state):
     """Purpose: what the resolver's views load (manual 1.12.2.15): everyone's lists, then each group's view (its
              match-clients, its rules zone, its safe search, its own lists, its allowed names); each list counted
-             against the memory limit in that order and left out when its copy would pass 90% of it.
+             against the memory limit in that order and left out when its copy would pass 80% of it.
     Inputs:  v — checked vars (dns_filter_lists, dns_filter_groups, dns_filter_safe_search, dns_filter_youtube,
              resolver_mem_limit); present — set of list zones that have a converted copy; state — the lists' state
              (update_lists: {zone: {memory_mb, ...}}).

@@ -146,12 +146,12 @@ mv = {**BASE, "resolver_mem_limit": "100m", "dns_filter_groups": [
     {"name": "tablet", "clients": ["192.168.77.5"], "safe_search": True, "youtube": "strict", "lists": [],
      "allow": [], "block": []}]}
 shared, big = list_zone("https://x.example/a.txt"), list_zone("https://x.example/big.txt")
-views = resolver_views(mv, {shared, big}, {shared: {"memory_mb": 50}, big: {"memory_mb": 30}})
+views = resolver_views(mv, {shared, big}, {shared: {"memory_mb": 50}, big: {"memory_mb": 20}})
 match = {g["name"]: g["match"] for g in views["groups"]}
 check("views: each group excludes the more specific entries of the others, so one client matches one group",
       match == {"house": ["!192.168.77.5", "!192.168.77.0/26", "192.168.77.0/24"],
                 "kids": ["!192.168.77.5", "192.168.77.0/26"], "tablet": ["192.168.77.5"]}, match)
-check("views: a list whose copy would pass 90% of the memory limit is left out and named (16 + 50 + 30 > 90)",
+check("views: a list whose copy would pass 80% of the memory limit is left out and named (16 + 50 + 20 = 86 > 80)",
       [x["zone"] for x in views["lists"]] == [shared] and views["groups"][0]["lists"] == []
       and views["memory"]["left_out"] == [{"view": "house", "zone": big, "name": "Big"}]
       and views["memory"]["estimate_mb"] == 66.0, views["memory"])
