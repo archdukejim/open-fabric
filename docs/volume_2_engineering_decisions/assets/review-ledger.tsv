@@ -28,7 +28,7 @@ docs/volume_1_description_and_architecture/1.1.8-about-settings.md	8022994724f5b
 docs/volume_1_description_and_architecture/1.1.9-optional-parts.md	b06f20c92138f3dc7278f3dfc6d8696d14663c37	2026-10-10	
 docs/volume_1_description_and_architecture/1.10.1-kea-design.md	0e8b6720aa82c79132444cd5a6e1a3893173246b	2026-10-10	
 docs/volume_1_description_and_architecture/1.10.2-dhcp-management.md	3d818cf18c62108409294438880e1f12692af38d	2026-10-08	
-docs/volume_1_description_and_architecture/1.10.3-serving-networks.md	ea59dd2f790f1f33c863a2d66243c7c184b93de2	2026-10-10	
+docs/volume_1_description_and_architecture/1.10.3-serving-networks.md	5d098a3910a595b22a783d41a978f6e103e95ddc	2026-10-10	
 docs/volume_1_description_and_architecture/1.11.1-freeradius-design.md	53be8bfe3baba02927c9b7b66dd4d02282115356	2026-10-09	
 docs/volume_1_description_and_architecture/1.12.1-adguard.md	b2280752ee06e87cb6e1497fdb91651e589b6a4d	2026-10-09	
 docs/volume_1_description_and_architecture/1.12.2-bind-resolver.md	334d2d332f05fe9a0626647c351a74c5998e03b2	2026-10-10	
@@ -68,7 +68,7 @@ docs/volume_1_description_and_architecture/1.17.5-fabriclib-common.md	68c5944275
 docs/volume_1_description_and_architecture/1.17.6-fabriclib-consent.md	fac0dccbc79c6b304807039ef3e7dde8cec12ad9	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.7-fabriclib-core.md	287e5a946064faecbdb0262ece385ff0e043036c	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.8-fabriclib-deploy.md	d92d9a4964d8ecb06fee8ad56173826d31178e9d	2026-10-10	
-docs/volume_1_description_and_architecture/1.17.9-fabriclib-dhcp.md	2070916f9df1cc6e04414871d9e2cc3b4cef2f1d	2026-10-10	
+docs/volume_1_description_and_architecture/1.17.9-fabriclib-dhcp.md	8b2e1da590690f5cb85c59f7c9c87ce7429e13c7	2026-10-10	
 docs/volume_1_description_and_architecture/1.2.1-topology.md	93eb5885bd1c51cc6545c5a5ebd269cf6a36173d	2026-10-10	
 docs/volume_1_description_and_architecture/1.2.10-global.md	5534a46e259bcd499006919750da778ed47dad63	2026-10-09	
 docs/volume_1_description_and_architecture/1.2.11-networking.md	e5e539a25342b54f7c49833226c73f0646beb8e5	2026-10-09	
@@ -493,10 +493,10 @@ src/fabriclib/dhcp/kea_option_data.py	6bb7ded343c406f7c6d1b56f26791df31572b6b9	2
 src/fabriclib/dhcp/kea_option_defs.py	fde354c29f512d9de59f09f0f4c831e793f4a7d3	2026-10-03	
 src/fabriclib/dhcp/list_leases.py	243e05170b0610dc5448890665eaee6b1497a752	2026-09-30	
 src/fabriclib/dhcp/normalize_client_classes.py	a9828a4ea82858ba229948a5b90b9b340d55d987	2026-10-08	
-src/fabriclib/dhcp/normalize_dhcp.py	7e4faa4f7396118dfabf94e058345cba55cdad5e	2026-10-10	
+src/fabriclib/dhcp/normalize_dhcp.py	dc641f94106bfaef41c96737d46b2ce55cae3c46	2026-10-10	
 src/fabriclib/dhcp/normalize_option_defs.py	3d1d65c7292a1b4ca70bb0442007cb92b4d3068f	2026-10-08	
 src/fabriclib/dhcp/normalize_options.py	895a0d1ae42c3e5766463f726ad73405b54ad2fb	2026-10-08	
-src/fabriclib/dhcp/place_subnets.py	589b00e3ff509e0b789170ebe6f2d426f86272ac	2026-10-10	
+src/fabriclib/dhcp/place_subnets.py	0cd1e86dbbe8715ad62d1651675356ebc69f97b8	2026-10-10	
 src/fabriclib/dhcp/remove_client_class.py	bee1a3e4517ac2fbdc4b0b687db44150c8fa36ef	2026-10-03	
 src/fabriclib/dhcp/remove_reservation.py	02dcff68b277dd43db7c2bc81282a8c318c500eb	2026-10-03	
 src/fabriclib/dhcp/remove_subnet.py	dfef6f3a75691d0d04b190af3bafb4703bd855bc	2026-10-03	
@@ -1346,7 +1346,7 @@ tests/pki/renewal.py	30889317dd2709f3de4aae6a0e1a2c2b2547d03e	2026-10-09
 tests/pki/revocation.py	f36e8ad4b2ca0683d820802ee8a6b9fb7f97dc97	2026-10-08	
 tests/pki/run.py	8a8b78b3bcc320c5019eb4929129ae5d2b711a7c	2026-10-08	
 tests/pki/site_ca.py	6e71ca7798e1aa94ce0f43160716ac57302bec65	2026-10-08	
-tests/render.py	15d374c2a65dc3759f94e6ce381cf7257cc47556	2026-10-10	
+tests/render.py	5f491dc092e3eafc67a51f0c39bf64dc32e5719c	2026-10-10	
 tests/resolver/README.md	e056b218eb8798e3eb120f5f4a07e34e4c40becd	2026-10-10	
 tests/resolver/console.py	0a3ff09bfbae63d42eca27a556cb69d7553fe2d5	2026-10-10	
 tests/resolver/groups.py	6d5c3280f7867e74fe946f3f87ccf2a1559a07d2	2026-10-10	

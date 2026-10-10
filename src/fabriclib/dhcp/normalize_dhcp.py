@@ -74,8 +74,8 @@ def normalize_dhcp(v):
              network, host bits zero), id (Kea's subnet id), name (one DNS label, unique), vlan (1-4094, unique: a
              record, fabric configures no switch), notes (at most 500 characters), allow_overlap (why it may
              overlap another site's network, at most 200 characters), access ("full", the default, or "guest":
-             DNS and NTP only, 2.1.10.4), relay (the DHCP relay's address in the subnet, for one not on a served
-             interface: manual 1.10.3.2), pools, routers, options,
+             DNS and NTP only, 2.1.10.4), relay (the DHCP relay's address when it lies outside the subnet: Kea
+             picks a relayed subnet by that address, manual 1.10.3.2), pools, routers, options,
              reservations [{mac, ip, hostname, options}]}], options (every subnet), option_defs, client_classes
              (manual 1.10.2.3), ddns_subdomain (one label, default dhcp), ntp (IPv4 addresses, default
              this host), lease_time (int 300-2592000, default 86400)}; dns (its A records); fabric_subnet
@@ -86,8 +86,8 @@ def normalize_dhcp(v):
              when set; options, option_defs and client_classes normalized (left out when empty).
     Fails:   ValidationError for missing or bad interfaces, bad ddns_subdomain, bad lease_time, a bad or non-IPv4
              subnet, a subnet overlapping fabric_subnet, a bad or repeated id, name or vlan, notes or
-             allow_overlap too long, an access that is not full or guest, a relay that is not an address in its
-             subnet, a bad pool or two pools overlapping
+             allow_overlap too long, an access that is not full or guest, a relay that is not an IPv4 address, a
+             bad pool or two pools overlapping
              (in any subnet), a router outside its subnet, a bad MAC, a reservation outside its subnet or inside a
              pool, a duplicate MAC or address, a bad hostname, no subnets, or a static A record inside a pool; a plain
              ValueError (not a ValidationError) if routers is not an IP address; errors of normalize_options,
@@ -155,8 +155,8 @@ def normalize_dhcp(v):
                 relay = ipaddress.ip_address(str(s["relay"]))
             except ValueError:
                 relay = None
-            if relay is None or relay not in net:
-                raise ValidationError(f"{net}: relay {s['relay']!r} is the DHCP relay's address in the subnet")
+            if relay is None or relay.version != 4:
+                raise ValidationError(f"{net}: relay {s['relay']!r} is the DHCP relay's IPv4 address")
             meta["relay"] = str(relay)
         if net.overlaps(fabric_net):
             raise ValidationError(f"{net} overlaps fabric's own container network {fabric_net} (fabric_subnet): "

@@ -362,15 +362,15 @@ lab["dhcp"] = place_subnets(lab["dhcp"], kv["host_ip"], nets)
 placed = {s["subnet"]: (s.get("interface"), s["server"]) for s in lab["dhcp"]["subnets"]}
 assert placed == {"192.168.7.0/24": ("eth0", kv["host_ip"]), "10.20.0.0/24": ("eth1", "10.20.0.10"),
                   "10.30.0.0/24": (None, kv["host_ip"])}, placed
-for bad, msg in (({"interfaces": ["eth9"]}, "no interface 'eth9'"),
-                 ({"subnets": [{"subnet": "10.40.0.0/24", "pools": ["10.40.0.10 - 10.40.0.20"], "id": 9}]},
-                  "not on a served interface")):
-    try:
-        place_subnets({**lab["dhcp"], **bad}, kv["host_ip"], nets)
-        raise AssertionError(f"not refused: {msg}")
-    except ValidationError as e:
-        assert msg in str(e), (msg, str(e))
-for bad, msg in (({"access": "staff"}, "access is full"), ({"relay": "10.99.0.1"}, "relay")):
+try:
+    place_subnets({**lab["dhcp"], "interfaces": ["eth9"]}, kv["host_ip"], nets)
+    raise AssertionError("not refused: an interface the host lacks")
+except ValidationError as e:
+    assert "no interface 'eth9'" in str(e), str(e)
+relayed = place_subnets({**lab["dhcp"], "subnets": [{"subnet": "10.40.0.0/24", "pools": ["10.40.0.10 - 10.40.0.20"],
+                                                     "id": 9}]}, kv["host_ip"], nets)
+assert relayed["subnets"][0]["server"] == kv["host_ip"] and "interface" not in relayed["subnets"][0],     "a subnet on no served interface is relayed, served from host_ip"
+for bad, msg in (({"access": "staff"}, "access is full"), ({"relay": "not-an-ip"}, "relay")):
     try:
         normalize_dhcp({**kv, "dhcp": {"interfaces": ["eth0"], "subnets": [
             {"subnet": "10.30.0.0/24", "pools": ["10.30.0.100 - 10.30.0.199"], **bad}]}})
