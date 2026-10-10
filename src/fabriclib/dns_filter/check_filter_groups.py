@@ -1,6 +1,7 @@
 import ipaddress
 import re
 
+from fabriclib.dhcp.client_networks import client_networks
 from fabriclib.common.errors import ValidationError
 from fabriclib.dns_filter.common.rule_names import rule_names
 
@@ -40,7 +41,8 @@ def _clients(raw, name, answered, fabric):
 
 def check_filter_groups(v, own, shared_urls):
     """Purpose: the DNS filter's client groups (manual 1.12.2.15), checked and normalised in place.
-    Inputs:  v — rendered vars (dns_filter_groups, lan_cidr, fabric_subnet, security.firewall_allow); changed in
+    Inputs:  v — rendered vars (dns_filter_groups, lan_cidr, fabric_subnet, security.firewall_allow, DHCP's
+             subnets: client_networks); changed in
              place; own — fabric's own domains; shared_urls — the urls of everyone's lists.
     Returns: None.
     Fails:   ValidationError naming the group: a bad or reserved name, the same name twice; clients (see _clients),
@@ -53,7 +55,8 @@ def check_filter_groups(v, own, shared_urls):
         raise ValidationError("dns_filter_groups must be a list of groups")
     security = v.get("security") or {}
     answered = []
-    for c in [v.get("lan_cidr"), *(security.get("firewall_allow") or [])]:
+    nets = client_networks(v)
+    for c in [v.get("lan_cidr"), *(security.get("firewall_allow") or []), *nets["full"], *nets["guest"]]:
         try:
             answered.append(ipaddress.ip_network(str(c), strict=False))
         except ValueError:

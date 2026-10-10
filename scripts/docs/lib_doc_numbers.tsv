@@ -171,6 +171,7 @@ file	fabriclib-dhcp|src/fabriclib/dhcp/add_client_class.py	1
 file	fabriclib-dhcp|src/fabriclib/dhcp/add_reservation.py	2	
 file	fabriclib-dhcp|src/fabriclib/dhcp/add_subnet.py	3	
 file	fabriclib-dhcp|src/fabriclib/dhcp/check_kea_config.py	4	
+file	fabriclib-dhcp|src/fabriclib/dhcp/client_networks.py	28	
 file	fabriclib-dhcp|src/fabriclib/dhcp/common/edit_dhcp.py	5	
 file	fabriclib-dhcp|src/fabriclib/dhcp/common/find_subnet.py	6	
 file	fabriclib-dhcp|src/fabriclib/dhcp/common/kea_image.py	27	
@@ -187,6 +188,7 @@ file	fabriclib-dhcp|src/fabriclib/dhcp/normalize_client_classes.py	16
 file	fabriclib-dhcp|src/fabriclib/dhcp/normalize_dhcp.py	17	
 file	fabriclib-dhcp|src/fabriclib/dhcp/normalize_option_defs.py	18	
 file	fabriclib-dhcp|src/fabriclib/dhcp/normalize_options.py	19	
+file	fabriclib-dhcp|src/fabriclib/dhcp/place_subnets.py	29	
 file	fabriclib-dhcp|src/fabriclib/dhcp/remove_client_class.py	20	
 file	fabriclib-dhcp|src/fabriclib/dhcp/remove_reservation.py	21	
 file	fabriclib-dhcp|src/fabriclib/dhcp/remove_subnet.py	22	
@@ -580,6 +582,7 @@ file	fabriclib-setup|src/fabriclib/setup/upgrade_vars.py	36
 file	fabriclib-setup|src/fabriclib/setup/verify_install.py	37	
 file	fabriclib-system|src/fabriclib/system/apply_changes.py	1	
 file	fabriclib-system|src/fabriclib/system/control_stack.py	2	
+file	fabriclib-system|src/fabriclib/system/host_networks.py	9	
 file	fabriclib-system|src/fabriclib/system/host_ram_gb.py	8	
 file	fabriclib-system|src/fabriclib/system/relaxed_settings.py	6	
 file	fabriclib-system|src/fabriclib/system/render_template_file.py	3	
@@ -1086,6 +1089,7 @@ function	fabriclib-dhcp|src/fabriclib/dhcp/add_client_class.py|add_client_class	
 function	fabriclib-dhcp|src/fabriclib/dhcp/add_reservation.py|add_reservation	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/add_subnet.py|add_subnet	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/check_kea_config.py|check_kea_config	1	
+function	fabriclib-dhcp|src/fabriclib/dhcp/client_networks.py|client_networks	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/common/edit_dhcp.py|_check_address_plan	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/common/edit_dhcp.py|edit_dhcp	2	
 function	fabriclib-dhcp|src/fabriclib/dhcp/common/find_subnet.py|find_subnet	1	
@@ -1107,6 +1111,7 @@ function	fabriclib-dhcp|src/fabriclib/dhcp/normalize_dhcp.py|_subnet_ids	3
 function	fabriclib-dhcp|src/fabriclib/dhcp/normalize_dhcp.py|normalize_dhcp	4	
 function	fabriclib-dhcp|src/fabriclib/dhcp/normalize_option_defs.py|normalize_option_defs	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/normalize_options.py|normalize_options	1	
+function	fabriclib-dhcp|src/fabriclib/dhcp/place_subnets.py|place_subnets	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/remove_client_class.py|remove_client_class	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/remove_reservation.py|remove_reservation	1	
 function	fabriclib-dhcp|src/fabriclib/dhcp/remove_subnet.py|remove_subnet	1	
@@ -1702,6 +1707,7 @@ function	fabriclib-setup|src/fabriclib/setup/verify_install.py|checks	3
 function	fabriclib-setup|src/fabriclib/setup/verify_install.py|run	4	
 function	fabriclib-system|src/fabriclib/system/apply_changes.py|apply_changes	1	
 function	fabriclib-system|src/fabriclib/system/control_stack.py|control_stack	1	
+function	fabriclib-system|src/fabriclib/system/host_networks.py|host_networks	1	
 function	fabriclib-system|src/fabriclib/system/host_ram_gb.py|host_ram_gb	1	
 function	fabriclib-system|src/fabriclib/system/relaxed_settings.py|relaxed_settings	1	
 function	fabriclib-system|src/fabriclib/system/render_template_file.py|render_template_file	1	
