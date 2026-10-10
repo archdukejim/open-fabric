@@ -5,6 +5,7 @@
 # clients' second interfaces too (manual 2.3.1.9.6). Over SSH, by name:
 #
 #   SERVER=g23-vm-ub24-1 CLIENTS="g23-vm-ub22-1 g23-vm-ub20-1" tests/lab/dhcp.sh
+#   [REUSE=1: keep the server's install from the last run; DHCP is turned off first]
 #   [LAB_IF=eth1 LAB_NET=10.20.0.0/24 LAB_ADDR=10.20.0.10 POOL="10.20.0.100 - 10.20.0.199" DOMAIN=lab.home.arpa]
 #
 # It WIPES fabric on SERVER and installs this checkout's package there; clients get a DHCP connection on their lab
@@ -18,7 +19,21 @@ REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${FABRIC_TEST_OUT:-/tmp/fabric-tests}/lab-dhcp"
 PASS=0; FAIL=0
 check() { if (set +o pipefail; eval "$2"); then echo "PASS $1"; PASS=$((PASS+1)); else echo "FAIL $1"; FAIL=$((FAIL+1)); fi; }
-on() { ssh -o ConnectTimeout=20 "$1" "$2" 2>&1 | grep -v "post-quantum\|store now\|upgraded. See"; }
+# Purpose: run a command on a lab machine: its output without OpenSSH's notices, and the command's own exit status (a
+#          filter's would hide it: a quiet command would look failed, and a negated one passed).
+on() {
+    local out rc
+    out=$(ssh -o ConnectTimeout=20 "$1" "$2" 2>&1); rc=$?
+    printf '%s\n' "$out" | grep -v "post-quantum\|store now\|upgraded. See\|^$" || true
+    return $rc
+}
+# Purpose: whether a client fetches https://info.<domain>/ by name, through its own resolver (fabric's), with fabric's
+#          CA verified: Python's TLS, as not every desktop has curl.
+# Inputs:  $1 — the client's ssh name (fabric's root CA already in /tmp/fabric-root.crt there).
+https_ok() {
+    on "$1" "python3 -c \"import ssl, urllib.request as u; print(u.urlopen('https://info.$DOMAIN/', timeout=15,
+        context=ssl.create_default_context(cafile='/tmp/fabric-root.crt')).status)\"" | grep -qx 200
+}
 R() { on "$SERVER" "sudo bash -lc $(printf '%q' "$1")"; }
 rm -rf "$OUT"; mkdir -p "$OUT"
 
@@ -33,6 +48,10 @@ renew() {
              ip -4 -o addr show $LAB_IF | awk '{print \$4}' | cut -d/ -f1 | head -1"
 }
 
+if [ -n "${REUSE:-}" ]; then     # REUSE=1: the install from the last run, DHCP turned off (quicker reruns of the checks)
+    R "fabricctl dhcp off" >/dev/null 2>&1
+    HOST_IP=$(R "ip -4 -o route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p'")
+else
 echo "--- the server: wiped, this checkout's package, setup with DHCP off"
 DEB=$(OUT="$OUT/dist" bash "$REPO/packaging/deb/build-deb.sh") || { echo "FAIL package build"; exit 1; }
 scp -q "$DEB" "$SERVER:/tmp/"
@@ -59,6 +78,7 @@ scp -q "$OUT/vars.yaml" "$SERVER:/tmp/lab-vars.yaml"; scp -q -p "$OUT/admin-pw" 
 R "fabricctl setup --file /tmp/lab-vars.yaml --non-interactive --yes --approve all --admin-password-file /tmp/admin-pw; \
    rm -f /tmp/admin-pw" > "$OUT/setup.log" 2>&1
 check "setup completes with DHCP off" "grep -q 'fabric is ready' '$OUT/setup.log' && ! R 'systemctl is-active kea' | grep -qx active"
+fi
 
 echo "--- DHCP on, the first subnet on $LAB_IF (fabricctl dhcp on)"
 R "fabricctl dhcp on --interface $LAB_IF --subnet $LAB_NET --pool '$POOL'" > "$OUT/on.log" 2>&1
@@ -84,17 +104,16 @@ for c in $CLIENTS; do
     check "$c: its PTR, through fabric (2.1.10.7)" \
         "for i in \$(seq 10); do [ \"\$(on $c 'dig +short -x $ip @$LAB_ADDR')\" = '$name.' ] && exit 0; sleep 3; done; exit 1"
     check "$c: https://info.$DOMAIN by name, fabric's CA verified" \
-        "on $c 'curl -s -m 15 --cacert /tmp/fabric-root.crt -o /dev/null -w %{http_code} --resolve info.$DOMAIN:443:\$(dig +short info.$DOMAIN @$LAB_ADDR | tail -1) https://info.$DOMAIN/' | grep -qx 200"
+        "https_ok $c"
 done
 first=${CLIENTS%% *}
 
 echo "--- a reservation"
 MAC=$(on "$first" "cat /sys/class/net/$LAB_IF/address")
 R "fabricctl dhcp reserve $MAC 10.20.0.50 labresv" > "$OUT/reserve.log" 2>&1
-R "fabricctl dhcp leases" | grep -q "$MAC" && R "true"
 on "$first" "sudo nmcli dev disconnect $LAB_IF >/dev/null 2>&1; true"
 sleep 2
-check "$first: the reserved address 10.20.0.50 after a new lease" "[ \"\$(renew $first)\" = 10.20.0.50 ]"
+check "$first: the reserved address 10.20.0.50 after a new lease" "renew $first >/dev/null; for i in \$(seq 15); do [ \"\$(on $first 'ip -4 -o addr show $LAB_IF | grep -o 10.20.0.50')\" = 10.20.0.50 ] && exit 0; sleep 2; done; exit 1"
 R "fabricctl dhcp unreserve $MAC" > /dev/null 2>&1
 
 echo "--- a guest subnet: DNS only (2.1.10.4)"

@@ -131,7 +131,7 @@ docs/volume_2_engineering_decisions/2.1.9-federation.md	6c344024d62480ec9bea70a3
 docs/volume_2_engineering_decisions/2.2.6-keycloak-gotchas.md	7997b28a9ff4b58f2bcef5ae7bdf8f7798b89e21	2026-10-08	
 docs/volume_2_engineering_decisions/2.2.8-webui-troubleshooting.md	0a312472d68d17d0cee4188d65a7b7e86b15c246	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.1-product-notes.md	3eb5037d2535157f691dfbf9ed9175124c4c482b	2026-10-10	
-docs/volume_2_engineering_decisions/2.3.10-dhcp-notes.md	f9418b7e2344ba4dfbe3b28ae1cf757611042f69	2026-10-08	
+docs/volume_2_engineering_decisions/2.3.10-dhcp-notes.md	e8f735951837d81f48e8d06cb2a6b55a669a905b	2026-10-10	
 docs/volume_2_engineering_decisions/2.3.11-radius-notes.md	3424b43960e50007224d299adac7dd0533c7f0f6	2026-10-08	
 docs/volume_2_engineering_decisions/2.3.12-dns-filter-notes.md	3d4caf6eef53d873ff4365ecab71f8fe6aa73141	2026-10-10	
 docs/volume_2_engineering_decisions/2.3.14-image-notes.md	2a6950b89b58dcc37ada049ac8dfe7f10bf86562	2026-10-09	
@@ -1331,7 +1331,7 @@ tests/keycloak/README.md	55bf0779666050bc9febb2d9c86957665c1d3d0d	2026-10-08
 tests/keycloak/run.py	149da9c370ebd0fca2780534972ae10cbc11efd1	2026-10-09	
 tests/keycloak/soft_passkey.py	51ec49de47ee87f347e246b14acf0eb5f20cb512	2026-10-08	
 tests/lab/README.md	b7cde2a34af23759773558044499b5e990f148ac	2026-10-10	
-tests/lab/dhcp.sh	5741cf5006d13ae54442d213ff4a3bdc9c054ed1	2026-10-10	
+tests/lab/dhcp.sh	5fbfcf3da1c0afaec9e14bd2c5de0a143ea5b052	2026-10-10	
 tests/lint/README.md	47efffa0aea5c6119f04a26d19fd906fb9bd74d0	2026-10-08	
 tests/lint/run.sh	9a1222b4062342ff88ac5d7ad5fea4c1dca1a761	2026-10-08	
 tests/nginx_check.sh	d41ad12b92c4ae5b509cc048987b12484f17d618	2026-10-09	
