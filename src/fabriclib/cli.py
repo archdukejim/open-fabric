@@ -67,6 +67,7 @@ import sys
 # Run as a script, Python puts fabriclib/ itself first on sys.path, where its
 # folders (dns/, keycloak/) would shadow real packages. Use fabric/lib.
 sys.path[0] = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from fabriclib.common.ask import ask  # noqa: E402
 from fabriclib.consent.show_consent_status import show_consent_status  # noqa: E402
 from fabriclib.dhcp.run_dhcp_command import run_dhcp_command  # noqa: E402
 from fabriclib.dns.run_acl_command import run_acl_command  # noqa: E402
@@ -130,7 +131,7 @@ def _confirm(prompt, args):
     Feeds:   main (`reinstall`)."""
     if "--yes" in args or "-y" in args:
         return True
-    return input(f"{prompt} Type 'yes' to continue: ").strip().lower() == "yes"
+    return ask("cli.reinstall.confirm", f"{prompt} Type 'yes' to continue: ").lower() == "yes"
 
 
 def _version():

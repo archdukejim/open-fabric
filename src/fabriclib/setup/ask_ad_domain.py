@@ -1,5 +1,6 @@
 import re
 
+from fabriclib.common.ask import ask
 from fabriclib.common.console import BOLD, NC, YELLOW
 from fabriclib.samba.suggested_ad_domain import suggested_ad_domain
 
@@ -27,7 +28,7 @@ def ask_ad_domain(ctx):
         print(f"    Suggested: {suggested_ad_domain(domain)}, {where}; press Enter to take it. "
               f"It cannot be {domain} itself.")
     while True:
-        answer = input(f"    AD domain{f' [{suggestion}]' if suggestion else ''}: ").strip().lower()
+        answer = ask("setup.ad_domain", f"    AD domain{f' [{suggestion}]' if suggestion else ''}: ").lower()
         chosen = answer or suggestion
         labels = chosen.split(".")
         if (chosen and chosen != domain and len(labels) >= 2 and all(_LABEL.match(x) for x in labels)

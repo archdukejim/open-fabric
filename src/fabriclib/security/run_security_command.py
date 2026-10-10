@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 
+from fabriclib.common.ask import ask
 from fabriclib.common.errors import ValidationError
 from fabriclib.common.load_vars import load_vars
 from fabriclib.common.paths import VARS_FILE
@@ -31,7 +32,7 @@ def _confirm(layer, row, new):
     print(f"Lowering {layer}: {row['what']}\n  now: {row['value']}   after: {new}\n"
           "Every sign-in this covers is weaker from now on. The change is recorded in the audit log, and doctor and "
           "the web console show a warning until it is raised again.")
-    return input(f"Type the layer's name ({layer}) to lower it: ").strip() == layer
+    return ask("security.lower.confirm", f"Type the layer's name ({layer}) to lower it: ") == layer
 
 
 def run_security_command(argv, vars_file=VARS_FILE):

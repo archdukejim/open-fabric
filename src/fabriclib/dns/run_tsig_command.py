@@ -1,7 +1,7 @@
 import argparse
-import getpass
 import sys
 
+from fabriclib.common.ask import ask_secret
 from fabriclib.common.errors import ValidationError
 from fabriclib.dns.add_tsig_key import add_tsig_key
 from fabriclib.dns.list_tsig_keys import list_tsig_keys
@@ -24,7 +24,7 @@ def _secret(args):
         with open(args.secret_file) as f:
             return f.read().strip()
     if getattr(args, "secret_prompt", False):
-        return getpass.getpass("TSIG secret (base64): ").strip()
+        return ask_secret("tsig.secret", "TSIG secret (base64): ").strip()
     return None
 
 
