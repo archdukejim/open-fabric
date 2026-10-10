@@ -1,6 +1,8 @@
 # A disposable "host" for end-to-end install tests: Ubuntu 24.04 with systemd
 # as PID 1 and room for its own Docker daemon (fabricctl setup installs Docker
 # itself, exactly as on a real machine). Run privileged; see run.sh.
+# binfmt_misc is the kernel's, shared with the machine running the box: systemd-binfmt unregisters every entry at
+# boot, which on WSL removes the one that runs Windows programs (the lab's ssh.exe, manual 2.3.1.9.6). Masked.
 FROM ubuntu:24.04
 ENV container=docker DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
@@ -8,6 +10,7 @@ RUN apt-get update \
     git sudo python3 procps kmod \
  && rm -rf /var/lib/apt/lists/* \
  && systemctl mask systemd-logind getty.target console-getty.service \
+    systemd-binfmt.service proc-sys-fs-binfmt_misc.automount \
  && systemctl set-default multi-user.target
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
