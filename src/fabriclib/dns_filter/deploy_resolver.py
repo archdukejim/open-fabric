@@ -32,7 +32,8 @@ def _state(paths):
 
 def deploy_resolver(v, secrets, links, jinja_env, fetch=True):
     """Purpose: the BIND resolver's deploy step (manual 1.12.2.10, 1.12.2.15): its folders, its configuration (the main
-             view and each client group's chained view), its rules zones (fabric's zones never filtered, the owner's
+             view and each client group's chained view; DoT and DoH for clients once the DNS name's certificate is in
+             <base>/resolver/tls, 1.12.2.16), its rules zones (fabric's zones never filtered, the owner's
              allows and blocks, each group's, safe search), its control key; each list with no converted copy yet is
              fetched first, so the configuration only names lists that exist, and a list that would pass the memory
              limit is left out; converted lists no longer used are removed; a running resolver reloads what changed.
@@ -55,6 +56,9 @@ def deploy_resolver(v, secrets, links, jinja_env, fetch=True):
     ensure_dir(paths["lists"], 0o750, 0, gid)
     ensure_dir(paths["log"], 0o750, uid, gid)
     ensure_dir(paths["cache"], 0o750, uid, gid)
+    ensure_dir(paths["tls"], 0o750, uid, gid)          # as install_cert leaves it (mint_service_certs)
+    # DoT and DoH for clients once the DNS name's certificate is there (a first deploy runs before the certificates)
+    client_tls = all(os.path.exists(os.path.join(paths["tls"], f)) for f in ("fullchain.pem", "privkey.pem"))
     lists = update_lists(v, only_missing=True, reload=False) if fetch else None
     used = {list_zone(i["url"]) for i in all_lists(v)}
     present = {z for z in used if os.path.exists(os.path.join(paths["lists"], z))}
@@ -68,6 +72,7 @@ def deploy_resolver(v, secrets, links, jinja_env, fetch=True):
     upstreams = v.get("dns_filter_upstreams") or []
     ctx = {**v, "resolver_rndc_secret": secrets["resolver_rndc_secret"], "zones": filter_zones(v, links),
            "lists": views["lists"], "safe_zone": views["safe_zone"], "groups": views["groups"],
+           "client_tls": client_tls,
            "upstream_names": list(dict.fromkeys(u["name"] for u in upstreams)),
            "clients": list(dict.fromkeys([v["lan_cidr"], v["fabric_subnet"],
                                           *(security.get("firewall_allow") or [])]))}

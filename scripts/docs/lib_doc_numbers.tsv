@@ -95,6 +95,7 @@ file	fabriclib-common|src/fabriclib/common/copy_tree_with_perms.py	3
 file	fabriclib-common|src/fabriclib/common/dns_query.py	4	
 file	fabriclib-common|src/fabriclib/common/dns_wire.py	25	
 file	fabriclib-common|src/fabriclib/common/doh_query.py	26	
+file	fabriclib-common|src/fabriclib/common/dot_query.py	27	
 file	fabriclib-common|src/fabriclib/common/ensure_dir.py	5	
 file	fabriclib-common|src/fabriclib/common/jinja_env.py	6	
 file	fabriclib-common|src/fabriclib/common/keep_original.py	7	
@@ -252,6 +253,7 @@ file	fabriclib-dns_filter|src/fabriclib/dns_filter/refresh_lists.py	23
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/remove_filter_group.py	33	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/remove_filter_list.py	24	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/remove_filter_rule.py	25	
+file	fabriclib-dns_filter|src/fabriclib/dns_filter/resolver_tls_pending.py	37	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/resolver_views.py	34	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/run_dns_filter_command.py	10	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/set_filter_group.py	35	
@@ -975,6 +977,8 @@ function	fabriclib-common|src/fabriclib/common/dns_query.py|dns_query	1
 function	fabriclib-common|src/fabriclib/common/dns_wire.py|dns_wire_answers	2	
 function	fabriclib-common|src/fabriclib/common/dns_wire.py|dns_wire_query	1	
 function	fabriclib-common|src/fabriclib/common/doh_query.py|doh_query	1	
+function	fabriclib-common|src/fabriclib/common/dot_query.py|_read	1	
+function	fabriclib-common|src/fabriclib/common/dot_query.py|dot_query	2	
 function	fabriclib-common|src/fabriclib/common/ensure_dir.py|ensure_dir	1	
 function	fabriclib-common|src/fabriclib/common/jinja_env.py|_RelativeEnvironment.join_path	1	
 function	fabriclib-common|src/fabriclib/common/jinja_env.py|_bool	4	
@@ -1196,6 +1200,7 @@ function	fabriclib-dns_filter|src/fabriclib/dns_filter/refresh_lists.py|refresh_
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/remove_filter_group.py|remove_filter_group	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/remove_filter_list.py|remove_filter_list	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/remove_filter_rule.py|remove_filter_rule	1	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/resolver_tls_pending.py|resolver_tls_pending	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/resolver_views.py|_limit_mb	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/resolver_views.py|_matches	2	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/resolver_views.py|resolver_views	3	

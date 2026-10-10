@@ -112,7 +112,8 @@ http {
         location /dns-query {
             # BIND's DoH speaks HTTP/2 only: grpc_pass is nginx's cleartext HTTP/2 to an upstream (proxy_pass speaks
             # HTTP/1.1, and BIND's answer came back as an HTTP/0.9 blob; found by doctor's DoH check, 0.6.3)
-            set $bind9_doh_backend "grpc://bind9:{{ bind9_doh_port }}";
+            # the DNS filter answers DoH when it is on (filtered, internet names too: 1.12.2.16), else BIND
+            set $bind9_doh_backend "{{ 'grpc://resolver:8053' if install_resolver else 'grpc://bind9:' ~ bind9_doh_port }}";
             grpc_pass $bind9_doh_backend;
             grpc_set_header Host $host;
             grpc_set_header X-Real-IP $remote_addr;

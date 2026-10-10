@@ -5,6 +5,11 @@ controls { inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { "rndc-key"; }; };
 {% for name in upstream_names %}
 tls "upstream-{{ loop.index }}" { remote-hostname "{{ name }}"; ca-file "/etc/ssl/certs/ca-certificates.crt"; };
 {% endfor %}
+{% if client_tls %}
+// DNS-over-TLS and DNS-over-HTTPS for clients (manual 1.12.2.16): the DNS name's certificate
+tls "clients" { cert-file "/etc/bind-tls/fullchain.pem"; key-file "/etc/bind-tls/privkey.pem"; protocols { TLSv1.2; TLSv1.3; }; };
+http "doh" { endpoints { "/dns-query"; }; };
+{% endif %}
 // the networks that may use it: the LAN, fabric's own, and what the firewall lets in
 acl "clients" { {% for c in clients %}{{ c }}; {% endfor %}127.0.0.1; };
 
@@ -12,6 +17,11 @@ options {
     directory "/var/cache/bind";
     session-keyfile "/var/cache/bind/session.key";
     listen-on port 53 { any; };
+{% if client_tls %}
+    listen-on port 853 tls "clients" { any; };
+    // DoH: nginx terminates TLS and passes cleartext HTTP/2 here (fabric_net only, not published)
+    listen-on port 8053 tls none http "doh" { any; };
+{% endif %}
     listen-on-v6 { none; };
     recursion yes;
     allow-query { clients; };

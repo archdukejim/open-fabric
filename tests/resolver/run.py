@@ -10,6 +10,7 @@ import http.server
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import sys
 import threading
@@ -65,6 +66,8 @@ from fabriclib.dns_filter.common.resolver_rndc import resolver_rndc  # noqa: E40
 from fabriclib.dns_filter.convert_list import convert_list  # noqa: E402
 from fabriclib.dns_filter.deploy_resolver import deploy_resolver  # noqa: E402
 from fabriclib.dns_filter.show_filter_status import show_filter_status  # noqa: E402
+from fabriclib.dns_filter.resolver_tls_pending import resolver_tls_pending  # noqa: E402
+from fabriclib.common.dot_query import dot_query  # noqa: E402
 from fabriclib.dns_filter.update_lists import update_lists  # noqa: E402
 
 # ---- the converter (pure)
@@ -204,6 +207,12 @@ try:
     with open(os.path.join(LIST_DIR, "one.txt"), "w") as f:
         f.write(LIST1)
     srv = serve()
+    # the DNS name's certificate, as mint_service_certs leaves it (a throwaway self-signed one: its own CA)
+    os.makedirs(f"{W}/resolver/tls")
+    sh(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes", "-days", "2",
+        "-subj", "/CN=dns.lan.test", "-addext", "subjectAltName=DNS:dns.lan.test",
+        "-keyout", f"{W}/resolver/tls/privkey.pem", "-out", f"{W}/resolver/tls/fullchain.pem"])
+    sh(f"chown -R 913:913 {W}/resolver/tls; chmod 600 {W}/resolver/tls/privkey.pem")
     URL1 = f"http://127.0.0.1:{srv.server_port}/one.txt"
     URL404 = f"http://127.0.0.1:{srv.server_port}/missing.txt"
     V = {"deploy_base_dir": W, "service_users": USERS, "domain": "lan.test", "org_domain": "lan.test",
@@ -244,6 +253,9 @@ try:
           f'zone "lan.test" {{ type forward; forward only; forwarders {{ {BIND_IP} port 53; }}; }};' in conf
           and 'validate-except { "lan.test"; };' in conf
           and conf.index('zone "fabric.rpz";') < conf.index('zone "owner.rpz";') < conf.index(f'zone "{zone1}";'))
+    check("config: DoT (853) and DoH (8053, plain: nginx terminates TLS) for clients with the DNS name's certificate",
+          'listen-on port 853 tls "clients"' in conf and 'listen-on port 8053 tls none http "doh"' in conf
+          and 'cert-file "/etc/bind-tls/fullchain.pem"' in conf and not resolver_tls_pending(V), conf[:900])
     check("config: DoT to the upstreams with the certificate name verified (when set)",
           (not internet) or ('remote-hostname "cloudflare-dns.com"' in conf and "1.1.1.1 port 853 tls" in conf), conf)
     check("deploy again: nothing changes", not deploy_resolver(V, SECRETS, {"children": [], "upstream": None},
@@ -284,6 +296,23 @@ try:
     check("a listed name answers NXDOMAIN, and every name below it", status("ads.example") == "NXDOMAIN"
           and status("deep.sub.ads.example") == "NXDOMAIN")
     check("a hosts line blocks", status("hosts-blocked.example") == "NXDOMAIN")
+    CA = f"{W}/resolver/tls/fullchain.pem"
+    dot = sh(["dig", "+time=5", "+tries=1", "+tls", f"+tls-ca={CA}", "+tls-hostname=dns.lan.test", f"@{RES_IP}",
+              "ads.example"], ok=False).stdout
+    check("DoT (853) for clients: the certificate verified, and filtered like plain DNS",
+          "status: NXDOMAIN" in dot and "10.9.8.7" in sh(["dig", "+time=5", "+tries=1", "+tls", f"+tls-ca={CA}",
+                                                           "+tls-hostname=dns.lan.test", f"@{RES_IP}", "+short",
+                                                           "www.lan.test"], ok=False).stdout, dot)
+    doh = sh(["dig", "+time=5", "+tries=1", "+http-plain", "-p", "8053", f"@{RES_IP}", "ads.example"], ok=False).stdout
+    check("DoH (/dns-query on 8053, as nginx passes it) answers and filters", "status: NXDOMAIN" in doh, doh)
+    check("doctor's DoT client (common/dot_query): the answer, the certificate verified for the DNS name",
+          dot_query("www.lan.test", "dns.lan.test", RES_IP, CA) == ["10.9.8.7"])
+    try:
+        dot_query("www.lan.test", "other.lan.test", RES_IP, CA)
+        check("doctor's DoT client refuses a certificate for another name", False, "accepted")
+    except ssl.SSLError as e:
+        check("doctor's DoT client refuses a certificate for another name", "match" in str(e) or "mismatch" in str(e)
+              or "CERTIFICATE_VERIFY_FAILED" in str(e), e)
     check("the owner's block applies", status("owner-blocked.example") == "NXDOMAIN"
           and status("x.owner-blocked.example") == "NXDOMAIN")
     log = open(f"{W}/resolver/log/rpz.log").read()

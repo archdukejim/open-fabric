@@ -9,6 +9,7 @@ import subprocess
 from fabriclib.common.console import err, ok, warn
 from fabriclib.common.dns_query import dns_query
 from fabriclib.common.doh_query import doh_query
+from fabriclib.common.dot_query import dot_query
 from fabriclib.common.paths import CERT_RENEWAL_FILE, DB_ROTATION_FILE, ISSUED_CERTS_FILE
 from fabriclib.common.sudo_owner import sudo_owner
 from fabriclib.consent.allowed_to_change import allowed_to_change
@@ -115,6 +116,12 @@ def checks(ctx):
                 ", ".join(got) or "no answer")
         except OSError as e:
             add(f"DNS filter (BIND resolver, port 53) resolves {v['hostname_landing']}", False, str(e))
+        what = f"DNS-over-TLS {v['host_ip']}:853 ({v['hostname_bind9']}) answers"      # 1.12.2.16
+        try:
+            got = dot_query(f"ns.{v['domain']}", v["hostname_bind9"], v["host_ip"], root_ca)
+            add(what, v["host_ip"] in got, ", ".join(got) or "no answer")
+        except (OSError, struct.error, IndexError) as e:
+            add(what, False, str(e)[-200:])
 
     if shutil.which("chronyc"):             # time (manual 1.13.1): certificates, TOTP and TSIG depend on it
         t = time_status()

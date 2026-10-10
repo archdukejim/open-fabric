@@ -23,9 +23,13 @@ services:
     ports:
       - "{{ host_ip }}:53:53/tcp"
       - "{{ host_ip }}:53:53/udp"
+      # DNS-over-TLS for clients (1.12.2.16); DoH comes through nginx to 8053 on fabric_net, never published
+      - "{{ host_ip }}:853:853/tcp"
     volumes:
       - {{ deploy_base_dir }}/resolver/config:/etc/bind:ro
       - {{ deploy_base_dir }}/resolver/lists:/etc/bind-lists:ro
+      # the DNS name's certificate (mint_service_certs), for DoT and DoH
+      - {{ deploy_base_dir }}/resolver/tls:/etc/bind-tls:ro
       - {{ deploy_base_dir }}/resolver/log:/var/log/named
       - {{ deploy_base_dir }}/resolver/cache:/var/cache/bind
       # the upstream's DoT certificate is checked against the host's CA bundle, kept current by its updates

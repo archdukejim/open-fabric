@@ -31,4 +31,5 @@ Home in 0.7, decision 2.1.12.3).
 | `start_list_fetch.py` | Start the lists job now (fabric-agent has no internet) |
 | `show_filter_status.py` | Each list's state and the resolver's, for `fabricctl dns-filter status` |
 | `run_dns_filter_command.py` | `fabricctl dns-filter lists \| status \| log \| stats \| ingest` |
+| `resolver_tls_pending.py` | Whether the DNS name's certificate arrived after the resolver was rendered (setup renders once more) |
 | `common/` | Helpers shared by these files |

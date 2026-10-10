@@ -4,7 +4,9 @@ import time
 
 from fabriclib.common.console import info, ok
 from fabriclib.common.errors import ValidationError
+from fabriclib.deploy.apply_deployment import apply_deployment
 from fabriclib.directory.ensure_default_device_roles import ensure_default_device_roles
+from fabriclib.dns_filter.resolver_tls_pending import resolver_tls_pending
 from fabriclib.federation.common.is_root_site import is_root_site
 from fabriclib.keycloak.install_sso_keytab import install_sso_keytab
 from fabriclib.samba.converge_domain import converge_domain
@@ -31,7 +33,8 @@ def run(ctx):
     Inputs:  ctx — SetupContext: vars install_keycloak, install_webui, install_fluentbit, install_kea,
              install_freeradius, install_resolver, federation_endpoint; restart_services (units to
              restart); target_dir (lib/keycloak_bootstrap.py), vars_file, secrets_file, config_dir.
-    Returns: None. fabric.target enabled and started; renamed units retired; every enabled unit running and its
+    Returns: None. fabric.target enabled and started; renamed units retired; the deploy rendered again when the DNS
+             filter's certificate arrived after it (DoT and DoH, 1.12.2.16); every enabled unit running and its
              container healthy; the domain converged; Keycloak given the DC's Kerberos keytab; Keycloak configured (up
              to 6 tries, 15 s apart); fabric-agent and fabric-web running when the web UI is on; fabric-federation
              running when federation_endpoint is on. Once Keycloak's password is OpenBao's, Postgres's roles are
@@ -47,6 +50,9 @@ def run(ctx):
         ok(f"{unit}: retired (renamed)")
     for item in retire_adguard(v, ctx.secrets, ctx.secrets_file, ctx.config_dir):   # 0.7: the resolver takes 53
         ok(f"AdGuard Home retired: {item}")
+    if resolver_tls_pending(v):          # the certificates step ran after the deploy: render again (1.12.2.16)
+        ctx.restart_services.update(apply_deployment(start_services=False) or ())
+        ok("DNS filter: DNS-over-TLS and DNS-over-HTTPS for clients, with the DNS name's certificate")
     for unit, container, flag in ORDER:
         if flag and not v.get(flag):
             continue

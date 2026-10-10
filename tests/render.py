@@ -101,7 +101,9 @@ for tpl in sorted(env.list_templates()):
         extra = dict(item={'service': 'samba', 'compose': 'samba', 'folder': 'samba', 'requires': []})
     if tpl.startswith('resolver/config/'):     # what dns_filter/deploy_resolver passes beside the vars
         extra = dict(zones=['lan.j-j.family', '7.168.192.in-addr.arpa'], lists=[{'zone': 'abc.list.rpz', 'name': 'L'}],
-                     upstream_names=['cloudflare-dns.com'], clients=['192.168.7.0/24'], resolver_rndc_secret='c2VjcmV0')
+                     upstream_names=['cloudflare-dns.com'], clients=['192.168.7.0/24'], resolver_rndc_secret='c2VjcmV0',
+                     groups=[], safe_zone=None, client_tls=False, zone='group-x.rpz', what='group x', allow=[],
+                     block=[], level='strict', records=[])
     if tpl.endswith('.json.j2'):
         json.loads(env.get_template(tpl).render(**full))
     text = env.get_template(tpl).render(**full, **extra)
@@ -140,8 +142,25 @@ assert 'fabric' not in [r['name'] for r in same['dns']['dynamic_zone_var']['CNAM
 print('web UI host name (default, custom, same as host) and certs host rendered')
 doh = ngx[ngx.index('location /dns-query'):]
 doh = doh[:doh.index('\n        }')]          # the location block only
-assert 'grpc_pass $bind9_doh_backend;' in doh and '"grpc://bind9:' in doh and 'proxy_pass $' not in doh,     "DoH goes to BIND over HTTP/2 (grpc_pass): BIND's DoH speaks HTTP/2 only"
-print('DoH: nginx speaks HTTP/2 to BIND (grpc_pass)')
+assert 'grpc_pass $bind9_doh_backend;' in doh and '"grpc://resolver:8053"' in doh and 'proxy_pass $' not in doh, \
+    "DoH goes to the DNS filter over HTTP/2 (grpc_pass) while it is on (1.12.2.16): BIND's DoH speaks HTTP/2 only"
+off = yaml.safe_load(env.get_template('vars.yaml.j2').render(**{**copy.deepcopy(PRISTINE), 'dns_filter': 'none'}))
+ngx_off = env.get_template('nginx/nginx.conf.j2').render(**{**secrets, **off})
+assert '"grpc://bind9:' in ngx_off[ngx_off.index('location /dns-query'):], 'DoH goes to BIND with the DNS filter off'
+print('DoH: nginx speaks HTTP/2 to the DNS filter (or BIND with it off) (grpc_pass)')
+res_ctx = dict(zones=['lan.j-j.family'], lists=[], upstream_names=['cloudflare-dns.com'], clients=['192.168.7.0/24'],
+               resolver_rndc_secret='c2VjcmV0', client_tls=True, safe_zone='safesearch-strict.rpz',
+               groups=[{'name': 'kids', 'match': ['!192.168.7.70', '192.168.7.64/27'], 'rules_zone': 'group-kids.rpz',
+                        'safe_zone': 'safesearch-ytmoderate.rpz', 'lists': [], 'allow': ['ok.example']}])
+res_conf = env.get_template('resolver/config/named.conf.j2').render(**{**v2, **res_ctx})
+assert 'listen-on port 853 tls "clients"' in res_conf and 'listen-on port 8053 tls none http "doh"' in res_conf \
+    and 'match-clients { !192.168.7.70; 192.168.7.64/27; };' in res_conf \
+    and res_conf.index('view "kids"') < res_conf.index('view "everyone"') \
+    and 'zone "ok.example" { type forward; forward only; forwarders { 1.1.1.1 port 853 tls "upstream-1"; ' in res_conf, \
+    res_conf
+assert 'tls "clients"' not in env.get_template('resolver/config/named.conf.j2').render(
+    **{**v2, **res_ctx, 'client_tls': False}), 'no DoT/DoH listeners before the certificate exists'
+print("DNS filter: a group's chained view, safe search, DoT and DoH listeners rendered (1.12.2.15, 1.12.2.16)")
 
 # Federation (manual 1.9): the endpoint's vhost, socket mount, CNAME and unit only when it is
 # on; a site's organisation suffix comes from org_domain, its local suffix and names from its own.
@@ -209,7 +228,8 @@ assert [f['name'] for f in res['dns_filter_lists']] == ['AdGuard DNS filter'] an
 assert 'adguard' not in env.get_template('nginx/nginx.conf.j2').render(**full), 'no AdGuard vhost'
 rc = yaml.safe_load(env.get_template('resolver/docker-compose.yml.j2').render(**{**secrets, **res}))['services']
 assert list(rc) == ['bind9-resolver'] and rc['bind9-resolver']['cap_drop'] == ['ALL'] and 'cap_add' not in rc['bind9-resolver']
-assert rc['bind9-resolver']['ports'] == [f"{res['host_ip']}:53:53/tcp", f"{res['host_ip']}:53:53/udp"], rc['bind9-resolver']['ports']
+assert rc['bind9-resolver']['ports'] == [f"{res['host_ip']}:53:53/tcp", f"{res['host_ip']}:53:53/udp",
+                                         f"{res['host_ip']}:853:853/tcp"], rc['bind9-resolver']['ports']   # DoT, 1.12.2.16
 units_res = {u['service']: u for u in service_units('/opt', res)}
 assert units_res['bind9-resolver']['enabled'] and units_res['bind9-resolver']['requires'] == [] and 'adguard' not in units_res
 print('DNS filter: the BIND resolver on by default, on 53, BIND on 5053, its own account, no capabilities, no AdGuard')
