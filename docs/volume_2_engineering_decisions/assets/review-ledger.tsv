@@ -28,10 +28,10 @@ docs/volume_1_description_and_architecture/1.1.8-about-settings.md	8022994724f5b
 docs/volume_1_description_and_architecture/1.1.9-optional-parts.md	b06f20c92138f3dc7278f3dfc6d8696d14663c37	2026-10-10	
 docs/volume_1_description_and_architecture/1.10.1-kea-design.md	0e8b6720aa82c79132444cd5a6e1a3893173246b	2026-10-10	
 docs/volume_1_description_and_architecture/1.10.2-dhcp-management.md	3d818cf18c62108409294438880e1f12692af38d	2026-10-08	
-docs/volume_1_description_and_architecture/1.10.3-serving-networks.md	0b0bc4f48a544780fafa667ecd520e61d5843c3e	2026-10-10	
+docs/volume_1_description_and_architecture/1.10.3-serving-networks.md	ea59dd2f790f1f33c863a2d66243c7c184b93de2	2026-10-10	
 docs/volume_1_description_and_architecture/1.11.1-freeradius-design.md	53be8bfe3baba02927c9b7b66dd4d02282115356	2026-10-09	
 docs/volume_1_description_and_architecture/1.12.1-adguard.md	b2280752ee06e87cb6e1497fdb91651e589b6a4d	2026-10-09	
-docs/volume_1_description_and_architecture/1.12.2-bind-resolver.md	e0e78dab7a8fb9c0c2b1dd2c18922391e98145d7	2026-10-10	
+docs/volume_1_description_and_architecture/1.12.2-bind-resolver.md	334d2d332f05fe9a0626647c351a74c5998e03b2	2026-10-10	
 docs/volume_1_description_and_architecture/1.13.1-chrony.md	ad072bf9a0b0d7d74c145a8df36599bb4f1aca6e	2026-10-08	
 docs/volume_1_description_and_architecture/1.14.1-image-channels.md	94a12a60defe93ae9bc13a991ae57f8961edd5ca	2026-10-08	
 docs/volume_1_description_and_architecture/1.14.2-image-updates.md	b7f95a062ae13998b7477152b86eb736930996d0	2026-10-09	
@@ -40,7 +40,7 @@ docs/volume_1_description_and_architecture/1.15.1-fluent-bit.md	f808ad89a79c1026
 docs/volume_1_description_and_architecture/1.16.1-luks.md	f4b4c1a4dd1ecd389fd2fde6ec3bc00e7f92a738	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.1-about-the-reference.md	4a2b06beefecb2046109e7be6217d3443827239a	2026-10-08	
 docs/volume_1_description_and_architecture/1.17.10-fabriclib-dns.md	7c6a265b4d1b7160feb807049931e6a934cfa592	2026-10-10	
-docs/volume_1_description_and_architecture/1.17.11-fabriclib-dns_filter.md	5c5026463c5fc45783713b272a635ea37c038f24	2026-10-10	
+docs/volume_1_description_and_architecture/1.17.11-fabriclib-dns_filter.md	d16cc57ee4c45d0d58d0c664c2345ea9ccf71939	2026-10-10	
 docs/volume_1_description_and_architecture/1.17.12-fabriclib-federation.md	a1d592e25dbc5675a278b5e73c59a2c925b0b57c	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.13-fabriclib-images.md	84cc17d7cdef06ea109040d5de56d68898b6465f	2026-10-09	
 docs/volume_1_description_and_architecture/1.17.14-fabriclib-keycloak.md	79772d31d87cdf4e234f66e22fd79d9b8ba3e8ed	2026-10-10	
@@ -234,7 +234,7 @@ scripts/README.md	dd36e9248260e4f936662417c4d10511c3cdb00a	2026-10-08
 scripts/docs/README.md	af834e1650d5a42ed93702d10180e09780634830	2026-10-08	
 scripts/docs/call_graph.py	bc2918c0b3b2f7f2091f5e229fb18df85dc956bd	2026-10-03	
 scripts/docs/gen_lib_doc.py	7ff94cd622677c2a6040c2c75374a04e50cc48c4	2026-10-08	
-scripts/docs/lib_doc_numbers.tsv	438651448e2ed0c8b4f088edd9d66ac5ca06eae9	2026-10-10	
+scripts/docs/lib_doc_numbers.tsv	3ab153a0d6db9d86fe5d4858348a1e350833a348	2026-10-10	
 scripts/docs/lib_doc_registry.py	a65ab5459802daaca963fac77a8b708397d42d89	2026-10-08	
 scripts/docs/product_code.py	645a3bb130463028b90de64798c81694e5293131	2026-10-03	
 scripts/docs/review_ledger.py	b3f307b4dbaba54a69cc93c993287d43c747ba8f	2026-10-08	
@@ -577,11 +577,11 @@ src/fabriclib/dns/validate_record.py	349e3665a7cb8a35f5284e901680eb3cb25cda21	20
 src/fabriclib/dns/zone_content_changed.py	69416e548344a0253bcc73c73d0e6b3ebf770868	2026-10-02	
 src/fabriclib/dns/zone_detail.py	6756697688d887379f9262e8b80560acfee74848	2026-10-03	
 src/fabriclib/dns/zone_name.py	b09815fd4726920e0bd9aeaebf9a23f0ad4fd0c3	2026-09-30	
-src/fabriclib/dns_filter/README.md	1e0070a6d615525cbf625e9941c78311137aa786	2026-10-10	
+src/fabriclib/dns_filter/README.md	f3d2d1101066e2624023c5d532db5a71a468ff0e	2026-10-10	
 src/fabriclib/dns_filter/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-02	
 src/fabriclib/dns_filter/add_filter_list.py	f2e80f183aa10326c28e76112a7d3d500cce49f0	2026-10-10	
 src/fabriclib/dns_filter/add_filter_rule.py	a744d161a95e10f3ed82e91ddf81915f55708e0d	2026-10-10	
-src/fabriclib/dns_filter/check_filter_groups.py	07b9c83c108fd40e3b89ada4066005049f3b8688	2026-10-10	
+src/fabriclib/dns_filter/check_filter_groups.py	a86c9288ede04baf16cbc41fc29b3179a81f9fec	2026-10-10	
 src/fabriclib/dns_filter/check_filter_settings.py	8a78be016ef85e848fa00df4ff34ca664c69edd8	2026-10-10	
 src/fabriclib/dns_filter/common/README.md	d9f033303fa9aa815554cf4ba4c01ee0d51c1ace	2026-10-10	
 src/fabriclib/dns_filter/common/__init__.py	e69de29bb2d1d6434b8b29ae775ad8c2e48c5391	2026-10-09	
@@ -598,6 +598,7 @@ src/fabriclib/dns_filter/convert_list.py	3b823be31c213d08821314959971174332e25da
 src/fabriclib/dns_filter/deploy_resolver.py	f28613898faf9db6a6d589b7e668629154dd01da	2026-10-10	
 src/fabriclib/dns_filter/dns_filter_stats.py	fd69a7b0130150bc935283deafdaaba62f8642e9	2026-10-09	
 src/fabriclib/dns_filter/ensure_dnslog_db.py	57ef08c266d69bddb3ec18438a502edcb52aeb7e	2026-10-09	
+src/fabriclib/dns_filter/expand_group_clients.py	0c7401fe3cdf33518d02db0361bfba9e53f76f3d	2026-10-10	
 src/fabriclib/dns_filter/fetch_catalogue.py	c15a84fdc76484eabc39ba911554c2e073079ae6	2026-10-09	
 src/fabriclib/dns_filter/filter_overview.py	282d374ab59d0abf08e620d60c424be64098f8cb	2026-10-10	
 src/fabriclib/dns_filter/import_adguard_settings.py	d6725e6b62268334cbaecd5817a6f72bd7aeece6	2026-10-10	
@@ -1290,7 +1291,7 @@ templates/webui-app/tsig_result.html	5f07121950d439c355fe9d3f2cbff9b30f2ab866	20
 templates/webui/README.md	18afb94efe023f28a4367b553e784c19970a9355	2026-10-03	
 templates/webui/docker-compose.yml.j2	8a2208e4a8bc715fce43eaf6f59a0e7949706177	2026-10-08	
 templates/webui/webui.json.j2	1161c507f612f4f256b7208bf12db143692a175d	2026-10-07	
-tests/README.md	bd5a7f61630be311e36196a9a3345689d97944e0	2026-10-09	
+tests/README.md	9d0b49e969da32cdcd8f113e522e8d6d768dbf5d	2026-10-10	
 tests/consent/README.md	e145a0d2d43d16682fc9dda3e46179d6530c5a03	2026-10-08	
 tests/consent/run.py	eaecbd26d8b849f2b92b583fe117bc3080b025bb	2026-10-08	
 tests/docs/README.md	f75d52925a7afe800bee5b2989addb136e813402	2026-10-03	
@@ -1329,6 +1330,8 @@ tests/kea/run.py	bf221d2e9a68ca6a6dc17fb155ac95aa6ba5a47c	2026-10-10
 tests/keycloak/README.md	55bf0779666050bc9febb2d9c86957665c1d3d0d	2026-10-08	
 tests/keycloak/run.py	149da9c370ebd0fca2780534972ae10cbc11efd1	2026-10-09	
 tests/keycloak/soft_passkey.py	51ec49de47ee87f347e246b14acf0eb5f20cb512	2026-10-08	
+tests/lab/README.md	b7cde2a34af23759773558044499b5e990f148ac	2026-10-10	
+tests/lab/dhcp.sh	5741cf5006d13ae54442d213ff4a3bdc9c054ed1	2026-10-10	
 tests/lint/README.md	47efffa0aea5c6119f04a26d19fd906fb9bd74d0	2026-10-08	
 tests/lint/run.sh	9a1222b4062342ff88ac5d7ad5fea4c1dca1a761	2026-10-08	
 tests/nginx_check.sh	d41ad12b92c4ae5b509cc048987b12484f17d618	2026-10-09	
@@ -1343,7 +1346,7 @@ tests/pki/renewal.py	30889317dd2709f3de4aae6a0e1a2c2b2547d03e	2026-10-09
 tests/pki/revocation.py	f36e8ad4b2ca0683d820802ee8a6b9fb7f97dc97	2026-10-08	
 tests/pki/run.py	8a8b78b3bcc320c5019eb4929129ae5d2b711a7c	2026-10-08	
 tests/pki/site_ca.py	6e71ca7798e1aa94ce0f43160716ac57302bec65	2026-10-08	
-tests/render.py	0731400e9a0c805fdc5c0291a45de2136fe1281b	2026-10-10	
+tests/render.py	15d374c2a65dc3759f94e6ce381cf7257cc47556	2026-10-10	
 tests/resolver/README.md	e056b218eb8798e3eb120f5f4a07e34e4c40becd	2026-10-10	
 tests/resolver/console.py	0a3ff09bfbae63d42eca27a556cb69d7553fe2d5	2026-10-10	
 tests/resolver/groups.py	6d5c3280f7867e74fe946f3f87ccf2a1559a07d2	2026-10-10	

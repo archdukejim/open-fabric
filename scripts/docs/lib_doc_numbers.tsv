@@ -248,6 +248,7 @@ file	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_adguard.py	2	0.6.3 / 2
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_resolver.py	9	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/dns_filter_stats.py	15	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/ensure_dnslog_db.py	16	
+file	fabriclib-dns_filter|src/fabriclib/dns_filter/expand_group_clients.py	38	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/fetch_catalogue.py	22	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/filter_overview.py	17	
 file	fabriclib-dns_filter|src/fabriclib/dns_filter/import_adguard_settings.py	13	
@@ -1199,6 +1200,7 @@ function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_resolver.py|_state
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/deploy_resolver.py|deploy_resolver	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/dns_filter_stats.py|dns_filter_stats	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/ensure_dnslog_db.py|ensure_dnslog_db	1	
+function	fabriclib-dns_filter|src/fabriclib/dns_filter/expand_group_clients.py|expand_group_clients	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/fetch_catalogue.py|fetch_catalogue	1	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/filter_overview.py|_lists	3	
 function	fabriclib-dns_filter|src/fabriclib/dns_filter/filter_overview.py|_read	2	

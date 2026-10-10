@@ -450,6 +450,26 @@ assert json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2
 assert json.loads("\n".join(ln for ln in env.get_template("kea/kea-dhcp4.conf.j2").render(**lab).splitlines()
                             if not ln.strip().startswith("//")))["Dhcp4"]["cache-threshold"] == 0.0, \
     "no lease caching: a reused lease would skip the update"
+# the DNS filter's groups from DHCP (manual 1.10.3.7): references turned into addresses
+from fabriclib.dns_filter.expand_group_clients import expand_group_clients  # noqa: E402
+gl = {**lab, "dhcp": {**lab["dhcp"], "subnets": [dict(s) for s in lab["dhcp"]["subnets"]]}}
+gl["dhcp"]["subnets"][1].update(name="lab", vlan=20)
+assert expand_group_clients(["dhcp:lab", "dhcp:10.30.0.0/24", "device:printer", "device:AA:BB:CC:00:11:22",
+                             "vlan:20", "192.168.7.77"], "kids", gl) == \
+    ["10.20.0.0/24", "10.30.0.0/24", "192.168.7.20", "192.168.7.20", "10.20.0.0/24", "192.168.7.77"]
+for raw, msg in ((["dhcp:nope"], "no DHCP subnet 'nope'"), (["device:ghost"], "no DHCP reservation 'ghost'"),
+                 (["vlan:99"], "no DHCP subnet with VLAN '99'")):
+    try:
+        expand_group_clients(raw, "kids", gl)
+        raise AssertionError(f"not refused: {raw}")
+    except ValidationError as e:
+        assert msg in str(e), (msg, str(e))
+try:
+    expand_group_clients(["dhcp:lab"], "kids", {**gl, "install_kea": False})
+    raise AssertionError("a reference with DHCP off not refused")
+except ValidationError as e:
+    assert "DHCP is off" in str(e), str(e)
+print("the DNS filter's groups from DHCP: dhcp:, device: and vlan: turned into addresses, unknown ones refused")
 print("DHCP's reverse DNS: the pools' zones generated even empty, Kea's key granted PTR and DHCID there only, Kea's "
       "reverse domains, registration again on renewal")
 kc = yaml.safe_load(env.get_template('kea/docker-compose.yml.j2').render(**kv))["services"]

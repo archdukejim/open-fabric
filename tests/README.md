@@ -28,7 +28,7 @@ suite needs no Docker or root and also runs alone: `python3 tests/docs/run.py`.
 | `images` | [images/](images/) | fabric's own images build from `packaging/docker-bake.hcl` with a default host's build inputs and pass the smoke test CI runs before publishing (decision 2.1.1.21) |
 | `sandbox` | [sandbox/](sandbox/) | A full install from the .deb in a disposable systemd + Docker container (about 30 min; not in the default list) |
 
-Not in `run-all.sh`: [host/](host/) (a subset of the sandbox checks on a real machine over SSH).
+Not in `run-all.sh`: [host/](host/) (a subset of the sandbox checks on a real machine over SSH) and [lab/](lab/) (DHCP on the Hyper-V lab's isolated network, manual 1.10.3.8).
 
 | File | What |
 |---|---|
