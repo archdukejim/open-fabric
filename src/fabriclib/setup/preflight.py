@@ -7,7 +7,7 @@ from fabriclib.common.console import ok, warn
 from fabriclib.setup.errors import SetupError
 
 SUPPORTED_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}
-SUPPORTED_UBUNTU = ("24.04", "26.04")  # host targets (2.1.1.1, 2.1.1.10)
+SUPPORTED_UBUNTU = ("22.04", "24.04", "26.04")  # host targets (2.1.1.1, 2.1.1.10; 22.04: 2.1.1.43)
 PUBLISHED_PORTS = (53, 80, 443, 389, 636, 853)
 MIN_RAM_GB_WITH_KEYCLOAK = 3
 
